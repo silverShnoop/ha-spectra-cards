@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -866,6 +866,81 @@ const BODIES = {
     return out;
   },
 
+  /* Where are we in a *day*? The same schedule the strip flattens, bent
+     into a semicircle: midnight left, noon at the top, midnight right.
+     Geometry is the Reference view's, not reinvented — viewBox 340x168,
+     centre (170,140), r 130, stroke 15, butt caps. Round caps make the
+     segment joins overlap. */
+  arc(b) {
+    const segments = Array.isArray(b.segments) && b.segments.length
+      ? b.segments
+      : segmentsFromTimeslots(b.timeslots, b.sun);
+    if (!segments.length) return "";
+
+    const CX = 170, CY = 140, R = 130;
+    const point = (minutes) => {
+      const angle = (180 - (minutes / DAY_MINUTES) * 180) * Math.PI / 180;
+      return [CX + R * Math.cos(angle), CY - R * Math.sin(angle)];
+    };
+    const fixed = (pair) => `${pair[0].toFixed(2)} ${pair[1].toFixed(2)}`;
+
+    const activeIndex = b.active_index === undefined ? b.activeIndex : b.active_index;
+    const active = segments.find((seg) => seg.index === activeIndex) || segments[0];
+    const manual = Boolean(b.manual);
+
+    const now = new Date();
+    const elapsed = now.getHours() * 60 + now.getMinutes();
+
+    let out = `<svg viewBox="0 0 340 168" role="img" aria-label="Today's light">`;
+    // The day's floor, so the ends read as midnight rather than trailing off.
+    out += `<line x1="${CX - R}" y1="${CY}" x2="${CX + R}" y2="${CY}"`
+      + ` stroke="var(--sp-edge)" stroke-width="2"/>`;
+
+    out += segments.map((seg) => {
+      const from = point(seg.start);
+      const to = point(Math.min(DAY_MINUTES, seg.start + seg.minutes));
+      /* sweep-flag 1 is what makes it travel over the top rather than under. */
+      return `<path d="M ${fixed(from)} A ${R} ${R} 0 0 1 ${fixed(to)}"`
+        + ` fill="none" stroke="${seg.color}" stroke-width="15"`
+        + ` stroke-linecap="butt"${manual ? ' opacity="0.28"' : ""}/>`;
+    }).join("");
+
+    // Sunrise and sunset as hollow rings — events on the day, not of it.
+    for (const marker of [["rise", b.sun && b.sun.rise], ["set", b.sun && b.sun.set]]) {
+      const at = minutesOfDay(marker[1]);
+      if (at === null) continue;
+      const spot = point(at);
+      out += `<circle cx="${spot[0].toFixed(2)}" cy="${spot[1].toFixed(2)}" r="4"`
+        + ` fill="var(--sp-surface)" stroke="var(--sp-ink-3)" stroke-width="3"/>`;
+    }
+
+    // Now: filled, in the live colour, ringed so it reads against pale segments.
+    const here = point(elapsed);
+    out += `<circle cx="${here[0].toFixed(2)}" cy="${here[1].toFixed(2)}" r="10"`
+      + ` fill="${active.color}" stroke="var(--sp-ink)" stroke-width="3"/>`;
+
+    for (const hour of [[0, "00"], [12, "12"], [24, "24"]]) {
+      const spot = point(hour[0] * 60);
+      out += `<text x="${spot[0].toFixed(2)}" y="158" font-size="10"`
+        + ` text-anchor="middle" fill="var(--sp-ink-3)">${hour[1]}</text>`;
+    }
+    out += `</svg>`;
+
+    /* The hero is a scene name and never a percentage — the house is
+       controlled by scenes. Beneath it, where the day goes next. */
+    const position = segments.indexOf(active);
+    const upcoming = [1, 2]
+      .map((step) => segments[(position + step) % segments.length])
+      .filter((seg) => seg && seg.start !== null)
+      .map((seg) => `${seg.label} ${clockLabel(seg.start)}`);
+
+    return out
+      + `<p class="hero" style="font-size:22px">${esc(active.label)}</p>`
+      + (manual
+        ? `<p class="sub"><span class="pill" style="${accentStyle(1)}">Manual</span></p>`
+        : (upcoming.length ? `<p class="sub">→ ${esc(upcoming.join("  ·  "))}</p>` : ""));
+  },
+
   /* What will it be like later? A chart answers what shape something is
      over time; this answers what the value will be at a given hour, which
      is the question actually asked of a weather panel. */
@@ -1268,6 +1343,7 @@ function bodyIsEmpty(type, b) {
         && !(Array.isArray(b.bars) && b.bars.length)
         && !(Array.isArray(b.icons) && b.icons.length);
     case "strip":
+    case "arc":
       return !(Array.isArray(b.segments) && b.segments.length)
         && !(Array.isArray(b.timeslots) && b.timeslots.length);
     default:
