@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.13.0";
+const VERSION = "0.14.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -436,19 +436,12 @@ img.avatar { object-fit:cover; display:block; }
 .toggle > span + span { border-left:2px solid var(--sp-sink); }
 .toggle > span.on { background:var(--accent); color:var(--sp-surface); }
 
-/* Two questions, two levels, one control. The frame answers "is this room
-   on" — teal, role 4, live and active now — and the filled position answers
-   "doing what". They are different accents at once, which the language
-   normally warns against, but they are not competing for the same question:
-   one is the container and one is the contents. From across a room you read
-   the frame first and the position second, which is the order you want them.
-
-   It also means the two on positions are grouped without drawing anything
-   extra to group them. */
-.toggle.lit { border-color:var(--sp-a4); background:var(--sp-a4-soft); }
-.toggle.lit > span { color:var(--sp-a4-on); }
-.toggle.lit > span + span { border-left-color:var(--sp-a4); }
-.toggle.lit > span.on { color:var(--sp-surface); }
+/* A toggle whose question does not apply yet. Greyed and genuinely inert,
+   not merely faint: a control that looks unavailable and still responds is
+   worse than either. A dark room's mode is not a question with an answer,
+   so it is not offered until there is a lit room to ask it about. */
+.toggle.inert { opacity:.38; pointer-events:none; }
+.pickend { flex-wrap:wrap; justify-content:flex-end; }
 .toggle > span::after {
   content:""; position:absolute; left:50%; top:50%;
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
@@ -1734,27 +1727,38 @@ const BODIES = {
        it, and this panel is read at arm's length while carrying something. */
     out += `<span class="pickend">`;
 
-    /* Three positions, because the room is in exactly one of three states.
-       Manual is pressable, not just a place you land: it pins whatever is
-       showing, which is how you say "keep this, stop following the clock".
-       Ochre for it by role — the language already defines ochre as needs
-       attention, or is overridden. */
-    out += `<span class="toggle${lit ? " lit" : ""}" role="group" aria-label="Mode">`;
-    if (smart && smart.entity) {
-      out += `<span class="${lit && !manual ? "on" : ""}" role="button" tabindex="0"`
-        + ` data-pickmode="auto" style="${accentStyle(3)}">Auto</span>`;
-    }
-    out += `<span class="${lit && manual ? "on" : ""}" role="button" tabindex="0"`
-      + ` data-pickmode="manual"`
-      + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}"`
-      + ` style="${accentStyle(2)}">Manual</span>`;
+    /* Power first, then mode. Two questions, not three peer states — and the
+       second only has an answer once the first is yes. Keeping them apart
+       means neither has to encode the other, which is what made a single
+       three-way track hard to read. */
     if (!isBlank(b.light)) {
-      out += `<span class="${lit ? "" : "on"}" role="button" tabindex="0"`
-        + ` data-pickmode="off" style="${accentStyle(5)}">Off</span>`;
+      out += `<span class="toggle" role="group" aria-label="Power">`
+        + `<span class="${lit ? "on" : ""}" role="button" tabindex="0"`
+        + ` data-pickmode="on" style="${accentStyle(4)}">On</span>`
+        + `<span class="${lit ? "" : "on"}" role="button" tabindex="0"`
+        + ` data-pickmode="off" style="${accentStyle(5)}">Off</span></span>`;
     }
-    /* Closes the toggle, the right-hand group, and the row itself: the next
-       line is a block of its own, not a flex child that happens to wrap. */
-    out += `</span></span></div>`;
+
+    /* Manual is pressable, not just a place you land: it pins whatever is
+       showing, which is how you say "keep this, stop following the clock".
+       Ochre by role — the language already defines ochre as needs attention,
+       or is overridden. */
+    if (smart && smart.entity) {
+      out += `<span class="toggle${lit ? "" : " inert"}" role="group"`
+        + ` aria-label="Mode"${lit ? "" : ` aria-disabled="true"`}>`
+        + `<span class="${lit && !manual ? "on" : ""}" role="button"`
+        + ` tabindex="${lit ? "0" : "-1"}"`
+        + ` data-pickmode="auto" style="${accentStyle(3)}">Auto</span>`
+        + `<span class="${lit && manual ? "on" : ""}" role="button"`
+        + ` tabindex="${lit ? "0" : "-1"}"`
+        + ` data-pickmode="manual"`
+        + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}"`
+        + ` style="${accentStyle(2)}">Manual</span></span>`;
+    }
+
+    /* Closes the right-hand group and the row itself: the next line is a
+       block of its own, not a flex child that happens to wrap. */
+    out += `</span></div>`;
 
     /* Always drawn even when empty. The next change is only true while the
        schedule is driving — once overridden, Hue holds the scene rather than
@@ -2587,7 +2591,11 @@ class SpectraCard extends HTMLElement {
         let action = null;
         if (mode === "off" && !isBlank(body.light)) {
           action = { service: "light.turn_off", target: { entity_id: body.light } };
-        } else if (mode === "auto") {
+        } else if (mode === "auto" || mode === "on") {
+          /* On lights the room the way the schedule would have it. There is
+             no other honest answer to "on" without also choosing a mode, and
+             choosing manual on someone's behalf invents an override they did
+             not ask for. */
           const smart = (body.scenes || []).find((sc) => sc && sc.smart);
           if (smart && smart.entity) {
             action = { service: "scene.turn_on", target: { entity_id: smart.entity } };
