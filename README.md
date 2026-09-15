@@ -91,9 +91,12 @@ Parts that read as nothing are dropped rather than leaving a stray separator
 behind, and a `join` where everything is missing is itself nothing — so the
 cell can disappear rather than render punctuation.
 
-Action configs (`action`, `tap_action`, `hold_action`, `double_tap_action`)
-are passed through untouched, because their `entity` key means the target, not
-a source.
+Some keys hold an **address rather than a source**, and pass through
+untouched: `action`, `tap_action`, `hold_action`, `double_tap_action`,
+`adjust` and `scenes`. Their `entity` means *act on this*, not *read this* —
+a scene resolved as a source collapses to the timestamp it was last
+activated, taking its name and icon with it, and one never activated resolves
+to nothing and disappears entirely.
 
 Only the entities a card actually reads are watched, and the card re-renders
 only when its marshalled data changes — a wall panel sees a great deal of

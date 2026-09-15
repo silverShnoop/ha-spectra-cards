@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.5.0";
+const VERSION = "0.5.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -487,8 +487,14 @@ function applyTheme(element, hass) {
 
 /* Action configs carry their own `entity` key with a different meaning, so
    they pass through untouched. */
+/* Keys whose contents are addresses rather than sources. A scene carries an
+   `entity` meaning "recall this", not "read this" — resolved as a source it
+   collapses to that scene's last-activated timestamp, taking its name and
+   icon with it, and a scene never yet activated resolves to nothing at all
+   and vanishes. Which is why a row of scenes came out as a row of empty
+   boxes, and why rooms used more often had more of them. */
 const RAW_KEYS = new Set([
-  "action", "tap_action", "hold_action", "double_tap_action", "adjust",
+  "action", "tap_action", "hold_action", "double_tap_action", "adjust", "scenes",
 ]);
 
 function applyFormat(value, spec) {
