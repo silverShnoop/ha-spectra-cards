@@ -11,6 +11,8 @@
 
 const VERSION = "0.1.0";
 
+const LOGGER_WARN = (...args) => console.warn(...args);
+
 /* ------------------------------------------------------------------ *
  * Stylesheet
  *
@@ -303,9 +305,9 @@ function readEntity(hass, spec) {
   return out;
 }
 
-function resolveValue(hass, spec) {
+function resolveValue(hass, spec, forecasts) {
   if (spec === null || spec === undefined) return spec;
-  if (Array.isArray(spec)) return spec.map((v) => resolveValue(hass, v));
+  if (Array.isArray(spec)) return spec.map((v) => resolveValue(hass, v, forecasts));
   if (typeof spec !== "object") return spec;
   /* One line of text out of several readings — a forecast beside a real
      sensor, a start time beside a title. Parts that read as nothing are
@@ -313,16 +315,43 @@ function resolveValue(hass, spec) {
   if (Array.isArray(spec.join)) {
     const separator = typeof spec.separator === "string" ? spec.separator : "";
     const parts = spec.join
-      .map((v) => resolveValue(hass, v))
+      .map((v) => resolveValue(hass, v, forecasts))
       .filter((v) => v !== null && v !== undefined && v !== "");
     return parts.length ? parts.join(separator) : null;
   }
   if (typeof spec.entity === "string") return readEntity(hass, spec);
+  /* A forecast is pushed, not stored — see readForecast. The card holds the
+     subscription; by the time a body sees this it is a plain array. */
+  if (typeof spec.forecast === "string") return readForecast(forecasts, spec);
   const out = {};
   for (const [key, value] of Object.entries(spec)) {
-    out[key] = RAW_KEYS.has(key) ? value : resolveValue(hass, value);
+    out[key] = RAW_KEYS.has(key) ? value : resolveValue(hass, value, forecasts);
   }
   return out;
+}
+
+/* Hourly and daily forecasts stopped being weather attributes in 2024. They
+   arrive over a websocket subscription instead, which is the right shape for
+   a wall panel anyway — it pushes rather than polling. The card owns the
+   subscription and hands the body a plain array, so the split still holds. */
+
+function forecastKey(spec) {
+  return `${spec.forecast}|${spec.type || "hourly"}`;
+}
+
+function readForecast(forecasts, spec) {
+  const rows = forecasts ? forecasts[forecastKey(spec)] : null;
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const limit = Number(spec.limit) > 0 ? Number(spec.limit) : rows.length;
+  const window = rows.slice(0, limit);
+  if (typeof spec.field === "string") {
+    return window.map((row) => {
+      const value = row ? row[spec.field] : null;
+      if (value === null || value === undefined) return null;
+      return spec.format || spec.map ? applyFormat(value, spec) : value;
+    });
+  }
+  return window;
 }
 
 /** Which entities this card depends on, so a state change elsewhere is free. */
@@ -335,6 +364,13 @@ function collectSources(spec, found) {
   if (typeof spec.entity === "string") {
     found.entities.add(spec.entity);
     if (spec.format === "relative") found.live = true;
+    return found;
+  }
+  if (typeof spec.forecast === "string") {
+    found.forecasts.set(forecastKey(spec), {
+      entity: spec.forecast,
+      type: spec.type || "hourly",
+    });
     return found;
   }
   for (const [key, value] of Object.entries(spec)) {
@@ -473,6 +509,67 @@ const BODIES = {
       }).join("")}</div>`;
     }
     return out;
+  },
+
+  /* What shape is this over time? */
+  chart(b) {
+    const line = (Array.isArray(b.line) ? b.line : []).map(Number);
+    const bars = (Array.isArray(b.bars) ? b.bars : []).map(Number);
+    const points = line.filter((n) => isFinite(n));
+    if (!points.length && !bars.length) return "";
+
+    const W = 320;
+    const H = 76;
+    const TOP = 8;
+    const PLOT = 42;
+    const BASE = 66;
+
+    const count = Math.max(points.length, bars.length);
+    const step = count > 1 ? (W - 26) / (count - 1) : 0;
+    const x = (i) => 13 + i * step;
+
+    let out = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(b.label || "Forecast")}">`;
+
+    /* Rain sits under the temperature line as its own scale — a probability
+       and a temperature share no axis. */
+    if (bars.length) {
+      const bw = Math.max(3, Math.min(26, step * 0.55));
+      out += bars.map((v, i) => {
+        const pct = clampPct(v);
+        if (!pct) return "";
+        const h = Math.max(1, (pct / 100) * 10);
+        return `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${(BASE - h).toFixed(1)}"`
+          + ` width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="var(--accent-soft)"/>`;
+      }).join("");
+    }
+
+    if (points.length) {
+      const lo = Math.min(...points);
+      const hi = Math.max(...points);
+      const span = hi - lo || 1;
+      const y = (v) => TOP + PLOT - ((v - lo) / span) * PLOT;
+      const coords = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+      out += `<polyline points="${coords.join(" ")}" fill="none"`
+        + ` stroke="var(--accent)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+      /* Only the current point is filled — it is the one the eye needs. */
+      out += `<circle cx="${x(0).toFixed(1)}" cy="${y(points[0]).toFixed(1)}" r="4" fill="var(--accent)"/>`;
+      out += `<text x="${x(0).toFixed(1)}" y="${(TOP - 1).toFixed(1)}" font-size="10"`
+        + ` fill="var(--sp-ink-3)">${esc(Math.round(points[0]))}°</text>`;
+      out += `<text x="${W - 13}" y="${(TOP - 1).toFixed(1)}" font-size="10" text-anchor="end"`
+        + ` fill="var(--sp-ink-3)">${esc(Math.round(points[points.length - 1]))}°</text>`;
+    }
+
+    const labels = Array.isArray(b.labels) ? b.labels : [];
+    if (labels.length) {
+      const every = Math.max(1, Math.ceil(labels.length / 4));
+      out += labels.map((text, i) => {
+        if (i % every || isBlank(text)) return "";
+        return `<text x="${x(i).toFixed(1)}" y="${H - 2}" font-size="10"`
+          + ` text-anchor="middle" fill="var(--sp-ink-3)">${esc(text)}</text>`;
+      }).join("");
+    }
+
+    return out + `</svg>`;
   },
 
   /* What happened, in order? */
@@ -643,6 +740,9 @@ function bodyIsEmpty(type, b) {
         && (!Array.isArray(b.metrics) || b.metrics.length === 0);
     case "rail":
       return !Array.isArray(b.events) || b.events.length === 0;
+    case "chart":
+      return !(Array.isArray(b.line) && b.line.length)
+        && !(Array.isArray(b.bars) && b.bars.length);
     case "strip":
       return !(Array.isArray(b.segments) && b.segments.length)
         && !(Array.isArray(b.timeslots) && b.timeslots.length);
@@ -678,6 +778,9 @@ class SpectraCard extends HTMLElement {
     this._live = false;
     this._timer = null;
     this._model = null;
+    this._forecastSources = new Map();
+    this._forecasts = {};
+    this._subscriptions = new Map();
   }
 
   setConfig(config) {
@@ -691,8 +794,11 @@ class SpectraCard extends HTMLElement {
       );
     }
     this._config = config;
-    const found = collectSources(config, { entities: new Set(), live: false });
+    const found = collectSources(config, {
+      entities: new Set(), forecasts: new Map(), live: false,
+    });
     this._sources = [...found.entities];
+    this._forecastSources = found.forecasts;
     this._live = found.live;
     this._watched = {};
     this._signature = null;
@@ -703,6 +809,7 @@ class SpectraCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (!this._config) return;
+    this._subscribeForecasts();
     /* Only re-marshal when an entity this card actually reads has changed.
        A wall panel sees a lot of state it does not care about. */
     let changed = this._signature === null;
@@ -722,12 +829,47 @@ class SpectraCard extends HTMLElement {
 
   connectedCallback() {
     this._startTicking();
+    this._subscribeForecasts();
   }
 
   disconnectedCallback() {
     if (this._timer) {
       clearInterval(this._timer);
       this._timer = null;
+    }
+    for (const pending of this._subscriptions.values()) {
+      Promise.resolve(pending).then(
+        (unsubscribe) => { if (typeof unsubscribe === "function") unsubscribe(); },
+        () => {},
+      );
+    }
+    this._subscriptions.clear();
+  }
+
+  /* One subscription per entity and forecast type, held for as long as the
+     card is on screen. Home Assistant pushes a new forecast when it has one,
+     so there is nothing to poll and nothing to cache in a sensor. */
+  _subscribeForecasts() {
+    if (!this._hass || !this._hass.connection || !this.isConnected) return;
+    for (const [key, source] of this._forecastSources) {
+      if (this._subscriptions.has(key)) continue;
+      const pending = this._hass.connection.subscribeMessage(
+        (message) => {
+          this._forecasts[key] = (message && message.forecast) || [];
+          this._signature = null;
+          this._update();
+        },
+        {
+          type: "weather/subscribe_forecast",
+          entity_id: source.entity,
+          forecast_type: source.type,
+        },
+      );
+      this._subscriptions.set(key, pending);
+      Promise.resolve(pending).catch((error) => {
+        LOGGER_WARN(`spectra-card: could not subscribe to the ${source.type} forecast for ${source.entity}`, error);
+        this._subscriptions.delete(key);
+      });
     }
   }
 
@@ -743,12 +885,13 @@ class SpectraCard extends HTMLElement {
 
   _update() {
     const config = this._config;
+    const f = this._forecasts;
     const model = {
-      accent: resolveValue(this._hass, config.accent),
-      icon: resolveValue(this._hass, config.icon),
-      title: resolveValue(this._hass, config.title),
-      meta: resolveValue(this._hass, config.meta),
-      body: resolveValue(this._hass, config.body) || {},
+      accent: resolveValue(this._hass, config.accent, f),
+      icon: resolveValue(this._hass, config.icon, f),
+      title: resolveValue(this._hass, config.title, f),
+      meta: resolveValue(this._hass, config.meta, f),
+      body: resolveValue(this._hass, config.body, f) || {},
     };
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;

@@ -8,8 +8,8 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`.
-**Planned:** `chart`, `arc`, `people`, `agenda`.
+**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`.
+**Planned:** `arc`, `people`, `agenda`.
 
 ## Why there is no template language
 
@@ -218,6 +218,41 @@ terracotta pill, for when something other than the adaptive scene is driving.
 
 Pass `segments: [{pct, color, label}]` instead of `timeslots` to drive the
 band from anything else.
+
+### `chart` — what shape is this over time?
+
+```yaml
+body:
+  type: chart
+  line:   {forecast: weather.home, type: hourly, field: temperature, limit: 12}
+  bars:   {forecast: weather.home, type: hourly, field: precipitation_probability, limit: 12}
+  labels: {forecast: weather.home, type: hourly, field: datetime, format: time, limit: 12}
+```
+
+A 3px line over its own scale, with bars beneath on theirs — a probability and
+a temperature share no axis. Only the current point is filled. Labels are
+thinned to about four so they never crowd. Never a gradient.
+
+`line`, `bars` and `labels` are plain arrays; the forecast source above is
+just one way to fill them.
+
+## Forecasts
+
+Hourly and daily forecasts stopped being `weather.*` attributes in 2024, so a
+`{forecast: ...}` value subscribes instead:
+
+| Key | Meaning |
+| --- | --- |
+| `forecast` | The weather entity. Required; marks the object as a subscription. |
+| `type` | `hourly` (default), `daily` or `twice_daily`. |
+| `field` | Pull one field into a flat array. Omit for whole rows. |
+| `limit` | Keep the first N. |
+| `format`, `map` | Applied per row, for axis labels. |
+
+The card holds one subscription per entity and type however many times it is
+referenced, and drops it when the card leaves the screen. Home Assistant
+pushes a new forecast when it has one, so there is nothing to poll and no
+sensor to cache it in — which is what the built-in weather card does too.
 
 ## Empty cells disappear
 
