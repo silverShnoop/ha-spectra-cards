@@ -138,6 +138,21 @@ const SHEET = `
 :focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
 .card.tappable { cursor:pointer; }
 
+/* alert — the reference draws this with the flex on .card itself; the same
+   measurements moved onto a wrapper, so the shell keeps owning its padding. */
+.alertrow { display:flex; align-items:center; gap:11px; }
+.alertrow > ha-icon { --mdc-icon-size:26px; flex:none; }
+.alerttitle { margin:0; font-size:15px; font-weight:500; }
+.alertbtn {
+  position:relative; margin-left:auto; background:var(--sp-surface);
+  color:var(--accent-on); font-size:12px; padding:7px 14px; border-radius:4px;
+  cursor:pointer; white-space:nowrap;
+}
+.alertbtn::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
+}
+
 /* Row action button. Box drawn exactly as the reference markup; the 44px
    touch target is an invariant an e-ink panel never had to meet, so it is
    added as a hit area rather than by inflating the button. The row grows to
@@ -623,6 +638,24 @@ const BODIES = {
     return out;
   },
 
+  /* What is wrong right now that you must fix?
+     Distinct from status, which answers what state a thing is in. This one
+     is always an exception, always conditional, and always actionable. */
+  alert(b) {
+    if (isBlank(b.title)) return "";
+    const label = firstOf(b.action_label, b.button);
+    return `<div class="alertrow">`
+      + (isBlank(b.icon) ? "" : `<ha-icon icon="${esc(b.icon)}"></ha-icon>`)
+      + `<div>`
+      + `<p class="alerttitle">${esc(b.title)}</p>`
+      + (isBlank(b.sub) ? "" : `<p class="sub">${escLines(b.sub)}</p>`)
+      + `</div>`
+      + (b.action && !isBlank(label)
+        ? `<span class="alertbtn" role="button" tabindex="0" data-alert>${esc(label)}</span>`
+        : "")
+      + `</div>`;
+  },
+
   /* What shape is this over time? */
   chart(b) {
     const line = (Array.isArray(b.line) ? b.line : []).map(Number);
@@ -852,6 +885,8 @@ function bodyIsEmpty(type, b) {
         && (!Array.isArray(b.metrics) || b.metrics.length === 0);
     case "rail":
       return !Array.isArray(b.events) || b.events.length === 0;
+    case "alert":
+      return isBlank(b.title);
     case "chart":
       return !(Array.isArray(b.line) && b.line.length)
         && !(Array.isArray(b.bars) && b.bars.length);
@@ -1086,6 +1121,21 @@ class SpectraCard extends HTMLElement {
         }
       });
     });
+
+    const alertButton = this._holder.querySelector("[data-alert]");
+    if (alertButton) {
+      const run = (event) => {
+        event.stopPropagation();
+        this._callAction(model.body && model.body.action);
+      };
+      alertButton.addEventListener("click", run);
+      alertButton.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
+      });
+    }
 
     const config = this._config;
     if (!config.tap_action || config.tap_action.action === "none") return;

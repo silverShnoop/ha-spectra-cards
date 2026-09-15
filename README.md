@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`.
+**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`, `alert`.
 **Planned:** `arc`, `people`, `agenda`.
 
 ## Why there is no template language
@@ -236,6 +236,23 @@ thinned to about four so they never crowd. Never a gradient.
 
 `line`, `bars` and `labels` are plain arrays; the forecast source above is
 just one way to fill them.
+
+### `alert` — what is wrong right now that you must fix?
+
+```yaml
+body:
+  type: alert
+  icon: mdi:lock-open-variant
+  title: Front door unlocked
+  sub: {entity: lock.front_door, attribute: last_changed, format: relative, prefix: "Unsecured for "}
+  action: {service: lock.lock, target: {entity_id: lock.front_door}}
+  action_label: Lock
+```
+
+Distinct from `status`, which answers what state a thing is *in*. This one is
+always an exception, always conditional and always actionable — so it has no
+hero and no metric strip, just an icon, a line, a reason and the button that
+fixes it. Pair it with `invert: true` and a `visibility` condition.
 
 ## Rows from a collection
 
