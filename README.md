@@ -8,8 +8,8 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`.
-**Planned:** `chart`, `rail`, `strip`, `arc`, `people`, `agenda`.
+**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`.
+**Planned:** `chart`, `arc`, `people`, `agenda`.
 
 ## Why there is no template language
 
@@ -167,6 +167,57 @@ target.
 scene's hex come from the bridge and are used literally — they live outside
 the accent system and must never be mapped into it. Anything that is not a
 recognisable CSS colour is dropped rather than written into the DOM.
+
+### `rail` — what happened, in order?
+
+```yaml
+body:
+  type: rail
+  events: {entity: sensor.activity_feed, attribute: events}
+  max: 6
+```
+
+Each event carries `area`, `kind` and either `ago` or `at` (a timestamp the
+rail turns into "2m ago"). The icon comes from `kind` — `motion`, `occupancy`,
+`button`, `lock`, `door` — overridable with `iconMap`.
+
+**Consecutive events from the same source collapse into one row with a
+count.** Nineteen hall trips in twelve minutes is one thing happening, not
+nineteen; without this the rail becomes a single sensor's log. Set
+`collapse: false` to see every row.
+
+Rows older than an hour drop to `ink-3`. A lock event never greys out — it is
+the one kind that still matters hours later.
+
+### `strip` — where are we in a cycle?
+
+```yaml
+body:
+  type: strip
+  timeslots: {entity: sensor.kitchen_golden_hours_schedule, attribute: timeslots}
+  active_index: {entity: sensor.kitchen_golden_hours_schedule, attribute: active_index}
+  sun:
+    set: {entity: sun.sun, attribute: next_setting}
+    rise: {entity: sun.sun, attribute: next_rising}
+  manual: {entity: sensor.kitchen_active_scene, map: {Golden hours: false}}
+```
+
+Segment widths are proportional to duration, laid out in **clock order** —
+a schedule's index 0 is not necessarily the start of the day. Slots starting
+at `sunset` or `sunrise` resolve against `sun`.
+
+**The active segment comes from `active_index`, never from the clock.** That
+is the bridge's own `active_timeslot`, and working it out from times would get
+the sunset case wrong — which is precisely the case a real schedule has: when
+sunset falls after the next fixed slot, the two swap places and one of them
+runs for minutes. A slot squeezed that way renders as a sliver rather than
+disappearing or going negative.
+
+`manual` desaturates the band and swaps the next-transition text for a
+terracotta pill, for when something other than the adaptive scene is driving.
+
+Pass `segments: [{pct, color, label}]` instead of `timeslots` to drive the
+band from anything else.
 
 ## Empty cells disappear
 
