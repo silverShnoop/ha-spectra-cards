@@ -181,6 +181,38 @@ const SHEET = `
 :focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
 .card.tappable { cursor:pointer; }
 
+/* control — the one body you touch rather than read. Same row metrics as
+   list, so a panel of controls and a panel of readings sit at the same
+   rhythm; the difference is the cluster on the right. */
+.ctl { display:flex; align-items:center; gap:8px; padding:8px 6px; border-radius:3px; min-height:44px; }
+.ctl.zebra { background:var(--sp-zebra); }
+.ctl .name { margin:0; font-size:13px; }
+.cluster { margin-left:auto; display:flex; align-items:center; gap:6px; flex:none; }
+.step {
+  width:34px; height:34px; border:2px solid var(--sp-edge); border-radius:4px;
+  background:var(--sp-surface); color:var(--sp-ink); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; position:relative;
+}
+.step ha-icon { --mdc-icon-size:18px; }
+.step::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; width:44px;
+}
+.ctlvalue {
+  font-family:var(--sp-mono); font-size:16px; font-weight:500;
+  min-width:52px; text-align:center;
+}
+.cmd {
+  position:relative; font-size:11px; padding:6px 10px; border-radius:4px;
+  border:2px solid var(--accent); color:var(--accent-on); cursor:pointer;
+  white-space:nowrap;
+}
+.cmd.on { background:var(--accent); color:var(--sp-surface); }
+.cmd::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
+}
+
 /* dock — the domain rail along the bottom. Not a cell: it is chrome, so it
    does not use the shell. Domain-based, never room-based; room selection
    lives inside each pop-up. */
@@ -395,7 +427,7 @@ function applyTheme(element, hass) {
 /* Action configs carry their own `entity` key with a different meaning, so
    they pass through untouched. */
 const RAW_KEYS = new Set([
-  "action", "tap_action", "hold_action", "double_tap_action",
+  "action", "tap_action", "hold_action", "double_tap_action", "adjust",
 ]);
 
 function applyFormat(value, spec) {
@@ -717,6 +749,52 @@ const BODIES = {
     return out;
   },
 
+  /* What do you want to change? The only body you touch rather than read.
+     A row per thing, with the controls clustered right so the eye still
+     scans names down the left edge exactly as it does in a list. */
+  control(b) {
+    const rows = Array.isArray(b.rows) ? b.rows.filter(Boolean) : [];
+    const zebra = b.zebra !== false;
+
+    return rows.map((r, index) => {
+      const classes = ["ctl"];
+      if (zebra && index % 2 === 0) classes.push("zebra");
+      const iconColour = accentBase(r.accent);
+
+      const lead = isBlank(r.icon) ? "" :
+        `<ha-icon icon="${esc(r.icon)}" style="--mdc-icon-size:20px;${iconColour ? `color:${iconColour}` : ""}"></ha-icon>`;
+
+      const middle = isBlank(r.sub)
+        ? `<p class="name">${esc(r.name)}</p>`
+        : `<div><p class="name">${esc(r.name)}</p><p class="sub">${escLines(r.sub)}</p></div>`;
+
+      let cluster = "";
+      /* A minus, the value, a plus. The card does the arithmetic because
+         the service wants an absolute number and config cannot compute. */
+      if (r.adjust) {
+        cluster += `<span class="step" role="button" tabindex="0" data-step="${index}" data-dir="-1">`
+          + `<ha-icon icon="mdi:minus"></ha-icon></span>`
+          + `<span class="ctlvalue">${esc(firstOf(r.value, "—"))}</span>`
+          + `<span class="step" role="button" tabindex="0" data-step="${index}" data-dir="1">`
+          + `<ha-icon icon="mdi:plus"></ha-icon></span>`;
+      } else if (!isBlank(r.value)) {
+        cluster += `<span class="ctlvalue">${esc(r.value)}</span>`;
+      }
+
+      const commands = Array.isArray(r.buttons) ? r.buttons.filter(Boolean) : [];
+      cluster += commands.map((cmd, position) =>
+        `<span class="cmd${cmd.on ? " on" : ""}" role="button" tabindex="0"`
+        + ` data-cmd="${index}" data-position="${position}"`
+        + (accentNumber(cmd.accent) ? ` style="${accentStyle(cmd.accent)}"` : "")
+        + `>${esc(cmd.label || "")}</span>`).join("");
+
+      const style = accentNumber(r.accent) ? ` style="${accentStyle(r.accent)}"` : "";
+      return `<div class="${classes.join(" ")}"${style}>${lead}${middle}`
+        + (cluster ? `<div class="cluster">${cluster}</div>` : "")
+        + `</div>`;
+    }).join("");
+  },
+
   /* What is wrong right now that you must fix?
      Distinct from status, which answers what state a thing is in. This one
      is always an exception, always conditional, and always actionable. */
@@ -971,6 +1049,8 @@ function bodyIsEmpty(type, b) {
       return !Array.isArray(b.events) || b.events.length === 0;
     case "alert":
       return isBlank(b.title);
+    case "control":
+      return !Array.isArray(b.rows) || b.rows.length === 0;
     case "chart":
       return !(Array.isArray(b.line) && b.line.length)
         && !(Array.isArray(b.bars) && b.bars.length);
@@ -1133,6 +1213,16 @@ class SpectraCard extends HTMLElement {
       });
   }
 
+  /* "Nothing to say" and "not told yet" are different states, and collapsing
+     them is how a broken fetch looked exactly like a quiet day. A card still
+     waiting on its first forecast keeps its shell so the fault is visible. */
+  _awaitingForecast() {
+    for (const key of this._forecastSources.keys()) {
+      if (!this._forecasts[key]) return true;
+    }
+    return false;
+  }
+
   _subscribeForecasts() {
     if (!this._hass || !this.isConnected) return;
     /* Fetching only needs callService. Subscribing needs a live connection,
@@ -1195,7 +1285,7 @@ class SpectraCard extends HTMLElement {
     const config = this._config;
     const type = config.body.type;
 
-    const empty = bodyIsEmpty(type, model.body);
+    const empty = bodyIsEmpty(type, model.body) && !this._awaitingForecast();
     /* Hiding a card in the dashboard editor makes it unselectable, so a
        preview always renders. */
     const editing = Boolean(this.preview || this.editMode);
@@ -1224,6 +1314,10 @@ class SpectraCard extends HTMLElement {
     ].join("");
 
     this._holder.innerHTML = card;
+    if (bodyIsEmpty(type, model.body) && this._awaitingForecast()) {
+      const body = this._holder.querySelector(".card");
+      if (body) body.insertAdjacentHTML("beforeend", `<p class="sub">Waiting for the forecast…</p>`);
+    }
     this._bind(model);
   }
 
@@ -1263,6 +1357,31 @@ class SpectraCard extends HTMLElement {
           event.preventDefault();
           run(event);
         }
+      });
+    });
+
+    const controls = (model.body && model.body.rows) || [];
+    this._holder.querySelectorAll("[data-step]").forEach((el) => {
+      const row = controls[Number(el.dataset.step)];
+      const run = (event) => {
+        event.stopPropagation();
+        this._adjust(row && row.adjust, Number(el.dataset.dir));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
+    this._holder.querySelectorAll("[data-cmd]").forEach((el) => {
+      const row = controls[Number(el.dataset.cmd)];
+      const command = row && row.buttons && row.buttons[Number(el.dataset.position)];
+      const run = (event) => {
+        event.stopPropagation();
+        this._callAction(command && command.action);
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
       });
     });
 
@@ -1324,6 +1443,35 @@ class SpectraCard extends HTMLElement {
         });
         break;
     }
+  }
+
+  /* Stepping a target reads the current value and sends an absolute one,
+     because that is what the services take. Config cannot do arithmetic and
+     should not learn how. */
+  _adjust(adjust, direction) {
+    if (!adjust || !this._hass || !adjust.entity) return;
+    const state = this._hass.states[adjust.entity];
+    if (!state) return;
+    const current = Number(
+      adjust.attribute ? state.attributes[adjust.attribute] : state.state,
+    );
+    if (!isFinite(current)) return;
+    const step = Number(adjust.step) || 1;
+    let next = current + direction * step;
+    if (adjust.min !== undefined) next = Math.max(Number(adjust.min), next);
+    if (adjust.max !== undefined) next = Math.min(Number(adjust.max), next);
+    next = Math.round(next / step) * step;
+    if (next === current) return;
+    /* Clamping must never reverse the press. Starting below a floor, minus
+       would otherwise raise the temperature, which is the opposite of what
+       the finger asked for. */
+    if ((next - current) * direction < 0) return;
+    const field = adjust.field || "temperature";
+    this._callAction({
+      service: adjust.service,
+      target: { entity_id: adjust.entity },
+      data: Object.assign({}, adjust.data, { [field]: Number(next.toFixed(2)) }),
+    });
   }
 
   _callAction(action) {

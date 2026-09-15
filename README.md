@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`, `alert`.
+**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`, `alert`, `control`.
 **Planned:** `arc`, `people`, `agenda`.
 
 ## Why there is no template language
@@ -253,6 +253,38 @@ Distinct from `status`, which answers what state a thing is *in*. This one is
 always an exception, always conditional and always actionable — so it has no
 hero and no metric strip, just an icon, a line, a reason and the button that
 fixes it. Pair it with `invert: true` and a `visibility` condition.
+
+### `control` — what do you want to change?
+
+The only body you touch rather than read, so the panels are Spectra rather
+than stock tiles.
+
+```yaml
+body:
+  type: control
+  rows:
+    - name: Kitchen
+      icon: mdi:radiator
+      accent: 1
+      sub: {entity: climate.kitchen, attribute: hvac_action, format: title}
+      value: {entity: climate.kitchen, attribute: temperature, suffix: "°"}
+      adjust: {entity: climate.kitchen, attribute: temperature, step: 0.5,
+               min: 5, max: 25, service: climate.set_temperature, field: temperature}
+    - name: Front door
+      icon: mdi:lock
+      accent: 3
+      buttons:
+        - {label: Lock, action: {service: lock.lock, target: {entity_id: lock.front_door}}}
+```
+
+Rows use the same metrics as `list`, so a panel of controls and a panel of
+readings sit at the same rhythm; the difference is the cluster on the right.
+Every target is at least 44px.
+
+`adjust` renders minus, value, plus. The card reads the current value and
+sends an absolute one, because that is what the services take — config cannot
+do arithmetic and should not learn how. Clamping never reverses a press: from
+below a floor, minus does nothing rather than raising the value.
 
 ## `spectra-dock` — the domain rail
 
