@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.7.0";
+const VERSION = "0.8.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -84,7 +84,7 @@ const SHEET = `
 /* shell */
 .card {
   background:var(--sp-surface); border:2px solid var(--sp-edge);
-  border-radius:6px; padding:9px 10px;
+  border-radius:6px; padding:9px 10px; position:relative;
 }
 .titlebar { display:flex; align-items:center; gap:7px; margin-bottom:8px; }
 .tick { width:3px; height:12px; flex:none; background:var(--accent); }
@@ -217,10 +217,20 @@ const SHEET = `
   animation: sp-spin .7s linear infinite;
   display:inline-block; vertical-align:middle;
 }
-/* The label stays legible while it waits — dimming it to nothing would
-   lose what you just pressed. */
-.busy > *:not(.spinner) { opacity:.45; }
-.busy { gap:6px; }
+
+/* A spinner that pushes its neighbours aside is its own small betrayal —
+   you press a button and the row jumps. On a control it is laid over the
+   top instead, so the control keeps its exact size and nothing around it
+   moves. The label dims rather than disappearing, because what you just
+   pressed is the thing you want to still be able to read. */
+.busy { position:relative; }
+.busy > *:not(.spinner) { opacity:.3; }
+.busy > .spinner { position:absolute; left:50%; top:50%; margin:-6.5px 0 0 -6.5px; }
+
+/* Where a spinner sits inline rather than over something — beside a value
+   that has to stay readable — the space is reserved whether it is spinning
+   or not, so its arrival moves nothing. */
+.spinslot { width:13px; height:13px; flex:none; display:inline-flex; }
 
 /* A pending value is the one you asked for, not the one the house has yet.
    It sits in the accent so it reads as provisional, and the spinner beside
@@ -1192,7 +1202,7 @@ const BODIES = {
         cluster += `<span class="step" role="button" tabindex="0" data-step="${index}" data-dir="-1">`
           + `<ha-icon icon="mdi:minus"></ha-icon></span>`
           + `<span class="ctlvalue${r.pending ? " pending" : ""}">${esc(firstOf(r.value, "—"))}</span>`
-          + (r.pending ? `<span class="spinner"></span>` : "")
+          + `<span class="spinslot">${r.pending ? `<span class="spinner"></span>` : ""}</span>`
           + `<span class="step" role="button" tabindex="0" data-step="${index}" data-dir="1">`
           + `<ha-icon icon="mdi:plus"></ha-icon></span>`;
       } else if (!isBlank(r.value)) {
@@ -1578,6 +1588,7 @@ class SpectraCard extends HTMLElement {
     this._todos = {};
     this._calendarSources = new Map();
     this._calendars = {};
+    this._failed = {};
     this._optimistic = {};
   }
 
@@ -1678,6 +1689,7 @@ class SpectraCard extends HTMLElement {
       const forecast = payload && payload.forecast;
       if (!Array.isArray(forecast) || this._forecasts[key]) return false;
       this._forecasts[key] = forecast;
+      delete this._failed[key];
       this._signature = null;
       this._update();
       return true;
@@ -1712,18 +1724,35 @@ class SpectraCard extends HTMLElement {
       ).then(accept))
       .catch((error) => {
         this._fetched.delete(key);
+        this._failed[key] = `Could not read the ${source.type} forecast for ${source.entity}.`;
+        this._signature = null;
         LOGGER_WARN(`spectra-card: could not fetch the ${source.type} forecast for ${source.entity}`, error);
+        this._update();
       });
   }
 
   /* "Nothing to say" and "not told yet" are different states, and collapsing
-     them is how a broken fetch looked exactly like a quiet day. A card still
-     waiting on its first forecast keeps its shell so the fault is visible. */
-  _awaitingForecast() {
-    for (const key of this._forecastSources.keys()) {
-      if (!this._forecasts[key]) return true;
+     them is how a broken fetch looked exactly like a quiet day. Everything
+     this card has to ask for rather than read — forecast, calendar, list —
+     keeps its shell until the answer arrives, and says so out loud when the
+     answer never comes. A blank space on a wall panel explains nothing. */
+  _awaiting() {
+    const asked = [
+      [this._forecastSources, this._forecasts, "the forecast"],
+      [this._calendarSources, this._calendars, "the calendar"],
+      [this._todoSources, this._todos, "the list"],
+    ];
+    for (const [sources] of asked) {
+      for (const key of sources.keys()) {
+        if (this._failed[key]) return this._failed[key];
+      }
     }
-    return false;
+    for (const [sources, store, what] of asked) {
+      for (const key of sources.keys()) {
+        if (!store[key]) return `Waiting for ${what}…`;
+      }
+    }
+    return "";
   }
 
   /* Refetched on a timer as well as on demand, because a to-do ticked off
@@ -1746,11 +1775,15 @@ class SpectraCard extends HTMLElement {
       const items = payload && payload.items;
       if (!Array.isArray(items)) throw new Error("no items in the response");
       this._todos[key] = items;
+      delete this._failed[key];
       this._signature = null;
       this._update();
     }).catch((error) => {
       this._fetched.delete(key);
+      this._failed[key] = `Could not read ${source.entity}.`;
+      this._signature = null;
       LOGGER_WARN(`spectra-card: could not fetch items for ${source.entity}`, error);
+      this._update();
     });
   }
 
@@ -1788,11 +1821,15 @@ class SpectraCard extends HTMLElement {
       const events = payload && payload.events;
       if (!Array.isArray(events)) throw new Error("no events in the response");
       this._calendars[key] = events;
+      delete this._failed[key];
       this._signature = null;
       this._update();
     }).catch((error) => {
       this._fetched.delete(key);
+      this._failed[key] = `Could not read ${source.entity}.`;
+      this._signature = null;
       LOGGER_WARN(`spectra-card: could not fetch events for ${source.entity}`, error);
+      this._update();
     });
   }
 
@@ -1874,7 +1911,11 @@ class SpectraCard extends HTMLElement {
     const config = this._config;
     const type = config.body.type;
 
-    const empty = bodyIsEmpty(type, model.body) && !this._awaitingForecast();
+    /* Only a body with nothing in it needs to explain itself, so the ask is
+       never made for the cards that read straight off the state machine. */
+    const bare = bodyIsEmpty(type, model.body);
+    const waiting = bare ? this._awaiting() : "";
+    const empty = bare && !waiting;
     /* Hiding a card in the dashboard editor makes it unselectable, so a
        preview always renders. */
     const editing = Boolean(this.preview || this.editMode);
@@ -1898,8 +1939,8 @@ class SpectraCard extends HTMLElement {
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
       this._titlebar(model),
-      bodyIsEmpty(type, model.body) && this._awaitingForecast()
-        ? `<p class="sub">Waiting for the forecast…</p>`
+      waiting
+        ? `<p class="sub">${esc(waiting)}</p>`
         : BODIES[type](model.body),
       `</div>`,
     ].join("");
