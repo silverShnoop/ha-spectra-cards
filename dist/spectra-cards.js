@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.11.0";
+const VERSION = "0.11.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1681,24 +1681,29 @@ const BODIES = {
        it, and this panel is read at arm's length while carrying something. */
     out += `<span class="pickend">`;
 
-    if (!lit) {
-      /* Still draggable: picking a scene in a dark room is how you light it. */
-      out += `<span class="pill" style="${accentStyle(5)}">Off</span>`;
-    } else if (manual) {
+    if (lit && manual) {
       out += `<span class="pill" style="${accentStyle(2)}">Manual</span>`;
-    } else if (nextText) {
+    } else if (lit && nextText) {
       out += `<span class="value" style="margin:0">${esc(nextText)}</span>`;
     }
 
-    /* Auto is offered whenever the room is not already following its
-       schedule — overridden, or off, which is just an override to darkness. */
-    if (!(lit && !manual) && smart && smart.entity) {
-      out += `<span class="cmd" role="button" tabindex="0" data-pickauto`
-        + ` style="${accentStyle(3)}">Auto</span>`;
+    /* Both buttons are always here, lit to show which state the room is in,
+       the same way the climate rows do it. Hiding Off because the room reads
+       off was a mistake twice over: a control you reach for and cannot find
+       reads as broken rather than unnecessary, and the moment you drag a
+       scene on you want Off back before the light entity has caught up with
+       what you just did. Pressing Off on a dark room costs nothing.
+
+       "A cell with nothing to say renders nothing" governs content. A control
+       is not content — it says what you can do, which stays true whether or
+       not you need it this second. */
+    if (smart && smart.entity) {
+      out += `<span class="cmd${lit && !manual ? " on" : ""}" role="button"`
+        + ` tabindex="0" data-pickauto style="${accentStyle(3)}">Auto</span>`;
     }
-    if (lit && !isBlank(b.light)) {
-      out += `<span class="cmd" role="button" tabindex="0" data-pickoff`
-        + ` style="${accentStyle(5)}">Off</span>`;
+    if (!isBlank(b.light)) {
+      out += `<span class="cmd${lit ? "" : " on"}" role="button"`
+        + ` tabindex="0" data-pickoff style="${accentStyle(5)}">Off</span>`;
     }
 
     return out + `</span></div>`;
