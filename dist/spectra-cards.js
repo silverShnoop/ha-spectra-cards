@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.12.1";
+const VERSION = "0.13.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -435,6 +435,20 @@ img.avatar { object-fit:cover; display:block; }
 }
 .toggle > span + span { border-left:2px solid var(--sp-sink); }
 .toggle > span.on { background:var(--accent); color:var(--sp-surface); }
+
+/* Two questions, two levels, one control. The frame answers "is this room
+   on" — teal, role 4, live and active now — and the filled position answers
+   "doing what". They are different accents at once, which the language
+   normally warns against, but they are not competing for the same question:
+   one is the container and one is the contents. From across a room you read
+   the frame first and the position second, which is the order you want them.
+
+   It also means the two on positions are grouped without drawing anything
+   extra to group them. */
+.toggle.lit { border-color:var(--sp-a4); background:var(--sp-a4-soft); }
+.toggle.lit > span { color:var(--sp-a4-on); }
+.toggle.lit > span + span { border-left-color:var(--sp-a4); }
+.toggle.lit > span.on { color:var(--sp-surface); }
 .toggle > span::after {
   content:""; position:absolute; left:50%; top:50%;
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
@@ -1725,7 +1739,7 @@ const BODIES = {
        showing, which is how you say "keep this, stop following the clock".
        Ochre for it by role — the language already defines ochre as needs
        attention, or is overridden. */
-    out += `<span class="toggle" role="group" aria-label="Mode">`;
+    out += `<span class="toggle${lit ? " lit" : ""}" role="group" aria-label="Mode">`;
     if (smart && smart.entity) {
       out += `<span class="${lit && !manual ? "on" : ""}" role="button" tabindex="0"`
         + ` data-pickmode="auto" style="${accentStyle(3)}">Auto</span>`;
