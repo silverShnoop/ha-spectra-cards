@@ -214,6 +214,16 @@ function clampPct(v) {
   return Math.max(0, Math.min(100, n));
 }
 
+function minutesSince(value) {
+  const t = Date.parse(value);
+  if (isNaN(t)) return 0;
+  return (Date.now() - t) / 60000;
+}
+
+/* The activity feed's own vocabulary; kept as a constant so the one kind
+   with special treatment is named rather than spelled inline. */
+const KIND_LOCK_NAME = "lock";
+
 /** "2m", "1h 12m", "3d 4h" — the rail's and the strip's unit of time. */
 function shortSince(value) {
   const t = Date.parse(value);
@@ -333,6 +343,76 @@ function collectSources(spec, found) {
   return found;
 }
 
+
+/* ------------------------------------------------------------------ *
+ * Timeslots to segments
+ *
+ * The strip body renders segments; turning a bridge schedule into them is
+ * marshalling, so it happens here rather than inside the body.
+ * ------------------------------------------------------------------ */
+
+const DAY_MINUTES = 24 * 60;
+
+function minutesOfDay(value) {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") return null;
+  const hhmm = /^(\d{1,2}):(\d{2})/.exec(value);
+  if (hhmm && value.length <= 8) {
+    return Number(hhmm[1]) * 60 + Number(hhmm[2]);
+  }
+  const t = Date.parse(value);
+  if (isNaN(t)) return null;
+  const d = new Date(t);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+/* A sunset slot can resolve after the slot that follows it, which is not a
+   bug to correct — the bridge really does schedule it that way, and it shows
+   up as a sliver. Slot order is never used to decide what is active; that is
+   active_index's job. */
+const MIN_SEGMENT_MINUTES = 15;
+
+function segmentsFromTimeslots(slots, sun) {
+  if (!Array.isArray(slots) || !slots.length) return [];
+  const resolved = [];
+  for (const slot of slots) {
+    if (!slot) continue;
+    let start = null;
+    if (slot.start_kind === "sunset") start = minutesOfDay(sun && sun.set);
+    else if (slot.start_kind === "sunrise") start = minutesOfDay(sun && sun.rise);
+    else start = minutesOfDay(slot.start);
+    if (start === null) continue;
+    resolved.push({
+      index: slot.index,
+      start,
+      color: cssColor(slot.color) || "var(--sp-sink)",
+      label: slot.scene,
+    });
+  }
+  if (!resolved.length) return [];
+
+  /* Laid out in clock order; the schedule is keyed by index, and index 0 is
+     not necessarily the start of the day. */
+  resolved.sort((a, b) => a.start - b.start);
+
+  return resolved.map((seg, i) => {
+    const next = i + 1 < resolved.length ? resolved[i + 1].start : DAY_MINUTES;
+    return {
+      index: seg.index,
+      color: seg.color,
+      label: seg.label,
+      start: seg.start,
+      minutes: Math.max(MIN_SEGMENT_MINUTES, next - seg.start),
+    };
+  });
+}
+
+function clockLabel(minutes) {
+  const h = Math.floor(minutes / 60) % 24;
+  const m = Math.round(minutes % 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 /* ------------------------------------------------------------------ *
  * Bodies
  *
@@ -392,6 +472,107 @@ const BODIES = {
           : `<p><span class="mlabel">${esc(m.label)}</span><br>${value}</p>`;
       }).join("")}</div>`;
     }
+    return out;
+  },
+
+  /* What happened, in order? */
+  rail(b) {
+    const raw = Array.isArray(b.events) ? b.events.filter(Boolean) : [];
+    const icons = Object.assign({
+      motion: "mdi:walk",
+      occupancy: "mdi:account",
+      button: "mdi:gesture-tap-button",
+      lock: "mdi:lock-open-variant",
+      door: "mdi:door-open",
+    }, b.iconMap || {});
+
+    /* Nineteen hall trips in twelve minutes is one thing happening, not
+       nineteen. Consecutive events from the same source collapse to a row
+       carrying a count, so the rail still answers "what happened, in order"
+       instead of becoming one sensor's log. */
+    const rows = [];
+    for (const event of raw) {
+      const previous = rows[rows.length - 1];
+      const key = event.entity_id || `${event.area}|${event.kind}`;
+      if (b.collapse !== false && previous && previous.key === key) {
+        previous.count += 1;
+        continue;
+      }
+      rows.push({ key, count: 1, event });
+    }
+
+    const limit = Number(b.max) > 0 ? Number(b.max) : rows.length;
+    const shown = rows.slice(0, limit);
+
+    return shown.map(({ event, count }, i) => {
+      const ago = firstOf(event.ago, shortSince(event.at));
+      /* An hour is the line between "just now" and "earlier"; past it a row
+         is context rather than news. A lock never greys out — it is the one
+         kind that still matters hours later. */
+      const isLock = event.kind === KIND_LOCK_NAME;
+      const stale = !isLock && minutesSince(event.at) > 60;
+      const colour = isLock ? "var(--sp-a2)" : (stale ? "" : "var(--accent)");
+      const parts = [event.area, event.kind].filter((v) => !isBlank(v));
+      const name = parts.length ? parts.join(" · ") : (event.name || "");
+      const suffix = count > 1 ? ` ×${count}` : "";
+
+      return `<div class="event${stale ? " stale" : ""}">`
+        + `<div class="railcol">`
+        + `<ha-icon icon="${esc(icons[event.kind] || "mdi:circle-small")}"`
+        + (colour ? ` style="color:${colour}"` : "")
+        + `></ha-icon>`
+        + (i < shown.length - 1 ? `<span class="line"></span>` : "")
+        + `</div>`
+        + `<div><p class="name">${esc(name)}${suffix}</p>`
+        + (isBlank(ago) ? "" : `<p class="sub">${esc(ago)} ago</p>`)
+        + `</div></div>`;
+    }).join("");
+  },
+
+  /* Where are we in a cycle? */
+  strip(b) {
+    const segments = Array.isArray(b.segments) && b.segments.length
+      ? b.segments.map((s) => ({
+        index: s.index,
+        color: cssColor(s.color) || "var(--sp-sink)",
+        label: s.label,
+        minutes: Number(s.pct) > 0 ? Number(s.pct) : 1,
+        start: null,
+      }))
+      : segmentsFromTimeslots(b.timeslots, b.sun);
+    if (!segments.length) return "";
+
+    const activeIndex = b.active_index === undefined ? b.activeIndex : b.active_index;
+    const active = segments.find((s) => s.index === activeIndex)
+      || segments[segments.length - 1];
+    /* The bridge's own active_timeslot is authoritative. Working the current
+       slot out from the clock would get the sunset case wrong, which is
+       exactly the case this schedule has. */
+    const manual = Boolean(b.manual);
+
+    const now = new Date();
+    const elapsed = ((now.getHours() * 60 + now.getMinutes()) / DAY_MINUTES) * 100;
+
+    let out = `<div class="strip${manual ? " manual" : ""}">`
+      + segments.map((s) => `<i style="flex:${(s.minutes / 60).toFixed(2)};background:${s.color}"></i>`).join("")
+      + `</div>`
+      + `<div class="caretrow"><span class="caret" style="left:${elapsed.toFixed(1)}%"></span></div>`;
+
+    const next = active && active.start !== null
+      ? segments[(segments.indexOf(active) + 1) % segments.length]
+      : null;
+    const nextText = next && next.start !== null
+      ? `→ ${next.label} ${clockLabel(next.start)}`
+      : null;
+
+    out += `<div class="row" style="padding-left:0">`
+      + `<span class="dot" style="background:${active.color}"></span>`
+      + `<p class="name">${esc(active.label)}</p>`
+      + (manual
+        ? `<span class="pill" style="margin-left:auto;${accentStyle(1)}">Manual</span>`
+        : (nextText ? `<span class="value">${esc(nextText)}</span>` : ""))
+      + `</div>`;
+
     return out;
   },
 
@@ -460,6 +641,11 @@ function bodyIsEmpty(type, b) {
       return isBlank(b.hero) && isBlank(b.sub)
         && !(b.pill && !isBlank(b.pill.text))
         && (!Array.isArray(b.metrics) || b.metrics.length === 0);
+    case "rail":
+      return !Array.isArray(b.events) || b.events.length === 0;
+    case "strip":
+      return !(Array.isArray(b.segments) && b.segments.length)
+        && !(Array.isArray(b.timeslots) && b.timeslots.length);
     default:
       return false;
   }
@@ -697,6 +883,9 @@ class SpectraCard extends HTMLElement {
     const body = (this._model && this._model.body) || this._config.body;
     if (this._config.body.type === "list") {
       return 1 + Math.min(6, (Array.isArray(body.rows) ? body.rows.length : 3));
+    }
+    if (this._config.body.type === "rail") {
+      return 1 + Math.min(8, (Array.isArray(body.events) ? body.events.length : 3));
     }
     return 3;
   }
