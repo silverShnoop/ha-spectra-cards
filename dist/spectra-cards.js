@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -186,6 +186,13 @@ const SHEET = `
    styling. outline, not border, so the ring costs no layout width. */
 :focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
 .card.tappable { cursor:pointer; }
+
+/* agenda — the week, grouped by the day it happens on. A flat list of
+   timestamps makes you do the grouping in your head every time you look. */
+.dayrow { display:flex; align-items:baseline; gap:8px; margin:9px 0 3px; }
+.dayrow .dayhead { margin:0; }
+.dayrule { flex:1; height:2px; background:var(--sp-sink); }
+.daycount { font-size:10px; color:var(--sp-ink-3); }
 
 /* ---- press feedback ----
    The invariant is "nothing moves unless the user moved it". A press flash
@@ -485,6 +492,24 @@ function minutesSince(value) {
    with special treatment is named rather than spelled inline. */
 const KIND_LOCK_NAME = "lock";
 
+function shortTime(value) {
+  const t = Date.parse(value);
+  if (isNaN(t)) return null;
+  return new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/* "40 min", "3h" — how long it takes, which is what you plan around. */
+function spanOf(start, end) {
+  const from = Date.parse(start);
+  const to = Date.parse(end);
+  if (isNaN(from) || isNaN(to) || to <= from) return null;
+  const minutes = Math.round((to - from) / 60000);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
 /** "2m", "1h 12m", "3d 4h" — the rail's and the strip's unit of time. */
 function shortSince(value) {
   const t = Date.parse(value);
@@ -630,6 +655,7 @@ function resolveValue(hass, spec, forecasts) {
      subscription; by the time a body sees this it is a plain array. */
   if (typeof spec.forecast === "string") return readForecast(forecasts, spec);
   if (typeof spec.todo === "string") return readTodo(forecasts && forecasts.__todo, spec);
+  if (typeof spec.calendar === "string") return readCalendar(forecasts && forecasts.__cal, spec);
   const out = {};
   for (const [key, value] of Object.entries(spec)) {
     out[key] = RAW_KEYS.has(key) ? value : resolveValue(hass, value, forecasts);
@@ -668,6 +694,20 @@ function resolveEach(hass, template, item, forecasts) {
     out[key] = RAW_KEYS.has(key) ? value : resolveEach(hass, value, item, forecasts);
   }
   return out;
+}
+
+/* Calendar events are fetched over a window, not read off the entity — a
+   calendar's state is just "is something on right now". Same shape as a
+   forecast or a to-do list. */
+function calendarKey(spec) {
+  return `${spec.calendar}|${spec.days || 7}`;
+}
+
+function readCalendar(store, spec) {
+  const events = store ? store[calendarKey(spec)] : null;
+  if (!Array.isArray(events)) return null;
+  const limit = Number(spec.limit) > 0 ? Number(spec.limit) : events.length;
+  return events.slice(0, limit);
 }
 
 /* A to-do list's items are not in its attributes — the state is a count and
@@ -744,6 +784,13 @@ function collectSources(spec, found) {
     found.todos.set(todoKey(spec), {
       entity: spec.todo,
       status: spec.status || "needs_action",
+    });
+    return found;
+  }
+  if (typeof spec.calendar === "string") {
+    found.calendars.set(calendarKey(spec), {
+      entity: spec.calendar,
+      days: Number(spec.days) || 7,
     });
     return found;
   }
@@ -909,6 +956,59 @@ const BODIES = {
       }).join("")}</div>`;
     }
     return out;
+  },
+
+  /* What is coming, and when? Grouped by day, because a flat list of
+     timestamps makes you do the grouping in your head every time.
+     Days with nothing on them are left out rather than drawn empty — an
+     empty row is not information, and the gap from Thursday to Sunday says
+     "nothing on Friday" perfectly well. */
+  agenda(b) {
+    const events = (Array.isArray(b.events) ? b.events : [])
+      .filter((event) => event && event.start);
+    if (!events.length) return "";
+
+    const order = [];
+    const byDay = {};
+    for (const event of events) {
+      const key = String(event.start).slice(0, 10);
+      if (!byDay[key]) { byDay[key] = []; order.push(key); }
+      byDay[key].push(event);
+    }
+    order.sort();
+    const days = order.slice(0, Number(b.days) || order.length);
+
+    return days.map((key) => {
+      const rows = byDay[key];
+      const head = weekdayLabel(key + "T12:00:00") || key;
+      let out = `<div class="dayrow"><p class="dayhead">${esc(head)}</p>`
+        + `<span class="dayrule"></span>`
+        + `<span class="daycount">${rows.length}</span></div>`;
+
+      out += rows.map((event, i) => {
+        /* An all-day event has a date and no time at all, which is the
+           whole difference between "Tuesday" and "09:00 Tuesday". */
+        const allDay = !String(event.start).includes("T");
+        const when = allDay ? "All day" : shortTime(event.start);
+        const parts = [event.location, allDay ? null : spanOf(event.start, event.end)]
+          .filter((part) => !isBlank(part));
+
+        return `<div class="event">`
+          + `<div class="railcol" style="width:14px">`
+          + `<span class="node"></span>`
+          + (i < rows.length - 1 ? `<span class="line"></span>` : "")
+          + `</div>`
+          + `<div style="padding-bottom:7px">`
+          + `<p class="name"><span class="pill" style="margin-right:6px">`
+          + `${esc(when)}</span>${esc(event.summary)}</p>`
+          /* Deliberately not the description: Google fills it with markup
+             and boilerplate, and the location is the part you act on. */
+          + (parts.length ? `<p class="sub">${esc(parts.join(" \u00b7 "))}</p>` : "")
+          + `</div></div>`;
+      }).join("");
+
+      return out;
+    }).join("");
   },
 
   /* Where are we in a *day*? The same schedule the strip flattens, bent
@@ -1384,6 +1484,8 @@ function bodyIsEmpty(type, b) {
       return !Array.isArray(b.rows) || b.rows.length === 0;
     case "forecast":
       return !Array.isArray(b.slots) || b.slots.length === 0;
+    case "agenda":
+      return !Array.isArray(b.events) || b.events.length === 0;
     case "chart":
       return !(Array.isArray(b.line) && b.line.length)
         && !(Array.isArray(b.bars) && b.bars.length)
@@ -1474,6 +1576,8 @@ class SpectraCard extends HTMLElement {
     this._fetched = new Set();
     this._todoSources = new Map();
     this._todos = {};
+    this._calendarSources = new Map();
+    this._calendars = {};
     this._optimistic = {};
   }
 
@@ -1496,11 +1600,13 @@ class SpectraCard extends HTMLElement {
     }
     this._config = config;
     const found = collectSources(config, {
-      entities: new Set(), forecasts: new Map(), todos: new Map(), live: false,
+      entities: new Set(), forecasts: new Map(), todos: new Map(),
+      calendars: new Map(), live: false,
     });
     this._sources = [...found.entities, ...[...found.todos.values()].map((t) => t.entity)];
     this._forecastSources = found.forecasts;
     this._todoSources = found.todos;
+    this._calendarSources = found.calendars;
     this._live = found.live;
     this._watched = {};
     this._signature = null;
@@ -1665,9 +1771,35 @@ class SpectraCard extends HTMLElement {
     }
   }
 
+  _fetchCalendar(key, source) {
+    if (this._fetched.has(key)) return;
+    this._fetched.add(key);
+    Promise.resolve(
+      this._hass.callWS({
+        type: "call_service",
+        domain: "calendar",
+        service: "get_events",
+        service_data: { duration: { days: source.days } },
+        target: { entity_id: source.entity },
+        return_response: true,
+      }),
+    ).then((result) => {
+      const payload = result && result.response && result.response[source.entity];
+      const events = payload && payload.events;
+      if (!Array.isArray(events)) throw new Error("no events in the response");
+      this._calendars[key] = events;
+      this._signature = null;
+      this._update();
+    }).catch((error) => {
+      this._fetched.delete(key);
+      LOGGER_WARN(`spectra-card: could not fetch events for ${source.entity}`, error);
+    });
+  }
+
   _subscribeForecasts() {
     if (!this._hass || !this.isConnected) return;
     if (this._todoSources.size) this._refreshTodos();
+    for (const [key, source] of this._calendarSources) this._fetchCalendar(key, source);
     /* Fetching only needs callService. Subscribing needs a live connection,
        and if that is missing the card should still paint rather than hide
        itself over a websocket it never got. */
@@ -1709,7 +1841,7 @@ class SpectraCard extends HTMLElement {
 
   _update() {
     const config = this._config;
-    const f = Object.assign({ __todo: this._todos }, this._forecasts);
+    const f = Object.assign({ __todo: this._todos, __cal: this._calendars }, this._forecasts);
     const model = {
       accent: resolveValue(this._hass, config.accent, f),
       icon: resolveValue(this._hass, config.icon, f),
@@ -2102,7 +2234,8 @@ class SpectraDock extends HTMLElement {
     }
     this._config = config;
     const found = collectSources(config, {
-      entities: new Set(), forecasts: new Map(), todos: new Map(), live: false,
+      entities: new Set(), forecasts: new Map(), todos: new Map(),
+      calendars: new Map(), live: false,
     });
     this._sources = [...found.entities];
     this._watched = {};

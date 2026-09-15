@@ -8,8 +8,8 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `arc`, `chart`, `forecast`, `alert`, `control`, `scenes`.
-**Planned:** `people`, `agenda`.
+**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `arc`, `chart`, `forecast`, `agenda`, `alert`, `control`, `scenes`.
+**Planned:** `people`.
 
 ## Why there is no template language
 
@@ -290,6 +290,39 @@ from three metres tells you nothing but its endpoints.
 `every` thins the hours: six legible columns beat eighteen unreadable ones.
 Rain only gets a line where there is some, because a row of zeroes is noise
 pretending to be information.
+
+### `agenda` — what is coming, and when?
+
+```yaml
+body:
+  type: agenda
+  days: 7
+  events: {calendar: calendar.jj, days: 7, limit: 24}
+```
+
+Grouped by the day it happens on, because a flat list of timestamps makes you
+do the grouping in your head every time you look. Each day head carries a
+count; **days with nothing on them are left out** rather than drawn empty —
+the gap from Thursday to Sunday says "nothing on Friday" perfectly well.
+
+An all-day event says "All day" rather than a time, which is the whole
+difference between *Tuesday* and *09:00 Tuesday*. Timed events carry how long
+they take, since that is what you plan around.
+
+The sub line is the **location**, never the description. Google fills
+descriptions with markup and boilerplate; the location is the part you act
+on.
+
+## Calendars
+
+A calendar's state is only "is something on right now", so events are fetched
+over a window:
+
+| Key | Meaning |
+| --- | --- |
+| `calendar` | The calendar entity. Required; marks the object as a fetch. |
+| `days` | How far ahead to look. Default 7. |
+| `limit` | Keep the first N. |
 
 ### `alert` — what is wrong right now that you must fix?
 
