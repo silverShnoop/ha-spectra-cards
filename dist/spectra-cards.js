@@ -265,6 +265,13 @@ function applyFormat(value, spec) {
     case "title":
       v = String(v).charAt(0).toUpperCase() + String(v).slice(1);
       break;
+    case "time": {
+      const t = Date.parse(v);
+      v = isNaN(t)
+        ? null
+        : new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+      break;
+    }
   }
   if (v === null || v === undefined) return null;
   if (typeof v === "string" || typeof v === "number") {
@@ -290,6 +297,16 @@ function resolveValue(hass, spec) {
   if (spec === null || spec === undefined) return spec;
   if (Array.isArray(spec)) return spec.map((v) => resolveValue(hass, v));
   if (typeof spec !== "object") return spec;
+  /* One line of text out of several readings — a forecast beside a real
+     sensor, a start time beside a title. Parts that read as nothing are
+     dropped rather than leaving a stray separator behind. */
+  if (Array.isArray(spec.join)) {
+    const separator = typeof spec.separator === "string" ? spec.separator : "";
+    const parts = spec.join
+      .map((v) => resolveValue(hass, v))
+      .filter((v) => v !== null && v !== undefined && v !== "");
+    return parts.length ? parts.join(separator) : null;
+  }
   if (typeof spec.entity === "string") return readEntity(hass, spec);
   const out = {};
   for (const [key, value] of Object.entries(spec)) {
