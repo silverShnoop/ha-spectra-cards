@@ -99,6 +99,11 @@ const SHEET = `
   font-family:var(--sp-mono); font-size:32px; font-weight:500;
   line-height:1; margin:0; letter-spacing:-.02em;
 }
+/* Sits on the hero's baseline. For a reading that qualifies the hero rather
+   than supporting it — humidity belongs to the temperature, not to the strip
+   of unrelated figures underneath. */
+.heroline { display:flex; align-items:baseline; gap:7px; }
+.heronote { font-family:var(--sp-mono); font-size:15px; color:var(--sp-ink-2); }
 .sub { font-size:12px; color:var(--sp-ink-2); margin:2px 0 0; }
 .pill {
   font-size:11px; padding:2px 8px; border-radius:9px;
@@ -579,6 +584,7 @@ function resolveValue(hass, spec, forecasts) {
   /* A forecast is pushed, not stored — see readForecast. The card holds the
      subscription; by the time a body sees this it is a plain array. */
   if (typeof spec.forecast === "string") return readForecast(forecasts, spec);
+  if (typeof spec.todo === "string") return readTodo(forecasts && forecasts.__todo, spec);
   const out = {};
   for (const [key, value] of Object.entries(spec)) {
     out[key] = RAW_KEYS.has(key) ? value : resolveValue(hass, value, forecasts);
@@ -619,6 +625,20 @@ function resolveEach(hass, template, item, forecasts) {
   return out;
 }
 
+/* A to-do list's items are not in its attributes — the state is a count and
+   the items come from todo.get_items. Same shape of problem as a forecast:
+   fetched, not read, so the card fetches and the body still gets an array. */
+function todoKey(spec) {
+  return `${spec.todo}|${spec.status || "needs_action"}`;
+}
+
+function readTodo(todos, spec) {
+  const items = todos ? todos[todoKey(spec)] : null;
+  if (!Array.isArray(items)) return null;
+  const limit = Number(spec.limit) > 0 ? Number(spec.limit) : items.length;
+  return items.slice(0, limit);
+}
+
 /* Hourly and daily forecasts stopped being weather attributes in 2024. They
    arrive over a websocket subscription instead, which is the right shape for
    a wall panel anyway — it pushes rather than polling. The card owns the
@@ -633,6 +653,14 @@ function readForecast(forecasts, spec) {
   if (!Array.isArray(rows) || !rows.length) return null;
   const limit = Number(spec.limit) > 0 ? Number(spec.limit) : rows.length;
   const window = rows.slice(0, limit);
+  /* A metric wants one number, not a series. */
+  if (spec.index !== undefined) {
+    const row = window[Number(spec.index)];
+    if (!row) return null;
+    const value = typeof spec.field === "string" ? row[spec.field] : row;
+    if (value === null || value === undefined) return null;
+    return typeof value === "object" ? value : applyFormat(value, spec);
+  }
   if (typeof spec.field === "string") {
     return window.map((row) => {
       const value = row ? row[spec.field] : null;
@@ -664,6 +692,13 @@ function collectSources(spec, found) {
     found.forecasts.set(forecastKey(spec), {
       entity: spec.forecast,
       type: spec.type || "hourly",
+    });
+    return found;
+  }
+  if (typeof spec.todo === "string") {
+    found.todos.set(todoKey(spec), {
+      entity: spec.todo,
+      status: spec.status || "needs_action",
     });
     return found;
   }
@@ -794,7 +829,9 @@ const BODIES = {
   status(b) {
     let lead = pillMarkup(b.pill);
     if (!isBlank(b.hero)) {
-      lead += `<p class="hero"${lead ? ' style="margin-top:6px"' : ""}>${esc(b.hero)}</p>`;
+      const hero = `<p class="hero">${esc(b.hero)}</p>`;
+      const note = isBlank(b.hero_note) ? "" : `<span class="heronote">${esc(b.hero_note)}</span>`;
+      lead += `<div class="heroline"${lead ? ' style="margin-top:6px"' : ""}>${hero}${note}</div>`;
     }
     let out = "";
     /* The hero sits bottom-aligned with whatever is beside it — a top-aligned
@@ -1209,7 +1246,7 @@ function bodyIsEmpty(type, b) {
       return isBlank(b.hero) && isBlank(b.sub)
         && (!Array.isArray(b.chips) || b.chips.length === 0);
     case "status":
-      return isBlank(b.hero) && isBlank(b.sub)
+      return isBlank(b.hero) && isBlank(b.sub) && isBlank(b.hero_note)
         && !(b.pill && !isBlank(b.pill.text))
         && (!Array.isArray(b.metrics) || b.metrics.length === 0);
     case "rail":
@@ -1264,6 +1301,8 @@ class SpectraCard extends HTMLElement {
     this._forecasts = {};
     this._subscriptions = new Map();
     this._fetched = new Set();
+    this._todoSources = new Map();
+    this._todos = {};
   }
 
   setConfig(config) {
@@ -1285,10 +1324,11 @@ class SpectraCard extends HTMLElement {
     }
     this._config = config;
     const found = collectSources(config, {
-      entities: new Set(), forecasts: new Map(), live: false,
+      entities: new Set(), forecasts: new Map(), todos: new Map(), live: false,
     });
-    this._sources = [...found.entities];
+    this._sources = [...found.entities, ...[...found.todos.values()].map((t) => t.entity)];
     this._forecastSources = found.forecasts;
+    this._todoSources = found.todos;
     this._live = found.live;
     this._watched = {};
     this._signature = null;
@@ -1401,8 +1441,54 @@ class SpectraCard extends HTMLElement {
     return false;
   }
 
+  /* Refetched on a timer as well as on demand, because a to-do ticked off
+     on a phone changes nothing this card is subscribed to. The entity's
+     state is a count, so it is the cheap signal that something moved. */
+  _fetchTodo(key, source) {
+    if (this._fetched.has(key)) return;
+    this._fetched.add(key);
+    Promise.resolve(
+      this._hass.callWS({
+        type: "call_service",
+        domain: "todo",
+        service: "get_items",
+        service_data: { status: source.status },
+        target: { entity_id: source.entity },
+        return_response: true,
+      }),
+    ).then((result) => {
+      const payload = result && result.response && result.response[source.entity];
+      const items = payload && payload.items;
+      if (!Array.isArray(items)) throw new Error("no items in the response");
+      this._todos[key] = items;
+      this._signature = null;
+      this._update();
+    }).catch((error) => {
+      this._fetched.delete(key);
+      LOGGER_WARN(`spectra-card: could not fetch items for ${source.entity}`, error);
+    });
+  }
+
+  /* A to-do entity's state is how many are outstanding, so when it moves the
+     list behind it has moved too and the cached items are stale. */
+  _refreshTodos() {
+    for (const [key, source] of this._todoSources) {
+      const state = this._hass.states[source.entity];
+      const seen = this._todoCounts && this._todoCounts[key];
+      const now = state ? state.state : null;
+      if (seen !== undefined && seen !== now) {
+        this._fetched.delete(key);
+        delete this._todos[key];
+      }
+      this._todoCounts = this._todoCounts || {};
+      this._todoCounts[key] = now;
+      this._fetchTodo(key, source);
+    }
+  }
+
   _subscribeForecasts() {
     if (!this._hass || !this.isConnected) return;
+    if (this._todoSources.size) this._refreshTodos();
     /* Fetching only needs callService. Subscribing needs a live connection,
        and if that is missing the card should still paint rather than hide
        itself over a websocket it never got. */
@@ -1444,7 +1530,7 @@ class SpectraCard extends HTMLElement {
 
   _update() {
     const config = this._config;
-    const f = this._forecasts;
+    const f = Object.assign({ __todo: this._todos }, this._forecasts);
     const model = {
       accent: resolveValue(this._hass, config.accent, f),
       icon: resolveValue(this._hass, config.icon, f),
@@ -1761,7 +1847,7 @@ class SpectraDock extends HTMLElement {
     }
     this._config = config;
     const found = collectSources(config, {
-      entities: new Set(), forecasts: new Map(), live: false,
+      entities: new Set(), forecasts: new Map(), todos: new Map(), live: false,
     });
     this._sources = [...found.entities];
     this._watched = {};

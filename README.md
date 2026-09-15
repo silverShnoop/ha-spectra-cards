@@ -67,6 +67,7 @@ rows: {entity: sensor.needs_you, attribute: items}
 | --- | --- |
 | `entity` | Required; marks the object as a reference. |
 | `attribute` | Read this attribute instead of the state. |
+| `index` | With `forecast`: take one entry rather than a series, for a metric that wants a number. |
 | `format` | `relative` (a timestamp as `2m`, `1h 12m`, `3d 4h`), `time` (a timestamp as local `19:15`), `round` with `digits`, `title`. |
 | `map` | Value-to-value lookup, applied before `format`. |
 | `prefix`, `suffix` | Concatenated onto the result. |
@@ -406,6 +407,24 @@ bundle rather than being retyped into every card.
 `attribute` also reads `last_changed`, `last_updated` and `last_reported`,
 which live on the state object rather than among the attributes — that is
 where a duration chip comes from.
+
+## To-do lists
+
+A to-do entity's state is a count; the items are not in its attributes. A
+`{todo: ...}` value fetches them, the same shape of problem as a forecast:
+
+```yaml
+rows:
+  from: {todo: todo.phoenix, status: needs_action, limit: 8}
+  each:
+    name: {field: summary}
+    sub:  {field: due}
+    icon: mdi:checkbox-blank-outline
+```
+
+The entity itself is watched, so when someone ticks an item off on their
+phone the count moves, the cache is dropped and the list refetches. Nothing
+to subscribe to — the count *is* the signal.
 
 ## Forecasts
 
