@@ -1034,22 +1034,47 @@ class SpectraCard extends HTMLElement {
   _fetchForecast(key, source) {
     if (this._fetched.has(key)) return;
     this._fetched.add(key);
-    Promise.resolve(
-      this._hass.callService(
-        "weather", "get_forecasts", { type: source.type },
-        { entity_id: source.entity }, false, true,
-      ),
-    ).then((result) => {
+    const accept = (result) => {
       const payload = result && result.response && result.response[source.entity];
       const forecast = payload && payload.forecast;
-      if (!Array.isArray(forecast) || this._forecasts[key]) return;
+      if (!Array.isArray(forecast) || this._forecasts[key]) return false;
       this._forecasts[key] = forecast;
       this._signature = null;
       this._update();
-    }, (error) => {
-      this._fetched.delete(key);
-      LOGGER_WARN(`spectra-card: could not fetch the ${source.type} forecast for ${source.entity}`, error);
-    });
+      return true;
+    };
+
+    /* The raw websocket call_service command, whose response shape is fixed.
+       hass.callService grew its returnResponse argument at some point and
+       silently drops the response on a build that predates it, which looks
+       exactly like a forecast that never arrived — so that is the fallback,
+       not the first choice. */
+    const viaWebsocket = this._hass.callWS
+      ? this._hass.callWS({
+        type: "call_service",
+        domain: "weather",
+        service: "get_forecasts",
+        service_data: { type: source.type },
+        target: { entity_id: source.entity },
+        return_response: true,
+      })
+      : Promise.reject(new Error("no callWS"));
+
+    Promise.resolve(viaWebsocket)
+      .then((result) => {
+        if (accept(result)) return null;
+        throw new Error("no forecast in the websocket response");
+      })
+      .catch(() => Promise.resolve(
+        this._hass.callService(
+          "weather", "get_forecasts", { type: source.type },
+          { entity_id: source.entity }, false, true,
+        ),
+      ).then(accept))
+      .catch((error) => {
+        this._fetched.delete(key);
+        LOGGER_WARN(`spectra-card: could not fetch the ${source.type} forecast for ${source.entity}`, error);
+      });
   }
 
   _subscribeForecasts() {
