@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`, `alert`, `control`.
+**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`, `alert`, `control`, `scenes`.
 **Planned:** `arc`, `people`, `agenda`.
 
 ## Why there is no template language
@@ -285,6 +285,40 @@ Every target is at least 44px.
 sends an absolute one, because that is what the services take — config cannot
 do arithmetic and should not learn how. Clamping never reverses a press: from
 below a floor, minus does nothing rather than raising the value.
+
+### `scenes` — which scene is this room in?
+
+The lights control. The house is driven by scenes rather than brightness, so
+the control is a scene and never a percentage.
+
+```yaml
+body:
+  type: scenes
+  rows:
+    - name: Kitchen
+      light: light.kitchen
+      on: {entity: light.kitchen, map: {on: true, off: false}}
+      active: {entity: sensor.kitchen_active_scene, attribute: effective_scene}
+      palette: {entity: sensor.kitchen_golden_hours_schedule, attribute: timeslots}
+      scenes:
+        - {entity: scene.kitchen_golden_hours_2, name: Golden hours, icon: mdi:brightness-auto, smart: true}
+        - {entity: scene.kitchen_arise, name: Arise, icon: mdi:weather-sunset-up}
+```
+
+**Chips carry the scene's own colour, not an accent.** `palette` takes the
+schedule sensor's timeslots, which already carry each scene's hex, so a room
+reads as the row of colours it can actually be — straight from the bridge,
+nothing configured twice.
+
+**Exactly one chip is ever named:** the live one, which expands to show its
+scene and takes a ring. Everything else stays a bare icon, so there is never
+a question of which of two labels is the current state. The ring is drawn
+with `outline`, which costs no layout width — a border would reflow the row
+every time the scene changed.
+
+Text colour on a chip is the one colour the theme does not choose. It sits on
+that scene's own hex, so relative luminance decides whether it is ink or
+paper.
 
 ## `spectra-dock` — the domain rail
 

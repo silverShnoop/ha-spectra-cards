@@ -181,6 +181,51 @@ const SHEET = `
 :focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
 .card.tappable { cursor:pointer; }
 
+/* scenes — the lights component. The house is driven by scenes, not by
+   brightness, so the scene is the control and the chips carry the scene's
+   own colour rather than an accent. Reading a room means reading a row of
+   the colours it can actually be. */
+.scenerow { display:flex; align-items:center; gap:7px; padding:7px 6px; border-radius:3px; min-height:44px; }
+.scenerow.zebra { background:var(--sp-zebra); }
+.roomname { margin:0; font-size:13px; width:78px; flex:none;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.chiprow { display:flex; align-items:center; gap:5px; margin-left:auto;
+  flex-wrap:wrap; justify-content:flex-end; }
+.scenechip {
+  position:relative; height:32px; min-width:32px; border-radius:4px;
+  display:flex; align-items:center; justify-content:center; gap:5px;
+  cursor:pointer; padding:0 7px; font-size:11px;
+}
+.scenechip ha-icon { --mdc-icon-size:17px; }
+/* outline, not a border — a ring that costs layout width reflows the row
+   every time the active scene changes. */
+.scenechip.active { outline:2px solid var(--sp-ink); outline-offset:1px; }
+/* The adaptive scene leads and is set apart by a hairline rather than by
+   shouting; it is the one to reach for first, not an alarm. */
+.scenechip.smart { box-shadow:inset 0 0 0 2px var(--sp-surface); }
+.scenechip::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
+}
+.power {
+  width:34px; height:34px; flex:none; border-radius:4px; cursor:pointer;
+  border:2px solid var(--sp-edge); background:var(--sp-surface);
+  display:flex; align-items:center; justify-content:center; position:relative;
+}
+.power.on { border-color:var(--sp-a2); color:var(--sp-a2); }
+.power ha-icon { --mdc-icon-size:18px; }
+.power::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; width:44px;
+}
+
+/* weather — the condition as a picture. A glance from the doorway should
+   land on the sky before it lands on a number. */
+.bigicon { --mdc-icon-size:44px; color:var(--sp-ink-2); flex:none; }
+.iconrow { display:flex; margin:0 0 2px; padding:0 13px; }
+.iconrow span { flex:1 1 0; text-align:center; }
+.iconrow ha-icon { --mdc-icon-size:17px; color:var(--sp-ink-3); }
+
 /* control — the one body you touch rather than read. Same row metrics as
    list, so a panel of controls and a panel of readings sit at the same
    rhythm; the difference is the cluster on the right. */
@@ -695,6 +740,22 @@ function clockLabel(minutes) {
  * and --accent-on, already resolved by the shell.
  * ------------------------------------------------------------------ */
 
+/* The one colour choice the theme does not make. A scene chip's text sits on
+   that scene's own hex, so the only question is whether that hex is light or
+   dark; relative luminance answers it. */
+function textOn(colour) {
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(colour).trim());
+  if (!hex) return "var(--sp-ink)";
+  let value = hex[1];
+  if (value.length === 3) value = value.split("").map((c) => c + c).join("");
+  const channel = (i) => {
+    const n = parseInt(value.slice(i, i + 2), 16) / 255;
+    return n <= 0.03928 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+  return luminance > 0.45 ? "#2B2724" : "#FAF8F2";
+}
+
 function pillMarkup(pill, extraStyle) {
   const p = typeof pill === "string" ? { text: pill } : pill;
   if (!p || isBlank(p.text)) return "";
@@ -727,12 +788,15 @@ const BODIES = {
     let out = "";
     /* The hero sits bottom-aligned with whatever is beside it — a top-aligned
        hero next to two lines of sub text looks broken. */
-    if (lead || !isBlank(b.sub)) {
+    if (lead || !isBlank(b.sub) || !isBlank(b.icon)) {
       out += `<div style="display:flex;align-items:flex-end;gap:10px">`
         + `<div>${lead}</div>`
         + (isBlank(b.sub)
           ? ""
           : `<p class="sub" style="margin-left:auto;text-align:right">${escLines(b.sub)}</p>`)
+        + (isBlank(b.icon)
+          ? ""
+          : `<ha-icon class="bigicon" icon="${esc(b.icon)}"></ha-icon>`)
         + `</div>`;
     }
     const metrics = (Array.isArray(b.metrics) ? b.metrics : [])
@@ -747,6 +811,60 @@ const BODIES = {
       }).join("")}</div>`;
     }
     return out;
+  },
+
+  /* Which scene is this room in? The house is controlled by scenes rather
+     than by brightness, so the hero of a light control is a scene name and
+     never a percentage. */
+  scenes(b) {
+    const rows = Array.isArray(b.rows) ? b.rows.filter(Boolean) : [];
+    const zebra = b.zebra !== false;
+
+    return rows.map((r, index) => {
+      /* The schedule's timeslots already carry each scene's own hex, so the
+         chips are painted from what the bridge reports rather than from
+         anything configured here. */
+      const palette = {};
+      if (Array.isArray(r.palette)) {
+        for (const slot of r.palette) {
+          if (slot && slot.scene) palette[String(slot.scene).toLowerCase()] = slot.color;
+        }
+      }
+      const active = isBlank(r.active) ? null : String(r.active).toLowerCase();
+      const scenes = Array.isArray(r.scenes) ? r.scenes.filter(Boolean) : [];
+
+      const chips = scenes.map((scene, position) => {
+        const label = firstOf(scene.name, "");
+        const isActive = active !== null && String(label).toLowerCase() === active;
+        const colour = cssColor(scene.color)
+          || cssColor(palette[String(label).toLowerCase()])
+          || "var(--sp-sink)";
+        const classes = ["scenechip"];
+        if (isActive) classes.push("active");
+        if (scene.smart) classes.push("smart");
+        /* Exactly one chip is ever named — the live one. Everything else
+           stays a bare icon, so there is never a question of which of two
+           labels is the current state. */
+        return `<span class="${classes.join(" ")}" role="button" tabindex="0"`
+          + ` data-scene="${index}" data-position="${position}"`
+          + ` style="background:${colour};color:${textOn(colour)}"`
+          + ` title="${esc(label)}">`
+          + (isBlank(scene.icon) ? "" : `<ha-icon icon="${esc(scene.icon)}"></ha-icon>`)
+          + (isActive ? esc(label) : "")
+          + `</span>`;
+      }).join("");
+
+      const power = r.light
+        ? `<span class="power${r.on ? " on" : ""}" role="button" tabindex="0" data-power="${index}">`
+          + `<ha-icon icon="mdi:power"></ha-icon></span>`
+        : "";
+
+      return `<div class="scenerow${zebra && index % 2 === 0 ? " zebra" : ""}">`
+        + power
+        + `<p class="roomname">${esc(r.name)}</p>`
+        + `<div class="chiprow">${chips}</div>`
+        + `</div>`;
+    }).join("");
   },
 
   /* What do you want to change? The only body you touch rather than read.
@@ -820,6 +938,18 @@ const BODIES = {
     const points = line.filter((n) => isFinite(n));
     if (!points.length && !bars.length) return "";
 
+    /* Thinned on the same interval as the labels, so an icon always sits
+       over the hour it belongs to rather than drifting off it. */
+    const marks = Array.isArray(b.icons) ? b.icons : [];
+    const labelList = Array.isArray(b.labels) ? b.labels : [];
+    const thin = Math.max(1, Math.ceil(Math.max(marks.length, labelList.length) / 4));
+    let head = "";
+    if (marks.length) {
+      head = `<div class="iconrow">${marks.map((icon, i) =>
+        `<span>${i % thin || isBlank(icon) ? "" : `<ha-icon icon="${esc(icon)}"></ha-icon>`}</span>`
+      ).join("")}</div>`;
+    }
+
     const W = 320;
     const H = 76;
     const TOP = 8;
@@ -830,7 +960,7 @@ const BODIES = {
     const step = count > 1 ? (W - 26) / (count - 1) : 0;
     const x = (i) => 13 + i * step;
 
-    let out = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(b.label || "Forecast")}">`;
+    let out = head + `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(b.label || "Forecast")}">`;
 
     /* Rain sits under the temperature line as its own scale — a probability
        and a temperature share no axis. */
@@ -866,9 +996,9 @@ const BODIES = {
         + ` fill="var(--sp-ink-3)">${esc(Math.round(points[points.length - 1]))}°</text>`;
     }
 
-    const labels = Array.isArray(b.labels) ? b.labels : [];
+    const labels = labelList;
     if (labels.length) {
-      const every = Math.max(1, Math.ceil(labels.length / 4));
+      const every = thin;
       out += labels.map((text, i) => {
         if (i % every || isBlank(text)) return "";
         return `<text x="${x(i).toFixed(1)}" y="${H - 2}" font-size="10"`
@@ -1050,10 +1180,12 @@ function bodyIsEmpty(type, b) {
     case "alert":
       return isBlank(b.title);
     case "control":
+    case "scenes":
       return !Array.isArray(b.rows) || b.rows.length === 0;
     case "chart":
       return !(Array.isArray(b.line) && b.line.length)
-        && !(Array.isArray(b.bars) && b.bars.length);
+        && !(Array.isArray(b.bars) && b.bars.length)
+        && !(Array.isArray(b.icons) && b.icons.length);
     case "strip":
       return !(Array.isArray(b.segments) && b.segments.length)
         && !(Array.isArray(b.timeslots) && b.timeslots.length);
@@ -1359,6 +1491,33 @@ class SpectraCard extends HTMLElement {
     });
 
     const controls = (model.body && model.body.rows) || [];
+    this._holder.querySelectorAll("[data-scene]").forEach((el) => {
+      const row = controls[Number(el.dataset.scene)];
+      const scene = row && row.scenes && row.scenes[Number(el.dataset.position)];
+      const run = (event) => {
+        event.stopPropagation();
+        if (scene && scene.entity) {
+          this._callAction({ service: "scene.turn_on", target: { entity_id: scene.entity } });
+        }
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
+    this._holder.querySelectorAll("[data-power]").forEach((el) => {
+      const row = controls[Number(el.dataset.power)];
+      const run = (event) => {
+        event.stopPropagation();
+        if (row && row.light) {
+          this._callAction({ service: "light.toggle", target: { entity_id: row.light } });
+        }
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
     this._holder.querySelectorAll("[data-step]").forEach((el) => {
       const row = controls[Number(el.dataset.step)];
       const run = (event) => {
