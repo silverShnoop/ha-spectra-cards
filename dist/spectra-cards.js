@@ -37,6 +37,49 @@ const SHEET = `
   display:block; color:var(--sp-ink);
 }
 
+/* ---- dark ----
+   Paper and ink swap materials rather than inverting arithmetically. The
+   ground is a warm near-black, never pure: the same argument that kept the
+   light surface off-white — a pure black panel in a dark kitchen is a hole,
+   and pure white on it is glare.
+
+   The six roles keep their meanings and their relationships. Each base is
+   lifted and slightly desaturated so it carries on a dark ground; each soft
+   becomes a deep tint of the same hue instead of a pale one, and each on
+   becomes light. Nothing is remapped to a different hue, so a terracotta row
+   means in the dark exactly what it means in the light.
+
+   Raw entity colours — a bulb's temperature, a Hue scene's hex — are
+   deliberately untouched. They are the colour the light actually is. */
+@media (prefers-color-scheme: dark) {
+  :host(:not([data-theme="light"])) {
+    --sp-paper:#16140F; --sp-surface:#211E19; --sp-sink:#312D26;
+    --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
+    --sp-ink-3:#837C6F; --sp-edge:#3C372E;
+    --sp-a1:#E08054; --sp-a1-soft:#3A241A; --sp-a1-on:#F0B393;
+    --sp-a2:#D9A63F; --sp-a2-soft:#382C14; --sp-a2-on:#EBC97E;
+    --sp-a3:#93B45F; --sp-a3-soft:#24301A; --sp-a3-on:#BBD495;
+    --sp-a4:#4FA9AA; --sp-a4-soft:#14302F; --sp-a4-on:#8CCBCB;
+    --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
+    --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
+  }
+}
+
+/* Home Assistant's own setting wins over the OS, because a panel forced to
+   one mode in HA should stay there. The card stamps data-theme from
+   hass.themes.darkMode, which already resolves "auto" against the system. */
+:host([data-theme="dark"]) {
+  --sp-paper:#16140F; --sp-surface:#211E19; --sp-sink:#312D26;
+  --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
+  --sp-ink-3:#837C6F; --sp-edge:#3C372E;
+  --sp-a1:#E08054; --sp-a1-soft:#3A241A; --sp-a1-on:#F0B393;
+  --sp-a2:#D9A63F; --sp-a2-soft:#382C14; --sp-a2-on:#EBC97E;
+  --sp-a3:#93B45F; --sp-a3-soft:#24301A; --sp-a3-on:#BBD495;
+  --sp-a4:#4FA9AA; --sp-a4-soft:#14302F; --sp-a4-on:#8CCBCB;
+  --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
+  --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
+}
+
 /* shell */
 .card {
   background:var(--sp-surface); border:2px solid var(--sp-edge);
@@ -91,7 +134,7 @@ const SHEET = `
 .railcol { width:22px; flex:none; display:flex; flex-direction:column;
   align-items:center; align-self:stretch; }
 .railcol ha-icon { --mdc-icon-size:15px; }
-.railcol .line { flex:1; width:2px; background:#E2DDCE; margin-top:3px; }
+.railcol .line { flex:1; width:2px; background:var(--sp-edge); margin-top:3px; }
 .event.stale .name, .event.stale ha-icon { color:var(--sp-ink-3); }
 
 /* strip */
@@ -322,6 +365,18 @@ function shortSince(value) {
   if (hours < 24) return hours + "h" + (mins % 60 ? ` ${mins % 60}m` : "");
   const days = Math.floor(hours / 24);
   return days + "d" + (hours % 24 ? ` ${hours % 24}h` : "");
+}
+
+/* Home Assistant resolves "auto" against the operating system for us, so
+   hass.themes.darkMode is already the answer to "is this panel dark right
+   now" — no need to watch the media query separately. Stamping it on the
+   host lets an explicit choice in HA beat the OS, while the CSS media query
+   still covers the moment before any hass arrives. */
+function applyTheme(element, hass) {
+  const themes = hass && hass.themes;
+  if (!themes || typeof themes.darkMode !== "boolean") return;
+  const mode = themes.darkMode ? "dark" : "light";
+  if (element.dataset.theme !== mode) element.dataset.theme = mode;
 }
 
 /* ------------------------------------------------------------------ *
@@ -985,6 +1040,7 @@ class SpectraCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    applyTheme(this, hass);
     if (!this._config) return;
     this._subscribeForecasts();
     /* Only re-marshal when an entity this card actually reads has changed.
@@ -1363,6 +1419,7 @@ class SpectraDock extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    applyTheme(this, hass);
     if (!this._config) return;
     let changed = this._signature === null;
     for (const id of this._sources) {
