@@ -829,9 +829,14 @@ const BODIES = {
   status(b) {
     let lead = pillMarkup(b.pill);
     if (!isBlank(b.hero)) {
-      const hero = `<p class="hero">${esc(b.hero)}</p>`;
-      const note = isBlank(b.hero_note) ? "" : `<span class="heronote">${esc(b.hero_note)}</span>`;
-      lead += `<div class="heroline"${lead ? ' style="margin-top:6px"' : ""}>${hero}${note}</div>`;
+      const offset = lead ? ' style="margin-top:6px"' : "";
+      /* Only wrapped when there is something to sit beside it. Without a
+         note this stays exactly the Reference view's markup, which is worth
+         more than the convenience of one code path. */
+      lead += isBlank(b.hero_note)
+        ? `<p class="hero"${offset}>${esc(b.hero)}</p>`
+        : `<div class="heroline"${offset}><p class="hero">${esc(b.hero)}</p>`
+          + `<span class="heronote">${esc(b.hero_note)}</span></div>`;
     }
     let out = "";
     /* The hero sits bottom-aligned with whatever is beside it — a top-aligned
