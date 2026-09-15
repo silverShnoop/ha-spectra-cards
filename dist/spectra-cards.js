@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.8.1";
+const VERSION = "0.9.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -188,6 +188,15 @@ const SHEET = `
   display:flex; align-items:center; justify-content:center;
   font-size:15px; font-weight:500; background:var(--accent); color:var(--sp-surface);
 }
+/* A photo fills the same circle the initial would have. */
+img.avatar { object-fit:cover; display:block; }
+/* Two people whose names begin alike get the same letter, so the circle was
+   drawing attention without telling you anything. It carries presence
+   instead — filled for in, sunk for out — which is the one thing this card
+   exists to answer, and is legible from across the room where a letter is
+   not. The label still says Home or Out; the colour only agrees with it. */
+.person:not(.here) .avatar { background:var(--sp-sink); color:var(--sp-ink-3); }
+.person:not(.here) img.avatar { opacity:.55; }
 
 /* agenda */
 .dayhead {
@@ -452,6 +461,18 @@ function isBlank(v) {
 function firstOf(...vals) {
   for (const v of vals) if (!isBlank(v)) return v;
   return null;
+}
+
+/* An avatar's src comes from a person's entity_picture, which is entity data
+   like any other. Home Assistant serves its own under /api/image/serve or
+   /local, and a card has no business fetching a face from somewhere else, so
+   anything that is not a plain root-relative path is dropped rather than
+   requested. Protocol-relative // is an off-site URL wearing a slash. */
+function safePicture(value) {
+  if (typeof value !== "string") return null;
+  const v = value.trim();
+  if (!v.startsWith("/") || v.startsWith("//")) return null;
+  return v;
 }
 
 /* Colours reaching the DOM come from sensor attributes, so they are checked
@@ -729,6 +750,28 @@ function resolveEach(hass, template, item, forecasts) {
     out[key] = RAW_KEYS.has(key) ? value : resolveEach(hass, value, item, forecasts);
   }
   return out;
+}
+
+/* A person's state is a fixed vocabulary: "home", "not_home", or the name of
+   whichever zone they are in. Every dashboard spelling that map out per
+   person is the same boilerplate three times over, so the body reads it. */
+function presenceLabel(state) {
+  if (isBlank(state)) return null;
+  const v = String(state);
+  if (v === "home") return "Home";
+  if (v === "not_home") return "Out";
+  if (v === "unknown" || v === "unavailable") return "No signal";
+  return v.charAt(0).toUpperCase() + v.slice(1);
+}
+
+/* The circle is an anchor, not an identifier — the name is written directly
+   under it. One letter is enough for that, and two people whose names start
+   alike get told apart by the name, or by a photo if one is set. */
+function initialsOf(name) {
+  const words = (typeof name === "string" ? name : "").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  if (words.length === 1) return words[0].charAt(0).toUpperCase();
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
 }
 
 /* Calendar events are fetched over a window, not read off the entity — a
@@ -1399,6 +1442,35 @@ const BODIES = {
     }).join("");
   },
 
+  /* Who is in. Presence is a category, not a verdict — being out is not
+     worse than being in — so "here" is the soft wash and "out" is the plain
+     zebra, one step apart on the ladder rather than two accents arguing
+     about which is good news. The label says which either way, because
+     colour never carries meaning alone. */
+  people(b) {
+    const rows = (Array.isArray(b.rows) ? b.rows : []).filter(Boolean);
+    if (!rows.length) return "";
+
+    return `<div class="people">` + rows.map((r) => {
+      const here = String(firstOf(r.state, "")) === "home";
+      const name = firstOf(r.name, "");
+      const label = firstOf(r.status, presenceLabel(r.state));
+      /* "Home since 3h ago" is noise when the wash already says home; the
+         duration is what you actually read, so it stands beside the label. */
+      const parts = [label, r.since].filter((v) => !isBlank(v));
+      const picture = safePicture(r.picture);
+      const face = picture
+        ? `<img class="avatar" src="${esc(picture)}" alt="">`
+        : `<span class="avatar">${esc(initialsOf(name))}</span>`;
+
+      return `<div class="person${here ? " here" : ""}">`
+        + face
+        + (isBlank(name) ? "" : `<p class="name">${esc(name)}</p>`)
+        + (parts.length ? `<p class="sub">${esc(parts.join(" \u00b7 "))}</p>` : "")
+        + `</div>`;
+    }).join("") + `</div>`;
+  },
+
   /* Where are we in a cycle? */
   strip(b) {
     const segments = Array.isArray(b.segments) && b.segments.length
@@ -1517,6 +1589,7 @@ function bodyIsEmpty(type, b) {
       return isBlank(b.title);
     case "control":
     case "scenes":
+    case "people":
       return !Array.isArray(b.rows) || b.rows.length === 0;
     case "forecast":
       return !Array.isArray(b.slots) || b.slots.length === 0;
