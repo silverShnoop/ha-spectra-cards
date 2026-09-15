@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.10.0";
+const VERSION = "0.11.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -192,9 +192,12 @@ const SHEET = `
    the same gesture until you declare otherwise, and losing the drag to the
    page scroll makes the control feel broken rather than absent.
 
-   The height change extends the press-feedback exception rather than
-   breaking the no-animation rule: the bar grows because a finger is on it,
-   and stops when the finger leaves. Nothing here moves on its own. */
+   The height change no longer needs defending against a no-animation
+   invariant — JAMES lifted that rule — but the restraint it produced is
+   worth keeping as a choice rather than a constraint: the bar grows because
+   a finger is on it and stops when the finger leaves. A wall panel is read
+   from across a room, and motion nobody caused is motion that pulls an eye
+   away from whatever it was actually doing. */
 .picker { position:relative; touch-action:none; cursor:pointer; }
 .picker .striphold { position:relative; }
 .picker .strip { height:16px; transition:height 120ms ease-out; }
@@ -214,8 +217,13 @@ const SHEET = `
 }
 .picker.picking .thumb { display:block; }
 .picker:focus-visible { outline:2px solid var(--sp-a4); outline-offset:3px; }
+.pickrow { flex-wrap:wrap; gap:6px; }
 .pickrow ha-icon { --mdc-icon-size:16px; color:var(--sp-ink-2); flex:none; }
 .pickrow .name { flex:none; }
+/* Status and buttons travel together and stay right-aligned; on a narrow
+   panel the whole group drops to its own line rather than the buttons
+   splitting away from the state they act on. */
+.pickend { margin-left:auto; display:flex; align-items:center; gap:6px; }
 
 /* people */
 .people { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
@@ -1667,20 +1675,33 @@ const BODIES = {
       + (b.pending ? `<span class="spinner"></span>` : "")
       + `</span>`;
 
+    /* Status and controls share one right-hand group so the buttons sit in
+       the same place in every state. A control that moves depending on what
+       the room is doing is a control you have to find before you can use
+       it, and this panel is read at arm's length while carrying something. */
+    out += `<span class="pickend">`;
+
     if (!lit) {
       /* Still draggable: picking a scene in a dark room is how you light it. */
-      out += `<span class="pill" style="margin-left:auto;${accentStyle(5)}">Off</span>`;
-    } else if (manual && smart && smart.entity) {
-      out += `<span class="pill" style="margin-left:auto;${accentStyle(2)}">Manual</span>`
-        + `<span class="cmd" role="button" tabindex="0" data-pickauto`
-        + ` style="margin-left:6px;${accentStyle(3)}">Auto</span>`;
+      out += `<span class="pill" style="${accentStyle(5)}">Off</span>`;
     } else if (manual) {
-      out += `<span class="pill" style="margin-left:auto;${accentStyle(2)}">Manual</span>`;
+      out += `<span class="pill" style="${accentStyle(2)}">Manual</span>`;
     } else if (nextText) {
-      out += `<span class="value">${esc(nextText)}</span>`;
+      out += `<span class="value" style="margin:0">${esc(nextText)}</span>`;
     }
 
-    return out + `</div>`;
+    /* Auto is offered whenever the room is not already following its
+       schedule — overridden, or off, which is just an override to darkness. */
+    if (!(lit && !manual) && smart && smart.entity) {
+      out += `<span class="cmd" role="button" tabindex="0" data-pickauto`
+        + ` style="${accentStyle(3)}">Auto</span>`;
+    }
+    if (lit && !isBlank(b.light)) {
+      out += `<span class="cmd" role="button" tabindex="0" data-pickoff`
+        + ` style="${accentStyle(5)}">Off</span>`;
+    }
+
+    return out + `</span></div>`;
   },
 
   /* Where are we in a cycle? */
@@ -2510,6 +2531,22 @@ class SpectraCard extends HTMLElement {
       };
       auto.addEventListener("click", run);
       auto.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    }
+
+    const off = this._holder.querySelector("[data-pickoff]");
+    if (off) {
+      const light = model.body && model.body.light;
+      const run = (event) => {
+        event.stopPropagation();
+        if (isBlank(light)) return;
+        onPress(off, () => this._callAction({
+          service: "light.turn_off", target: { entity_id: light },
+        }));
+      };
+      off.addEventListener("click", run);
+      off.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
       });
     }
