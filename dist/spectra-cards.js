@@ -138,6 +138,30 @@ const SHEET = `
 :focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
 .card.tappable { cursor:pointer; }
 
+/* dock — the domain rail along the bottom. Not a cell: it is chrome, so it
+   does not use the shell. Domain-based, never room-based; room selection
+   lives inside each pop-up. */
+.dock { display:flex; flex-wrap:wrap; gap:10px; }
+.dockbtn {
+  flex:1 1 130px; min-width:0; position:relative;
+  background:var(--sp-surface); border:2px solid var(--sp-edge);
+  border-radius:6px; padding:9px 10px; cursor:pointer;
+}
+/* A domain with something live takes its accent on the edge. The summary
+   text says so too — colour never carries it alone. */
+.dockbtn.live { border-color:var(--accent); }
+.dockhead { display:flex; align-items:center; gap:7px; }
+.dockhead ha-icon { --mdc-icon-size:18px; color:var(--accent); flex:none; }
+.dockhead h4 {
+  margin:0; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+  font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.docksum {
+  margin:5px 0 0; font-size:12px; color:var(--sp-ink-2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.dockbtn.live .docksum { color:var(--accent-on); }
+
 /* alert — the reference draws this with the flex on .card itself; the same
    measurements moved onto a wrapper, so the shell keeps owning its padding. */
 .alertrow { display:flex; align-items:center; gap:11px; }
@@ -1216,6 +1240,147 @@ if (!window.customCards.some((c) => c.type === "spectra-card")) {
     type: "spectra-card",
     name: "Spectra Card",
     description: "A Spectra widget shell wrapping one body archetype.",
+    preview: false,
+    documentationURL: "https://github.com/silverShnoop/ha-spectra-cards",
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * spectra-dock — the domain rail
+ *
+ * Five buttons along the bottom: Lights, Climate, Security, Lists,
+ * Cleaning. Domain-based and never room-based — room selection belongs
+ * inside each pop-up, because you reach for "the lights" before you reach
+ * for "the kitchen".
+ *
+ * Each carries a live one-line summary, so the rail informs as well as
+ * navigates. A row of five identical icons would be a menu; this is a
+ * status bar you can press.
+ * ------------------------------------------------------------------ */
+
+class SpectraDock extends HTMLElement {
+  static getStubConfig() {
+    return { buttons: [{ icon: "mdi:lightbulb-group", label: "Lights" }] };
+  }
+
+  constructor() {
+    super();
+    const root = this.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    style.textContent = SHEET;
+    root.appendChild(style);
+    this._holder = document.createElement("div");
+    root.appendChild(this._holder);
+    this._signature = null;
+    this._sources = [];
+    this._watched = {};
+  }
+
+  setConfig(config) {
+    if (!config || !Array.isArray(config.buttons) || !config.buttons.length) {
+      throw new Error("spectra-dock: `buttons` must be a non-empty list");
+    }
+    this._config = config;
+    const found = collectSources(config, {
+      entities: new Set(), forecasts: new Map(), live: false,
+    });
+    this._sources = [...found.entities];
+    this._watched = {};
+    this._signature = null;
+    if (this._hass) this._update();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._config) return;
+    let changed = this._signature === null;
+    for (const id of this._sources) {
+      const state = hass.states ? hass.states[id] : undefined;
+      if (this._watched[id] !== state) {
+        this._watched[id] = state;
+        changed = true;
+      }
+    }
+    if (changed) this._update();
+  }
+
+  get hass() {
+    return this._hass;
+  }
+
+  _update() {
+    const model = resolveValue(this._hass, this._config.buttons, {});
+    const signature = JSON.stringify(model);
+    if (signature === this._signature) return;
+    this._signature = signature;
+    this._render(model);
+  }
+
+  _render(buttons) {
+    this._holder.innerHTML = `<div class="dock">${buttons.map((button, index) => {
+      const b = button || {};
+      return `<div class="dockbtn${b.live ? " live" : ""}" role="button" tabindex="0"`
+        + ` data-button="${index}" style="${accentStyle(b.accent)}">`
+        + `<div class="dockhead">`
+        + (isBlank(b.icon) ? "" : `<ha-icon icon="${esc(b.icon)}"></ha-icon>`)
+        + `<h4>${esc(b.label)}</h4>`
+        + `</div>`
+        + `<p class="docksum">${esc(firstOf(b.summary, "—"))}</p>`
+        + `</div>`;
+    }).join("")}</div>`;
+
+    this._holder.querySelectorAll("[data-button]").forEach((el) => {
+      const config = this._config.buttons[Number(el.dataset.button)];
+      const open = () => this._open(config && config.tap_action);
+      el.addEventListener("click", open);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+    });
+  }
+
+  _open(action) {
+    if (!action || !this._hass || action.action === "none") return;
+    if (action.action === "navigate" && action.navigation_path) {
+      history.pushState(null, "", action.navigation_path);
+      window.dispatchEvent(new CustomEvent("location-changed", {
+        detail: { replace: false }, bubbles: true, composed: true,
+      }));
+      return;
+    }
+    if (action.action === "more-info" && action.entity) {
+      this.dispatchEvent(new CustomEvent("hass-more-info", {
+        detail: { entityId: action.entity }, bubbles: true, composed: true,
+      }));
+      return;
+    }
+    const name = action.service || action.perform_action;
+    if (typeof name !== "string" || !name.includes(".")) return;
+    const [domain, service] = name.split(".");
+    this._hass.callService(domain, service, action.data || {}, action.target || undefined);
+  }
+
+  getCardSize() {
+    return 2;
+  }
+
+  getGridOptions() {
+    return { rows: "auto", min_rows: 1, columns: 12, min_columns: 6 };
+  }
+}
+
+if (!customElements.get("spectra-dock")) {
+  customElements.define("spectra-dock", SpectraDock);
+}
+
+if (!window.customCards.some((c) => c.type === "spectra-dock")) {
+  window.customCards.push({
+    type: "spectra-dock",
+    name: "Spectra Dock",
+    description: "The domain rail: one pressable button per domain, each with a live summary.",
     preview: false,
     documentationURL: "https://github.com/silverShnoop/ha-spectra-cards",
   });

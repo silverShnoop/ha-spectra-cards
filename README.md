@@ -254,6 +254,34 @@ always an exception, always conditional and always actionable — so it has no
 hero and no metric strip, just an icon, a line, a reason and the button that
 fixes it. Pair it with `invert: true` and a `visibility` condition.
 
+## `spectra-dock` — the domain rail
+
+Not a cell. It is chrome along the bottom of the screen, so it does not use
+the shell.
+
+```yaml
+type: custom:spectra-dock
+buttons:
+  - icon: mdi:lightbulb-group
+    label: Lights
+    accent: 2
+    live: {entity: light.home, map: {on: true, off: false}}
+    summary: {entity: light.home, map: {on: On, off: All off}}
+    tap_action:
+      action: perform-action
+      perform_action: browser_mod.popup
+      data: {title: Lights, content: {...}}
+```
+
+**Domain-based, never room-based** — you reach for "the lights" before you
+reach for "the kitchen", so room selection belongs inside each pop-up.
+
+Each button carries a **live one-line summary**, which is what stops the rail
+being a menu. A row of five identical icons tells you nothing; this is a
+status bar you can press. A button whose `live` resolves truthy takes its
+accent on the edge — and the summary text says so too, because colour never
+carries meaning alone.
+
 ## Rows from a collection
 
 A `list` (or any array) can be built one row per item:
