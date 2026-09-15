@@ -46,6 +46,7 @@ tap_action:                # optional
 | `body` | Required, with a `type`. |
 | `tap_action` | `more-info`, `navigate`, `url`, `perform-action`, `none`. |
 | `hide_when_empty` | Default `true`. See below. |
+| `invert` | Accent fill, paper text. Step 7 of the emphasis ladder and the only one in the system — see below. |
 
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
@@ -236,6 +237,39 @@ thinned to about four so they never crowd. Never a gradient.
 `line`, `bars` and `labels` are plain arrays; the forecast source above is
 just one way to fill them.
 
+## Rows from a collection
+
+A `list` (or any array) can be built one row per item:
+
+```yaml
+rows:
+  from: {forecast: weather.home, type: daily, limit: 5}
+  each:
+    name:  {field: datetime, format: weekday}
+    icon:  {field: condition, format: weather_icon}
+    sub:   {field: condition, format: weather_text}
+    value: {join: [{field: temperature, suffix: "°"}, {field: templow, suffix: "°"}], separator: " / "}
+```
+
+`{field: x}` reads the current item and takes the same `format`, `map`,
+`prefix`, `suffix` and `fallback` options as an entity reference. Anything
+else falls through to the ordinary resolver, so a row can still mix in a
+value from an entity.
+
+The shape is fixed — one source, one row template — rather than a general
+expression language. The moment a card can compute, it stops being obvious
+what it shows.
+
+Three formats exist for weather specifically: `weekday` ("Today",
+"Tomorrow", then a short weekday, because a date on a wall panel is read as a
+position in the week), `weather_icon` and `weather_text`. Home Assistant's
+condition vocabulary is fixed and standard, so the mapping lives in the
+bundle rather than being retyped into every card.
+
+`attribute` also reads `last_changed`, `last_updated` and `last_reported`,
+which live on the state object rather than among the attributes — that is
+where a duration chip comes from.
+
 ## Forecasts
 
 Hourly and daily forecasts stopped being `weather.*` attributes in 2024, so a
@@ -262,6 +296,30 @@ the `Needs you` band is simply gone.
 
 That is `hide_when_empty`, on by default. A card always renders in the
 dashboard editor, because a hidden card cannot be selected.
+
+## The one inversion
+
+`invert: true` fills the card with accent 1 and sets the text to paper. It
+exists for a single cell — an unsecured front door, which has to read from
+across a room — and it is rationed rather than offered: a second inverted
+cell would stop the first from reading as urgent.
+
+Conditional cells use Home Assistant's own card `visibility`, which is
+handled by the frontend and takes no grid space:
+
+```yaml
+type: custom:spectra-card
+accent: 1
+invert: true
+visibility:
+  - condition: state
+    entity: lock.front_door
+    state_not: locked
+body:
+  type: status
+  hero: Front door unlocked
+  sub: {entity: lock.front_door, attribute: last_changed, format: relative, prefix: "Unsecured for "}
+```
 
 ## Theming
 
