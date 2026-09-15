@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.11.1";
+const VERSION = "0.12.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -224,6 +224,13 @@ const SHEET = `
    panel the whole group drops to its own line rather than the buttons
    splitting away from the state they act on. */
 .pickend { margin-left:auto; display:flex; align-items:center; gap:6px; }
+/* Reserved whether or not it has anything to say: JAMES asked that nothing
+   move when state changes, and a line that comes and goes moves everything
+   under it. */
+.picknext {
+  margin:5px 0 0; font-size:12px; color:var(--sp-ink-2);
+  min-height:15px; line-height:15px;
+}
 
 /* people */
 .people { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
@@ -405,6 +412,29 @@ img.avatar { object-fit:cover; display:block; }
   white-space:nowrap;
 }
 .cmd.on { background:var(--accent); color:var(--sp-surface); }
+
+/* A toggle with named positions.
+
+   Two separate buttons can show two lit, or none, and neither is a state the
+   thing itself can be in. One track can only ever show one, so the control
+   cannot draw something untrue. Each position carries its own accent by role
+   — the filled one is the state, the others are plain, which is step 6
+   against step 1 rather than the step 6 against step 3 that made a dimmed
+   button and a live one look so alike. */
+.toggle {
+  display:inline-flex; flex:none; overflow:hidden;
+  border:2px solid var(--sp-sink); border-radius:5px;
+}
+.toggle > span {
+  position:relative; font-size:11px; padding:6px 11px; white-space:nowrap;
+  color:var(--sp-ink-3); cursor:pointer;
+}
+.toggle > span + span { border-left:2px solid var(--sp-sink); }
+.toggle > span.on { background:var(--accent); color:var(--sp-surface); }
+.toggle > span::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
+}
 .cmd::after {
   content:""; position:absolute; left:50%; top:50%;
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
@@ -1681,32 +1711,35 @@ const BODIES = {
        it, and this panel is read at arm's length while carrying something. */
     out += `<span class="pickend">`;
 
-    if (lit && manual) {
-      out += `<span class="pill" style="${accentStyle(2)}">Manual</span>`;
-    } else if (lit && nextText) {
-      out += `<span class="value" style="margin:0">${esc(nextText)}</span>`;
-    }
-
-    /* Both buttons are always here, lit to show which state the room is in,
-       the same way the climate rows do it. Hiding Off because the room reads
-       off was a mistake twice over: a control you reach for and cannot find
-       reads as broken rather than unnecessary, and the moment you drag a
-       scene on you want Off back before the light entity has caught up with
-       what you just did. Pressing Off on a dark room costs nothing.
-
-       "A cell with nothing to say renders nothing" governs content. A control
-       is not content — it says what you can do, which stays true whether or
-       not you need it this second. */
+    /* Three positions, because the room is in exactly one of three states.
+       Manual is pressable, not just a place you land: it pins whatever is
+       showing, which is how you say "keep this, stop following the clock".
+       Ochre for it by role — the language already defines ochre as needs
+       attention, or is overridden. */
+    out += `<span class="toggle" role="group" aria-label="Mode">`;
     if (smart && smart.entity) {
-      out += `<span class="cmd${lit && !manual ? " on" : ""}" role="button"`
-        + ` tabindex="0" data-pickauto style="${accentStyle(3)}">Auto</span>`;
+      out += `<span class="${lit && !manual ? "on" : ""}" role="button" tabindex="0"`
+        + ` data-pickmode="auto" style="${accentStyle(3)}">Auto</span>`;
     }
+    out += `<span class="${lit && manual ? "on" : ""}" role="button" tabindex="0"`
+      + ` data-pickmode="manual"`
+      + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}"`
+      + ` style="${accentStyle(2)}">Manual</span>`;
     if (!isBlank(b.light)) {
-      out += `<span class="cmd${lit ? "" : " on"}" role="button"`
-        + ` tabindex="0" data-pickoff style="${accentStyle(5)}">Off</span>`;
+      out += `<span class="${lit ? "" : "on"}" role="button" tabindex="0"`
+        + ` data-pickmode="off" style="${accentStyle(5)}">Off</span>`;
     }
+    /* Closes the toggle, the right-hand group, and the row itself: the next
+       line is a block of its own, not a flex child that happens to wrap. */
+    out += `</span></span></div>`;
 
-    return out + `</span></div>`;
+    /* Always drawn even when empty. The next change is only true while the
+       schedule is driving — once overridden, Hue holds the scene rather than
+       advancing — so this says nothing in the other two states, but it keeps
+       its height so toggling does not make the card jump under your thumb. */
+    return out + `<p class="picknext">`
+      + (lit && !manual && nextText ? esc(nextText) : "")
+      + `</p>`;
   },
 
   /* Where are we in a cycle? */
@@ -2523,38 +2556,33 @@ class SpectraCard extends HTMLElement {
     const picker = this._holder.querySelector("[data-pick]");
     if (picker) this._bindPicker(picker);
 
-    const auto = this._holder.querySelector("[data-pickauto]");
-    if (auto) {
-      const scenes = (model.body && model.body.scenes) || [];
-      const smart = scenes.find((sc) => sc && sc.smart);
+    this._holder.querySelectorAll("[data-pickmode]").forEach((el) => {
+      const mode = el.getAttribute("data-pickmode");
+      const body = model.body || {};
       const run = (event) => {
         event.stopPropagation();
-        if (!smart || !smart.entity) return;
-        onPress(auto, () => this._callAction({
-          service: "scene.turn_on", target: { entity_id: smart.entity },
-        }));
+        let action = null;
+        if (mode === "off" && !isBlank(body.light)) {
+          action = { service: "light.turn_off", target: { entity_id: body.light } };
+        } else if (mode === "auto") {
+          const smart = (body.scenes || []).find((sc) => sc && sc.smart);
+          if (smart && smart.entity) {
+            action = { service: "scene.turn_on", target: { entity_id: smart.entity } };
+          }
+        } else if (mode === "manual") {
+          /* Pinning what is already showing: turning the scene on explicitly
+             is what stops the smart scene advancing at the next slot. */
+          const entity = el.getAttribute("data-pickscene");
+          if (entity) action = { service: "scene.turn_on", target: { entity_id: entity } };
+        }
+        if (!action) return;
+        onPress(el, () => this._callAction(action));
       };
-      auto.addEventListener("click", run);
-      auto.addEventListener("keydown", (event) => {
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
       });
-    }
-
-    const off = this._holder.querySelector("[data-pickoff]");
-    if (off) {
-      const light = model.body && model.body.light;
-      const run = (event) => {
-        event.stopPropagation();
-        if (isBlank(light)) return;
-        onPress(off, () => this._callAction({
-          service: "light.turn_off", target: { entity_id: light },
-        }));
-      };
-      off.addEventListener("click", run);
-      off.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
-      });
-    }
+    });
 
     const alertButton = this._holder.querySelector("[data-alert]");
     if (alertButton) {
