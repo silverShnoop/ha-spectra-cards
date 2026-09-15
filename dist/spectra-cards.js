@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.12.0";
+const VERSION = "0.12.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -209,6 +209,10 @@ const SHEET = `
 /* Nothing is driving this room, so nothing on the bar is lit. The bar stays
    legible enough to aim at, because dragging it is how you turn the room on. */
 .picker.off .strip { opacity:.32; }
+/* Same .32 as the bar, so the dot and the segment it came from fade together
+   rather than one looking deliberate and the other looking broken. */
+.pickrow.unlit .name, .pickrow.unlit ha-icon { color:var(--sp-ink-3); }
+.pickrow.unlit .dot { opacity:.32; }
 .picker .thumb {
   position:absolute; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px;
   border-radius:50%; box-sizing:border-box;
@@ -1695,7 +1699,12 @@ const BODIES = {
       : null;
     const smart = catalogue.find((sc) => sc && sc.smart);
 
-    out += `<div class="row pickrow" style="padding-left:0">`
+    /* An unlit room was naming its scheduled scene in full ink beside a
+       dimmed bar, and it read as "Sleepy is on" rather than "Sleepy is what
+       the schedule would be doing". The name belongs to the bar, so it dims
+       with the bar. The toggle does not: it is the control, and a control
+       stays legible whatever the room is doing. */
+    out += `<div class="row pickrow${lit ? "" : " unlit"}" style="padding-left:0">`
       + `<span class="dot" data-pickdot style="background:${chosen.color}"></span>`
       /* Always present, even empty: the drag rewrites this in place, and an
          element that has to be created mid-gesture is an element that jumps. */
