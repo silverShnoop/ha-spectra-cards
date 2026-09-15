@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.9.0";
+const VERSION = "0.10.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -155,6 +155,13 @@ const SHEET = `
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .eventbody .sub { flex-basis:100%; margin:0; }
+/* "All day" is a wider word than "09:00" is a number — 53px against 48px —
+   so the names after it started 6px further right than everybody else's and
+   the column stopped being a column. The slot is sized for the longer of the
+   two and both sit centred in it. A floor rather than a fixed width: if a
+   platform font ever overflows it the row is merely as ragged as it was
+   before, not clipped. */
+.eventbody .pill { min-width:56px; text-align:center; box-sizing:border-box; }
 .trail { flex:none; margin-left:auto; font-size:11px; color:var(--sp-ink-3); }
 .railcol { width:22px; flex:none; display:flex; flex-direction:column;
   align-items:center; align-self:stretch; }
@@ -178,6 +185,37 @@ const SHEET = `
   border-bottom:6px solid var(--sp-ink);
 }
 .strip.manual { opacity:.28; }
+
+/* picker — the strip you can move.
+
+   touch-action:none because a drag along a bar and a scroll down a page are
+   the same gesture until you declare otherwise, and losing the drag to the
+   page scroll makes the control feel broken rather than absent.
+
+   The height change extends the press-feedback exception rather than
+   breaking the no-animation rule: the bar grows because a finger is on it,
+   and stops when the finger leaves. Nothing here moves on its own. */
+.picker { position:relative; touch-action:none; cursor:pointer; }
+.picker .striphold { position:relative; }
+.picker .strip { height:16px; transition:height 120ms ease-out; }
+.picker.picking .strip { height:30px; }
+/* Dim the unchosen, never recolour the chosen: the segment's colour is the
+   scene's own light, and tinting it would be a lie about the room. */
+.picker.choosing .strip i { opacity:.3; }
+.picker.choosing .strip i.on { opacity:1; }
+/* Nothing is driving this room, so nothing on the bar is lit. The bar stays
+   legible enough to aim at, because dragging it is how you turn the room on. */
+.picker.off .strip { opacity:.32; }
+.picker .thumb {
+  position:absolute; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px;
+  border-radius:50%; box-sizing:border-box;
+  background:var(--sp-surface); border:3px solid var(--sp-ink);
+  pointer-events:none; display:none;
+}
+.picker.picking .thumb { display:block; }
+.picker:focus-visible { outline:2px solid var(--sp-a4); outline-offset:3px; }
+.pickrow ha-icon { --mdc-icon-size:16px; color:var(--sp-ink-2); flex:none; }
+.pickrow .name { flex:none; }
 
 /* people */
 .people { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
@@ -756,11 +794,16 @@ function resolveEach(hass, template, item, forecasts) {
    whichever zone they are in. Every dashboard spelling that map out per
    person is the same boilerplate three times over, so the body reads it. */
 function presenceLabel(state) {
-  if (isBlank(state)) return null;
+  /* A person whose trackers have all gone quiet reads as unknown, and the
+     resolver turns "unknown" into nothing at all on the way here — so the
+     blank case is not "say nothing", it is the same case. Saying nothing
+     left a tile with a duration and no word beside it, which is the one
+     reading that means neither in nor out. */
+  if (isBlank(state)) return "Unknown";
   const v = String(state);
   if (v === "home") return "Home";
   if (v === "not_home") return "Out";
-  if (v === "unknown" || v === "unavailable") return "No signal";
+  if (v === "unknown" || v === "unavailable") return "Unknown";
   return v.charAt(0).toUpperCase() + v.slice(1);
 }
 
@@ -940,6 +983,56 @@ function segmentsFromTimeslots(slots, sun) {
       minutes: Math.max(MIN_SEGMENT_MINUTES, next - seg.start),
     };
   });
+}
+
+/* A schedule drawn to exact scale is a good chart and a bad control: the
+   sliver between sunset and the next slot is three pixels wide on a phone,
+   which you can read but cannot put a thumb on. So the picker widens anything
+   under half an equal share and takes the difference proportionally from the
+   segments that have room. The bar stays monotonic in time and a long scene
+   still looks longer than a short one; it is just no longer linear.
+
+   Everything drawn on the bar goes through the same distortion — see
+   caretAt — because a caret placed by raw clock time would drift off the
+   segment it is meant to be pointing at, which is worse than the distortion. */
+function pickerLayout(segments) {
+  const count = segments.length;
+  const total = segments.reduce((sum, s) => sum + s.minutes, 0) || 1;
+  const floor = 100 / (count * 2);
+  const raw = segments.map((s) => (s.minutes / total) * 100);
+
+  let deficit = 0;
+  let surplus = 0;
+  for (const w of raw) {
+    if (w < floor) deficit += floor - w;
+    else surplus += w - floor;
+  }
+  const widths = raw.map((w) => {
+    if (w <= floor) return floor;
+    return surplus > 0 ? w - (w - floor) * (deficit / surplus) : w;
+  });
+
+  const offsets = [];
+  let running = 0;
+  for (const w of widths) { offsets.push(running); running += w; }
+  return { widths, offsets };
+}
+
+/* Where a moment in the day falls on that distorted bar. Null when the
+   segments carry no clock at all, and 0 for a time earlier than the first
+   slot starts — the schedule does not claim the small hours, and guessing
+   would put the caret somewhere it cannot defend. */
+function caretAt(segments, layout, minutes) {
+  if (!segments.length || segments[0].start === null) return null;
+  for (let i = segments.length - 1; i >= 0; i -= 1) {
+    const seg = segments[i];
+    if (seg.start === null) return null;
+    if (minutes >= seg.start) {
+      const through = Math.min(1, (minutes - seg.start) / Math.max(1, seg.minutes));
+      return layout.offsets[i] + through * layout.widths[i];
+    }
+  }
+  return 0;
 }
 
 function clockLabel(minutes) {
@@ -1471,6 +1564,125 @@ const BODIES = {
     }).join("") + `</div>`;
   },
 
+  /* The schedule, but you can move it.
+
+     Two things are true of a room's lighting at once: what the schedule
+     would be doing, and what is actually on. The bar shows the first and the
+     thumb sets the second, so auto and manual are the same control in two
+     states rather than two controls arguing.
+
+     Nothing is sent while a finger is down. Dragging across five scenes
+     would otherwise fire five scene activations at the bridge, and you would
+     watch the room flash through every one of them on the way to the one you
+     wanted. The bar says what you are about to choose; the release chooses. */
+  picker(b) {
+    const segments = Array.isArray(b.segments) && b.segments.length
+      ? b.segments.map((s) => ({
+        index: s.index,
+        color: cssColor(s.color) || "var(--sp-sink)",
+        label: s.label,
+        minutes: Number(s.pct) > 0 ? Number(s.pct) : 1,
+        start: null,
+      }))
+      : segmentsFromTimeslots(b.timeslots, b.sun);
+    if (!segments.length) return "";
+
+    /* Timeslots name a scene; only the catalogue knows which entity that is
+       and what it looks like. Matched by name because that is the only key
+       the two sides share. */
+    const catalogue = Array.isArray(b.scenes) ? b.scenes : [];
+    const known = {};
+    for (const scene of catalogue) {
+      if (scene && !isBlank(scene.name)) known[String(scene.name)] = scene;
+    }
+
+    const layout = pickerLayout(segments);
+    const activeIndex = b.active_index === undefined ? b.activeIndex : b.active_index;
+    let scheduled = segments.findIndex((s) => s.index === activeIndex);
+    if (scheduled < 0) scheduled = segments.length - 1;
+
+    const manual = Boolean(b.manual);
+    /* A dark room and an overridden room look identical through the active
+       scene alone — both report "not the schedule" — and calling a room
+       "Manual" when somebody simply turned the lights off is the card
+       asserting an override nobody made. When the light says it is off,
+       that is the more specific truth and it wins. */
+    const lit = b.on === undefined || Boolean(b.on);
+    /* picked is what the user is choosing right now, or has just chosen and
+       the bridge has not confirmed. It outranks both. */
+    const wanted = firstOf(b.picked, manual ? b.active : null);
+    let current = scheduled;
+    if (!isBlank(wanted)) {
+      const found = segments.findIndex((s) => String(s.label) === String(wanted));
+      if (found >= 0) current = found;
+    }
+
+    /* Dim the unchosen only when a choice is being expressed. While the
+       schedule is driving, no segment is more chosen than the clock says. */
+    const choosing = lit && (manual || Boolean(b.picked));
+    const now = new Date();
+    const caret = caretAt(segments, layout, now.getHours() * 60 + now.getMinutes());
+
+    const bar = segments.map((s, i) => {
+      const scene = known[String(s.label)];
+      return `<i data-seg="${i}"`
+        + ` data-scene-entity="${esc(scene && scene.entity ? scene.entity : "")}"`
+        + ` data-label="${esc(s.label)}"`
+        + ` data-icon="${esc(scene && scene.icon ? scene.icon : "")}"`
+        + ` data-color="${esc(s.color)}"`
+        + ` class="${i === current ? "on" : ""}"`
+        + ` style="flex:0 0 ${layout.widths[i].toFixed(3)}%;background:${s.color}"></i>`;
+    }).join("");
+
+    const thumbAt = layout.offsets[current] + layout.widths[current] / 2;
+    let out = `<div class="picker${choosing ? " choosing" : ""}${lit ? "" : " off"}"`
+      + ` role="slider" tabindex="0" data-pick`
+      + ` aria-label="Scene"`
+      + ` aria-valuemin="0" aria-valuemax="${segments.length - 1}"`
+      + ` aria-valuenow="${current}"`
+      + ` aria-valuetext="${esc(segments[current].label)}">`
+      + `<div class="striphold"><div class="strip">${bar}</div>`
+      + `<span class="thumb" style="left:${thumbAt.toFixed(2)}%"></span></div>`
+      + `<div class="caretrow">`
+      + (caret === null ? "" : `<span class="caret" style="left:${caret.toFixed(2)}%"></span>`)
+      + `</div></div>`;
+
+    const chosen = segments[current];
+    const scene = known[String(chosen.label)];
+    const next = chosen.start !== null
+      ? segments[(current + 1) % segments.length]
+      : null;
+    const nextText = next && next.start !== null
+      ? `→ ${next.label} ${clockLabel(next.start)}`
+      : null;
+    const smart = catalogue.find((sc) => sc && sc.smart);
+
+    out += `<div class="row pickrow" style="padding-left:0">`
+      + `<span class="dot" data-pickdot style="background:${chosen.color}"></span>`
+      /* Always present, even empty: the drag rewrites this in place, and an
+         element that has to be created mid-gesture is an element that jumps. */
+      + `<ha-icon data-pickicon icon="${esc(scene && scene.icon ? scene.icon : "")}"></ha-icon>`
+      + `<p class="name" data-pickname>${esc(chosen.label)}</p>`
+      + `<span class="spinslot" data-pickspin>`
+      + (b.pending ? `<span class="spinner"></span>` : "")
+      + `</span>`;
+
+    if (!lit) {
+      /* Still draggable: picking a scene in a dark room is how you light it. */
+      out += `<span class="pill" style="margin-left:auto;${accentStyle(5)}">Off</span>`;
+    } else if (manual && smart && smart.entity) {
+      out += `<span class="pill" style="margin-left:auto;${accentStyle(2)}">Manual</span>`
+        + `<span class="cmd" role="button" tabindex="0" data-pickauto`
+        + ` style="margin-left:6px;${accentStyle(3)}">Auto</span>`;
+    } else if (manual) {
+      out += `<span class="pill" style="margin-left:auto;${accentStyle(2)}">Manual</span>`;
+    } else if (nextText) {
+      out += `<span class="value">${esc(nextText)}</span>`;
+    }
+
+    return out + `</div>`;
+  },
+
   /* Where are we in a cycle? */
   strip(b) {
     const segments = Array.isArray(b.segments) && b.segments.length
@@ -1601,6 +1813,7 @@ function bodyIsEmpty(type, b) {
         && !(Array.isArray(b.icons) && b.icons.length);
     case "strip":
     case "arc":
+    case "picker":
       return !(Array.isArray(b.segments) && b.segments.length)
         && !(Array.isArray(b.timeslots) && b.timeslots.length);
     default:
@@ -1689,6 +1902,8 @@ class SpectraCard extends HTMLElement {
     this._calendars = {};
     this._failed = {};
     this._optimistic = {};
+    this._dragging = false;
+    this._pick = null;
   }
 
   setConfig(config) {
@@ -1763,6 +1978,9 @@ class SpectraCard extends HTMLElement {
       if (pending.giveUp) clearTimeout(pending.giveUp);
     }
     this._optimistic = {};
+    this._dragging = false;
+    if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
+    if (this._keyPick) { clearTimeout(this._keyPick); this._keyPick = null; }
     for (const pending of this._subscriptions.values()) {
       Promise.resolve(pending).then(
         (unsubscribe) => { if (typeof unsubscribe === "function") unsubscribe(); },
@@ -1985,6 +2203,9 @@ class SpectraCard extends HTMLElement {
       meta: resolveValue(this._hass, config.meta, f),
       body: resolveValue(this._hass, config.body, f) || {},
     };
+    /* A finger is on the bar. Rebuilding it now would take the element the
+       pointer is captured on out from under the gesture. */
+    if (this._dragging) return;
     this._applyPending(model);
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
@@ -1995,6 +2216,18 @@ class SpectraCard extends HTMLElement {
 
   /* What the user asked for, shown in place of what the house last said. */
   _applyPending(model) {
+    const pick = this._pick;
+    if (pick && model.body) {
+      const active = model.body.active;
+      if (!isBlank(active) && String(active) === String(pick.label)) {
+        this._pick = null;
+        if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
+      } else {
+        model.body.picked = pick.label;
+        model.body.pending = true;
+      }
+    }
+
     const rows = model.body && model.body.rows;
     if (!Array.isArray(rows)) return;
     for (const row of rows) {
@@ -2062,6 +2295,125 @@ class SpectraCard extends HTMLElement {
   /* An empty cell must take no grid space, not render an empty shell. In a
      sections view the grid item is the hui-card wrapper, so collapsing only
      :host would leave a gap where the card used to be. */
+  /* The bar answers the finger directly rather than through a re-render.
+     Re-rendering on every pointermove would rebuild the very element the
+     pointer is captured on, which drops the gesture; and the whole point of
+     this control is that nothing is sent until the finger lifts, so there is
+     nothing for a re-render to say in the meantime. */
+  _bindPicker(el) {
+    const strip = el.querySelector(".strip");
+    const thumb = el.querySelector(".thumb");
+    if (!strip || !thumb) return;
+    const cells = Array.prototype.slice.call(strip.querySelectorAll("i"));
+    if (!cells.length) return;
+
+    const nameEl = this._holder.querySelector("[data-pickname]");
+    const iconEl = this._holder.querySelector("[data-pickicon]");
+    const dotEl = this._holder.querySelector("[data-pickdot]");
+
+    let index = cells.findIndex((c) => c.classList.contains("on"));
+    if (index < 0) index = 0;
+    const began = index;
+
+    const show = (i) => {
+      for (let n = 0; n < cells.length; n += 1) cells[n].classList.toggle("on", n === i);
+      const cell = cells[i];
+      const label = cell.getAttribute("data-label") || "";
+      if (nameEl) nameEl.textContent = label;
+      if (iconEl) iconEl.setAttribute("icon", cell.getAttribute("data-icon") || "");
+      if (dotEl) dotEl.style.background = cell.getAttribute("data-color") || "";
+      el.setAttribute("aria-valuenow", String(i));
+      el.setAttribute("aria-valuetext", label);
+    };
+
+    /* Hit-tested against the rendered boxes rather than the percentages that
+       produced them: flex rounds, and a thumb that reports a different
+       segment from the one it is sitting on is the whole bug. */
+    const segmentAt = (clientX) => {
+      for (let i = 0; i < cells.length - 1; i += 1) {
+        if (clientX < cells[i].getBoundingClientRect().right) return i;
+      }
+      return cells.length - 1;
+    };
+
+    const moveThumb = (clientX) => {
+      const box = strip.getBoundingClientRect();
+      if (!box.width) return;
+      const x = Math.min(box.right, Math.max(box.left, clientX));
+      thumb.style.left = `${(((x - box.left) / box.width) * 100).toFixed(2)}%`;
+    };
+
+    const track = (clientX) => {
+      moveThumb(clientX);
+      const next = segmentAt(clientX);
+      if (next !== index) { index = next; show(index); }
+    };
+
+    const finish = (commit) => {
+      if (!this._dragging) return;
+      this._dragging = false;
+      el.classList.remove("picking");
+      const cell = cells[index];
+      const entity = cell && cell.getAttribute("data-scene-entity");
+      /* Landing back where you started is a cancelled gesture, not a choice,
+         and a scene you cannot name is a scene this card cannot turn on. */
+      if (commit && entity && index !== began) this._choose(cell.getAttribute("data-label"), entity);
+      this._signature = null;
+      this._update();
+    };
+
+    el.addEventListener("pointerdown", (event) => {
+      if (event.button) return;
+      if (el.setPointerCapture) el.setPointerCapture(event.pointerId);
+      this._dragging = true;
+      el.classList.add("picking", "choosing");
+      flashPress(el);
+      track(event.clientX);
+      event.preventDefault();
+    });
+    el.addEventListener("pointermove", (event) => {
+      if (!this._dragging) return;
+      track(event.clientX);
+      event.preventDefault();
+    });
+    el.addEventListener("pointerup", () => finish(true));
+    el.addEventListener("pointercancel", () => finish(false));
+
+    /* Arrows walk the bar; the commit waits for you to stop, for the same
+       reason the drag waits for the lift. */
+    el.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" ? 1 : (event.key === "ArrowLeft" ? -1 : 0);
+      if (!step) return;
+      event.preventDefault();
+      const next = Math.min(cells.length - 1, Math.max(0, index + step));
+      if (next === index) return;
+      index = next;
+      el.classList.add("choosing");
+      show(index);
+      if (this._keyPick) clearTimeout(this._keyPick);
+      this._keyPick = setTimeout(() => {
+        const cell = cells[index];
+        const entity = cell && cell.getAttribute("data-scene-entity");
+        if (entity) this._choose(cell.getAttribute("data-label"), entity);
+        this._signature = null;
+        this._update();
+      }, 600);
+    });
+  }
+
+  /* Held so the bar keeps showing what you asked for until the bridge agrees
+     — the same contract as a pending temperature. */
+  _choose(label, entity) {
+    if (this._pickGiveUp) clearTimeout(this._pickGiveUp);
+    this._pick = { label: label, at: Date.now() };
+    this._pickGiveUp = setTimeout(() => {
+      this._pick = null;
+      this._signature = null;
+      this._update();
+    }, 12000);
+    this._callAction({ service: "scene.turn_on", target: { entity_id: entity } });
+  }
+
   _setHidden(hide) {
     this.hidden = hide;
     const parent = this.parentElement;
@@ -2141,6 +2493,26 @@ class SpectraCard extends HTMLElement {
         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
       });
     });
+
+    const picker = this._holder.querySelector("[data-pick]");
+    if (picker) this._bindPicker(picker);
+
+    const auto = this._holder.querySelector("[data-pickauto]");
+    if (auto) {
+      const scenes = (model.body && model.body.scenes) || [];
+      const smart = scenes.find((sc) => sc && sc.smart);
+      const run = (event) => {
+        event.stopPropagation();
+        if (!smart || !smart.entity) return;
+        onPress(auto, () => this._callAction({
+          service: "scene.turn_on", target: { entity_id: smart.entity },
+        }));
+      };
+      auto.addEventListener("click", run);
+      auto.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    }
 
     const alertButton = this._holder.querySelector("[data-alert]");
     if (alertButton) {
