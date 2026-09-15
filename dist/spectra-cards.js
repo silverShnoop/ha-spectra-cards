@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.1.0";
+const VERSION = "0.4.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1271,9 +1271,16 @@ class SpectraCard extends HTMLElement {
       throw new Error("spectra-card: a `body` with a `type` is required");
     }
     if (!BODIES[config.body.type]) {
+      /* Nearly always a stale bundle rather than a typo: the dashboard has
+         been pointed at a body this copy of the file does not have yet.
+         Saying so beats a bare "Configuration error", because the fix is a
+         cache clear and not an edit. */
       throw new Error(
-        `spectra-card: unknown body type "${config.body.type}". `
-        + `Known types: ${Object.keys(BODIES).join(", ")}`,
+        `spectra-card: this bundle has no "${config.body.type}" body. `
+        + `It knows: ${Object.keys(BODIES).join(", ")}. `
+        + `If the dashboard expects one that is missing, the browser is `
+        + `running an old copy of spectra-cards.js — clear the frontend `
+        + `cache and reload. Bundle ${VERSION}.`,
       );
     }
     this._config = config;
