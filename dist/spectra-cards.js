@@ -181,6 +181,17 @@ const SHEET = `
 :focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
 .card.tappable { cursor:pointer; }
 
+/* forecast — columns of hours. A line answers "what shape", which is a
+   question nobody asks at a wall panel; this answers "what will it be at
+   six", which is the one they do. Read at distance, so the icon is the
+   largest thing and the number is mono. */
+.slots { display:flex; gap:3px; align-items:flex-start; }
+.slot { flex:1 1 0; min-width:0; text-align:center; }
+.slot .when { font-size:10px; color:var(--sp-ink-3); }
+.slot ha-icon { --mdc-icon-size:28px; color:var(--sp-ink-2); display:block; margin:3px auto 1px; }
+.slot .deg { font-family:var(--sp-mono); font-size:15px; font-weight:500; display:block; }
+.slot .wet { font-size:10px; color:var(--accent-on); display:block; margin-top:1px; }
+
 /* scenes — the lights component. The house is driven by scenes, not by
    brightness, so the scene is the control and the chips carry the scene's
    own colour rather than an accent. Reading a room means reading a row of
@@ -813,6 +824,32 @@ const BODIES = {
     return out;
   },
 
+  /* What will it be like later? A chart answers what shape something is
+     over time; this answers what the value will be at a given hour, which
+     is the question actually asked of a weather panel. */
+  forecast(b) {
+    const all = Array.isArray(b.slots) ? b.slots.filter(Boolean) : [];
+    if (!all.length) return "";
+    /* Every Nth hour rather than every hour: six legible columns beat
+       eighteen unreadable ones on a panel seen from across a room. */
+    const every = Math.max(1, Number(b.every) || 1);
+    const slots = all.filter((_, i) => i % every === 0).slice(0, Number(b.max) || 7);
+
+    return `<div class="slots">${slots.map((slot) => {
+      const wet = Number(slot.rain);
+      return `<div class="slot">`
+        + (isBlank(slot.time) ? "" : `<span class="when">${esc(slot.time)}</span>`)
+        + (isBlank(slot.icon) ? "" : `<ha-icon icon="${esc(slot.icon)}"></ha-icon>`)
+        + (isBlank(slot.temp) ? "" : `<span class="deg">${esc(slot.temp)}</span>`)
+        /* Rain is only worth a line when there is some. A column of zeroes
+           is noise pretending to be information. */
+        + (isFinite(wet) && wet > 0
+          ? `<span class="wet">${esc(wet < 1 ? wet.toFixed(1) : Math.round(wet))}mm</span>`
+          : "")
+        + `</div>`;
+    }).join("")}</div>`;
+  },
+
   /* Which scene is this room in? The house is controlled by scenes rather
      than by brightness, so the hero of a light control is a scene name and
      never a percentage. */
@@ -1182,6 +1219,8 @@ function bodyIsEmpty(type, b) {
     case "control":
     case "scenes":
       return !Array.isArray(b.rows) || b.rows.length === 0;
+    case "forecast":
+      return !Array.isArray(b.slots) || b.slots.length === 0;
     case "chart":
       return !(Array.isArray(b.line) && b.line.length)
         && !(Array.isArray(b.bars) && b.bars.length)
@@ -1651,6 +1690,7 @@ class SpectraCard extends HTMLElement {
     if (this._config.body.type === "list") {
       return 1 + Math.min(6, (Array.isArray(body.rows) ? body.rows.length : 3));
     }
+    if (this._config.body.type === "forecast") return 3;
     if (this._config.body.type === "rail") {
       return 1 + Math.min(8, (Array.isArray(body.events) ? body.events.length : 3));
     }

@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`, `alert`, `control`, `scenes`.
+**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`, `forecast`, `alert`, `control`, `scenes`.
 **Planned:** `arc`, `people`, `agenda`.
 
 ## Why there is no template language
@@ -236,6 +236,32 @@ thinned to about four so they never crowd. Never a gradient.
 
 `line`, `bars` and `labels` are plain arrays; the forecast source above is
 just one way to fill them.
+
+### `forecast` — what will it be like later?
+
+```yaml
+body:
+  type: forecast
+  every: 3          # every third hour
+  max: 6
+  slots:
+    from: {forecast: weather.home, type: hourly, limit: 18}
+    each:
+      time: {field: datetime, format: time}
+      icon: {field: condition, format: weather_icon}
+      temp: {field: temperature, format: round, digits: 0, suffix: "°"}
+      rain: {field: precipitation}
+```
+
+Columns of hours, not a line. `chart` answers *what shape is this over time*,
+which is not a question anyone asks at a wall panel; this answers *what will
+it be at six*, which is the one they do. So the icon is the largest thing on
+the card and every column carries a readable number — a 3px sparkline seen
+from three metres tells you nothing but its endpoints.
+
+`every` thins the hours: six legible columns beat eighteen unreadable ones.
+Rain only gets a line where there is some, because a row of zeroes is noise
+pretending to be information.
 
 ### `alert` — what is wrong right now that you must fix?
 
