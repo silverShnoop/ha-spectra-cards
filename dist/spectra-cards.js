@@ -1309,15 +1309,13 @@ class SpectraCard extends HTMLElement {
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
       this._titlebar(model),
-      BODIES[type](model.body),
+      bodyIsEmpty(type, model.body) && this._awaitingForecast()
+        ? `<p class="sub">Waiting for the forecast…</p>`
+        : BODIES[type](model.body),
       `</div>`,
     ].join("");
 
     this._holder.innerHTML = card;
-    if (bodyIsEmpty(type, model.body) && this._awaitingForecast()) {
-      const body = this._holder.querySelector(".card");
-      if (body) body.insertAdjacentHTML("beforeend", `<p class="sub">Waiting for the forecast…</p>`);
-    }
     this._bind(model);
   }
 
