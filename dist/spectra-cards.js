@@ -1053,9 +1053,15 @@ class SpectraCard extends HTMLElement {
   }
 
   _subscribeForecasts() {
-    if (!this._hass || !this._hass.connection || !this.isConnected) return;
+    if (!this._hass || !this.isConnected) return;
+    /* Fetching only needs callService. Subscribing needs a live connection,
+       and if that is missing the card should still paint rather than hide
+       itself over a websocket it never got. */
     for (const [key, source] of this._forecastSources) {
       this._fetchForecast(key, source);
+    }
+    if (!this._hass.connection) return;
+    for (const [key, source] of this._forecastSources) {
       if (this._subscriptions.has(key)) continue;
       const pending = this._hass.connection.subscribeMessage(
         (message) => {
