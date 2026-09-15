@@ -8,8 +8,8 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `chart`, `forecast`, `alert`, `control`, `scenes`.
-**Planned:** `arc`, `people`, `agenda`.
+**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `arc`, `chart`, `forecast`, `alert`, `control`, `scenes`.
+**Planned:** `people`, `agenda`.
 
 ## Why there is no template language
 
@@ -220,6 +220,30 @@ terracotta pill, for when something other than the adaptive scene is driving.
 
 Pass `segments: [{pct, color, label}]` instead of `timeslots` to drive the
 band from anything else.
+
+### `arc` — where are we in a *day*?
+
+The same schedule `strip` flattens, bent into a semicircle: midnight left,
+noon at the top, midnight right.
+
+```yaml
+body:
+  type: arc
+  timeslots: {entity: sensor.kitchen_golden_hours_schedule, attribute: timeslots}
+  active_index: {entity: sensor.kitchen_golden_hours_schedule, attribute: active_index}
+  sun:
+    rise: {entity: sun.sun, attribute: next_rising}
+    set:  {entity: sun.sun, attribute: next_setting}
+```
+
+Sunrise and sunset are hollow rings — events *on* the day rather than *of*
+it. Now is a filled dot in the live segment's colour, stroked so it reads
+against the pale ones. The hero is a scene name and never a percentage, with
+the next two transitions beneath.
+
+Geometry comes from the design's reference drawing rather than being
+reinvented: `viewBox 0 0 340 168`, centre (170,140), r 130, stroke 15, butt
+caps — round caps make the segment joins overlap.
 
 ### `chart` — what shape is this over time?
 
