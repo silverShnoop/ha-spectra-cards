@@ -66,13 +66,28 @@ rows: {entity: sensor.needs_you, attribute: items}
 | --- | --- |
 | `entity` | Required; marks the object as a reference. |
 | `attribute` | Read this attribute instead of the state. |
-| `format` | `relative` (a timestamp as `2m`, `1h 12m`, `3d 4h`), `round` with `digits`, `title`. |
+| `format` | `relative` (a timestamp as `2m`, `1h 12m`, `3d 4h`), `time` (a timestamp as local `19:15`), `round` with `digits`, `title`. |
 | `map` | Value-to-value lookup, applied before `format`. |
 | `prefix`, `suffix` | Concatenated onto the result. |
 | `fallback` | Used when the entity is missing, `unknown` or `unavailable`. |
 
 `unknown` and `unavailable` become nothing, not the words. A sensor that has
 not reported yet should leave a hole, not shout its plumbing at the room.
+
+One line of text can be composed from several readings with `join`, which is
+what a forecast sitting beside a real sensor needs:
+
+```yaml
+sub:
+  join:
+    - {entity: weather.home, attribute: temperature, prefix: "Forecast ", suffix: "°"}
+    - {entity: weather.home, format: title}
+  separator: "\n"
+```
+
+Parts that read as nothing are dropped rather than leaving a stray separator
+behind, and a `join` where everything is missing is itself nothing — so the
+cell can disappear rather than render punctuation.
 
 Action configs (`action`, `tap_action`, `hold_action`, `double_tap_action`)
 are passed through untouched, because their `entity` key means the target, not
