@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.14.0";
+const VERSION = "0.15.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -441,6 +441,26 @@ img.avatar { object-fit:cover; display:block; }
    worse than either. A dark room's mode is not a question with an answer,
    so it is not offered until there is a lit room to ask it about. */
 .toggle.inert { opacity:.38; pointer-events:none; }
+
+/* The one control in this system with no word on it. It can afford that
+   because the thing it switches is named two inches to its left, and the
+   side the knob sits on is a non-colour signal in its own right — so the
+   rule that colour never carries meaning alone still holds. Flat: the knob
+   moves, nothing about it lifts off the surface. */
+.switch {
+  position:relative; width:42px; height:24px; flex:none; cursor:pointer;
+  border:2px solid var(--sp-sink); border-radius:12px; background:var(--sp-sink);
+}
+.switch > i {
+  position:absolute; top:1px; left:1px; width:18px; height:18px; border-radius:50%;
+  background:var(--sp-ink-3); transition:left 140ms ease-out;
+}
+.switch.on { background:var(--sp-a4); border-color:var(--sp-a4); }
+.switch.on > i { left:19px; background:var(--sp-surface); }
+.switch::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
+}
 .pickend { flex-wrap:wrap; justify-content:flex-end; }
 .toggle > span::after {
   content:""; position:absolute; left:50%; top:50%;
@@ -1727,17 +1747,9 @@ const BODIES = {
        it, and this panel is read at arm's length while carrying something. */
     out += `<span class="pickend">`;
 
-    /* Power first, then mode. Two questions, not three peer states — and the
-       second only has an answer once the first is yes. Keeping them apart
-       means neither has to encode the other, which is what made a single
-       three-way track hard to read. */
-    if (!isBlank(b.light)) {
-      out += `<span class="toggle" role="group" aria-label="Power">`
-        + `<span class="${lit ? "on" : ""}" role="button" tabindex="0"`
-        + ` data-pickmode="on" style="${accentStyle(4)}">On</span>`
-        + `<span class="${lit ? "" : "on"}" role="button" tabindex="0"`
-        + ` data-pickmode="off" style="${accentStyle(5)}">Off</span></span>`;
-    }
+    /* Mode, then power. Two questions, not three peer states — and the mode
+       only has an answer once the room is on. Power sits rightmost because
+       it is the one you reach for without reading. */
 
     /* Manual is pressable, not just a place you land: it pins whatever is
        showing, which is how you say "keep this, stop following the clock".
@@ -1754,6 +1766,12 @@ const BODIES = {
         + ` data-pickmode="manual"`
         + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}"`
         + ` style="${accentStyle(2)}">Manual</span></span>`;
+    }
+
+    if (!isBlank(b.light)) {
+      out += `<span class="switch${lit ? " on" : ""}" role="switch"`
+        + ` aria-checked="${lit ? "true" : "false"}" aria-label="Lights"`
+        + ` tabindex="0" data-pickpower><i></i></span>`;
     }
 
     /* Closes the right-hand group and the row itself: the next line is a
@@ -2583,6 +2601,32 @@ class SpectraCard extends HTMLElement {
     const picker = this._holder.querySelector("[data-pick]");
     if (picker) this._bindPicker(picker);
 
+    const power = this._holder.querySelector("[data-pickpower]");
+    if (power) {
+      const body = model.body || {};
+      const on = body.on === undefined || Boolean(body.on);
+      const run = (event) => {
+        event.stopPropagation();
+        if (isBlank(body.light)) return;
+        let action;
+        if (on) {
+          action = { service: "light.turn_off", target: { entity_id: body.light } };
+        } else {
+          /* Switching a scheduled room on means letting the schedule have
+             it; a room with no schedule has nothing to defer to. */
+          const smart = (body.scenes || []).find((sc) => sc && sc.smart);
+          action = smart && smart.entity
+            ? { service: "scene.turn_on", target: { entity_id: smart.entity } }
+            : { service: "light.turn_on", target: { entity_id: body.light } };
+        }
+        onPress(power, () => this._callAction(action));
+      };
+      power.addEventListener("click", run);
+      power.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    }
+
     this._holder.querySelectorAll("[data-pickmode]").forEach((el) => {
       const mode = el.getAttribute("data-pickmode");
       const body = model.body || {};
@@ -2591,11 +2635,7 @@ class SpectraCard extends HTMLElement {
         let action = null;
         if (mode === "off" && !isBlank(body.light)) {
           action = { service: "light.turn_off", target: { entity_id: body.light } };
-        } else if (mode === "auto" || mode === "on") {
-          /* On lights the room the way the schedule would have it. There is
-             no other honest answer to "on" without also choosing a mode, and
-             choosing manual on someone's behalf invents an override they did
-             not ask for. */
+        } else if (mode === "auto") {
           const smart = (body.scenes || []).find((sc) => sc && sc.smart);
           if (smart && smart.entity) {
             action = { service: "scene.turn_on", target: { entity_id: smart.entity } };
