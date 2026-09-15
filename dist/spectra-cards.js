@@ -216,6 +216,51 @@ function clampPct(v) {
   return Math.max(0, Math.min(100, n));
 }
 
+/* Home Assistant's condition vocabulary is fixed and standard, so the
+   mapping belongs here rather than being retyped into every card's config. */
+const WEATHER_ICONS = {
+  "clear-night": "mdi:weather-night",
+  cloudy: "mdi:weather-cloudy",
+  exceptional: "mdi:alert-circle-outline",
+  fog: "mdi:weather-fog",
+  hail: "mdi:weather-hail",
+  lightning: "mdi:weather-lightning",
+  "lightning-rainy": "mdi:weather-lightning-rainy",
+  partlycloudy: "mdi:weather-partly-cloudy",
+  pouring: "mdi:weather-pouring",
+  rainy: "mdi:weather-rainy",
+  snowy: "mdi:weather-snowy",
+  "snowy-rainy": "mdi:weather-snowy-rainy",
+  sunny: "mdi:weather-sunny",
+  windy: "mdi:weather-windy",
+  "windy-variant": "mdi:weather-windy-variant",
+};
+
+const WEATHER_TEXT = {
+  "clear-night": "Clear",
+  partlycloudy: "Partly cloudy",
+  "lightning-rainy": "Thunderstorms",
+  "snowy-rainy": "Sleet",
+  "windy-variant": "Windy",
+  pouring: "Heavy rain",
+};
+
+/* "Today", "Tomorrow", then the short weekday — a date on a wall panel is
+   read as a position in the week, not as a number. */
+function weekdayLabel(value) {
+  const t = Date.parse(value);
+  if (isNaN(t)) return null;
+  const then = new Date(t);
+  const today = new Date();
+  const days = Math.round(
+    (new Date(then.getFullYear(), then.getMonth(), then.getDate())
+      - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000,
+  );
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  return then.toLocaleDateString([], { weekday: "short" });
+}
+
 function minutesSince(value) {
   const t = Date.parse(value);
   if (isNaN(t)) return 0;
@@ -277,6 +322,17 @@ function applyFormat(value, spec) {
     case "title":
       v = String(v).charAt(0).toUpperCase() + String(v).slice(1);
       break;
+    case "weekday":
+      v = weekdayLabel(v);
+      break;
+    case "weather_icon":
+      v = WEATHER_ICONS[v] || "mdi:weather-cloudy";
+      break;
+    case "weather_text": {
+      const key = String(v);
+      v = WEATHER_TEXT[key] || (key.charAt(0).toUpperCase() + key.slice(1));
+      break;
+    }
     case "time": {
       const t = Date.parse(v);
       v = isNaN(t)
@@ -293,10 +349,18 @@ function applyFormat(value, spec) {
   return v;
 }
 
+/* Not attributes — they live on the state object itself, and a duration
+   chip ("unsecured for 6 minutes") is read off one of them. */
+const STATE_FIELDS = new Set(["last_changed", "last_updated", "last_reported"]);
+
 function readEntity(hass, spec) {
   const state = hass && hass.states ? hass.states[spec.entity] : null;
   let v = null;
-  if (state) v = spec.attribute ? state.attributes[spec.attribute] : state.state;
+  if (state) {
+    if (!spec.attribute) v = state.state;
+    else if (STATE_FIELDS.has(spec.attribute)) v = state[spec.attribute];
+    else v = state.attributes[spec.attribute];
+  }
   if (v === undefined || v === "unknown" || v === "unavailable") v = null;
   const out = v === null ? null : applyFormat(v, spec);
   if (out === null || out === "") {
@@ -319,6 +383,16 @@ function resolveValue(hass, spec, forecasts) {
       .filter((v) => v !== null && v !== undefined && v !== "");
     return parts.length ? parts.join(separator) : null;
   }
+  /* A row per item of a collection. The shape is fixed — a source and one
+     row template — rather than a general expression language, because the
+     moment a card can compute it stops being obvious what it shows. */
+  if (spec.from !== undefined && spec.each !== undefined) {
+    const items = resolveValue(hass, spec.from, forecasts);
+    if (!Array.isArray(items)) return [];
+    const limit = Number(spec.limit) > 0 ? Number(spec.limit) : items.length;
+    return items.slice(0, limit)
+      .map((item) => resolveEach(hass, spec.each, item, forecasts));
+  }
   if (typeof spec.entity === "string") return readEntity(hass, spec);
   /* A forecast is pushed, not stored — see readForecast. The card holds the
      subscription; by the time a body sees this it is a plain array. */
@@ -326,6 +400,39 @@ function resolveValue(hass, spec, forecasts) {
   const out = {};
   for (const [key, value] of Object.entries(spec)) {
     out[key] = RAW_KEYS.has(key) ? value : resolveValue(hass, value, forecasts);
+  }
+  return out;
+}
+
+/* Resolves a row template against one item. `{field: x}` reads the item;
+   anything else falls through to the ordinary resolver, so a row can still
+   mix in a value from an entity. */
+function resolveEach(hass, template, item, forecasts) {
+  if (template === null || template === undefined) return template;
+  if (Array.isArray(template)) {
+    return template.map((v) => resolveEach(hass, v, item, forecasts));
+  }
+  if (typeof template !== "object") return template;
+  if (typeof template.field === "string") {
+    const value = item ? item[template.field] : null;
+    if (value === null || value === undefined) {
+      return template.fallback !== undefined ? template.fallback : null;
+    }
+    return applyFormat(value, template);
+  }
+  if (Array.isArray(template.join)) {
+    const separator = typeof template.separator === "string" ? template.separator : "";
+    const parts = template.join
+      .map((v) => resolveEach(hass, v, item, forecasts))
+      .filter((v) => v !== null && v !== undefined && v !== "");
+    return parts.length ? parts.join(separator) : null;
+  }
+  if (typeof template.entity === "string" || typeof template.forecast === "string") {
+    return resolveValue(hass, template, forecasts);
+  }
+  const out = {};
+  for (const [key, value] of Object.entries(template)) {
+    out[key] = RAW_KEYS.has(key) ? value : resolveEach(hass, value, item, forecasts);
   }
   return out;
 }
@@ -364,6 +471,11 @@ function collectSources(spec, found) {
   if (typeof spec.entity === "string") {
     found.entities.add(spec.entity);
     if (spec.format === "relative") found.live = true;
+    return found;
+  }
+  if (spec.from !== undefined && spec.each !== undefined) {
+    collectSources(spec.from, found);
+    collectSources(spec.each, found);
     return found;
   }
   if (typeof spec.forecast === "string") {
@@ -916,8 +1028,14 @@ class SpectraCard extends HTMLElement {
     }
 
     const tappable = Boolean(config.tap_action && config.tap_action.action !== "none");
+    /* Step 7 of the emphasis ladder, and the only one in the system. It is
+       rationed on purpose: a second inverted cell would stop the first from
+       reading as urgent. */
+    const classes = "card"
+      + (config.invert ? " invert" : "")
+      + (tappable ? " tappable" : "");
     const card = [
-      `<div class="card${tappable ? " tappable" : ""}"`,
+      `<div class="${classes}"`,
       ` style="${accentStyle(model.accent)}"`,
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
