@@ -717,7 +717,7 @@ if (!window.customCards.some((c) => c.type === "spectra-card")) {
     name: "Spectra Card",
     description: "A Spectra widget shell wrapping one body archetype.",
     preview: false,
-    documentationURL: "https://github.com/silverShnoop/spectra-cards",
+    documentationURL: "https://github.com/silverShnoop/ha-spectra-cards",
   });
 }
 
