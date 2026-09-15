@@ -530,10 +530,27 @@ what it means in the light.
 temperature and a Hue scene's hex are the colour the light actually is, not a
 decision about contrast.
 
-One deliberate non-feature remains: **no animation, no gradients, no shadows,
-no blur.** Nothing moves unless the user moved it. This is an e-ink design
-language ported to an LCD, and the stillness is the point rather than a
-limitation being worked around.
+**No gradients, no shadows, no blur**, and nothing animates on its own. This
+is an e-ink design language ported to an LCD, and the stillness is the point
+rather than a limitation being worked around.
+
+The one motion in the system is the motion a finger caused, which is the
+invariant *"nothing moves unless the user moved it"* read literally rather
+than as a ban:
+
+- **Every control flashes on press**, immediately, before anything is sent.
+- **A spinner runs until the house answers**, and for at least 400ms, because
+  below that it reads as a flicker and is worse than nothing. The label stays
+  legible while it waits — dimming it away loses what you just pressed.
+- **`adjust` moves its number at once.** What is shown while the spinner runs
+  is what you *asked for*; when it clears, it is what the house actually has.
+  Those are different claims, and the spinner is the difference. Successive
+  taps build on each other, and a flurry of them is one service call rather
+  than one per tap. If the house never agrees, the claim expires after 12
+  seconds rather than lying indefinitely.
+
+`prefers-reduced-motion` drops the flash to a static wash and slows the
+spinner.
 
 ## Installing
 
