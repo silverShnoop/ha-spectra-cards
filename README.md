@@ -369,13 +369,33 @@ body:
 ## Theming
 
 Everything is a CSS custom property on `:host`, so a dashboard can override
-the palette wholesale. Two deliberate non-features:
+the palette wholesale.
 
-- **No dark theme.** The panel is a wall display at fixed brightness; a dark
-  variant is unbuilt work with no user.
-- **No animation, no gradients, no shadows, no blur.** Nothing moves unless
-  the user moved it. This is an e-ink design language ported to an LCD, and
-  the stillness is the point, not a limitation being worked around.
+**Dark follows the system.** Home Assistant already resolves its "auto"
+setting against the operating system, so the card reads `hass.themes.darkMode`
+and stamps `data-theme` on itself — which means an explicit light or dark
+choice in HA beats the OS, and a `prefers-color-scheme` media query covers
+the moment before any `hass` arrives.
+
+Paper and ink swap materials rather than inverting arithmetically. The dark
+ground is a warm near-black and never pure: the same argument that kept the
+light surface off-white. A pure black panel in a dark kitchen is a hole, and
+pure white on it is glare.
+
+The six roles keep their meanings. Each base is lifted and slightly
+desaturated so it carries on a dark ground; each `soft` becomes a deep tint
+of the same hue rather than a pale one, and each `on` becomes light. No role
+is remapped to a different hue, so a terracotta row means in the dark exactly
+what it means in the light.
+
+**Raw entity colours are untouched in both themes** — a bulb's colour
+temperature and a Hue scene's hex are the colour the light actually is, not a
+decision about contrast.
+
+One deliberate non-feature remains: **no animation, no gradients, no shadows,
+no blur.** Nothing moves unless the user moved it. This is an e-ink design
+language ported to an LCD, and the stillness is the point rather than a
+limitation being worked around.
 
 ## Installing
 
