@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.5.1";
+const VERSION = "0.6.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -34,6 +34,7 @@ const SHEET = `
   --sp-a5:#4C5D8A; --sp-a5-soft:#DCE1ED; --sp-a5-on:#3A496E;
   --sp-a6:#7A4C6B; --sp-a6-soft:#EDDEE8; --sp-a6-on:#5E3452;
   --sp-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sp-press: rgba(43,39,36,.20);
   display:block; color:var(--sp-ink);
 }
 
@@ -55,7 +56,7 @@ const SHEET = `
   :host(:not([data-theme="light"])) {
     --sp-paper:#16140F; --sp-surface:#211E19; --sp-sink:#312D26;
     --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
-    --sp-ink-3:#837C6F; --sp-edge:#3C372E;
+    --sp-ink-3:#837C6F; --sp-edge:#3C372E; --sp-press: rgba(240,235,224,.22);
     --sp-a1:#E08054; --sp-a1-soft:#3A241A; --sp-a1-on:#F0B393;
     --sp-a2:#D9A63F; --sp-a2-soft:#382C14; --sp-a2-on:#EBC97E;
     --sp-a3:#93B45F; --sp-a3-soft:#24301A; --sp-a3-on:#BBD495;
@@ -71,7 +72,7 @@ const SHEET = `
 :host([data-theme="dark"]) {
   --sp-paper:#16140F; --sp-surface:#211E19; --sp-sink:#312D26;
   --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
-  --sp-ink-3:#837C6F; --sp-edge:#3C372E;
+  --sp-ink-3:#837C6F; --sp-edge:#3C372E; --sp-press: rgba(240,235,224,.22);
   --sp-a1:#E08054; --sp-a1-soft:#3A241A; --sp-a1-on:#F0B393;
   --sp-a2:#D9A63F; --sp-a2-soft:#382C14; --sp-a2-on:#EBC97E;
   --sp-a3:#93B45F; --sp-a3-soft:#24301A; --sp-a3-on:#BBD495;
@@ -185,6 +186,44 @@ const SHEET = `
    styling. outline, not border, so the ring costs no layout width. */
 :focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
 .card.tappable { cursor:pointer; }
+
+/* ---- press feedback ----
+   The invariant is "nothing moves unless the user moved it". A press flash
+   and a pending spinner are precisely that case, so this extends the rule
+   rather than breaking it: the only motion in the system is the motion a
+   finger caused. Nothing here animates on its own.
+
+   A button that sits inert for a second after a tap reads as broken, and
+   the honest fix is to say "heard you" immediately and "still working"
+   until the house agrees. */
+@keyframes sp-press {
+  0%   { box-shadow: inset 0 0 0 999px var(--sp-press); }
+  100% { box-shadow: inset 0 0 0 999px transparent; }
+}
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+
+.pressed { animation: sp-press 260ms ease-out; }
+
+.spinner {
+  width:13px; height:13px; flex:none; border-radius:50%;
+  border:2px solid var(--sp-sink); border-top-color:currentColor;
+  animation: sp-spin .7s linear infinite;
+  display:inline-block; vertical-align:middle;
+}
+/* The label stays legible while it waits — dimming it to nothing would
+   lose what you just pressed. */
+.busy > *:not(.spinner) { opacity:.45; }
+.busy { gap:6px; }
+
+/* A pending value is the one you asked for, not the one the house has yet.
+   It sits in the accent so it reads as provisional, and the spinner beside
+   it is the promise that it will be checked. */
+.ctlvalue.pending { color:var(--accent-on); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pressed { animation:none; box-shadow:inset 0 0 0 999px var(--sp-press); }
+  .spinner { animation-duration:2.4s; }
+}
 
 /* forecast — columns of hours. A line answers "what shape", which is a
    question nobody asks at a wall panel; this answers "what will it be at
@@ -1052,7 +1091,8 @@ const BODIES = {
       if (r.adjust) {
         cluster += `<span class="step" role="button" tabindex="0" data-step="${index}" data-dir="-1">`
           + `<ha-icon icon="mdi:minus"></ha-icon></span>`
-          + `<span class="ctlvalue">${esc(firstOf(r.value, "—"))}</span>`
+          + `<span class="ctlvalue${r.pending ? " pending" : ""}">${esc(firstOf(r.value, "—"))}</span>`
+          + (r.pending ? `<span class="spinner"></span>` : "")
           + `<span class="step" role="button" tabindex="0" data-step="${index}" data-dir="1">`
           + `<ha-icon icon="mdi:plus"></ha-icon></span>`;
       } else if (!isBlank(r.value)) {
@@ -1358,6 +1398,50 @@ function bodyIsEmpty(type, b) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Press feedback
+ *
+ * Two separate promises to the finger: "heard you", immediately, and
+ * "still working", until the house says otherwise. The first is a flash;
+ * the second is a spinner that outlives the service call by a beat so it
+ * is actually seen rather than glimpsed.
+ * ------------------------------------------------------------------ */
+
+/* Below this a spinner reads as a flicker, which is worse than none. */
+const SPINNER_FLOOR_MS = 400;
+
+function flashPress(element) {
+  if (!element) return;
+  element.classList.remove("pressed");
+  /* Reading offsetWidth restarts the animation; without it a second tap
+     inside 260ms does nothing visible. */
+  void element.offsetWidth;
+  element.classList.add("pressed");
+}
+
+function markBusy(element) {
+  if (!element || element.classList.contains("busy")) return () => {};
+  element.classList.add("busy");
+  const spinner = document.createElement("span");
+  spinner.className = "spinner";
+  element.appendChild(spinner);
+  const started = Date.now();
+  return () => {
+    const wait = Math.max(0, SPINNER_FLOOR_MS - (Date.now() - started));
+    setTimeout(() => {
+      element.classList.remove("busy");
+      if (spinner.parentNode) spinner.parentNode.removeChild(spinner);
+    }, wait);
+  };
+}
+
+/* Wraps a press: flash now, spin until settled. */
+function onPress(element, run) {
+  flashPress(element);
+  const done = markBusy(element);
+  Promise.resolve(run()).then(done, done);
+}
+
+/* ------------------------------------------------------------------ *
  * The shell
  *
  * Border, padding, title bar. It owns the eyebrow tick, the lead icon, the
@@ -1390,6 +1474,7 @@ class SpectraCard extends HTMLElement {
     this._fetched = new Set();
     this._todoSources = new Map();
     this._todos = {};
+    this._optimistic = {};
   }
 
   setConfig(config) {
@@ -1427,6 +1512,7 @@ class SpectraCard extends HTMLElement {
     this._hass = hass;
     applyTheme(this, hass);
     if (!this._config) return;
+    this._reconcile();
     this._subscribeForecasts();
     /* Only re-marshal when an entity this card actually reads has changed.
        A wall panel sees a lot of state it does not care about. */
@@ -1455,6 +1541,12 @@ class SpectraCard extends HTMLElement {
       clearInterval(this._timer);
       this._timer = null;
     }
+    for (const entity of Object.keys(this._optimistic)) {
+      const pending = this._optimistic[entity];
+      if (pending.send) clearTimeout(pending.send);
+      if (pending.giveUp) clearTimeout(pending.giveUp);
+    }
+    this._optimistic = {};
     for (const pending of this._subscriptions.values()) {
       Promise.resolve(pending).then(
         (unsubscribe) => { if (typeof unsubscribe === "function") unsubscribe(); },
@@ -1625,11 +1717,25 @@ class SpectraCard extends HTMLElement {
       meta: resolveValue(this._hass, config.meta, f),
       body: resolveValue(this._hass, config.body, f) || {},
     };
+    this._applyPending(model);
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
     this._signature = signature;
     this._model = model;
     this._render(model);
+  }
+
+  /* What the user asked for, shown in place of what the house last said. */
+  _applyPending(model) {
+    const rows = model.body && model.body.rows;
+    if (!Array.isArray(rows)) return;
+    for (const row of rows) {
+      const entity = row && row.adjust && row.adjust.entity;
+      const pending = entity && this._optimistic[entity];
+      if (!pending) continue;
+      row.value = pending.display;
+      row.pending = true;
+    }
   }
 
   _render(model) {
@@ -1698,7 +1804,7 @@ class SpectraCard extends HTMLElement {
       const row = rows[Number(el.dataset.row)];
       const run = (event) => {
         event.stopPropagation();
-        this._callAction(row && row.action);
+        onPress(el, () => this._callAction(row && row.action));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
@@ -1715,9 +1821,10 @@ class SpectraCard extends HTMLElement {
       const scene = row && row.scenes && row.scenes[Number(el.dataset.position)];
       const run = (event) => {
         event.stopPropagation();
-        if (scene && scene.entity) {
-          this._callAction({ service: "scene.turn_on", target: { entity_id: scene.entity } });
-        }
+        if (!scene || !scene.entity) return;
+        onPress(el, () => this._callAction({
+          service: "scene.turn_on", target: { entity_id: scene.entity },
+        }));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
@@ -1728,9 +1835,10 @@ class SpectraCard extends HTMLElement {
       const row = controls[Number(el.dataset.power)];
       const run = (event) => {
         event.stopPropagation();
-        if (row && row.light) {
-          this._callAction({ service: "light.toggle", target: { entity_id: row.light } });
-        }
+        if (!row || !row.light) return;
+        onPress(el, () => this._callAction({
+          service: "light.toggle", target: { entity_id: row.light },
+        }));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
@@ -1741,6 +1849,7 @@ class SpectraCard extends HTMLElement {
       const row = controls[Number(el.dataset.step)];
       const run = (event) => {
         event.stopPropagation();
+        flashPress(el);
         this._adjust(row && row.adjust, Number(el.dataset.dir));
       };
       el.addEventListener("click", run);
@@ -1753,7 +1862,7 @@ class SpectraCard extends HTMLElement {
       const command = row && row.buttons && row.buttons[Number(el.dataset.position)];
       const run = (event) => {
         event.stopPropagation();
-        this._callAction(command && command.action);
+        onPress(el, () => this._callAction(command && command.action));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
@@ -1765,7 +1874,7 @@ class SpectraCard extends HTMLElement {
     if (alertButton) {
       const run = (event) => {
         event.stopPropagation();
-        this._callAction(model.body && model.body.action);
+        onPress(el, () => this._callAction(model.body && model.body.action));
       };
       alertButton.addEventListener("click", run);
       alertButton.addEventListener("keydown", (event) => {
@@ -1780,11 +1889,11 @@ class SpectraCard extends HTMLElement {
     if (!config.tap_action || config.tap_action.action === "none") return;
     const card = this._holder.querySelector(".card");
     if (!card) return;
-    card.addEventListener("click", () => this._handleTap());
+    card.addEventListener("click", () => onPress(card, () => this._handleTap()));
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        this._handleTap();
+        onPress(card, () => this._handleTap());
       }
     });
   }
@@ -1823,15 +1932,28 @@ class SpectraCard extends HTMLElement {
 
   /* Stepping a target reads the current value and sends an absolute one,
      because that is what the services take. Config cannot do arithmetic and
-     should not learn how. */
+     should not learn how.
+
+     The number moves the instant it is pressed, because waiting two seconds
+     for a thermostat to answer feels broken and invites a second press. What
+     is shown while waiting is what you asked for; when the spinner clears,
+     it is what the house actually has. Those are different claims and the
+     spinner is the difference. */
   _adjust(adjust, direction) {
     if (!adjust || !this._hass || !adjust.entity) return;
+    /* A throw inside a click handler kills the button with no trace, so the
+       one piece of state this path needs is never assumed. */
+    this._optimistic = this._optimistic || {};
     const state = this._hass.states[adjust.entity];
     if (!state) return;
-    const current = Number(
-      adjust.attribute ? state.attributes[adjust.attribute] : state.state,
-    );
+    const pending = this._optimistic[adjust.entity];
+    /* Successive taps build on each other rather than each starting from a
+       stale reading, so +,+,+ is three steps and not one. */
+    const current = pending
+      ? pending.target
+      : Number(adjust.attribute ? state.attributes[adjust.attribute] : state.state);
     if (!isFinite(current)) return;
+
     const step = Number(adjust.step) || 1;
     let next = current + direction * step;
     if (adjust.min !== undefined) next = Math.max(Number(adjust.min), next);
@@ -1842,25 +1964,71 @@ class SpectraCard extends HTMLElement {
        would otherwise raise the temperature, which is the opposite of what
        the finger asked for. */
     if ((next - current) * direction < 0) return;
+
     const field = adjust.field || "temperature";
-    this._callAction({
-      service: adjust.service,
-      target: { entity_id: adjust.entity },
-      data: Object.assign({}, adjust.data, { [field]: Number(next.toFixed(2)) }),
-    });
+    const decimals = String(step).includes(".") ? 1 : 0;
+    const previous = pending || {};
+    if (previous.send) clearTimeout(previous.send);
+    if (previous.giveUp) clearTimeout(previous.giveUp);
+
+    this._optimistic[adjust.entity] = {
+      target: next,
+      display: next.toFixed(decimals) + (adjust.suffix || "\u00b0"),
+      /* One call for a flurry of taps: a thermostat asked three times in a
+         second is three round trips for one decision. */
+      send: setTimeout(() => {
+        this._callAction({
+          service: adjust.service,
+          target: { entity_id: adjust.entity },
+          data: Object.assign({}, adjust.data, { [field]: Number(next.toFixed(2)) }),
+        });
+      }, 450),
+      /* If the house never agrees, stop claiming it did. */
+      giveUp: setTimeout(() => this._settle(adjust.entity), 12000),
+      attribute: adjust.attribute,
+    };
+    this._signature = null;
+    this._update();
+  }
+
+  _settle(entity) {
+    const pending = this._optimistic[entity];
+    if (!pending) return;
+    if (pending.send) clearTimeout(pending.send);
+    if (pending.giveUp) clearTimeout(pending.giveUp);
+    delete this._optimistic[entity];
+    this._signature = null;
+    this._update();
+  }
+
+  /* The moment the entity reports the number we asked for, the claim stops
+     being a claim and the spinner has done its job. */
+  _reconcile() {
+    for (const entity of Object.keys(this._optimistic)) {
+      const pending = this._optimistic[entity];
+      const state = this._hass.states[entity];
+      if (!state) continue;
+      const actual = Number(
+        pending.attribute ? state.attributes[pending.attribute] : state.state,
+      );
+      if (isFinite(actual) && Math.abs(actual - pending.target) < 0.01) {
+        this._settle(entity);
+      }
+    }
   }
 
   _callAction(action) {
-    if (!action || !this._hass) return;
+    if (!action || !this._hass) return Promise.resolve();
     const name = action.service || action.perform_action || action.action;
     if (typeof name !== "string" || !name.includes(".")) {
       LOGGER_WARN("spectra-card: action has no service to call", action);
-      return;
+      return Promise.resolve();
     }
     const [domain, service] = name.split(".");
     /* A rejected call is silent otherwise, and a button that does nothing
-       with no explanation is the worst thing a panel can do. */
-    Promise.resolve(
+       with no explanation is the worst thing a panel can do. Returned so a
+       spinner can wait on it. */
+    return Promise.resolve(
       this._hass.callService(domain, service, action.data || {}, action.target || undefined),
     ).catch((error) => LOGGER_WARN(`spectra-card: ${name} failed`, error));
   }
@@ -1984,7 +2152,7 @@ class SpectraDock extends HTMLElement {
 
     this._holder.querySelectorAll("[data-button]").forEach((el) => {
       const config = this._config.buttons[Number(el.dataset.button)];
-      const open = () => this._open(config && config.tap_action);
+      const open = () => onPress(el, () => this._open(config && config.tap_action));
       el.addEventListener("click", open);
       el.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -2013,7 +2181,7 @@ class SpectraDock extends HTMLElement {
     const name = action.service || action.perform_action;
     if (typeof name !== "string" || !name.includes(".")) return;
     const [domain, service] = name.split(".");
-    Promise.resolve(
+    return Promise.resolve(
       this._hass.callService(domain, service, action.data || {}, action.target || undefined),
     ).catch((error) => LOGGER_WARN(`spectra-dock: ${name} failed`, error));
   }
