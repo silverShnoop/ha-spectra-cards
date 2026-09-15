@@ -703,10 +703,15 @@ const BODIES = {
        and a temperature share no axis. */
     if (bars.length) {
       const bw = Math.max(3, Math.min(26, step * 0.55));
+      /* Bars are scaled to their own series, not to 100. Met.no reports
+         rainfall in millimetres, where a wet hour is 0.4 — read as a
+         percentage that is a bar one pixel tall, which is the same as no
+         bar at all. */
+      const peak = Math.max(...bars.filter((n) => isFinite(n)), 0);
       out += bars.map((v, i) => {
-        const pct = clampPct(v);
-        if (!pct) return "";
-        const h = Math.max(1, (pct / 100) * 10);
+        const value = isFinite(v) ? Math.max(0, v) : 0;
+        if (!value || !peak) return "";
+        const h = Math.max(2, (value / peak) * 12);
         return `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${(BASE - h).toFixed(1)}"`
           + ` width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="var(--accent-soft)"/>`;
       }).join("");
@@ -952,6 +957,7 @@ class SpectraCard extends HTMLElement {
     this._forecastSources = new Map();
     this._forecasts = {};
     this._subscriptions = new Map();
+    this._fetched = new Set();
   }
 
   setConfig(config) {
@@ -1019,10 +1025,37 @@ class SpectraCard extends HTMLElement {
 
   /* One subscription per entity and forecast type, held for as long as the
      card is on screen. Home Assistant pushes a new forecast when it has one,
-     so there is nothing to poll and nothing to cache in a sensor. */
+     so there is nothing to poll and nothing to cache in a sensor.
+
+     The subscription only pushes when the forecast *changes*, which can be
+     an hour away, so the first paint comes from weather.get_forecasts
+     instead. Without it a freshly loaded panel shows nothing and looks
+     broken. */
+  _fetchForecast(key, source) {
+    if (this._fetched.has(key)) return;
+    this._fetched.add(key);
+    Promise.resolve(
+      this._hass.callService(
+        "weather", "get_forecasts", { type: source.type },
+        { entity_id: source.entity }, false, true,
+      ),
+    ).then((result) => {
+      const payload = result && result.response && result.response[source.entity];
+      const forecast = payload && payload.forecast;
+      if (!Array.isArray(forecast) || this._forecasts[key]) return;
+      this._forecasts[key] = forecast;
+      this._signature = null;
+      this._update();
+    }, (error) => {
+      this._fetched.delete(key);
+      LOGGER_WARN(`spectra-card: could not fetch the ${source.type} forecast for ${source.entity}`, error);
+    });
+  }
+
   _subscribeForecasts() {
     if (!this._hass || !this._hass.connection || !this.isConnected) return;
     for (const [key, source] of this._forecastSources) {
+      this._fetchForecast(key, source);
       if (this._subscriptions.has(key)) continue;
       const pending = this._hass.connection.subscribeMessage(
         (message) => {
@@ -1209,9 +1242,16 @@ class SpectraCard extends HTMLElement {
   _callAction(action) {
     if (!action || !this._hass) return;
     const name = action.service || action.perform_action || action.action;
-    if (typeof name !== "string" || !name.includes(".")) return;
+    if (typeof name !== "string" || !name.includes(".")) {
+      LOGGER_WARN("spectra-card: action has no service to call", action);
+      return;
+    }
     const [domain, service] = name.split(".");
-    this._hass.callService(domain, service, action.data || {}, action.target || undefined);
+    /* A rejected call is silent otherwise, and a button that does nothing
+       with no explanation is the worst thing a panel can do. */
+    Promise.resolve(
+      this._hass.callService(domain, service, action.data || {}, action.target || undefined),
+    ).catch((error) => LOGGER_WARN(`spectra-card: ${name} failed`, error));
   }
 
   getCardSize() {
@@ -1360,7 +1400,9 @@ class SpectraDock extends HTMLElement {
     const name = action.service || action.perform_action;
     if (typeof name !== "string" || !name.includes(".")) return;
     const [domain, service] = name.split(".");
-    this._hass.callService(domain, service, action.data || {}, action.target || undefined);
+    Promise.resolve(
+      this._hass.callService(domain, service, action.data || {}, action.target || undefined),
+    ).catch((error) => LOGGER_WARN(`spectra-dock: ${name} failed`, error));
   }
 
   getCardSize() {
