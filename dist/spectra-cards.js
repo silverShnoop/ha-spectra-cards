@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.8.0";
+const VERSION = "0.8.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -135,13 +135,38 @@ const SHEET = `
 .bar { height:5px; width:56px; background:var(--sp-sink); border-radius:3px; overflow:hidden; margin-left:auto; }
 .bar i { display:block; height:100%; }
 
-/* rail */
-.event { display:flex; gap:9px; align-items:flex-start; padding:5px 0; }
+/* rail and agenda share one event shape: a rail column, a name, and a short
+   trailing scrap. A duration or a time-since is two characters wide and was
+   costing a whole line each, which is how seven events filled a screen. The
+   scrap rides the name line, right-aligned, and the row stays one line tall
+   unless there is something that genuinely needs the second — a location.
+
+   .name is declared here rather than only under .row and .ctl, which is the
+   bug that made these rows tall in the first place: an unmatched .name is a
+   bare <p>, and a bare <p> brings 16px of margin with it. */
+.name { margin:0; font-size:13px; }
+.event { display:flex; gap:9px; align-items:flex-start; padding:2px 0; }
+.eventbody {
+  flex:1; min-width:0; display:flex; flex-wrap:wrap;
+  align-items:baseline; gap:2px 8px; padding-bottom:4px;
+}
+.eventbody .name {
+  flex:1 1 auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.eventbody .sub { flex-basis:100%; margin:0; }
+.trail { flex:none; margin-left:auto; font-size:11px; color:var(--sp-ink-3); }
 .railcol { width:22px; flex:none; display:flex; flex-direction:column;
   align-items:center; align-self:stretch; }
 .railcol ha-icon { --mdc-icon-size:15px; }
-.railcol .line { flex:1; width:2px; background:var(--sp-edge); margin-top:3px; }
+/* Now that a row is one line tall the connector had shrunk to a 4px stub
+   between two dots, which reads as debris rather than a rail. The negative
+   bottom margin carries it across the gap to the next marker, so the column
+   is one continuous spine with the dots sitting on it. */
+.railcol .line { flex:1; width:2px; background:var(--sp-edge);
+  margin-top:3px; margin-bottom:-6px; }
 .event.stale .name, .event.stale ha-icon { color:var(--sp-ink-3); }
+.event.stale .trail { color:var(--sp-ink-3); }
 
 /* strip */
 .strip { display:flex; height:16px; border-radius:3px; overflow:hidden; }
@@ -169,7 +194,7 @@ const SHEET = `
   font-size:10px; letter-spacing:.08em; text-transform:uppercase;
   color:var(--sp-ink-3); margin:7px 0 3px;
 }
-.node { width:9px; height:9px; border-radius:50%; margin-top:4px; flex:none;
+.node { width:9px; height:9px; border-radius:50%; margin-top:3px; flex:none;
   background:var(--accent); }
 
 /* inverted — unsecured strip ONLY */
@@ -189,7 +214,7 @@ const SHEET = `
 
 /* agenda — the week, grouped by the day it happens on. A flat list of
    timestamps makes you do the grouping in your head every time you look. */
-.dayrow { display:flex; align-items:baseline; gap:8px; margin:9px 0 3px; }
+.dayrow { display:flex; align-items:baseline; gap:8px; margin:8px 0 2px; }
 .dayrow .dayhead { margin:0; }
 .dayrule { flex:1; height:2px; background:var(--sp-sink); }
 .daycount { font-size:10px; color:var(--sp-ink-3); }
@@ -1000,20 +1025,21 @@ const BODIES = {
            whole difference between "Tuesday" and "09:00 Tuesday". */
         const allDay = !String(event.start).includes("T");
         const when = allDay ? "All day" : shortTime(event.start);
-        const parts = [event.location, allDay ? null : spanOf(event.start, event.end)]
-          .filter((part) => !isBlank(part));
+        const span = allDay ? null : spanOf(event.start, event.end);
 
         return `<div class="event">`
           + `<div class="railcol" style="width:14px">`
           + `<span class="node"></span>`
           + (i < rows.length - 1 ? `<span class="line"></span>` : "")
           + `</div>`
-          + `<div style="padding-bottom:7px">`
+          + `<div class="eventbody">`
           + `<p class="name"><span class="pill" style="margin-right:6px">`
           + `${esc(when)}</span>${esc(event.summary)}</p>`
+          + (isBlank(span) ? "" : `<span class="trail">${esc(span)}</span>`)
           /* Deliberately not the description: Google fills it with markup
-             and boilerplate, and the location is the part you act on. */
-          + (parts.length ? `<p class="sub">${esc(parts.join(" \u00b7 "))}</p>` : "")
+             and boilerplate, and the location is the part you act on — and
+             the only thing here worth a second line. */
+          + (isBlank(event.location) ? "" : `<p class="sub">${esc(event.location)}</p>`)
           + `</div></div>`;
       }).join("");
 
@@ -1367,8 +1393,8 @@ const BODIES = {
         + `></ha-icon>`
         + (i < shown.length - 1 ? `<span class="line"></span>` : "")
         + `</div>`
-        + `<div><p class="name">${esc(name)}${suffix}</p>`
-        + (isBlank(ago) ? "" : `<p class="sub">${esc(ago)} ago</p>`)
+        + `<div class="eventbody"><p class="name">${esc(name)}${suffix}</p>`
+        + (isBlank(ago) ? "" : `<span class="trail">${esc(ago)} ago</span>`)
         + `</div></div>`;
     }).join("");
   },
