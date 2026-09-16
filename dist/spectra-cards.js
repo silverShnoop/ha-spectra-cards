@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.20.0";
+const VERSION = "0.20.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2220,6 +2220,7 @@ class SpectraCard extends HTMLElement {
        and done settles into a tick that reads and then leaves. */
     this._phase = "idle";
     this._busy = 0;
+    this._power = null;
   }
 
   setConfig(config) {
@@ -2295,7 +2296,9 @@ class SpectraCard extends HTMLElement {
     }
     this._optimistic = {};
     this._dragging = false;
+    this._power = null;
     if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
+    if (this._powerGiveUp) { clearTimeout(this._powerGiveUp); this._powerGiveUp = null; }
     if (this._keyPick) { clearTimeout(this._keyPick); this._keyPick = null; }
     for (const pending of this._subscriptions.values()) {
       Promise.resolve(pending).then(
@@ -2544,6 +2547,19 @@ class SpectraCard extends HTMLElement {
 
   /* What the user asked for, shown in place of what the house last said. */
   _applyPending(model) {
+    const power = this._power;
+    if (power && model.body && model.body.on !== undefined) {
+      if (Boolean(model.body.on) === power.want) {
+        this._power = null;
+        if (this._powerGiveUp) { clearTimeout(this._powerGiveUp); this._powerGiveUp = null; }
+      } else {
+        /* Everything downstream reads this — the status, the circle, the
+           outline, whether the mode tab is live — so they all move together
+           rather than the switch arguing with the rest of the card. */
+        model.body.on = power.want;
+      }
+    }
+
     const pick = this._pick;
     if (pick && model.body) {
       const active = model.body.active;
@@ -2813,6 +2829,19 @@ class SpectraCard extends HTMLElement {
     Promise.resolve(run()).then(settle, settle);
   }
 
+  /* The switch shows what you asked for until the light reports it. Given up
+     on after twelve seconds, so a call that never lands leaves a switch
+     telling the truth rather than one stuck on a promise. */
+  _wantPower(want) {
+    if (this._powerGiveUp) clearTimeout(this._powerGiveUp);
+    this._power = { want: Boolean(want) };
+    this._powerGiveUp = setTimeout(() => {
+      this._power = null;
+      this._signature = null;
+      this._update();
+    }, 12000);
+  }
+
   /* Held so the bar keeps showing what you asked for until the bridge agrees
      — the same contract as a pending temperature. */
   _choose(label, entity) {
@@ -2929,12 +2958,21 @@ class SpectraCard extends HTMLElement {
             ? { service: "scene.turn_on", target: { entity_id: smart.entity } }
             : { service: "light.turn_on", target: { entity_id: body.light } };
         }
-        /* Move the knob now, on the live element, so the transition actually
-           runs — a re-render would replace the node and the knob would jump
-           rather than travel. The render that follows agrees with it. */
+        /* Two separate jobs, and missing either one is visible.
+
+           The knob moves on the live element so the transition actually runs
+           — a re-render replaces the node, and a node created already in its
+           new position does not animate.
+
+           And the wanted state is held until the bridge agrees, the same
+           contract the bar and the climate rows use. Without it the render
+           after the transition reads the light's real state, which has not
+           caught up, so the knob travels, snaps back, and travels again when
+           the state finally lands. */
         power.classList.toggle("on", !on);
         power.setAttribute("aria-checked", on ? "false" : "true");
         this._switchedAt = Date.now();
+        this._wantPower(!on);
         flashPress(power);
         this._work(() => this._callAction(action));
       };
