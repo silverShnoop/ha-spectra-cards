@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.25.1";
+const VERSION = "0.26.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -35,6 +35,9 @@ const SHEET = `
   --sp-a6:#7A4C6B; --sp-a6-soft:#EDDEE8; --sp-a6-on:#5E3452;
   --sp-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --sp-press: rgba(43,39,36,.20);
+  /* A flash on plain paper only has to beat paper. A flash landing on top of
+     a selection wash has to beat the wash, so it presses harder. */
+  --sp-press-firm: rgba(43,39,36,.34);
   display:block; color:var(--sp-ink);
 }
 
@@ -57,6 +60,7 @@ const SHEET = `
     --sp-paper:#16140F; --sp-surface:#211E19; --sp-sink:#312D26;
     --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
     --sp-ink-3:#837C6F; --sp-edge:#3C372E; --sp-press: rgba(240,235,224,.22);
+    --sp-press-firm: rgba(240,235,224,.36);
     --sp-a1:#E08054; --sp-a1-soft:#3A241A; --sp-a1-on:#F0B393;
     --sp-a2:#D9A63F; --sp-a2-soft:#382C14; --sp-a2-on:#EBC97E;
     --sp-a3:#93B45F; --sp-a3-soft:#24301A; --sp-a3-on:#BBD495;
@@ -73,6 +77,7 @@ const SHEET = `
   --sp-paper:#16140F; --sp-surface:#211E19; --sp-sink:#312D26;
   --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
   --sp-ink-3:#837C6F; --sp-edge:#3C372E; --sp-press: rgba(240,235,224,.22);
+  --sp-press-firm: rgba(240,235,224,.36);
   --sp-a1:#E08054; --sp-a1-soft:#3A241A; --sp-a1-on:#F0B393;
   --sp-a2:#D9A63F; --sp-a2-soft:#382C14; --sp-a2-on:#EBC97E;
   --sp-a3:#93B45F; --sp-a3-soft:#24301A; --sp-a3-on:#BBD495;
@@ -671,6 +676,10 @@ img.avatar { object-fit:cover; display:block; }
    alone would be a rail that says nothing across a room in the dark. */
 .dockbtn.selected { background:var(--sp-a4-soft); border-color:var(--sp-a4); }
 .dockbtn.selected .dockhead h4 { color:var(--sp-a4-on); }
+/* The rail reuses the shared press animation but feeds it the firmer value,
+   because here the flash lands on top of the selection wash rather than on a
+   plain surface. No new keyframes: the same motion, more of it. */
+.dockbtn { --sp-press: var(--sp-press-firm); }
 .dockbtn.selected::before {
   content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
   border-radius:6px 0 0 6px; background:var(--sp-a4);
@@ -2417,6 +2426,12 @@ function moveBarFrom(root, shot) {
   }
 }
 
+/* The unit harness has no frame loop; a timer is close enough there, and the
+   browser gets the real thing. */
+const RAF = typeof requestAnimationFrame === "function"
+  ? (fn) => requestAnimationFrame(fn)
+  : (fn) => setTimeout(fn, 16);
+
 function flashPress(element) {
   if (!element) return;
   element.classList.remove("pressed");
@@ -3603,6 +3618,7 @@ class SpectraDock extends HTMLElement {
     this._sources = [...found.entities];
     this._watched = {};
     this._signature = null;
+    if (this._pressedAt === undefined) this._pressedAt = null;
     if (this._hass) this._update();
   }
 
@@ -3634,6 +3650,20 @@ class SpectraDock extends HTMLElement {
     const model = { buttons: buttons, selected: selected };
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
+    /* The press already moved the selection and started the flash on the live
+       elements. The helper changing is the house agreeing a moment later, and
+       re-rendering on it would rebuild those nodes and wipe both. Same rule as
+       the card: a render waits out a press's answer. */
+    if (this._pressedAt && Date.now() - this._pressedAt < PRESS_HOLD_MS) {
+      if (!this._pressTimer) {
+        this._pressTimer = setTimeout(() => {
+          this._pressTimer = null;
+          this._signature = null;
+          this._update();
+        }, PRESS_HOLD_MS + 20);
+      }
+      return;
+    }
     this._signature = signature;
     this._render(buttons, selected);
   }
@@ -3654,9 +3684,31 @@ class SpectraDock extends HTMLElement {
         + `</div>`;
     }).join("")}</div>`;
 
-    this._holder.querySelectorAll("[data-button]").forEach((el) => {
+    const all = this._holder.querySelectorAll("[data-button]");
+    all.forEach((el) => {
       const config = this._config.buttons[Number(el.dataset.button)];
-      const open = () => onPress(el, () => this._open(config && config.tap_action));
+      const open = () => {
+        /* No spinner. The rail is a switch, and the selection moving *is* the
+           answer — a spinner on top of it reports "working" about something
+           that has already happened, and covers the thing it is reporting on.
+
+           Selection moves on the press rather than on the round trip, for the
+           same reason the light switch does: a switch that waits for the
+           house to agree reads as a switch that did not hear you. */
+        all.forEach((other) => {
+          other.classList.toggle("selected", other === el);
+          other.setAttribute("aria-current", other === el ? "page" : "false");
+        });
+        this._pressedAt = Date.now();
+        /* A frame later, so the flash paints over the colour that has just
+           landed instead of arriving with it and being swallowed by it.
+
+           It runs on every press, including a press of the button already
+           selected. That press changes nothing, but it was still heard, and a
+           control that ignores you is indistinguishable from a broken one. */
+        RAF(() => flashPress(el));
+        this._open(config && config.tap_action);
+      };
       el.addEventListener("click", open);
       el.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -3688,6 +3740,13 @@ class SpectraDock extends HTMLElement {
     return Promise.resolve(
       this._hass.callService(domain, service, action.data || {}, action.target || undefined),
     ).catch((error) => LOGGER_WARN(`spectra-dock: ${name} failed`, error));
+  }
+
+  disconnectedCallback() {
+    if (this._pressTimer) {
+      clearTimeout(this._pressTimer);
+      this._pressTimer = null;
+    }
   }
 
   getCardSize() {
