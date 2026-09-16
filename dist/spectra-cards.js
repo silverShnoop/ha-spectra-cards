@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.29.0";
+const VERSION = "0.30.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -167,28 +167,6 @@ const SHEET = `
 .quote { margin:0; font-size:22px; line-height:1.36; color:var(--sp-ink);
   max-width:34ch; text-wrap:pretty; }
 .quoteby { margin:9px 0 0; font-size:12px; color:var(--sp-ink-3); }
-
-/* Weather art. Sized by the site it sits in, exactly as ha-icon was, so
-   nothing above it had to move. currentColor is not used: each part carries
-   its own role, which is the entire point of not using a single glyph. */
-.wicon { display:block; width:24px; height:24px; flex:none; fill:none;
-  stroke-linecap:round; stroke-linejoin:round; }
-/* Cloud, and every other neutral in the set. */
-.wicon .wc { stroke:var(--sp-ink-2); color:var(--sp-ink-2); }
-/* Water. One hue, and the lighter tone carried by opacity rather than a
-   second hue, so a drizzle and a downpour cannot drift apart in colour. */
-.wicon .ww { stroke:var(--sp-a5); color:var(--sp-a5); }
-.wicon .wl { stroke:var(--sp-a5); color:var(--sp-a5); opacity:.75; }
-/* Ice is not pale water. Snow, sleet and hail take their falling part in ink
-   instead, which also lets sleet show blue drops beside pale flakes — the
-   distinction the icon exists to make. */
-.wicon.frozen .wl { stroke:var(--sp-ink-2); color:var(--sp-ink-2); opacity:1; }
-/* Sun, and the lightning bolt, which is the same warmth doing a louder job. */
-.wicon .ws { stroke:var(--sp-a2); color:var(--sp-a2); }
-.titlebar .wicon { width:17px; height:17px; }
-.bigicon.wicon { width:46px; height:46px; }
-.slot .wicon { width:36px; height:36px; margin:0 auto; }
-.rowicon { width:22px; height:22px; }
 
 /* primitives */
 .hero {
@@ -509,7 +487,7 @@ img.avatar { object-fit:cover; display:block; }
 .slots { display:flex; gap:3px; align-items:flex-start; }
 .slot { flex:1 1 0; min-width:0; text-align:center; }
 .slot .when { font-size:10px; color:var(--sp-ink-3); }
-.slot ha-icon { --mdc-icon-size:32px; color:var(--sp-ink-2); display:block; margin:2px auto 0; }
+.slot ha-icon { --mdc-icon-size:28px; color:var(--sp-ink-2); display:block; margin:3px auto 1px; }
 .slot .deg { font-family:var(--sp-mono); font-size:15px; font-weight:500; display:block; }
 .slot .wet { font-size:10px; color:var(--accent-on); display:block; margin-top:1px; }
 
@@ -826,71 +804,21 @@ function clampPct(v) {
 /* Home Assistant's condition vocabulary is fixed and standard, so the
    mapping belongs here rather than being retyped into every card's config. */
 const WEATHER_ICONS = {
-  "clear-night": "spectra:clear-night",
-  cloudy: "spectra:cloudy",
-  /* Their set has no generic alert, and its stand-in draws the letters
-     "N/A" — text inside an icon, which is worse than a plain glyph. */
+  "clear-night": "mdi:weather-night",
+  cloudy: "mdi:weather-cloudy",
   exceptional: "mdi:alert-circle-outline",
-  fog: "spectra:fog",
-  hail: "spectra:hail",
-  lightning: "spectra:lightning",
-  "lightning-rainy": "spectra:lightning-rainy",
-  partlycloudy: "spectra:partlycloudy",
-  pouring: "spectra:pouring",
-  rainy: "spectra:rainy",
-  snowy: "spectra:snowy",
-  "snowy-rainy": "spectra:snowy-rainy",
-  sunny: "spectra:sunny",
-  windy: "spectra:windy",
-  "windy-variant": "spectra:windy-variant",
-};
-
-/* ------------------------------------------------------------------ *
- * Weather art
- *
- * Line icons from Meteocons by Bas Milius, MIT licensed:
- * https://github.com/basmilius/weather-icons
- *
- * Taken rather than drawn, and taken in the line variant specifically: it is
- * stroke-only, carries no gradients and no depth, and already separates the
- * cloud from the water from the sun as distinct elements — which is the whole
- * reason an mdi glyph could not do this. One path cannot have two colours.
- *
- * Their flat hex values are replaced by classes so the theme decides the
- * colour, not the file: the drawing is theirs, the palette is ours. Every id
- * is namespaced, because several of these share `id="a"` for a clipPath and
- * inlining them into one document would otherwise cross-wire the clips.
- *
- * The falling parts are not theirs. Meteocons draws rain, snow and hail as
- * hairlines a single unit long, which at the size a forecast slot actually
- * renders is under a device pixel: on the dark theme they disappear, and
- * rain, sleet, snow and hail all collapse into one silhouette — a cloud with
- * specks. So the precipitation is redrawn here with area instead of length,
- * and each kind given a shape rather than a count: drops for rain, slanted
- * bars for a downpour, asterisks for snow, discs for hail, and drops beside
- * an asterisk for sleet. A wall panel is read from across the room; the
- * silhouette has to survive that on its own, before any colour helps.
- *
- * windy-variant is likewise ours. Meteocons ships it identical to windy,
- * which makes two conditions indistinguishable; it is a cloud over one
- * swoosh here so the pair reads apart.
- * ------------------------------------------------------------------ */
-const WEATHER_ART = {
-  "clear-night": `<path d="M46.66,36.2A16.66,16.66,0,0,1,29.88,19.65a16.29,16.29,0,0,1,.55-4.15A16.56,16.56,0,1,0,48.5,36.1C47.89,36.16,47.28,36.2,46.66,36.2Z" fill="none" class="wl" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>`,
-  "cloudy": `<path d="M46.5,31.5l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0h28a7,7,0,0,0,0-14Z" fill="none" class="wc" stroke-linejoin="round" stroke-width="3"/>`,
-  "exceptional": `<path d="M26.1,24.08a.83.83,0,0,1,.16.56V38.12a.59.59,0,0,1-.72.71h-1.2a.75.75,0,0,1-.69-.35l-5.14-7.6a11.62,11.62,0,0,1-.85-1.5c-.28-.57-.49-1.05-.64-1.43s-.23-.59-.23-.6h-.13s0,.23.12.66.15,1,.23,1.64a18,18,0,0,1,.11,1.88v6.59a.77.77,0,0,1-.16.56.79.79,0,0,1-.55.15H15.3a.85.85,0,0,1-.57-.15.76.76,0,0,1-.17-.56V24.64a.78.78,0,0,1,.17-.56.85.85,0,0,1,.57-.15h1.19a.81.81,0,0,1,.7.33l5.1,7.56a13,13,0,0,1,.89,1.56c.27.55.48,1,.63,1.41s.23.59.24.6h.13s0-.25-.12-.67-.15-1-.23-1.63a16.11,16.11,0,0,1-.11-1.94V24.64a.83.83,0,0,1,.15-.56.82.82,0,0,1,.56-.15h1.11A.82.82,0,0,1,26.1,24.08Z" fill="currentColor" class="wc"/> <path d="M30.47,40a1,1,0,0,1-.54.12H28.76c-.24,0-.4-.05-.46-.14a.43.43,0,0,1,0-.44l5.58-15a1.16,1.16,0,0,1,.33-.46.94.94,0,0,1,.53-.12H36c.24,0,.39.05.45.14a.5.5,0,0,1,0,.44l-5.59,15A1.06,1.06,0,0,1,30.47,40Z" fill="currentColor" class="wc"/> <path d="M48.89,38.83H47.8a2.4,2.4,0,0,1-.91-.12.78.78,0,0,1-.39-.51l-1-2.7H39.74l-1,2.7a.78.78,0,0,1-.39.51,2.4,2.4,0,0,1-.91.12h-1q-.73,0-.48-.69l5.25-13.65a1.07,1.07,0,0,1,.33-.47,1,1,0,0,1,.55-.11h1.11a1.06,1.06,0,0,1,.57.11.9.9,0,0,1,.32.45l5.24,13.67Q49.63,38.83,48.89,38.83Zm-6-11.13c-.09-.43-.14-.76-.17-1l0-.36h-.15a7.73,7.73,0,0,1-.46,2.54l-1.62,4.45H44.8L43.2,28.9A10,10,0,0,1,42.89,27.7Z" fill="currentColor" class="wc"/>`,
-  "fog": `<path d="M46.5,31.5l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0h28a7,7,0,0,0,0-14Z" fill="none" class="wc" stroke-linejoin="round" stroke-width="3"/> <line x1="17" y1="58" x2="47" y2="58" fill="none" class="wc" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/> <line x1="17" y1="52" x2="47" y2="52" fill="none" class="wc" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>`,
-  "hail": `<path d="M43.67,45.5H46.5a7,7,0,0,0,0-14l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0" fill="none" class="wc" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/> <circle cx="24" cy="52.5" r="2.7" fill="currentColor" class="wl"/> <circle cx="31" cy="52.5" r="2.7" fill="currentColor" class="wl"/> <circle cx="38" cy="52.5" r="2.7" fill="currentColor" class="wl"/>`,
-  "lightning": `<path d="M43.67,45.5H46.5a7,7,0,0,0,0-14l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0" fill="none" class="wc" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/> <polygon points="30 36 26 48 30 48 28 58 38 44 32 44 36 36 30 36" fill="currentColor" class="ws"/>`,
-  "lightning-rainy": `<path d="M43.67,45.5H46.5a7,7,0,0,0,0-14l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0" fill="none" class="wc" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/> <path d="M21,47.5c-2.2,3.2-3.3,4.9-3.3,6.1a3.3,3.3,0,0,0,6.6,0C24.3,52.4,23.2,50.7,21,47.5Z" fill="currentColor" class="ww"/> <path d="M42,47.5c-2.2,3.2-3.3,4.9-3.3,6.1a3.3,3.3,0,0,0,6.6,0C45.3,52.4,44.2,50.7,42,47.5Z" fill="currentColor" class="ww"/> <polygon points="30 36 26 48 30 48 28 58 38 44 32 44 36 36 30 36" fill="currentColor" class="ws"/>`,
-  "partlycloudy": `<defs> <clipPath id="wipartly-cloudy-daya"> <polygon points="12 35 6.72 30.79 4.72 24.79 5.72 17.79 9.72 12.79 14.72 9.79 20.72 9.79 25.72 10.79 28.72 13.79 33 20 27 24 21 24 18 27 18 31 14 33 12 35" fill="none"/> </clipPath> </defs> <g clip-path="url(#wipartly-cloudy-daya)"> <path d="M23.5,24A4.5,4.5,0,1,1,19,19.5,4.49,4.49,0,0,1,23.5,24ZM19,15.67V12.5m0,23V32.33m5.89-14.22,2.24-2.24M10.87,32.13l2.24-2.24m0-11.78-2.24-2.24M27.13,32.13l-2.24-2.24M7.5,24h3.17M30.5,24H27.33" fill="none" class="ws" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2.6"/> </g> <path d="M46.5,31.5l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0h28a7,7,0,0,0,0-14Z" fill="none" class="wc" stroke-linejoin="round" stroke-width="3"/>`,
-  "pouring": `<path d="M43.67,45.5H46.5a7,7,0,0,0,0-14l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0" fill="none" class="wc" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/> <line x1="26" y1="48" x2="22" y2="58" fill="none" class="ww" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/> <line x1="33" y1="48" x2="29" y2="58" fill="none" class="ww" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/> <line x1="40" y1="48" x2="36" y2="58" fill="none" class="ww" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>`,
-  "rainy": `<path d="M43.67,45.5H46.5a7,7,0,0,0,0-14l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0" fill="none" class="wc" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/> <path d="M24,47.5c-2.2,3.2-3.3,4.9-3.3,6.1a3.3,3.3,0,0,0,6.6,0C27.3,52.4,26.2,50.7,24,47.5Z" fill="currentColor" class="ww"/> <path d="M31,47.5c-2.2,3.2-3.3,4.9-3.3,6.1a3.3,3.3,0,0,0,6.6,0C34.3,52.4,33.2,50.7,31,47.5Z" fill="currentColor" class="ww"/> <path d="M38,47.5c-2.2,3.2-3.3,4.9-3.3,6.1a3.3,3.3,0,0,0,6.6,0C41.3,52.4,40.2,50.7,38,47.5Z" fill="currentColor" class="ww"/>`,
-  "snowy": `<path d="M43.67,45.5H46.5a7,7,0,0,0,0-14l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0" fill="none" class="wc" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/> <path d="M25.5,48.5V56.5M22.04,50.5L28.96,54.5M22.04,54.5L28.96,50.5" fill="none" class="wl" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/> <path d="M38.5,48.5V56.5M35.04,50.5L41.96,54.5M35.04,54.5L41.96,50.5" fill="none" class="wl" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>`,
-  "snowy-rainy": `<path d="M43.67,45.5H46.5a7,7,0,0,0,0-14l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0" fill="none" class="wc" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/> <path d="M25,47.5c-2.2,3.2-3.3,4.9-3.3,6.1a3.3,3.3,0,0,0,6.6,0C28.3,52.4,27.2,50.7,25,47.5Z" fill="currentColor" class="ww"/> <path d="M37,48.5V56.5M33.54,50.5L40.46,54.5M33.54,54.5L40.46,50.5" fill="none" class="wl" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>`,
-  "sunny": `<path d="M42.5,32A10.5,10.5,0,1,1,32,21.5,10.5,10.5,0,0,1,42.5,32ZM32,15.71V9.5m0,45V48.29M43.52,20.48l4.39-4.39M16.09,47.91l4.39-4.39m0-23-4.39-4.39M47.91,47.91l-4.39-4.39M15.71,32H9.5m45,0H48.29" fill="none" class="ws" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>`,
-  "windy": `<path d="M43.64,20a5,5,0,1,1,3.61,8.46H11.75" fill="none" class="wc" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/> <path d="M29.14,44a5,5,0,1,0,3.61-8.46h-21" fill="none" class="wc" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>`,
-  "windy-variant": `<path d="M46.5,31.5l-.32,0a10.49,10.49,0,0,0-19.11-8,7,7,0,0,0-10.57,6,7.21,7.21,0,0,0,.1,1.14A7.5,7.5,0,0,0,18,45.5a4.19,4.19,0,0,0,.5,0v0h28a7,7,0,0,0,0-14Z" fill="none" class="wc" stroke-linejoin="round" stroke-width="3"/> <path d="M31.5,58a3.8,3.8,0,1,0,2.75-6.45H17" fill="none" class="wc" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>`,
+  fog: "mdi:weather-fog",
+  hail: "mdi:weather-hail",
+  lightning: "mdi:weather-lightning",
+  "lightning-rainy": "mdi:weather-lightning-rainy",
+  partlycloudy: "mdi:weather-partly-cloudy",
+  pouring: "mdi:weather-pouring",
+  rainy: "mdi:weather-rainy",
+  snowy: "mdi:weather-snowy",
+  "snowy-rainy": "mdi:weather-snowy-rainy",
+  sunny: "mdi:weather-sunny",
+  windy: "mdi:weather-windy",
+  "windy-variant": "mdi:weather-windy-variant",
 };
 
 const WEATHER_TEXT = {
@@ -1000,25 +928,6 @@ const RAW_KEYS = new Set([
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
   "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
 
-/* An icon name becomes markup in one place, because there are five call sites
-   and they must not drift. A `spectra:` name is our own art and renders as
-   inline svg; anything else is an mdi name and goes to ha-icon as before. */
-/* Meteocons draws falling snow and hailstones in the same light blue it uses
-   for light rain. Water and ice want different colours, so these three say so
-   and the stylesheet does the rest. */
-const WEATHER_FROZEN = new Set(["snowy", "snowy-rainy", "hail"]);
-
-function iconMarkup(name, cls) {
-  if (isBlank(name)) return "";
-  const key = String(name).startsWith("spectra:") ? String(name).slice(8) : null;
-  const art = key ? WEATHER_ART[key] : null;
-  const klass = isBlank(cls) ? "" : ` ${cls}`;
-  if (!art) return `<ha-icon${klass ? ` class="${cls}"` : ""} icon="${esc(name)}"></ha-icon>`;
-  const frozen = WEATHER_FROZEN.has(key) ? " frozen" : "";
-  return `<svg class="wicon${klass}${frozen}" viewBox="0 0 64 64"`
-    + ` aria-hidden="true">${art}</svg>`;
-}
-
 function applyFormat(value, spec) {
   let v = value;
   if (spec.map && (typeof v === "string" || typeof v === "number")
@@ -1063,7 +972,7 @@ function applyFormat(value, spec) {
       break;
     }
     case "weather_icon":
-      v = WEATHER_ICONS[v] || "spectra:cloudy";
+      v = WEATHER_ICONS[v] || "mdi:weather-cloudy";
       break;
     case "weather_text": {
       const key = String(v);
@@ -1734,7 +1643,7 @@ const BODIES = {
           : `<p class="sub" style="margin-left:auto;text-align:right">${escLines(b.sub)}</p>`)
         + (isBlank(b.icon)
           ? ""
-          : iconMarkup(b.icon, "bigicon"))
+          : `<ha-icon class="bigicon" icon="${esc(b.icon)}"></ha-icon>`)
         + `</div>`;
     }
     const metrics = (Array.isArray(b.metrics) ? b.metrics : [])
@@ -1895,7 +1804,7 @@ const BODIES = {
       const wet = Number(slot.rain);
       return `<div class="slot">`
         + (isBlank(slot.time) ? "" : `<span class="when">${esc(slot.time)}</span>`)
-        + iconMarkup(slot.icon)
+        + (isBlank(slot.icon) ? "" : `<ha-icon icon="${esc(slot.icon)}"></ha-icon>`)
         + (isBlank(slot.temp) ? "" : `<span class="deg">${esc(slot.temp)}</span>`)
         /* Rain is only worth a line when there is some. A column of zeroes
            is noise pretending to be information. */
@@ -2411,9 +2320,7 @@ const BODIES = {
       let lead = "";
       const iconColour = accentBase(r.accent);
       if (!isBlank(r.icon)) {
-        lead = String(r.icon).startsWith("spectra:")
-          ? iconMarkup(r.icon, "rowicon")
-          : `<ha-icon icon="${esc(r.icon)}" style="--mdc-icon-size:19px;${iconColour ? `color:${iconColour}` : ""}"></ha-icon>`;
+        lead = `<ha-icon icon="${esc(r.icon)}" style="--mdc-icon-size:19px;${iconColour ? `color:${iconColour}` : ""}"></ha-icon>`;
       } else if (!isBlank(r.dot)) {
         /* A light's dot is the bulb's own colour, not an accent. */
         const colour = cssColor(r.dot) || iconColour;
@@ -3158,7 +3065,7 @@ class SpectraCard extends HTMLElement {
     if (isBlank(title) && isBlank(icon) && !status && !slot) return "";
     return `<div class="titlebar">`
       + `<span class="tick"></span>`
-      + iconMarkup(icon)
+      + (isBlank(icon) ? "" : `<ha-icon icon="${esc(icon)}"></ha-icon>`)
       + (isBlank(title) ? "" : `<h3>${esc(title)}</h3>`)
       + (status
         ? `<span class="metagroup">`

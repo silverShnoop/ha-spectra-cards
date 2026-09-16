@@ -612,15 +612,3 @@ in `dist/spectra-cards.js`. There is no build step.
 ## Licence
 
 MIT
-
-### Third-party art
-
-The weather condition icons in `WEATHER_ART` are adapted from
-[Meteocons](https://github.com/basmilius/weather-icons) by Bas Milius, MIT
-licensed — the `line` variant, with its flat hex values replaced by role
-classes so the theme supplies the colour.
-
-The falling parts — rain, sleet, snow and hail — and `windy-variant` are
-drawn here rather than taken. Meteocons renders precipitation as hairlines
-that fall under a device pixel at the size a forecast slot actually uses, and
-ships `windy-variant` identical to `windy`.
