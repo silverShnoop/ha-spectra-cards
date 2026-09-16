@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.36.0";
+const VERSION = "0.37.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -583,6 +583,53 @@ img.avatar { object-fit:cover; display:block; }
   font-family:var(--sp-mono); font-size:16px; font-weight:500;
   min-width:52px; text-align:center;
 }
+/* The target is a barrel you turn, not a pair of buttons you count. Plus and
+   minus meant one tap per half degree, which is six taps to move three — and
+   six chances for the row to re-render under the finger between them.
+   touch-action:none because a drag down this column turns the numbers; if
+   the page took it as a scroll instead, the control could not work at all. */
+.dial {
+  position:relative; min-width:64px; height:44px; flex:none;
+  display:flex; align-items:center; justify-content:center;
+  border:2px solid var(--sp-edge); border-radius:4px;
+  background:var(--sp-surface); cursor:ns-resize;
+  touch-action:none; user-select:none; -webkit-user-select:none;
+}
+.dialnow { font-family:var(--sp-mono); font-size:16px; font-weight:500; }
+.dial.pending .dialnow { color:var(--accent-on); }
+.dial:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* Overlaid and centred on the resting number, so the number you pressed is
+   the number under your thumb when the column appears.
+
+   Three cells, not five. The window has to clear the card it opens inside:
+   centred on the first row, a taller barrel runs off the top of the panel
+   and the numbers above the line cannot be read at all. One neighbour either
+   side is also what a padlock shows through its window. */
+.barrel {
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:calc(100% + 20px); height:102px; display:none; overflow:hidden;
+  border:2px solid var(--sp-ink); border-radius:6px;
+  background:var(--sp-surface); z-index:6;
+}
+.dial.turning .barrel { display:block; }
+.barrelinner { position:absolute; left:0; right:0; top:34px; }
+.barrelinner i {
+  display:flex; align-items:center; justify-content:center;
+  height:34px; font-style:normal; color:var(--sp-ink-3);
+  font-family:var(--sp-mono); font-size:16px;
+}
+.barrelinner i.on { color:var(--sp-ink); font-size:20px; }
+/* Two rules marking the centre slot. Without them the barrel says which
+   number is biggest, not which one is chosen. */
+.barrel::before, .barrel::after {
+  content:""; position:absolute; left:0; right:0; height:2px;
+  background:var(--sp-edge); pointer-events:none; z-index:1;
+}
+.barrel::before { top:34px; }
+.barrel::after { top:68px; }
+/* Dragged away sideways: the gesture is being abandoned, and the lift will
+   do nothing. Same escape hatch, and the same look, as the scene picker. */
+.dial.adrift .barrel { opacity:.3; }
 .cmd {
   position:relative; font-size:11px; padding:6px 10px; border-radius:4px;
   border:2px solid var(--accent); color:var(--accent-on); cursor:pointer;
@@ -1962,15 +2009,12 @@ const BODIES = {
         : `<div><p class="name">${esc(r.name)}</p><p class="sub">${escLines(r.sub)}</p></div>`;
 
       let cluster = "";
-      /* A minus, the value, a plus. The card does the arithmetic because
-         the service wants an absolute number and config cannot compute. */
+      /* A barrel of every value the thermostat takes. The card does the
+         arithmetic because the service wants an absolute number and config
+         cannot compute. */
       if (r.adjust) {
-        cluster += `<span class="step" role="button" tabindex="0" data-step="${index}" data-dir="-1">`
-          + `<ha-icon icon="mdi:minus"></ha-icon></span>`
-          + `<span class="ctlvalue${r.pending ? " pending" : ""}">${esc(firstOf(r.value, "—"))}</span>`
-          + `<span class="spinslot">${r.pending ? `<span class="spinner"></span>` : ""}</span>`
-          + `<span class="step" role="button" tabindex="0" data-step="${index}" data-dir="1">`
-          + `<ha-icon icon="mdi:plus"></ha-icon></span>`;
+        cluster += dialMarkup(r, index)
+          + `<span class="spinslot">${r.pending ? `<span class="spinner"></span>` : ""}</span>`;
       } else if (!isBlank(r.value)) {
         cluster += `<span class="ctlvalue">${esc(r.value)}</span>`;
       }
@@ -2584,6 +2628,57 @@ const RAF = typeof requestAnimationFrame === "function"
   ? (fn) => requestAnimationFrame(fn)
   : (fn) => setTimeout(fn, 16);
 
+/* The height of one number on the barrel. The stylesheet sizes the cells and
+   this positions them, so the two must agree; dial.js asserts it. */
+const DIAL_CELL = 34;
+
+/* Every value the thermostat will accept, as one column. Turning the barrel
+   therefore cannot run off the end and clamping needs no arithmetic — the
+   column simply stops, which is also how it feels under a thumb. */
+function dialRange(adjust, current) {
+  const step = Number(adjust.step) || 1;
+  const min = Number(adjust.min);
+  const max = Number(adjust.max);
+  if (!isFinite(min) || !isFinite(max) || max <= min || step <= 0) return null;
+  /* A barrel with a thousand notches is not a control anyone can turn, and
+     it is a sign the config meant something else. Fall back to plain text. */
+  const count = Math.round((max - min) / step);
+  if (count > 400) return null;
+  const decimals = String(step).includes(".") ? 1 : 0;
+  const suffix = adjust.suffix === undefined ? "\u00b0" : adjust.suffix;
+  const labels = [];
+  for (let n = 0; n <= count; n += 1) {
+    labels.push((min + n * step).toFixed(decimals) + suffix);
+  }
+  let index = Math.round((current - min) / step);
+  if (!isFinite(index)) index = 0;
+  index = Math.min(count, Math.max(0, index));
+  return { labels, index, step, min, decimals };
+}
+
+/* At rest this is one number. Pressing it opens the barrel over the row —
+   over, not in, because a row that grows under a finger moves everything
+   below it out from under that finger. */
+function dialMarkup(row, position) {
+  const now = firstOf(row.value, "\u2014");
+  const range = dialRange(row.adjust || {}, parseFloat(row.value));
+  if (!range) {
+    return `<span class="ctlvalue${row.pending ? " pending" : ""}">${esc(now)}</span>`;
+  }
+  const cells = range.labels.map((label, n) =>
+    `<i${n === range.index ? ` class="on"` : ""}>${esc(label)}</i>`).join("");
+  const at = range.min + range.index * range.step;
+  return `<span class="dial${row.pending ? " pending" : ""}" data-dial="${position}"`
+    + ` role="spinbutton" tabindex="0" aria-valuenow="${at}"`
+    + ` aria-valuemin="${range.min}"`
+    + ` aria-valuemax="${range.min + (range.labels.length - 1) * range.step}"`
+    + ` aria-valuetext="${esc(range.labels[range.index])}">`
+    + `<span class="dialnow">${esc(now)}</span>`
+    + `<span class="barrel"><span class="barrelinner" data-barrelinner`
+    + ` style="transform:translateY(${-range.index * DIAL_CELL}px)">${cells}</span>`
+    + `</span></span>`;
+}
+
 function flashPress(element) {
   if (!element) return;
   element.classList.remove("pressed");
@@ -2982,6 +3077,7 @@ class SpectraCard extends HTMLElement {
       meta: resolveValue(this._hass, config.meta, f),
       body: resolveValue(this._hass, config.body, f) || {},
     };
+    this._fitDials(model.body);
     /* A finger is on the bar. Rebuilding it now would take the element the
        pointer is captured on out from under the gesture. */
     if (this._dragging) return;
@@ -3156,6 +3252,145 @@ class SpectraCard extends HTMLElement {
   /* An empty cell must take no grid space, not render an empty shell. In a
      sections view the grid item is the hui-card wrapper, so collapsing only
      :host would leave a gap where the card used to be. */
+  /* A thermostat already reports the range it will accept, so config should
+     not have to restate it. The old plus and minus worked without bounds —
+     they just stepped — but a barrel is made of them, so anything left out
+     is taken from the entity rather than quietly costing the row its
+     control. Config still wins where it is given. */
+  _fitDials(body) {
+    if (!body || body.type !== "control" || !Array.isArray(body.rows)) return;
+    if (!this._hass) return;
+    for (const row of body.rows) {
+      const adjust = row && row.adjust;
+      if (!adjust || !adjust.entity) continue;
+      const state = this._hass.states[adjust.entity];
+      if (!state || !state.attributes) continue;
+      const a = state.attributes;
+      if (adjust.min === undefined && isFinite(a.min_temp)) adjust.min = a.min_temp;
+      if (adjust.max === undefined && isFinite(a.max_temp)) adjust.max = a.max_temp;
+      if (adjust.step === undefined && isFinite(a.target_temp_step)) {
+        adjust.step = a.target_temp_step;
+      }
+    }
+  }
+
+  /* Turning the barrel.
+   *
+   * The column follows the finger exactly — no easing, no snapping until the
+   * lift — for the same reason the scene bar does: easing between a hand and
+   * the thing it is dragging reads as lag, not as smoothness.
+   *
+   * Nothing is sent while turning. A drag from 18 to 23 is one decision, not
+   * ten, and a thermostat asked ten times in a second is nine wasted round
+   * trips and a lot of relay clicking. Only the lift decides, which also
+   * makes landing back where you started a cancelled gesture rather than a
+   * redundant call.
+   */
+  _bindDial(el, row) {
+    const inner = el.querySelector("[data-barrelinner]");
+    const now = el.querySelector(".dialnow");
+    const adjust = row && row.adjust;
+    if (!inner || !adjust) return;
+    const cells = Array.prototype.slice.call(inner.querySelectorAll("i"));
+    if (!cells.length) return;
+
+    const step = Number(adjust.step) || 1;
+    const min = Number(adjust.min);
+    const last = cells.length - 1;
+
+    let index = cells.findIndex((c) => c.classList.contains("on"));
+    if (index < 0) index = 0;
+    const began = index;
+    let offset = -index * DIAL_CELL;
+    let adrift = false;
+
+    const place = (px) => { inner.style.transform = `translateY(${px}px)`; };
+    const show = (i) => {
+      for (let n = 0; n <= last; n += 1) cells[n].classList.toggle("on", n === i);
+      const label = cells[i].textContent;
+      if (now) now.textContent = label;
+      el.setAttribute("aria-valuenow", String(min + i * step));
+      el.setAttribute("aria-valuetext", label);
+    };
+
+    /* Sideways is the way out. Vertical distance cannot mean abandonment
+       here — it is the gesture itself — so only horizontal stray counts, and
+       generously, because a thumb travelling up a phone does not go straight. */
+    const ADRIFT_PX = 130;
+    const strayed = (event) => {
+      const box = el.getBoundingClientRect();
+      return Math.max(box.left - event.clientX, event.clientX - box.right, 0) > ADRIFT_PX;
+    };
+
+    let startY = 0;
+    let startOffset = 0;
+
+    const finish = (commit) => {
+      if (!this._dragging) return;
+      this._dragging = false;
+      el.classList.remove("turning", "adrift");
+      if (commit && !adrift && index !== began) {
+        this._setTarget(adjust, min + index * step);
+      } else {
+        index = began;
+      }
+      this._signature = null;
+      this._update();
+    };
+
+    el.addEventListener("pointerdown", (event) => {
+      if (event.button) return;
+      if (el.setPointerCapture) el.setPointerCapture(event.pointerId);
+      this._dragging = true;
+      adrift = false;
+      startY = event.clientY;
+      startOffset = offset;
+      el.classList.add("turning");
+      flashPress(el);
+      show(index);
+      event.preventDefault();
+    });
+
+    el.addEventListener("pointermove", (event) => {
+      if (!this._dragging) return;
+      const away = strayed(event);
+      if (away !== adrift) {
+        adrift = away;
+        el.classList.toggle("adrift", adrift);
+        /* Snap home, so the barrel never shows a number the lift will not set. */
+        if (adrift) { index = began; offset = -index * DIAL_CELL; place(offset); show(index); }
+      }
+      if (adrift) { event.preventDefault(); return; }
+      /* Down is cooler, up is warmer: the column ascends downward, so pushing
+         it up brings the next number in from below, which is what a padlock
+         barrel does under a thumb. */
+      offset = Math.min(0, Math.max(-last * DIAL_CELL, startOffset + (event.clientY - startY)));
+      place(offset);
+      const next = Math.min(last, Math.max(0, Math.round(-offset / DIAL_CELL)));
+      if (next !== index) { index = next; show(index); }
+      event.preventDefault();
+    });
+
+    el.addEventListener("pointerup", () => finish(true));
+    el.addEventListener("pointercancel", () => finish(false));
+
+    /* A mouse wheel and the arrow keys are the same decision one notch at a
+       time, so they take the stepping path and its debounce rather than this
+       one — there is no gesture in flight for a lift to end. */
+    el.addEventListener("wheel", (event) => {
+      if (this._dragging) return;
+      event.preventDefault();
+      this._adjust(adjust, event.deltaY > 0 ? -1 : 1);
+    }, { passive: false });
+
+    el.addEventListener("keydown", (event) => {
+      const dir = event.key === "ArrowUp" ? 1 : (event.key === "ArrowDown" ? -1 : 0);
+      if (!dir) return;
+      event.preventDefault();
+      this._adjust(adjust, dir);
+    });
+  }
+
   /* The bar answers the finger directly rather than through a re-render.
      Re-rendering on every pointermove would rebuild the very element the
      pointer is captured on, which drops the gesture; and the whole point of
@@ -3448,6 +3683,10 @@ class SpectraCard extends HTMLElement {
       });
     });
 
+    this._holder.querySelectorAll("[data-dial]").forEach((el) => {
+      this._bindDial(el, controls[Number(el.dataset.dial)]);
+    });
+
     const picker = this._holder.querySelector("[data-pick]");
     if (picker) this._bindPicker(picker);
 
@@ -3626,10 +3865,20 @@ class SpectraCard extends HTMLElement {
        would otherwise raise the temperature, which is the opposite of what
        the finger asked for. */
     if ((next - current) * direction < 0) return;
+    this._setTarget(adjust, next);
+  }
 
+  /* The absolute half of the same contract. A drag already knows the number
+     it landed on, so it comes straight here; stepping works out a number
+     first and then does exactly this. One place decides what is claimed,
+     what is sent and when the claim expires. */
+  _setTarget(adjust, next) {
+    if (!adjust || !this._hass || !adjust.entity) return;
+    this._optimistic = this._optimistic || {};
+    const step = Number(adjust.step) || 1;
     const field = adjust.field || "temperature";
     const decimals = String(step).includes(".") ? 1 : 0;
-    const previous = pending || {};
+    const previous = this._optimistic[adjust.entity] || {};
     if (previous.send) clearTimeout(previous.send);
     if (previous.giveUp) clearTimeout(previous.giveUp);
 
