@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.38.0";
+const VERSION = "0.39.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -630,6 +630,12 @@ img.avatar { object-fit:cover; display:block; }
 /* Dragged away sideways: the gesture is being abandoned, and the lift will
    do nothing. Same escape hatch, and the same look, as the scene picker. */
 .dial.adrift .barrel { opacity:.3; }
+/* climate — one room. Same row as the light card's, so the two card types
+   sit at the same rhythm and the controls land in the same place on both. */
+.climrow { min-height:44px; }
+/* Something is stopping the room heating that the room did not choose — an
+   open window. Ochre, because it is a warning rather than a fault. */
+.pickinfo.warn { color:var(--sp-a2-on); }
 .cmd {
   position:relative; font-size:11px; padding:6px 10px; border-radius:4px;
   border:2px solid var(--accent); color:var(--accent-on); cursor:pointer;
@@ -2033,6 +2039,60 @@ const BODIES = {
     }).join("");
   },
 
+  /* What is this room set to, what is driving that, and can I change it?
+   *
+   * One room, where `control` is a list of them — the same split as `picker`
+   * against `scenes`, and for the same reason: a room you are working on
+   * wants the schedule, the override and the target all visible, and six of
+   * those in a column would be a wall of them.
+   *
+   * The shape is the light card's: schedule button, then what the room is
+   * doing, then the controls hard right. Both card types then read the same
+   * way, and a Climate card is learnable from having used a Lights card.
+   *
+   * Grounded in what Tado actually exposes. There is no schedule to draw —
+   * the integration publishes no blocks and no next-change time — so this
+   * says which of the two things is driving rather than pretending to plot
+   * the day. And an off zone is an *override* on Tado, not an absence of
+   * one, which is why the schedule button stays live when the room is off:
+   * handing a cold room back to its schedule is exactly what it needs.
+   */
+  climate(b) {
+    if (!b || typeof b !== "object") return "";
+    const on = b.on === undefined ? true : Boolean(b.on);
+    const auto = Boolean(b.auto);
+
+    let out = `<div class="row pickrow climrow" style="padding-left:0">`;
+
+    /* Live in every state, unlike the lights' twin: see above. */
+    if (!isBlank(b.zone)) {
+      out += `<span class="iconbtn${auto ? " on" : ""}" role="button" tabindex="0"`
+        + ` aria-pressed="${auto ? "true" : "false"}"`
+        + ` aria-label="Follow the schedule"`
+        + ` title="${auto ? "Following the schedule" : "Follow the schedule"}"`
+        + ` data-climauto style="${accentStyle(3)}">`
+        + `<ha-icon icon="${esc(firstOf(b.auto_icon, "mdi:sun-clock"))}"></ha-icon></span>`;
+    }
+
+    /* Reserved whether or not it has anything to say, so nothing below it
+       moves when the room changes what it is doing. */
+    out += `<p class="pickinfo${b.warn ? " warn" : ""}">${esc(firstOf(b.info, ""))}</p>`;
+
+    out += `<span class="pickend">`;
+    if (b.adjust) {
+      out += dialMarkup(b, 0)
+        + `<span class="spinslot">${b.pending ? `<span class="spinner"></span>` : ""}</span>`;
+    } else if (!isBlank(b.value)) {
+      out += `<span class="ctlvalue">${esc(b.value)}</span>`;
+    }
+    if (!isBlank(b.zone)) {
+      out += `<span class="switch${on ? " on" : ""}" role="switch"`
+        + ` aria-checked="${on ? "true" : "false"}" aria-label="Heating"`
+        + ` tabindex="0" data-climpower><i></i></span>`;
+    }
+    return out + `</span></div>`;
+  },
+
   /* What is wrong right now that you must fix?
      Distinct from status, which answers what state a thing is in. This one
      is always an exception, always conditional, and always actionable. */
@@ -2489,6 +2549,10 @@ function bodyIsEmpty(type, b) {
     case "scenes":
     case "people":
       return !Array.isArray(b.rows) || b.rows.length === 0;
+    /* A zone with no target to show and nothing to drive is not a control,
+       and a card with nothing to say renders nothing rather than a shell. */
+    case "climate":
+      return isBlank(b.zone) && isBlank(b.value) && !b.adjust;
     case "forecast":
       return !Array.isArray(b.slots) || b.slots.length === 0;
     case "agenda":
@@ -2631,6 +2695,10 @@ const RAF = typeof requestAnimationFrame === "function"
 /* The height of one number on the barrel. The stylesheet sizes the cells and
    this positions them, so the two must agree; dial.js asserts it. */
 const DIAL_CELL = 34;
+
+/* The finest the barrel will build itself from an entity's own reported
+   step. Config may ask for finer; discovery may not. */
+const DIAL_MIN_STEP = 0.5;
 
 /* Every value the thermostat will accept, as one column. Turning the barrel
    therefore cannot run off the end and clamping needs no arithmetic — the
@@ -3260,9 +3328,13 @@ class SpectraCard extends HTMLElement {
      is taken from the entity rather than quietly costing the row its
      control. Config still wins where it is given. */
   _fitDials(body) {
-    if (!body || body.type !== "control" || !Array.isArray(body.rows)) return;
-    if (!this._hass) return;
-    for (const row of body.rows) {
+    if (!body || !this._hass) return;
+    /* `control` is a list of rows; `climate` is one room and carries the
+       adjust itself. */
+    const rows = body.type === "climate" ? [body]
+      : (body.type === "control" && Array.isArray(body.rows) ? body.rows : null);
+    if (!rows) return;
+    for (const row of rows) {
       const adjust = row && row.adjust;
       if (!adjust || !adjust.entity) continue;
       const state = this._hass.states[adjust.entity];
@@ -3270,8 +3342,12 @@ class SpectraCard extends HTMLElement {
       const a = state.attributes;
       if (adjust.min === undefined && isFinite(a.min_temp)) adjust.min = a.min_temp;
       if (adjust.max === undefined && isFinite(a.max_temp)) adjust.max = a.max_temp;
+      /* Tado reports a tenth of a degree, which is true and useless: two
+         hundred notches is not a barrel anyone can turn, and nobody sets a
+         radiator to 20.3. The entity's step is a floor to respect, not a
+         resolution to adopt, so the fallback never goes finer than a half. */
       if (adjust.step === undefined && isFinite(a.target_temp_step)) {
-        adjust.step = a.target_temp_step;
+        adjust.step = Math.max(Number(a.target_temp_step), DIAL_MIN_STEP);
       }
     }
   }
@@ -3689,9 +3765,53 @@ class SpectraCard extends HTMLElement {
       });
     });
 
+    /* The climate body is one room, so its dial is the body itself rather
+       than a row of one — otherwise `controls` would have to be faked just
+       to be indexed into. */
+    const body = model.body || {};
+    const dialRow = body.type === "climate" ? body : null;
     this._holder.querySelectorAll("[data-dial]").forEach((el) => {
-      this._bindDial(el, controls[Number(el.dataset.dial)]);
+      this._bindDial(el, dialRow || controls[Number(el.dataset.dial)]);
     });
+
+    /* Tado's own vocabulary: a zone is driven by its schedule, or held by an
+       overlay, and turning it off is itself an overlay. So "on" means hand it
+       back to the schedule rather than pick a mode — the same press as the
+       schedule button, which is correct and not a coincidence. */
+    if (dialRow && !isBlank(dialRow.zone)) {
+      const zone = dialRow.zone;
+      const setMode = (mode) => this._callAction({
+        service: "climate.set_hvac_mode",
+        target: { entity_id: zone },
+        data: { hvac_mode: mode },
+      });
+      const auto = this._holder.querySelector("[data-climauto]");
+      if (auto) {
+        const run = (event) => {
+          event.stopPropagation();
+          onPress(auto, () => setMode("auto"));
+        };
+        auto.addEventListener("click", run);
+        auto.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+        });
+      }
+      const power = this._holder.querySelector("[data-climpower]");
+      if (power) {
+        const on = dialRow.on === undefined ? true : Boolean(dialRow.on);
+        const run = (event) => {
+          event.stopPropagation();
+          /* The knob travels on the press, before the thermostat answers,
+             for the same reason every other control here does. */
+          power.classList.toggle("on", !on);
+          onPress(power, () => setMode(on ? "off" : "auto"));
+        };
+        power.addEventListener("click", run);
+        power.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+        });
+      }
+    }
 
     const picker = this._holder.querySelector("[data-pick]");
     if (picker) this._bindPicker(picker);
