@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.31.0";
+const VERSION = "0.32.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -177,13 +177,13 @@ const SHEET = `
 /* Water. One hue, the lighter tone carried by opacity rather than a second
    hue, so a drizzle and a downpour cannot drift apart in colour. */
 .wicon .ww { fill:var(--sp-a5); }
-.wicon .wl { fill:var(--sp-a5); opacity:.75; }
-/* Ice is not pale water. Snow, sleet and hail take their falling part in ink
-   instead, which also lets sleet show a blue drop beside a pale flake — the
+/* Ice is not pale water: snow, sleet and hail fall in ink rather than blue,
+   a step lighter than the cloud so they read as separate from it. Which is
+   also what lets sleet show a blue drop beside a pale flake — the one
    distinction that icon exists to make. */
-.wicon.frozen .wl { fill:var(--sp-ink-2); opacity:1; }
-/* Sun, moon-stars, and the lightning bolt, which is the same warmth doing a
-   louder job. */
+.wicon .wl { fill:var(--sp-ink-3); }
+/* Anything that gives off light: sun, moon, stars, and the bolt, which is the
+   same warmth doing a louder job. */
 .wicon .ws { fill:var(--sp-a2); }
 .titlebar .wicon { width:16px; height:16px; }
 .bigicon.wicon { width:44px; height:44px; }
@@ -861,7 +861,7 @@ const WEATHER_ICONS = {
  * future mdi redraw stops the script instead of miscolouring a piece.
  * ------------------------------------------------------------------ */
 const WEATHER_ART = {
-  "clear-night": `<path d="M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09" class="ws"/><path d="M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11" class="ws"/><path d="M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.64 6.35,17.66C9.37,20.67 14.19,20.78 17.33,17.97Z" class="wl"/>`,
+  "clear-night": `<path d="M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09" class="ws"/><path d="M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11" class="ws"/><path d="M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.64 6.35,17.66C9.37,20.67 14.19,20.78 17.33,17.97Z" class="ws"/>`,
   cloudy: `<path d="M6,19A5,5 0 0,1 1,14A5,5 0 0,1 6,9C7,6.65 9.3,5 12,5C15.43,5 18.24,7.66 18.5,11.03L19,11A4,4 0 0,1 23,15A4,4 0 0,1 19,19H6M19,13H17V12A5,5 0 0,0 12,7C9.5,7 7.45,8.82 7.06,11.19C6.73,11.07 6.37,11 6,11A3,3 0 0,0 3,14A3,3 0 0,0 6,17H19A2,2 0 0,0 21,15A2,2 0 0,0 19,13Z" class="wc"/>`,
   fog: `<path d="M3,15H13A1,1 0 0,1 14,16A1,1 0 0,1 13,17H3A1,1 0 0,1 2,16A1,1 0 0,1 3,15" class="wc"/><path d="M16,15H21A1,1 0 0,1 22,16A1,1 0 0,1 21,17H16A1,1 0 0,1 15,16A1,1 0 0,1 16,15" class="wc"/><path d="M1,12A5,5 0 0,1 6,7C7,4.65 9.3,3 12,3C15.43,3 18.24,5.66 18.5,9.03L19,9C21.19,9 22.97,10.76 23,13H21A2,2 0 0,0 19,11H17V10A5,5 0 0,0 12,5C9.5,5 7.45,6.82 7.06,9.19C6.73,9.07 6.37,9 6,9A3,3 0 0,0 3,12C3,12.35 3.06,12.69 3.17,13H1.1L1,12" class="wc"/><path d="M3,19H5A1,1 0 0,1 6,20A1,1 0 0,1 5,21H3A1,1 0 0,1 2,20A1,1 0 0,1 3,19" class="wc"/><path d="M8,19H21A1,1 0 0,1 22,20A1,1 0 0,1 21,21H8A1,1 0 0,1 7,20A1,1 0 0,1 8,19Z" class="wc"/>`,
   hail: `<path d="M6,14A1,1 0 0,1 7,15A1,1 0 0,1 6,16A5,5 0 0,1 1,11A5,5 0 0,1 6,6C7,3.65 9.3,2 12,2C15.43,2 18.24,4.66 18.5,8.03L19,8A4,4 0 0,1 23,12A4,4 0 0,1 19,16H18A1,1 0 0,1 17,15A1,1 0 0,1 18,14H19A2,2 0 0,0 21,12A2,2 0 0,0 19,10H17V9A5,5 0 0,0 12,4C9.5,4 7.45,5.82 7.06,8.19C6.73,8.07 6.37,8 6,8A3,3 0 0,0 3,11A3,3 0 0,0 6,14" class="wc"/><path d="M10,18A2,2 0 0,1 12,20A2,2 0 0,1 10,22A2,2 0 0,1 8,20A2,2 0 0,1 10,18" class="wl"/><path d="M14.5,16A1.5,1.5 0 0,1 16,17.5A1.5,1.5 0 0,1 14.5,19A1.5,1.5 0 0,1 13,17.5A1.5,1.5 0 0,1 14.5,16" class="wl"/><path d="M10.5,12A1.5,1.5 0 0,1 12,13.5A1.5,1.5 0 0,1 10.5,15A1.5,1.5 0 0,1 9,13.5A1.5,1.5 0 0,1 10.5,12Z" class="wl"/>`,
@@ -987,19 +987,13 @@ const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
 /* An icon name becomes markup in one place, because there are five call sites
    and they must not drift. A `spectra:` name is our own art and renders as
    inline svg; anything else is an mdi name and goes to ha-icon as before. */
-/* Falling water and falling ice want different colours, and the role class
-   alone cannot tell them apart — a flake and a drop are both `wl` until
-   something says which. These three say so; the stylesheet does the rest. */
-const WEATHER_FROZEN = new Set(["snowy", "snowy-rainy", "hail"]);
-
 function iconMarkup(name, cls) {
   if (isBlank(name)) return "";
   const key = String(name).startsWith("spectra:") ? String(name).slice(8) : null;
   const art = key ? WEATHER_ART[key] : null;
   const klass = isBlank(cls) ? "" : ` ${cls}`;
   if (!art) return `<ha-icon${klass ? ` class="${cls}"` : ""} icon="${esc(name)}"></ha-icon>`;
-  const frozen = WEATHER_FROZEN.has(key) ? " frozen" : "";
-  return `<svg class="wicon${klass}${frozen}" viewBox="0 0 24 24"`
+  return `<svg class="wicon${klass}" viewBox="0 0 24 24"`
     + ` aria-hidden="true">${art}</svg>`;
 }
 
