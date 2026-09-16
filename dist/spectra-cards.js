@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.22.0";
+const VERSION = "0.23.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -113,6 +113,44 @@ const SHEET = `
 .metagroup { margin-left:auto; }
 .scenename .dot, .metagroup .dot { width:8px; height:8px; }
 .titlebar .metaicon { --mdc-icon-size:14px; color:var(--sp-ink-2); }
+
+/* clock — the one cell that is read from the doorway. Everything about it is
+   sized for that: the time is the largest thing on the whole dashboard, and
+   the day and date orbit it rather than competing.
+
+   No seconds. A wall panel with a ticking second is motion nobody asked for,
+   and it is the one thing on this screen that would never stop moving. */
+.clock { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+.clocktime {
+  margin:0; font-family:var(--sp-mono); font-weight:500;
+  font-size:64px; line-height:.92; letter-spacing:-.03em; color:var(--sp-ink);
+}
+/* Pushed to the far side so the time reads alone. Right-aligned because the
+   two lines are different lengths and a ragged left edge beside a big number
+   looks like a mistake. */
+.clockwhen { margin-left:auto; text-align:right; min-width:0; }
+/* A day name is a day head, which is the one place outside a title bar where
+   uppercase is allowed. */
+.clockday {
+  margin:0; font-size:19px; font-weight:500;
+  letter-spacing:.11em; text-transform:uppercase; color:var(--sp-ink);
+}
+.clockdate { margin:3px 0 0; font-size:14px; color:var(--sp-ink-2); }
+.clocknote { margin:10px 0 0; font-size:12px; color:var(--sp-ink-2); }
+
+/* The day's shape, which is the one thing a digital clock cannot say: how
+   much daylight is left. A track of the whole 24 hours, the lit part filled,
+   and the same caret the strip uses marking now. */
+.daylight { margin-top:12px; }
+.daybar {
+  position:relative; height:6px; border-radius:2px;
+  background:var(--sp-sink); overflow:hidden;
+}
+.daybar > i { position:absolute; top:0; bottom:0; background:var(--accent); }
+.dayends {
+  display:flex; justify-content:space-between;
+  margin-top:5px; font-size:11px; color:var(--sp-ink-3);
+}
 
 /* primitives */
 .hero {
@@ -1385,7 +1423,68 @@ function pillMarkup(pill, extraStyle) {
   return `<span class="pill${p.solid ? " solid" : ""}"${style ? ` style="${style}"` : ""}>${esc(p.text)}</span>`;
 }
 
+/* English, spelled out rather than localised. Every other word on this panel
+   is English, and a date that silently changes shape with a browser setting
+   is a date nobody can write a test for. */
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
+  "Friday", "Saturday"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/* 1st, 2nd, 3rd, 4th — and the three that break the rule in the teens. */
+function ordinal(n) {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
 const BODIES = {
+  /* What time is it, and what day? */
+  clock(b) {
+    const now = b && b.now ? new Date(b.now) : new Date();
+    let out = `<div class="clock">`
+      + `<p class="clocktime">${pad2(now.getHours())}:${pad2(now.getMinutes())}</p>`
+      + `<div class="clockwhen">`
+      + `<p class="clockday">${esc(DAY_NAMES[now.getDay()])}</p>`
+      + `<p class="clockdate">`
+      + esc(`${ordinal(now.getDate())} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`)
+      + `</p></div></div>`;
+
+    /* minutesOfDay, not the date on the timestamp. sun.sun reports the *next*
+       rising, which after dawn is tomorrow's — so its date is wrong for today
+       about half the time while its time of day is right either way. */
+    const day = b && b.daylight;
+    const rise = day ? minutesOfDay(day.rise) : null;
+    const set = day ? minutesOfDay(day.set) : null;
+    /* A day with no dark in it, or none the sun tells us about, has no shape
+       worth drawing — and a cell with nothing to say renders nothing. */
+    if (rise !== null && set !== null && set > rise) {
+      const left = (rise / DAY_MINUTES) * 100;
+      const width = ((set - rise) / DAY_MINUTES) * 100;
+      const at = ((now.getHours() * 60 + now.getMinutes()) / DAY_MINUTES) * 100;
+      out += `<div class="daylight">`
+        + `<div class="daybar">`
+        + `<i style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%"></i>`
+        + `</div>`
+        + `<div class="caretrow"><span class="caret" style="left:${at.toFixed(2)}%"></span></div>`
+        + `<div class="dayends"><span>${esc(clockLabel(rise))}</span>`
+        + `<span>${esc(clockLabel(set))}</span></div>`
+        + `</div>`;
+    }
+
+    if (!isBlank(b && b.note)) out += `<p class="clocknote">${esc(b.note)}</p>`;
+    return out;
+  },
+
   /* What is the one number or word? */
   stat(b) {
     let out = "";
@@ -2424,7 +2523,7 @@ class SpectraCard extends HTMLElement {
 
   disconnectedCallback() {
     if (this._timer) {
-      clearInterval(this._timer);
+      clearTimeout(this._timer);
       this._timer = null;
     }
     for (const entity of Object.keys(this._optimistic)) {
@@ -2646,11 +2745,22 @@ class SpectraCard extends HTMLElement {
   /* Relative times go stale on their own, with no state change to prompt a
      re-render. Only cards that actually show one pay for the timer. */
   _startTicking() {
-    if (this._timer || !this._live || !this.isConnected) return;
-    this._timer = setInterval(() => {
+    if (this._timer || !this.isConnected) return;
+    const clock = this._config.body && this._config.body.type === "clock";
+    if (!this._live && !clock) return;
+    const now = new Date();
+    /* A clock thirty seconds late is a broken clock, so it waits for the
+       minute boundary rather than for a fixed interval. Seconds are not shown
+       and so are not chased. */
+    const delay = clock
+      ? 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 20
+      : 30000;
+    this._timer = setTimeout(() => {
+      this._timer = null;
       this._signature = null;
       this._update();
-    }, 30000);
+      this._startTicking();
+    }, delay);
   }
 
   _update() {
