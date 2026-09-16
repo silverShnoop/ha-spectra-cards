@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.20.1";
+const VERSION = "0.21.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -352,6 +352,18 @@ img.avatar { object-fit:cover; display:block; }
   100% { box-shadow: inset 0 0 0 999px transparent; }
 }
 @keyframes sp-spin { to { transform: rotate(360deg); } }
+/* A scene changing is the card's one piece of news, and it used to arrive as
+   a pop: spinner, tick, then everything at its new value at once. The DOM is
+   replaced wholesale, so a true crossfade is not on offer; rising from a
+   quarter opacity is, and it reads as the change landing rather than as the
+   card being rebuilt. Only the two things that actually carry the scene move
+   — the name in the title bar and the bar itself — because fading the whole
+   card would take the controls with it, and a control that fades when you
+   did not touch it is a control you distrust. */
+@keyframes sp-swap {
+  0%   { opacity:.25; }
+  100% { opacity:1; }
+}
 /* A spinner that simply disappears leaves you unsure whether it worked. It
    becomes a tick, holds long enough to be read, then goes. */
 @keyframes sp-settle {
@@ -362,6 +374,7 @@ img.avatar { object-fit:cover; display:block; }
 }
 
 .pressed { animation: sp-press 260ms ease-out; }
+.swap .metagroup, .swap .strip { animation: sp-swap 260ms ease-out; }
 
 .spinner {
   width:13px; height:13px; flex:none; border-radius:50%;
@@ -400,6 +413,7 @@ img.avatar { object-fit:cover; display:block; }
 
 @media (prefers-reduced-motion: reduce) {
   .pressed { animation:none; box-shadow:inset 0 0 0 999px var(--sp-press); }
+  .swap .metagroup, .swap .strip { animation:none; }
   .spinner { animation-duration:2.4s; }
 }
 
@@ -517,13 +531,20 @@ img.avatar { object-fit:cover; display:block; }
 /* Square, because what is in it is square. It shares the switch's height so
    the two sit on one line, and deliberately not its width: a square button
    beside a wide one reads as two different kinds of control, which is what
-   they are. */
+   they are.
+
+   Filled at rest, not outlined. The two controls measured the same height
+   all along and still did not look it: an outline with a small glyph in the
+   middle of it gives the eye nothing to measure but the glyph, so the button
+   read as the size of the switch's knob rather than the size of the switch.
+   The resting fill is the switch's own off-track, so both controls now
+   present the same slab and the match is visible instead of merely true. */
 .iconbtn {
   position:relative; display:inline-flex; align-items:center; justify-content:center;
   width:26px; height:26px; border-radius:3px; cursor:pointer; flex:none;
-  border:2px solid var(--sp-sink); color:var(--sp-ink-3);
+  border:2px solid var(--sp-sink); background:var(--sp-sink); color:var(--sp-ink-3);
 }
-.iconbtn ha-icon { --mdc-icon-size:16px; }
+.iconbtn ha-icon { --mdc-icon-size:18px; }
 .iconbtn.on { background:var(--accent); border-color:var(--accent); color:var(--sp-surface); }
 .iconbtn.inert { opacity:.38; pointer-events:none; }
 .iconbtn::after {
@@ -2145,6 +2166,13 @@ function bodyIsEmpty(type, b) {
 /* Below this a spinner reads as a flicker, which is worse than none. */
 const SPINNER_FLOOR_MS = 400;
 
+/* A press answers on the live element — the flash, the knob's travel, the
+   button lighting up — and every one of those answers is destroyed by a
+   re-render, which arrives immediately because pressing a button is what
+   starts the spinner. So renders wait out the answer. Slightly longer than
+   the 260ms flash, so the whole of it is seen. */
+const PRESS_HOLD_MS = 280;
+
 function flashPress(element) {
   if (!element) return;
   element.classList.remove("pressed");
@@ -2221,6 +2249,7 @@ class SpectraCard extends HTMLElement {
     this._phase = "idle";
     this._busy = 0;
     this._power = null;
+    this._mode = null;
   }
 
   setConfig(config) {
@@ -2297,8 +2326,11 @@ class SpectraCard extends HTMLElement {
     this._optimistic = {};
     this._dragging = false;
     this._power = null;
+    this._mode = null;
     if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
     if (this._powerGiveUp) { clearTimeout(this._powerGiveUp); this._powerGiveUp = null; }
+    if (this._modeGiveUp) { clearTimeout(this._modeGiveUp); this._modeGiveUp = null; }
+    if (this._pressTimer) { clearTimeout(this._pressTimer); this._pressTimer = null; }
     if (this._keyPick) { clearTimeout(this._keyPick); this._keyPick = null; }
     for (const pending of this._subscriptions.values()) {
       Promise.resolve(pending).then(
@@ -2525,15 +2557,16 @@ class SpectraCard extends HTMLElement {
     /* A finger is on the bar. Rebuilding it now would take the element the
        pointer is captured on out from under the gesture. */
     if (this._dragging) return;
-    /* A switch mid-travel: let the transition finish before the node is
-       replaced, or the knob teleports instead of sliding. */
-    if (this._switchedAt && Date.now() - this._switchedAt < 240) {
-      if (!this._switchTimer) {
-        this._switchTimer = setTimeout(() => {
-          this._switchTimer = null;
+    /* A press mid-answer: the switch's knob part-way through its travel, a
+       button still flashing. Replacing the node now would teleport the one
+       and swallow the other. */
+    if (this._pressedAt && Date.now() - this._pressedAt < PRESS_HOLD_MS) {
+      if (!this._pressTimer) {
+        this._pressTimer = setTimeout(() => {
+          this._pressTimer = null;
           this._signature = null;
           this._update();
-        }, 260);
+        }, PRESS_HOLD_MS + 20);
       }
       return;
     }
@@ -2557,6 +2590,20 @@ class SpectraCard extends HTMLElement {
            outline, whether the mode tab is live — so they all move together
            rather than the switch arguing with the rest of the card. */
         model.body.on = power.want;
+      }
+    }
+
+    const mode = this._mode;
+    if (mode && model.body) {
+      if (Boolean(model.body.manual) === mode.manual) {
+        this._mode = null;
+        if (this._modeGiveUp) { clearTimeout(this._modeGiveUp); this._modeGiveUp = null; }
+      } else {
+        /* Same contract as the switch: the bar undims, the info line says
+           Auto, and the button stays lit, all from the moment of the press
+           and all from this one value — so nothing on the card can disagree
+           with anything else while the bridge catches up. */
+        model.body.manual = mode.manual;
       }
     }
 
@@ -2606,9 +2653,19 @@ class SpectraCard extends HTMLElement {
     /* Step 7 of the emphasis ladder, and the only one in the system. It is
        rationed on purpose: a second inverted cell would stop the first from
        reading as urgent. */
+    /* The scene the card is reporting. Compared rather than assumed, because
+       most renders are not news — a spinner starting, a tick leaving, a lamp
+       count ticking over — and fading for those would make the card restless.
+       The first render of all never fades: arriving is not a change. */
+    const status = BODY_STATUS[type] ? BODY_STATUS[type](model.body) : null;
+    const scene = status && status.text !== undefined ? String(status.text) : "";
+    const swapped = this._scene !== undefined && this._scene !== scene && !this._dragging;
+    this._scene = scene;
+
     const classes = "card"
       + (config.invert ? " invert" : "")
-      + (tappable ? " tappable" : "");
+      + (tappable ? " tappable" : "")
+      + (swapped ? " swap" : "");
     const card = [
       `<div class="${classes}"`,
       ` style="${accentStyle(model.accent)}"`,
@@ -2842,6 +2899,19 @@ class SpectraCard extends HTMLElement {
     }, 12000);
   }
 
+  /* Auto and Manual answer on the press and are corrected by the bridge, not
+     waited on: a mode button that does nothing for a second is a mode button
+     you press twice. */
+  _wantMode(mode) {
+    if (this._modeGiveUp) clearTimeout(this._modeGiveUp);
+    this._mode = { manual: mode === "manual" };
+    this._modeGiveUp = setTimeout(() => {
+      this._mode = null;
+      this._signature = null;
+      this._update();
+    }, 12000);
+  }
+
   /* Held so the bar keeps showing what you asked for until the bridge agrees
      — the same contract as a pending temperature. */
   _choose(label, entity) {
@@ -2971,7 +3041,7 @@ class SpectraCard extends HTMLElement {
            the state finally lands. */
         power.classList.toggle("on", !on);
         power.setAttribute("aria-checked", on ? "false" : "true");
-        this._switchedAt = Date.now();
+        this._pressedAt = Date.now();
         this._wantPower(!on);
         flashPress(power);
         this._work(() => this._callAction(action));
@@ -3002,6 +3072,16 @@ class SpectraCard extends HTMLElement {
           if (entity) action = { service: "scene.turn_on", target: { entity_id: entity } };
         }
         if (!action) return;
+        /* The button lights on the press, for the same reason the knob moves
+           on the press: the live element is the only one that can answer, and
+           the render that follows is built from the wanted state so the
+           answer survives it. */
+        if (mode === "auto" || mode === "manual") {
+          el.classList.toggle("on", mode === "auto");
+          el.setAttribute("aria-pressed", mode === "auto" ? "true" : "false");
+          this._wantMode(mode);
+        }
+        this._pressedAt = Date.now();
         flashPress(el);
         this._work(() => this._callAction(action));
       };
