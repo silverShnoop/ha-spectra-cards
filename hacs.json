@@ -1,6 +1,6 @@
 {
   "name": "Spectra Cards",
-  "filename": "spectra-cards-2.js",
+  "filename": "spectra-cards.js",
   "render_readme": true,
   "homeassistant": "2026.9.0"
 }
