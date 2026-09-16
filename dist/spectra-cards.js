@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.15.0";
+const VERSION = "0.16.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -221,9 +221,26 @@ const SHEET = `
 }
 .picker.picking .thumb { display:block; }
 .picker:focus-visible { outline:2px solid var(--sp-a4); outline-offset:3px; }
-.pickrow { flex-wrap:wrap; gap:6px; }
-.pickrow ha-icon { --mdc-icon-size:16px; color:var(--sp-ink-2); flex:none; }
-.pickrow .name { flex:none; }
+.pickrow { flex-wrap:wrap; gap:6px; min-height:30px; }
+.pickinfo {
+  margin:0; font-size:12px; color:var(--sp-ink-2); min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+/* The lens sits above the bar, which on a card this short means over the
+   title bar. That is deliberate: during a drag it is the only thing worth
+   reading, and it is gone the moment the finger lifts. */
+.picklens {
+  position:absolute; bottom:calc(100% + 12px); left:50%;
+  transform:translateX(-50%); display:none; align-items:center; gap:8px;
+  padding:7px 13px; border-radius:6px; white-space:nowrap;
+  background:var(--sp-ink); color:var(--sp-surface);
+  font-size:19px; font-family:var(--sp-mono); letter-spacing:-.01em;
+  pointer-events:none; z-index:5;
+}
+.picklens ha-icon { --mdc-icon-size:21px; }
+.picker.picking .picklens { display:flex; }
+/* Dragged far enough away that the gesture is being abandoned. */
+.picker.adrift .picklens, .picker.adrift .thumb { opacity:.3; }
 /* Status and buttons travel together and stay right-aligned; on a narrow
    panel the whole group drops to its own line rather than the buttons
    splitting away from the state they act on. */
@@ -231,10 +248,7 @@ const SHEET = `
 /* Reserved whether or not it has anything to say: JAMES asked that nothing
    move when state changes, and a line that comes and goes moves everything
    under it. */
-.picknext {
-  margin:5px 0 0; font-size:12px; color:var(--sp-ink-2);
-  min-height:15px; line-height:15px;
-}
+
 
 /* people */
 .people { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
@@ -299,6 +313,14 @@ img.avatar { object-fit:cover; display:block; }
   100% { box-shadow: inset 0 0 0 999px transparent; }
 }
 @keyframes sp-spin { to { transform: rotate(360deg); } }
+/* A spinner that simply disappears leaves you unsure whether it worked. It
+   becomes a tick, holds long enough to be read, then goes. */
+@keyframes sp-settle {
+  0%   { opacity:0; transform:scale(.7); }
+  18%  { opacity:1; transform:scale(1); }
+  66%  { opacity:1; transform:scale(1); }
+  100% { opacity:0; transform:scale(.9); }
+}
 
 .pressed { animation: sp-press 260ms ease-out; }
 
@@ -322,6 +344,15 @@ img.avatar { object-fit:cover; display:block; }
    that has to stay readable — the space is reserved whether it is spinning
    or not, so its arrival moves nothing. */
 .spinslot { width:13px; height:13px; flex:none; display:inline-flex; }
+.ok {
+  width:13px; height:13px; flex:none; position:relative;
+  animation: sp-settle 900ms ease-in-out forwards;
+}
+.ok::after {
+  content:""; position:absolute; left:4px; top:0; width:4px; height:9px;
+  border:solid var(--sp-a3); border-width:0 2px 2px 0;
+  transform:rotate(45deg);
+}
 
 /* A pending value is the one you asked for, not the one the house has yet.
    It sits in the accent so it reads as provisional, and the spinner beside
@@ -819,6 +850,7 @@ function resolveValue(hass, spec, forecasts) {
   if (typeof spec.forecast === "string") return readForecast(forecasts, spec);
   if (typeof spec.todo === "string") return readTodo(forecasts && forecasts.__todo, spec);
   if (typeof spec.calendar === "string") return readCalendar(forecasts && forecasts.__cal, spec);
+  if (typeof spec.count === "string") return readCount(hass, spec);
   const out = {};
   for (const [key, value] of Object.entries(spec)) {
     out[key] = RAW_KEYS.has(key) ? value : resolveValue(hass, value, forecasts);
@@ -857,6 +889,29 @@ function resolveEach(hass, template, item, forecasts) {
     out[key] = RAW_KEYS.has(key) ? value : resolveEach(hass, value, item, forecasts);
   }
   return out;
+}
+
+/* How many of a group's members are in a given state. The group's own state
+   only says "something is on"; the number of lamps actually lit is a
+   different and more useful fact, and it is marshalling, so it lives here
+   rather than in a template somebody has to maintain. */
+function readCount(hass, spec) {
+  const group = hass && hass.states ? hass.states[spec.count] : null;
+  if (!group) return null;
+  const members = group.attributes && group.attributes.entity_id;
+  if (!Array.isArray(members)) return null;
+  const want = isBlank(spec.state) ? "on" : String(spec.state);
+  let n = 0;
+  for (const id of members) {
+    const member = hass.states[id];
+    if (member && member.state === want) n += 1;
+  }
+  /* "1 lights on" is the kind of thing that makes a panel look unfinished,
+     and the fix is one optional string rather than a pluralisation engine. */
+  const shape = n === 1 && !isBlank(spec.singular)
+    ? Object.assign({}, spec, { suffix: spec.singular })
+    : spec;
+  return applyFormat(n, shape);
 }
 
 /* A person's state is a fixed vocabulary: "home", "not_home", or the name of
@@ -977,6 +1032,13 @@ function collectSources(spec, found) {
     });
     return found;
   }
+  if (typeof spec.count === "string") {
+    /* The group is watched, not its members: Home Assistant rebuilds a
+       group's state object when any member moves, so the card re-marshals
+       anyway and the member list can stay dynamic. */
+    found.entities.add(spec.count);
+    return found;
+  }
   if (typeof spec.calendar === "string") {
     found.calendars.set(calendarKey(spec), {
       entity: spec.calendar,
@@ -990,6 +1052,52 @@ function collectSources(spec, found) {
   return found;
 }
 
+
+/* Which scene the picker is showing, and why. Worked out once here because
+   the bar draws it and the title bar names it, and two copies of this would
+   be two chances to disagree about what the room is doing. */
+function pickerState(b) {
+  const segments = Array.isArray(b.segments) && b.segments.length
+    ? b.segments.map((seg) => ({
+      index: seg.index,
+      color: cssColor(seg.color) || "var(--sp-sink)",
+      label: seg.label,
+      minutes: Number(seg.pct) > 0 ? Number(seg.pct) : 1,
+      start: null,
+    }))
+    : segmentsFromTimeslots(b.timeslots, b.sun);
+  if (!segments.length) return null;
+
+  const activeIndex = b.active_index === undefined ? b.activeIndex : b.active_index;
+  let scheduled = segments.findIndex((seg) => seg.index === activeIndex);
+  if (scheduled < 0) scheduled = segments.length - 1;
+
+  const manual = Boolean(b.manual);
+  /* picked is what the user is choosing right now, or has just chosen and
+     the bridge has not confirmed. It outranks both. */
+  const wanted = firstOf(b.picked, manual ? b.active : null);
+  let current = scheduled;
+  if (!isBlank(wanted)) {
+    const found = segments.findIndex((seg) => String(seg.label) === String(wanted));
+    if (found >= 0) current = found;
+  }
+  return { segments, scheduled, current, manual, lit: b.on === undefined || Boolean(b.on) };
+}
+
+/* What a body would say about itself in the title bar, where config cannot
+   know it. One line, and the same line whatever the body is drawing. */
+const BODY_STATUS = {
+  picker(b) {
+    if (!b || typeof b !== "object") return null;
+    if (b.on !== undefined && !b.on) return "Off";
+    const wanted = firstOf(b.picked, b.active);
+    if (!isBlank(wanted)) return String(wanted);
+    /* On something this card has no name for. */
+    if (b.manual) return "Manual";
+    const state = pickerState(b);
+    return state ? String(state.segments[state.current].label) : null;
+  },
+};
 
 /* ------------------------------------------------------------------ *
  * Timeslots to segments
@@ -1645,16 +1753,9 @@ const BODIES = {
      watch the room flash through every one of them on the way to the one you
      wanted. The bar says what you are about to choose; the release chooses. */
   picker(b) {
-    const segments = Array.isArray(b.segments) && b.segments.length
-      ? b.segments.map((s) => ({
-        index: s.index,
-        color: cssColor(s.color) || "var(--sp-sink)",
-        label: s.label,
-        minutes: Number(s.pct) > 0 ? Number(s.pct) : 1,
-        start: null,
-      }))
-      : segmentsFromTimeslots(b.timeslots, b.sun);
-    if (!segments.length) return "";
+    const state = pickerState(b);
+    if (!state) return "";
+    const segments = state.segments;
 
     /* Timeslots name a scene; only the catalogue knows which entity that is
        and what it looks like. Matched by name because that is the only key
@@ -1666,25 +1767,12 @@ const BODIES = {
     }
 
     const layout = pickerLayout(segments);
-    const activeIndex = b.active_index === undefined ? b.activeIndex : b.active_index;
-    let scheduled = segments.findIndex((s) => s.index === activeIndex);
-    if (scheduled < 0) scheduled = segments.length - 1;
-
-    const manual = Boolean(b.manual);
     /* A dark room and an overridden room look identical through the active
        scene alone — both report "not the schedule" — and calling a room
        "Manual" when somebody simply turned the lights off is the card
        asserting an override nobody made. When the light says it is off,
        that is the more specific truth and it wins. */
-    const lit = b.on === undefined || Boolean(b.on);
-    /* picked is what the user is choosing right now, or has just chosen and
-       the bridge has not confirmed. It outranks both. */
-    const wanted = firstOf(b.picked, manual ? b.active : null);
-    let current = scheduled;
-    if (!isBlank(wanted)) {
-      const found = segments.findIndex((s) => String(s.label) === String(wanted));
-      if (found >= 0) current = found;
-    }
+    const { current, manual, lit } = state;
 
     /* Dim the unchosen only when a choice is being expressed. While the
        schedule is driving, no segment is more chosen than the clock says. */
@@ -1711,7 +1799,12 @@ const BODIES = {
       + ` aria-valuenow="${current}"`
       + ` aria-valuetext="${esc(segments[current].label)}">`
       + `<div class="striphold"><div class="strip">${bar}</div>`
-      + `<span class="thumb" style="left:${thumbAt.toFixed(2)}%"></span></div>`
+      + `<span class="thumb" style="left:${thumbAt.toFixed(2)}%"></span>`
+      /* Under a finger, the bar is hidden by the finger. The lens says what
+         is being chosen, large, above the hand rather than beneath it. */
+      + `<span class="picklens" data-picklens>`
+      + `<ha-icon data-lensicon icon=""></ha-icon>`
+      + `<span data-lensname></span></span></div>`
       + `<div class="caretrow">`
       + (caret === null ? "" : `<span class="caret" style="left:${caret.toFixed(2)}%"></span>`)
       + `</div></div>`;
@@ -1726,20 +1819,19 @@ const BODIES = {
       : null;
     const smart = catalogue.find((sc) => sc && sc.smart);
 
-    /* An unlit room was naming its scheduled scene in full ink beside a
-       dimmed bar, and it read as "Sleepy is on" rather than "Sleepy is what
-       the schedule would be doing". The name belongs to the bar, so it dims
-       with the bar. The toggle does not: it is the control, and a control
-       stays legible whatever the room is doing. */
-    out += `<div class="row pickrow${lit ? "" : " unlit"}" style="padding-left:0">`
-      + `<span class="dot" data-pickdot style="background:${chosen.color}"></span>`
-      /* Always present, even empty: the drag rewrites this in place, and an
-         element that has to be created mid-gesture is an element that jumps. */
-      + `<ha-icon data-pickicon icon="${esc(scene && scene.icon ? scene.icon : "")}"></ha-icon>`
-      + `<p class="name" data-pickname>${esc(chosen.label)}</p>`
-      + `<span class="spinslot" data-pickspin>`
-      + (b.pending ? `<span class="spinner"></span>` : "")
-      + `</span>`;
+    /* The scene's name lives in the title bar now, with one spinner beside
+       it for the whole card. This row is the supporting line and the
+       controls, so it never changes width as scenes change, and "what is
+       this room doing" is in the same place on every card. */
+    out += `<div class="row pickrow" style="padding-left:0">`
+      + `<p class="pickinfo">`
+      /* Extra whenever the room is lit; the next change only while the
+         schedule is actually driving it, because once overridden Hue holds
+         the scene rather than advancing to the next slot. */
+      + esc(lit
+        ? [b.info, manual ? null : nextText].filter((v) => !isBlank(v)).join(" \u00b7 ")
+        : "")
+      + `</p>`;
 
     /* Status and controls share one right-hand group so the buttons sit in
        the same place in every state. A control that moves depending on what
@@ -1774,17 +1866,7 @@ const BODIES = {
         + ` tabindex="0" data-pickpower><i></i></span>`;
     }
 
-    /* Closes the right-hand group and the row itself: the next line is a
-       block of its own, not a flex child that happens to wrap. */
-    out += `</span></div>`;
-
-    /* Always drawn even when empty. The next change is only true while the
-       schedule is driving — once overridden, Hue holds the scene rather than
-       advancing — so this says nothing in the other two states, but it keeps
-       its height so toggling does not make the card jump under your thumb. */
-    return out + `<p class="picknext">`
-      + (lit && !manual && nextText ? esc(nextText) : "")
-      + `</p>`;
+    return out + `</span></div>`;
   },
 
   /* Where are we in a cycle? */
@@ -2008,6 +2090,10 @@ class SpectraCard extends HTMLElement {
     this._optimistic = {};
     this._dragging = false;
     this._pick = null;
+    /* One spinner for the card, not one per button. idle -> busy -> done,
+       and done settles into a tick that reads and then leaves. */
+    this._phase = "idle";
+    this._busy = 0;
   }
 
   setConfig(config) {
@@ -2310,6 +2396,18 @@ class SpectraCard extends HTMLElement {
     /* A finger is on the bar. Rebuilding it now would take the element the
        pointer is captured on out from under the gesture. */
     if (this._dragging) return;
+    /* A switch mid-travel: let the transition finish before the node is
+       replaced, or the knob teleports instead of sliding. */
+    if (this._switchedAt && Date.now() - this._switchedAt < 240) {
+      if (!this._switchTimer) {
+        this._switchTimer = setTimeout(() => {
+          this._switchTimer = null;
+          this._signature = null;
+          this._update();
+        }, 260);
+      }
+      return;
+    }
     this._applyPending(model);
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
@@ -2374,7 +2472,7 @@ class SpectraCard extends HTMLElement {
       ` style="${accentStyle(model.accent)}"`,
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
-      this._titlebar(model),
+      this._titlebar(model, this._phase),
       waiting
         ? `<p class="sub">${esc(waiting)}</p>`
         : BODIES[type](model.body),
@@ -2385,14 +2483,26 @@ class SpectraCard extends HTMLElement {
     this._bind(model);
   }
 
-  _titlebar(model) {
-    const { title, icon, meta } = model;
-    if (isBlank(title) && isBlank(icon) && isBlank(meta)) return "";
+  /* Some bodies know their own state better than any config line can. Where
+     one does, it says so here and the shell still draws the title bar — the
+     body never reaches outside itself. */
+  _titlebar(model, phase) {
+    const { title, icon } = model;
+    const type = this._config.body.type;
+    const own = BODY_STATUS[type] ? BODY_STATUS[type](model.body) : null;
+    const meta = own === null ? model.meta : own;
+    const slot = BODY_STATUS[type]
+      ? `<span class="spinslot">${
+        phase === "busy" ? `<span class="spinner"></span>`
+          : (phase === "done" ? `<span class="ok"></span>` : "")}</span>`
+      : "";
+    if (isBlank(title) && isBlank(icon) && isBlank(meta) && !slot) return "";
     return `<div class="titlebar">`
       + `<span class="tick"></span>`
       + (isBlank(icon) ? "" : `<ha-icon icon="${esc(icon)}"></ha-icon>`)
       + (isBlank(title) ? "" : `<h3>${esc(title)}</h3>`)
       + (isBlank(meta) ? "" : `<span class="meta">${esc(meta)}</span>`)
+      + slot
       + `</div>`;
   }
 
@@ -2411,9 +2521,8 @@ class SpectraCard extends HTMLElement {
     const cells = Array.prototype.slice.call(strip.querySelectorAll("i"));
     if (!cells.length) return;
 
-    const nameEl = this._holder.querySelector("[data-pickname]");
-    const iconEl = this._holder.querySelector("[data-pickicon]");
-    const dotEl = this._holder.querySelector("[data-pickdot]");
+    const lensName = this._holder.querySelector("[data-lensname]");
+    const lensIcon = this._holder.querySelector("[data-lensicon]");
 
     let index = cells.findIndex((c) => c.classList.contains("on"));
     if (index < 0) index = 0;
@@ -2423,11 +2532,22 @@ class SpectraCard extends HTMLElement {
       for (let n = 0; n < cells.length; n += 1) cells[n].classList.toggle("on", n === i);
       const cell = cells[i];
       const label = cell.getAttribute("data-label") || "";
-      if (nameEl) nameEl.textContent = label;
-      if (iconEl) iconEl.setAttribute("icon", cell.getAttribute("data-icon") || "");
-      if (dotEl) dotEl.style.background = cell.getAttribute("data-color") || "";
+      if (lensName) lensName.textContent = label;
+      if (lensIcon) lensIcon.setAttribute("icon", cell.getAttribute("data-icon") || "");
       el.setAttribute("aria-valuenow", String(i));
       el.setAttribute("aria-valuetext", label);
+    };
+
+    /* Far enough from the bar that this is no longer a choice being made.
+       Sliding back within reach picks the gesture up again — only the lift
+       decides, and a lift out here decides nothing. */
+    const ADRIFT_PX = 90;
+    let adrift = false;
+    const strayed = (event) => {
+      const box = strip.getBoundingClientRect();
+      const dy = Math.max(box.top - event.clientY, event.clientY - box.bottom, 0);
+      const dx = Math.max(box.left - event.clientX, event.clientX - box.right, 0);
+      return Math.max(dy, dx) > ADRIFT_PX;
     };
 
     /* Hit-tested against the rendered boxes rather than the percentages that
@@ -2453,15 +2573,29 @@ class SpectraCard extends HTMLElement {
       if (next !== index) { index = next; show(index); }
     };
 
+    /* The lens follows the thumb but is kept clear of the card edges: a
+       label that runs off the side is a label you cannot read. */
+    const lens = el.querySelector("[data-picklens]");
+    const moveLens = (clientX) => {
+      if (!lens) return;
+      const box = strip.getBoundingClientRect();
+      if (!box.width) return;
+      const pct = ((Math.min(box.right, Math.max(box.left, clientX)) - box.left) / box.width) * 100;
+      lens.style.left = `${Math.min(84, Math.max(16, pct)).toFixed(2)}%`;
+    };
+
     const finish = (commit) => {
       if (!this._dragging) return;
       this._dragging = false;
-      el.classList.remove("picking");
+      el.classList.remove("picking", "adrift");
       const cell = cells[index];
       const entity = cell && cell.getAttribute("data-scene-entity");
-      /* Landing back where you started is a cancelled gesture, not a choice,
-         and a scene you cannot name is a scene this card cannot turn on. */
-      if (commit && entity && index !== began) this._choose(cell.getAttribute("data-label"), entity);
+      /* Landing back where you started is a cancelled gesture, not a choice;
+         so is lifting off far from the bar. And a scene this card cannot
+         name is a scene it cannot turn on. */
+      if (commit && !adrift && entity && index !== began) {
+        this._choose(cell.getAttribute("data-label"), entity);
+      }
       this._signature = null;
       this._update();
     };
@@ -2470,14 +2604,27 @@ class SpectraCard extends HTMLElement {
       if (event.button) return;
       if (el.setPointerCapture) el.setPointerCapture(event.pointerId);
       this._dragging = true;
+      adrift = false;
       el.classList.add("picking", "choosing");
       flashPress(el);
       track(event.clientX);
+      /* track only redraws when the segment changes, so pressing the one
+         already chosen would leave the lens blank — which is the moment a
+         first-time user most needs it to say something. */
+      show(index);
+      moveLens(event.clientX);
       event.preventDefault();
     });
     el.addEventListener("pointermove", (event) => {
       if (!this._dragging) return;
-      track(event.clientX);
+      const away = strayed(event);
+      if (away !== adrift) {
+        adrift = away;
+        el.classList.toggle("adrift", adrift);
+        /* Snap back, so the bar never claims a choice the lift will not make. */
+        if (adrift) { index = began; show(index); }
+      }
+      if (!adrift) { track(event.clientX); moveLens(event.clientX); }
       event.preventDefault();
     });
     el.addEventListener("pointerup", () => finish(true));
@@ -2505,6 +2652,32 @@ class SpectraCard extends HTMLElement {
     });
   }
 
+  /* Every action on this card funnels through one indicator. Counting rather
+     than flagging, because a second press while the first is in flight must
+     not clear the spinner early. */
+  _work(run) {
+    this._busy += 1;
+    if (this._phase !== "busy") { this._phase = "busy"; this._signature = null; this._update(); }
+    const started = Date.now();
+    const settle = () => {
+      this._busy -= 1;
+      if (this._busy > 0) return;
+      const wait = Math.max(0, SPINNER_FLOOR_MS - (Date.now() - started));
+      if (this._settleTimer) clearTimeout(this._settleTimer);
+      this._settleTimer = setTimeout(() => {
+        this._phase = "done";
+        this._signature = null;
+        this._update();
+        this._settleTimer = setTimeout(() => {
+          this._phase = "idle";
+          this._signature = null;
+          this._update();
+        }, 900);
+      }, wait);
+    };
+    Promise.resolve(run()).then(settle, settle);
+  }
+
   /* Held so the bar keeps showing what you asked for until the bridge agrees
      — the same contract as a pending temperature. */
   _choose(label, entity) {
@@ -2515,7 +2688,9 @@ class SpectraCard extends HTMLElement {
       this._signature = null;
       this._update();
     }, 12000);
-    this._callAction({ service: "scene.turn_on", target: { entity_id: entity } });
+    this._work(() => this._callAction({
+      service: "scene.turn_on", target: { entity_id: entity },
+    }));
   }
 
   _setHidden(hide) {
@@ -2619,7 +2794,14 @@ class SpectraCard extends HTMLElement {
             ? { service: "scene.turn_on", target: { entity_id: smart.entity } }
             : { service: "light.turn_on", target: { entity_id: body.light } };
         }
-        onPress(power, () => this._callAction(action));
+        /* Move the knob now, on the live element, so the transition actually
+           runs — a re-render would replace the node and the knob would jump
+           rather than travel. The render that follows agrees with it. */
+        power.classList.toggle("on", !on);
+        power.setAttribute("aria-checked", on ? "false" : "true");
+        this._switchedAt = Date.now();
+        flashPress(power);
+        this._work(() => this._callAction(action));
       };
       power.addEventListener("click", run);
       power.addEventListener("keydown", (event) => {
@@ -2647,7 +2829,8 @@ class SpectraCard extends HTMLElement {
           if (entity) action = { service: "scene.turn_on", target: { entity_id: entity } };
         }
         if (!action) return;
-        onPress(el, () => this._callAction(action));
+        flashPress(el);
+        this._work(() => this._callAction(action));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
