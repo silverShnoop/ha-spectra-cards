@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.25.0";
+const VERSION = "0.25.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2490,6 +2490,7 @@ class SpectraCard extends HTMLElement {
     this._pick = null;
     /* One spinner for the card, not one per button. idle -> busy -> done,
        and done settles into a tick that reads and then leaves. */
+    this._config = null;
     this._phase = "idle";
     this._busy = 0;
     this._power = null;
@@ -2782,7 +2783,12 @@ class SpectraCard extends HTMLElement {
      re-render. Only cards that actually show one pay for the timer. */
   _startTicking() {
     if (this._timer || !this.isConnected) return;
-    const clock = this._config.body && this._config.body.type === "clock";
+    /* Home Assistant can attach the element before it configures it, so this
+       runs with no config at all. Reading through it unguarded threw, and a
+       throw in connectedCallback takes down every card on the page rather
+       than the one that caused it. */
+    const body = this._config && this._config.body;
+    const clock = Boolean(body) && body.type === "clock";
     if (!this._live && !clock) return;
     const now = new Date();
     /* A clock thirty seconds late is a broken clock, so it waits for the
