@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.19.0";
+const VERSION = "0.20.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -220,13 +220,21 @@ const SHEET = `
 .picker.choosing .strip i.on { opacity:1; }
 /* The chosen scene is outlined as well as bright, so "which one" does not
    rest on a brightness difference alone and still reads from across a room.
+
+   Ink, not a per-scene contrast colour: JAMES asked for one ring that is dark
+   on paper and pale in the dark, the same ink the marker circle is drawn in,
+   so the two read as one piece of furniture rather than the ring changing
+   character as it travels. The cost is that it is quieter on a scene close to
+   the ink in tone — a pale scene under the light theme — and the segment's
+   own brightness carries it there.
+
    outline rather than border: it costs no layout width, so the segments do
    not shuffle as the choice moves under a finger. A dark room outlines
    nothing, for the same reason it carries no circle — unless a finger is on
    the bar, in which case something is being chosen after all. */
 .picker:not(.off) .strip i.on,
 .picker.picking .strip i.on {
-  outline:2px solid var(--seg-ink); outline-offset:-2px;
+  outline:2px solid var(--sp-ink); outline-offset:-2px;
 }
 /* Nothing is driving this room, so nothing on the bar is lit. The bar stays
    legible enough to aim at, because dragging it is how you turn the room on. */
@@ -253,7 +261,7 @@ const SHEET = `
 .picker:focus-visible { outline:2px solid var(--sp-a4); outline-offset:3px; }
 .pickrow { flex-wrap:wrap; gap:6px; min-height:30px; }
 .pickinfo {
-  margin:0; font-size:12px; color:var(--sp-ink-2); min-width:0;
+  margin:0; font-size:12px; color:var(--sp-ink-2); min-width:0; flex:1 1 auto;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 /* The lens sits above the bar, which on a card this short means over the
@@ -506,12 +514,13 @@ img.avatar { object-fit:cover; display:block; }
 
 /* A button that is only a symbol. Same shape language as .cmd, same 44px
    touch floor underneath it. */
-/* The same outside dimensions as the switch it sits beside, and the same
-   1px of air around what is inside it. They are a pair; a pair that differs
-   by nine pixels of height reads as a mistake, because it was one. */
+/* Square, because what is in it is square. It shares the switch's height so
+   the two sit on one line, and deliberately not its width: a square button
+   beside a wide one reads as two different kinds of control, which is what
+   they are. */
 .iconbtn {
   position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:40px; height:22px; border-radius:3px; cursor:pointer; flex:none;
+  width:26px; height:26px; border-radius:3px; cursor:pointer; flex:none;
   border:2px solid var(--sp-sink); color:var(--sp-ink-3);
 }
 .iconbtn ha-icon { --mdc-icon-size:16px; }
@@ -527,25 +536,27 @@ img.avatar { object-fit:cover; display:block; }
    side the knob sits on is a non-colour signal in its own right — so the
    rule that colour never carries meaning alone still holds. Flat: the knob
    moves, nothing about it lifts off the surface. */
-/* Geometry taken verbatim from the "power switch, then the mode pair"
-   proposal, integers and all: 40x22 outside, 2px border, a 16px knob inset
-   exactly 1px on every side in both positions. Scaling the track to sit
-   level with the button beside it and leaving the knob offsets alone is what
-   made it look wrong — the extra height all landed underneath the knob, 1.5
-   above against 3.5 below, and the resting gap stopped matching the
-   travelled one. Nothing here is a round number by accident; changing one
-   dimension means re-deriving the other three. */
+/* 40x26 outside, 2px border, so 36x22 inside. A 20px knob is then inset
+   exactly 1px on every side, and travels 1 -> 15 to land inset 1px at the
+   far end too.
+
+   Taller at the same width than the shape it started from, which is what
+   makes it read as the rectangle beside the square button rather than as its
+   twin. The knob had to grow with the height: leaving it at 16 would have put
+   3px above and below against 1px at the ends, and uneven insets are exactly
+   what looked wrong the last two times. Nothing here is a round number by
+   accident — change one dimension and the other three follow. */
 .switch {
   position:relative;
-  width:40px; height:22px; flex:none; cursor:pointer;
+  width:40px; height:26px; flex:none; cursor:pointer;
   border:2px solid var(--sp-sink); border-radius:3px; background:var(--sp-sink);
 }
 .switch > i {
-  position:absolute; top:1px; left:1px; width:16px; height:16px; border-radius:2px;
+  position:absolute; top:1px; left:1px; width:20px; height:20px; border-radius:2px;
   background:var(--sp-ink-3); transition:left 140ms ease-out;
 }
 .switch.on { background:var(--sp-a4); border-color:var(--sp-a4); }
-.switch.on > i { left:19px; background:var(--sp-surface); }
+.switch.on > i { left:15px; background:var(--sp-surface); }
 .switch::after {
   content:""; position:absolute; left:50%; top:50%;
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
@@ -1142,13 +1153,16 @@ function pickerState(b) {
   return { segments, scheduled, current, manual, lit: b.on === undefined || Boolean(b.on) };
 }
 
-/* "3 lights on \u00b7 Auto \u2192 Storybook 19:13" \u2014 two statements, not three.
+/* "Auto \u2192 Storybook 19:13 \u00b7 3 lights on" \u2014 two statements, not three. The
+   mode leads because the button that sets it sits immediately to its left, so
+   the word is that button's caption before it is anything else.
+
    Kept out of the body so its shape can be read at a glance and tested on its
-   own, because the order of these has now been wrong twice. */
+   own, because the order of these has now been wrong three times. */
 function pickerInfo(extra, manual, nextText) {
   const mode = manual ? "Manual" : "Auto";
   const driving = !manual && !isBlank(nextText) ? `${mode} ${nextText}` : mode;
-  return [extra, driving].filter((v) => !isBlank(v)).join(" \u00b7 ");
+  return [driving, extra].filter((v) => !isBlank(v)).join(" \u00b7 ");
 }
 
 /* The catalogue entry for a scene the schedule names, if there is one. The
@@ -1879,13 +1893,7 @@ const BODIES = {
         + ` data-icon="${esc(scene && scene.icon ? scene.icon : "")}"`
         + ` data-color="${esc(s.color)}"`
         + ` class="${i === current ? "on" : ""}"`
-        /* The outline has to read against the scene's own colour, which comes
-           from the bulbs and owes the palette nothing — a dark ink ring
-           disappears on Night-time, a pale one disappears on Arise. Picked by
-           luminance per segment, so it survives both themes and any scene
-           anyone adds later. */
-        + ` style="flex:0 0 ${layout.widths[i].toFixed(3)}%;background:${s.color}`
-        + `;--seg-ink:${textOn(s.color)}"></i>`;
+        + ` style="flex:0 0 ${layout.widths[i].toFixed(3)}%;background:${s.color}"></i>`;
     }).join("");
 
     /* One circle answers "what scene am I on", in all three cases. Following
@@ -1933,6 +1941,27 @@ const BODIES = {
        controls, so it never changes width as scenes change, and "what is
        this room doing" is in the same place on every card. */
     out += `<div class="row pickrow" style="padding-left:0">`
+      /* The symbol sits against the word that explains it. A caption two
+         inches away from its control is a caption for nothing.
+
+         It is the same symbol the marker wears when the schedule is driving,
+         so the button and the circle on the bar are plainly one idea: press
+         it and the circle gains the symbol and goes to the clock; press it
+         again and the symbol leaves and the circle settles on the scene you
+         are holding. Pressing it while overridden hands the room back to its
+         schedule; pressing it while following pins whatever is showing. */
+      + (smart && smart.entity
+        ? `<span class="iconbtn${auto ? " on" : ""}${lit ? "" : " inert"}"`
+          + ` role="button" tabindex="${lit ? "0" : "-1"}"`
+          + ` aria-pressed="${auto ? "true" : "false"}"`
+          + ` aria-label="Follow the schedule"`
+          + ` title="${auto ? "Following the schedule" : "Follow the schedule"}"`
+          + `${lit ? "" : ` aria-disabled="true"`}`
+          + ` data-pickmode="${auto ? "manual" : "auto"}"`
+          + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}"`
+          + ` style="${accentStyle(3)}">`
+          + `<ha-icon icon="${esc(autoIcon)}"></ha-icon></span>`
+        : "")
       + `<p class="pickinfo">`
       /* What the room is, then what is driving it. The next change is not a
          third fact standing alongside the mode — it is the consequence of
@@ -1956,28 +1985,6 @@ const BODIES = {
     /* Mode, then power. Two questions, not three peer states — and the mode
        only has an answer once the room is on. Power sits rightmost because
        it is the one you reach for without reading. */
-
-    /* One symbol, not two words. It is the same symbol the marker wears when
-       the schedule is driving, so the button and the circle on the bar are
-       plainly the same idea — press it and the circle gains the symbol and
-       goes to the clock; press it again and the symbol leaves and the circle
-       settles on the scene you are holding.
-
-       Pressing it while overridden hands the room back to its schedule.
-       Pressing it while following pins whatever is showing, which is how you
-       say "keep this, stop following the clock". */
-    if (smart && smart.entity) {
-      out += `<span class="iconbtn${auto ? " on" : ""}${lit ? "" : " inert"}"`
-        + ` role="button" tabindex="${lit ? "0" : "-1"}"`
-        + ` aria-pressed="${auto ? "true" : "false"}"`
-        + ` aria-label="Follow the schedule"`
-        + ` title="${auto ? "Following the schedule" : "Follow the schedule"}"`
-        + `${lit ? "" : ` aria-disabled="true"`}`
-        + ` data-pickmode="${auto ? "manual" : "auto"}"`
-        + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}"`
-        + ` style="${accentStyle(3)}">`
-        + `<ha-icon icon="${esc(autoIcon)}"></ha-icon></span>`;
-    }
 
     if (!isBlank(b.light)) {
       out += `<span class="switch${lit ? " on" : ""}" role="switch"`
