@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.16.0";
+const VERSION = "0.17.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -214,12 +214,20 @@ const SHEET = `
 .pickrow.unlit .name, .pickrow.unlit ha-icon { color:var(--sp-ink-3); }
 .pickrow.unlit .dot { opacity:.32; }
 .picker .thumb {
-  position:absolute; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px;
+  position:absolute; top:50%; width:25px; height:25px; margin:-12.5px 0 0 -12.5px;
   border-radius:50%; box-sizing:border-box;
   background:var(--sp-surface); border:3px solid var(--sp-ink);
   pointer-events:none; display:none;
+  align-items:center; justify-content:center;
 }
-.picker.picking .thumb { display:block; }
+.picker .thumb ha-icon { --mdc-icon-size:13px; color:var(--sp-ink); }
+/* Shown whenever the room is lit — there is a scene to point at. A dark room
+   has none, so the bar carries no marker rather than one pointing at a scene
+   that is not running. */
+.picker .thumb.shown, .picker.picking .thumb { display:flex; }
+/* The symbol belongs to the clock, and under a finger the clock is not what
+   is choosing. */
+.picker.picking .thumb ha-icon { display:none; }
 .picker:focus-visible { outline:2px solid var(--sp-a4); outline-offset:3px; }
 .pickrow { flex-wrap:wrap; gap:6px; min-height:30px; }
 .pickinfo {
@@ -472,6 +480,21 @@ img.avatar { object-fit:cover; display:block; }
    worse than either. A dark room's mode is not a question with an answer,
    so it is not offered until there is a lit room to ask it about. */
 .toggle.inert { opacity:.38; pointer-events:none; }
+
+/* A button that is only a symbol. Same shape language as .cmd, same 44px
+   touch floor underneath it. */
+.iconbtn {
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:36px; height:27px; border-radius:4px; cursor:pointer; flex:none;
+  border:2px solid var(--sp-sink); color:var(--sp-ink-3);
+}
+.iconbtn ha-icon { --mdc-icon-size:18px; }
+.iconbtn.on { background:var(--accent); border-color:var(--accent); color:var(--sp-surface); }
+.iconbtn.inert { opacity:.38; pointer-events:none; }
+.iconbtn::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
+}
 
 /* The one control in this system with no word on it. It can afford that
    because the thing it switches is named two inches to its left, and the
@@ -1791,7 +1814,17 @@ const BODIES = {
         + ` style="flex:0 0 ${layout.widths[i].toFixed(3)}%;background:${s.color}"></i>`;
     }).join("");
 
-    const thumbAt = layout.offsets[current] + layout.widths[current] / 2;
+    /* One circle answers "what scene am I on", in all three cases. Following
+       the schedule it sits where the clock is and carries the auto symbol —
+       the job the caret used to do, which is why the caret is gone rather
+       than sitting beside it saying the same thing twice. Overridden, it sits
+       in the middle of the scene you chose and carries nothing, because the
+       clock is no longer what decides. Under a finger it goes where the
+       finger goes. */
+    const middle = layout.offsets[current] + layout.widths[current] / 2;
+    const auto = lit && !manual;
+    const thumbAt = auto && caret !== null ? caret : middle;
+    const autoIcon = firstOf(b.auto_icon, "mdi:sun-clock");
     let out = `<div class="picker${choosing ? " choosing" : ""}${lit ? "" : " off"}"`
       + ` role="slider" tabindex="0" data-pick`
       + ` aria-label="Scene"`
@@ -1799,15 +1832,16 @@ const BODIES = {
       + ` aria-valuenow="${current}"`
       + ` aria-valuetext="${esc(segments[current].label)}">`
       + `<div class="striphold"><div class="strip">${bar}</div>`
-      + `<span class="thumb" style="left:${thumbAt.toFixed(2)}%"></span>`
+      + `<span class="thumb${lit ? " shown" : ""}${auto ? " auto" : ""}"`
+      + ` style="left:${thumbAt.toFixed(2)}%">`
+      + (auto ? `<ha-icon icon="${esc(autoIcon)}"></ha-icon>` : "")
+      + `</span>`
       /* Under a finger, the bar is hidden by the finger. The lens says what
          is being chosen, large, above the hand rather than beneath it. */
       + `<span class="picklens" data-picklens>`
       + `<ha-icon data-lensicon icon=""></ha-icon>`
       + `<span data-lensname></span></span></div>`
-      + `<div class="caretrow">`
-      + (caret === null ? "" : `<span class="caret" style="left:${caret.toFixed(2)}%"></span>`)
-      + `</div></div>`;
+      + `</div>`;
 
     const chosen = segments[current];
     const scene = known[String(chosen.label)];
@@ -1843,21 +1877,26 @@ const BODIES = {
        only has an answer once the room is on. Power sits rightmost because
        it is the one you reach for without reading. */
 
-    /* Manual is pressable, not just a place you land: it pins whatever is
-       showing, which is how you say "keep this, stop following the clock".
-       Ochre by role — the language already defines ochre as needs attention,
-       or is overridden. */
+    /* One symbol, not two words. It is the same symbol the marker wears when
+       the schedule is driving, so the button and the circle on the bar are
+       plainly the same idea — press it and the circle gains the symbol and
+       goes to the clock; press it again and the symbol leaves and the circle
+       settles on the scene you are holding.
+
+       Pressing it while overridden hands the room back to its schedule.
+       Pressing it while following pins whatever is showing, which is how you
+       say "keep this, stop following the clock". */
     if (smart && smart.entity) {
-      out += `<span class="toggle${lit ? "" : " inert"}" role="group"`
-        + ` aria-label="Mode"${lit ? "" : ` aria-disabled="true"`}>`
-        + `<span class="${lit && !manual ? "on" : ""}" role="button"`
-        + ` tabindex="${lit ? "0" : "-1"}"`
-        + ` data-pickmode="auto" style="${accentStyle(3)}">Auto</span>`
-        + `<span class="${lit && manual ? "on" : ""}" role="button"`
-        + ` tabindex="${lit ? "0" : "-1"}"`
-        + ` data-pickmode="manual"`
+      out += `<span class="iconbtn${auto ? " on" : ""}${lit ? "" : " inert"}"`
+        + ` role="button" tabindex="${lit ? "0" : "-1"}"`
+        + ` aria-pressed="${auto ? "true" : "false"}"`
+        + ` aria-label="Follow the schedule"`
+        + ` title="${auto ? "Following the schedule" : "Follow the schedule"}"`
+        + `${lit ? "" : ` aria-disabled="true"`}`
+        + ` data-pickmode="${auto ? "manual" : "auto"}"`
         + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}"`
-        + ` style="${accentStyle(2)}">Manual</span></span>`;
+        + ` style="${accentStyle(3)}">`
+        + `<ha-icon icon="${esc(autoIcon)}"></ha-icon></span>`;
     }
 
     if (!isBlank(b.light)) {
