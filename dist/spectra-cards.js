@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.18.2";
+const VERSION = "0.18.3";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1132,6 +1132,15 @@ function pickerState(b) {
   return { segments, scheduled, current, manual, lit: b.on === undefined || Boolean(b.on) };
 }
 
+/* "3 lights on \u00b7 Auto \u2192 Storybook 19:13" \u2014 two statements, not three.
+   Kept out of the body so its shape can be read at a glance and tested on its
+   own, because the order of these has now been wrong twice. */
+function pickerInfo(extra, manual, nextText) {
+  const mode = manual ? "Manual" : "Auto";
+  const driving = !manual && !isBlank(nextText) ? `${mode} ${nextText}` : mode;
+  return [extra, driving].filter((v) => !isBlank(v)).join(" \u00b7 ");
+}
+
 /* The catalogue entry for a scene the schedule names, if there is one. The
    timeslots carry the colour and the catalogue carries the symbol, and a
    name is the only key the two share. */
@@ -1915,15 +1924,17 @@ const BODIES = {
        this room doing" is in the same place on every card. */
     out += `<div class="row pickrow" style="padding-left:0">`
       + `<p class="pickinfo">`
-      /* The mode in words, because the control that sets it is a symbol and
-         a symbol on its own teaches nobody what it does. Then the extra, and
-         the next change — that last only while the schedule is actually
-         driving, since once overridden Hue holds the scene rather than
-         advancing to the next slot. */
-      + esc(lit
-        ? [manual ? "Manual" : "Auto", b.info, manual ? null : nextText]
-          .filter((v) => !isBlank(v)).join(" \u00b7 ")
-        : "")
+      /* What the room is, then what is driving it. The next change is not a
+         third fact standing alongside the mode — it is the consequence of
+         being in Auto — so it follows the word directly with no separator
+         between them, and the only middot is the one dividing the two
+         genuinely separate statements.
+
+         The mode is spelled out because the control that sets it is a symbol,
+         and a symbol on its own teaches nobody what it does. There is nothing
+         to promise once overridden: Hue holds the scene rather than advancing
+         to the next slot. */
+      + esc(lit ? pickerInfo(b.info, manual, nextText) : "")
       + `</p>`;
 
     /* Status and controls share one right-hand group so the buttons sit in
