@@ -58,11 +58,17 @@ const CONDITIONS = [
    glyph is. The element count is asserted against this list: if mdi redraws
    one, the script stops rather than colouring the wrong piece.
 
-   wc neutral (cloud, fog, wind, moon) · ww water · wl ice · ws sun, stars,
-   lightning. The moon is neutral rather than warm — it is the shape of the
-   night, and a clear night is the one condition with nothing to warn about.
-   What matters is that it is not `wl`: that leaves ice meaning ice and
-   nothing else, so no condition needs a colour override. */
+   wc cloud, and the moon · wa moving air: wind swooshes and fog bars · ww
+   water · wl ice · ws sun, stars, lightning.
+
+   `wa` and `wl` are the same idea twice: a thing in front of a cloud has to
+   sit off it, or it reads as part of the cloud rather than as something the
+   cloud is doing. Both are a step lighter than `wc`.
+
+   The moon is neutral rather than warm — a clear night is the one condition
+   with nothing to warn about, and amber made it the loudest icon in the set.
+   What matters is that it is not `wl`: that leaves ice meaning ice alone, so
+   no condition needs a colour override. */
 const ROLES = {
   sunny: ["ws", "ws", "ws", "ws", "ws", "ws", "ws"],
   partlycloudy: ["ws", "wc", "ws", "ws", "ws", "ws"],
@@ -74,9 +80,9 @@ const ROLES = {
   snowy: ["wc", "wl"],
   "snowy-rainy": ["ww", "wl", "wc"],
   hail: ["wc", "wl", "wl", "wl"],
-  fog: ["wc", "wc", "wc", "wc", "wc"],
-  windy: ["wc", "wc", "wc"],
-  "windy-variant": ["wc", "wc"],
+  fog: ["wa", "wa", "wc", "wa", "wa"],
+  windy: ["wa", "wa", "wa"],
+  "windy-variant": ["wc", "wa"],
   "clear-night": ["ws", "ws", "wc"],
 };
 
