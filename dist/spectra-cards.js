@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.18.3";
+const VERSION = "0.19.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -80,6 +80,13 @@ const SHEET = `
   --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
   --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
 }
+
+/* Every box in this sheet is sized by its outside edge. Declared twice by
+   hand already and missed twice — the switch came out 44x26 against a
+   declared 40x22, and the button beside it 40x31 against 36x27, which is
+   precisely why they did not line up. A border here is a border, not four
+   extra pixels nobody asked for. */
+*, *::before, *::after { box-sizing:border-box; }
 
 /* shell */
 .card {
@@ -230,7 +237,7 @@ const SHEET = `
 .pickrow.unlit .dot { opacity:.32; }
 .picker .thumb {
   position:absolute; top:50%; width:25px; height:25px; margin:-12.5px 0 0 -12.5px;
-  border-radius:50%; box-sizing:border-box;
+  border-radius:50%;
   background:var(--sp-surface); border:3px solid var(--sp-ink);
   pointer-events:none; display:none;
   align-items:center; justify-content:center;
@@ -499,12 +506,15 @@ img.avatar { object-fit:cover; display:block; }
 
 /* A button that is only a symbol. Same shape language as .cmd, same 44px
    touch floor underneath it. */
+/* The same outside dimensions as the switch it sits beside, and the same
+   1px of air around what is inside it. They are a pair; a pair that differs
+   by nine pixels of height reads as a mistake, because it was one. */
 .iconbtn {
   position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:36px; height:27px; border-radius:4px; cursor:pointer; flex:none;
+  width:40px; height:22px; border-radius:3px; cursor:pointer; flex:none;
   border:2px solid var(--sp-sink); color:var(--sp-ink-3);
 }
-.iconbtn ha-icon { --mdc-icon-size:18px; }
+.iconbtn ha-icon { --mdc-icon-size:16px; }
 .iconbtn.on { background:var(--accent); border-color:var(--accent); color:var(--sp-surface); }
 .iconbtn.inert { opacity:.38; pointer-events:none; }
 .iconbtn::after {
@@ -526,7 +536,7 @@ img.avatar { object-fit:cover; display:block; }
    travelled one. Nothing here is a round number by accident; changing one
    dimension means re-deriving the other three. */
 .switch {
-  position:relative; box-sizing:border-box;
+  position:relative;
   width:40px; height:22px; flex:none; cursor:pointer;
   border:2px solid var(--sp-sink); border-radius:3px; background:var(--sp-sink);
 }
