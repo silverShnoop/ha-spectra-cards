@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.39.0";
+const VERSION = "0.40.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -304,7 +304,7 @@ const SHEET = `
 /* Every segment carries the ring, transparent until it is the chosen one, so
    there are two colours to move between rather than a ring that blinks into
    existence. What does the moving is _paint, not a transition: see the note
-   above moveBarFrom. */
+   above motionFrom. */
 .picker .strip i { outline:2px solid transparent; outline-offset:-2px; }
 /* Dim the unchosen, never recolour the chosen: the segment's colour is the
    scene's own light, and tinting it would be a lie about the room. */
@@ -2620,7 +2620,7 @@ function stillWanted() {
 /* Animates one property from a value the element no longer has. Silent about
    a browser that cannot: the card is correct without any of this, and a
    missing animation is not worth an exception on a wall panel. */
-function moveFrom(element, property, from, to) {
+function moveFrom(element, property, from, to, ms) {
   if (!element || from === null || to === null || from === to) return;
   if (typeof element.animate !== "function") return;
   const a = {};
@@ -2628,7 +2628,7 @@ function moveFrom(element, property, from, to) {
   a[property] = from;
   b[property] = to;
   try {
-    element.animate([a, b], { duration: MOVE_MS, easing: MOVE_EASE });
+    element.animate([a, b], { duration: ms || MOVE_MS, easing: MOVE_EASE });
   } catch (err) {
     /* An unanimatable property is not a reason to stop rendering. */
   }
@@ -2639,50 +2639,73 @@ function moveFrom(element, property, from, to) {
 
    Only what actually moves is captured. Not the segment colours: a scene's
    hex is fixed by the schedule and does not change between renders. */
-function barSnapshot(root) {
+function motionSnapshot(root) {
+  const shot = { count: 0, strip: null, cells: [], thumb: null, knob: null, dial: null };
+
   const strip = root.querySelector(".strip");
-  if (!strip) return null;
-  const cells = strip.children;
-  const shot = {
-    count: cells.length,
-    strip: getComputedStyle(strip).opacity,
-    cells: [],
-    thumb: null,
-  };
-  for (let i = 0; i < cells.length; i += 1) {
-    const cs = getComputedStyle(cells[i]);
-    shot.cells.push({ opacity: cs.opacity, outline: cs.outlineColor });
+  if (strip) {
+    const cells = strip.children;
+    shot.count = cells.length;
+    shot.strip = getComputedStyle(strip).opacity;
+    for (let i = 0; i < cells.length; i += 1) {
+      const cs = getComputedStyle(cells[i]);
+      shot.cells.push({ opacity: cs.opacity, outline: cs.outlineColor });
+    }
+    const thumb = root.querySelector(".thumb");
+    /* The rendered position, not the inline one: on a lift this is where the
+       finger actually left it, which is where the marker has to set off from. */
+    if (thumb) shot.thumb = getComputedStyle(thumb).left;
   }
-  const thumb = root.querySelector(".thumb");
-  /* The rendered position, not the inline one: on a lift this is where the
-     finger actually left it, which is where the marker has to set off from. */
-  if (thumb) shot.thumb = getComputedStyle(thumb).left;
+
+  /* A switch knob travels. Its CSS transition covers a press, because the
+     press holds renders off for longer than the travel takes — but a change
+     the house made has no press behind it, and without this the knob would
+     teleport across its track. */
+  const knob = root.querySelector(".switch > i");
+  if (knob) shot.knob = getComputedStyle(knob).left;
+
+  /* A target temperature swaps: one number replaced by another, with nothing
+     in between to interpolate. So it fades rather than moves. */
+  const dial = root.querySelector(".dialnow");
+  if (dial) shot.dial = dial.textContent;
+
   return shot;
 }
 
 /* Bails on a bar it does not recognise. A schedule with a different number of
    slots is a different day, and interpolating between two different days
    would be an animation that means nothing. */
-function moveBarFrom(root, shot) {
+function motionFrom(root, shot) {
   if (!shot || !stillWanted()) return;
-  const strip = root.querySelector(".strip");
-  if (!strip) return;
-  const cells = strip.children;
-  if (!cells.length || cells.length !== shot.count) return;
 
-  moveFrom(strip, "opacity", shot.strip, getComputedStyle(strip).opacity);
-  for (let i = 0; i < cells.length; i += 1) {
-    const cs = getComputedStyle(cells[i]);
-    moveFrom(cells[i], "opacity", shot.cells[i].opacity, cs.opacity);
-    moveFrom(cells[i], "outlineColor", shot.cells[i].outline, cs.outlineColor);
+  const strip = root.querySelector(".strip");
+  const cells = strip ? strip.children : null;
+  if (cells && cells.length && cells.length === shot.count) {
+    moveFrom(strip, "opacity", shot.strip, getComputedStyle(strip).opacity);
+    for (let i = 0; i < cells.length; i += 1) {
+      const cs = getComputedStyle(cells[i]);
+      moveFrom(cells[i], "opacity", shot.cells[i].opacity, cs.opacity);
+      moveFrom(cells[i], "outlineColor", shot.cells[i].outline, cs.outlineColor);
+    }
+    const thumb = root.querySelector(".thumb");
+    /* A marker that was not on the bar a moment ago has nowhere to travel
+       from: it belongs at its new place immediately, not sliding in from the
+       last place the room happened to be lit. */
+    if (thumb && shot.thumb && shot.thumb !== "auto") {
+      moveFrom(thumb, "left", shot.thumb, getComputedStyle(thumb).left);
+    }
   }
 
-  const thumb = root.querySelector(".thumb");
-  /* A marker that was not on the bar a moment ago has nowhere to travel from:
-     it belongs at its new place immediately, not sliding in from the last
-     place the room happened to be lit. */
-  if (thumb && shot.thumb && shot.thumb !== "auto") {
-    moveFrom(thumb, "left", shot.thumb, getComputedStyle(thumb).left);
+  const knob = root.querySelector(".switch > i");
+  if (knob && shot.knob) {
+    moveFrom(knob, "left", shot.knob, getComputedStyle(knob).left);
+  }
+
+  /* Only when it actually changed. Fading a number onto itself is motion
+     nobody asked for, which is the one thing the panel is meant not to do. */
+  const dial = root.querySelector(".dialnow");
+  if (dial && shot.dial !== null && shot.dial !== dial.textContent) {
+    moveFrom(dial, "opacity", "0.25", "1");
   }
 }
 
@@ -2699,6 +2722,11 @@ const DIAL_CELL = 34;
 /* The finest the barrel will build itself from an entity's own reported
    step. Config may ask for finer; discovery may not. */
 const DIAL_MIN_STEP = 0.5;
+
+/* The barrel clicks into its notch before it closes. Briefer than a travel:
+   this is the end of a gesture, not a journey, and a lift that takes a
+   quarter of a second to resolve feels like hesitation. */
+const DIAL_SNAP_MS = 130;
 
 /* Every value the thermostat will accept, as one column. Turning the barrel
    therefore cannot run off the end and clamping needs no arithmetic — the
@@ -3282,10 +3310,10 @@ class SpectraCard extends HTMLElement {
      to interpolate, and the title bar's fade covers it. */
   _paint(html) {
     const shot = this._holder.firstElementChild
-      ? barSnapshot(this._holder)
+      ? motionSnapshot(this._holder)
       : null;
     this._holder.innerHTML = html;
-    moveBarFrom(this._holder, shot);
+    motionFrom(this._holder, shot);
   }
 
   /* Some bodies know their own state better than any config line can. Where
@@ -3405,8 +3433,9 @@ class SpectraCard extends HTMLElement {
     let startY = 0;
     let startOffset = 0;
 
-    const finish = (commit) => {
-      if (!this._dragging) return;
+    const settle = (commit) => {
+      /* Cleared here rather than on the lift, so a state change arriving
+         during the snap cannot rebuild the barrel out from under it. */
       this._dragging = false;
       el.classList.remove("turning", "adrift");
       if (commit && !adrift && index !== began) {
@@ -3416,6 +3445,25 @@ class SpectraCard extends HTMLElement {
       }
       this._signature = null;
       this._update();
+    };
+
+    const finish = (commit) => {
+      if (!this._dragging) return;
+      const land = commit && !adrift ? index : began;
+      const to = -land * DIAL_CELL;
+      /* Mid-notch on the lift: the column travels the last few pixels rather
+         than the number jumping to attention. It is the one bit of motion
+         this control has, and it is the padlock clicking home. */
+      if (to !== offset) {
+        const from = offset;
+        offset = to;
+        place(to);
+        moveFrom(inner, "transform",
+          `translateY(${from}px)`, `translateY(${to}px)`, DIAL_SNAP_MS);
+        setTimeout(() => settle(commit), DIAL_SNAP_MS);
+        return;
+      }
+      settle(commit);
     };
 
     el.addEventListener("pointerdown", (event) => {
