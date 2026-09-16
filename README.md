@@ -612,3 +612,16 @@ in `dist/spectra-cards.js`. There is no build step.
 ## Licence
 
 MIT
+
+### Third-party art
+
+The weather condition icons in `WEATHER_ART` are the Material Design Icons
+`weather-*` glyphs — [Pictogrammers](https://pictogrammers.com/library/mdi/),
+Apache 2.0 — taken apart so their parts can take different colours.
+
+Nothing is redrawn: every curve is mdi's own. An mdi icon is a single
+`<path>`, but that path already contains the parts as separate subpaths; the
+split tells a part from a hole and regroups them. `tools/split-mdi.js`
+regenerates the block from the sources vendored in `tools/mdi/`. Run it after
+an mdi bump rather than editing the art by hand — it asserts what it finds
+and stops if a glyph has changed shape.
