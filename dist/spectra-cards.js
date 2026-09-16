@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.37.0";
+const VERSION = "0.38.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2646,14 +2646,16 @@ function dialRange(adjust, current) {
   if (count > 400) return null;
   const decimals = String(step).includes(".") ? 1 : 0;
   const suffix = adjust.suffix === undefined ? "\u00b0" : adjust.suffix;
+  /* Warm at the top, cold at the bottom — a thermometer, not a list. The
+     column therefore descends, and position 0 is the ceiling. */
   const labels = [];
   for (let n = 0; n <= count; n += 1) {
-    labels.push((min + n * step).toFixed(decimals) + suffix);
+    labels.push((max - n * step).toFixed(decimals) + suffix);
   }
-  let index = Math.round((current - min) / step);
-  if (!isFinite(index)) index = 0;
+  let index = Math.round((max - current) / step);
+  if (!isFinite(index)) index = count;
   index = Math.min(count, Math.max(0, index));
-  return { labels, index, step, min, decimals };
+  return { labels, index, step, min, max, decimals };
 }
 
 /* At rest this is one number. Pressing it opens the barrel over the row —
@@ -2667,11 +2669,11 @@ function dialMarkup(row, position) {
   }
   const cells = range.labels.map((label, n) =>
     `<i${n === range.index ? ` class="on"` : ""}>${esc(label)}</i>`).join("");
-  const at = range.min + range.index * range.step;
+  const at = range.max - range.index * range.step;
   return `<span class="dial${row.pending ? " pending" : ""}" data-dial="${position}"`
     + ` role="spinbutton" tabindex="0" aria-valuenow="${at}"`
-    + ` aria-valuemin="${range.min}"`
-    + ` aria-valuemax="${range.min + (range.labels.length - 1) * range.step}"`
+    + ` aria-valuemin="${range.max - (range.labels.length - 1) * range.step}"`
+    + ` aria-valuemax="${range.max}"`
     + ` aria-valuetext="${esc(range.labels[range.index])}">`
     + `<span class="dialnow">${esc(now)}</span>`
     + `<span class="barrel"><span class="barrelinner" data-barrelinner`
@@ -3295,8 +3297,10 @@ class SpectraCard extends HTMLElement {
     if (!cells.length) return;
 
     const step = Number(adjust.step) || 1;
-    const min = Number(adjust.min);
+    const max = Number(adjust.max);
     const last = cells.length - 1;
+    /* Position 0 is the ceiling, so the value falls as the index rises. */
+    const valueAt = (i) => max - i * step;
 
     let index = cells.findIndex((c) => c.classList.contains("on"));
     if (index < 0) index = 0;
@@ -3309,7 +3313,7 @@ class SpectraCard extends HTMLElement {
       for (let n = 0; n <= last; n += 1) cells[n].classList.toggle("on", n === i);
       const label = cells[i].textContent;
       if (now) now.textContent = label;
-      el.setAttribute("aria-valuenow", String(min + i * step));
+      el.setAttribute("aria-valuenow", String(valueAt(i)));
       el.setAttribute("aria-valuetext", label);
     };
 
@@ -3330,7 +3334,7 @@ class SpectraCard extends HTMLElement {
       this._dragging = false;
       el.classList.remove("turning", "adrift");
       if (commit && !adrift && index !== began) {
-        this._setTarget(adjust, min + index * step);
+        this._setTarget(adjust, valueAt(index));
       } else {
         index = began;
       }
@@ -3361,10 +3365,12 @@ class SpectraCard extends HTMLElement {
         if (adrift) { index = began; offset = -index * DIAL_CELL; place(offset); show(index); }
       }
       if (adrift) { event.preventDefault(); return; }
-      /* Down is cooler, up is warmer: the column ascends downward, so pushing
-         it up brings the next number in from below, which is what a padlock
-         barrel does under a thumb. */
-      offset = Math.min(0, Math.max(-last * DIAL_CELL, startOffset + (event.clientY - startY)));
+      /* Up is warmer, and warm is at the top — so this is a thermometer
+         scale passing a fixed marker, not a list being scrolled. The scale
+         travels against the finger for the same reason the scale on a fader
+         does: the thing you are moving is the reading, not the paper. Both
+         "up" cues then agree, which is what JAMES asked for. */
+      offset = Math.min(0, Math.max(-last * DIAL_CELL, startOffset - (event.clientY - startY)));
       place(offset);
       const next = Math.min(last, Math.max(0, Math.round(-offset / DIAL_CELL)));
       if (next !== index) { index = next; show(index); }
