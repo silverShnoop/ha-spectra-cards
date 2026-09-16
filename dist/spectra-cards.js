@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.23.0";
+const VERSION = "0.24.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -651,6 +651,19 @@ img.avatar { object-fit:cover; display:block; }
 /* A domain with something live takes its accent on the edge. The summary
    text says so too — colour never carries it alone. */
 .dockbtn.live { border-color:var(--accent); }
+/* Which set of cards is on screen. A different question from "is anything
+   happening in here", so a different device: live is an edge, this is a soft
+   wash and the label in full ink. Two rungs of the ladder, never the same
+   one, or a lit kitchen would be indistinguishable from the page you are on.
+
+   The tick is the non-colour half. A rail that said "you are here" in colour
+   alone would be a rail that says nothing across a room in the dark. */
+.dockbtn.selected { background:var(--sp-a4-soft); border-color:var(--sp-a4); }
+.dockbtn.selected .dockhead h4 { color:var(--sp-a4-on); }
+.dockbtn.selected::before {
+  content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  border-radius:6px 0 0 6px; background:var(--sp-a4);
+}
 .dockhead { display:flex; align-items:center; gap:7px; }
 .dockhead ha-icon { --mdc-icon-size:18px; color:var(--accent); flex:none; }
 .dockhead h4 {
@@ -3584,17 +3597,25 @@ class SpectraDock extends HTMLElement {
   }
 
   _update() {
-    const model = resolveValue(this._hass, this._config.buttons, {});
+    const buttons = resolveValue(this._hass, this._config.buttons, {});
+    /* One resolver for the whole rail rather than a flag on each button: the
+       alternative is every button carrying a map of every other button's
+       name, and the day a name changes five of the six are quietly wrong. */
+    const selected = resolveValue(this._hass, this._config.selected, {});
+    const model = { buttons: buttons, selected: selected };
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
     this._signature = signature;
-    this._render(model);
+    this._render(buttons, selected);
   }
 
-  _render(buttons) {
+  _render(buttons, selected) {
+    const here = isBlank(selected) ? null : String(selected);
     this._holder.innerHTML = `<div class="dock">${buttons.map((button, index) => {
       const b = button || {};
-      return `<div class="dockbtn${b.live ? " live" : ""}" role="button" tabindex="0"`
+      const on = here !== null && String(b.label) === here;
+      return `<div class="dockbtn${b.live ? " live" : ""}${on ? " selected" : ""}"`
+        + ` role="button" tabindex="0" aria-current="${on ? "page" : "false"}"`
         + ` data-button="${index}" style="${accentStyle(b.accent)}">`
         + `<div class="dockhead">`
         + (isBlank(b.icon) ? "" : `<ha-icon icon="${esc(b.icon)}"></ha-icon>`)
