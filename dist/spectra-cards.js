@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.17.0";
+const VERSION = "0.18.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -93,7 +93,12 @@ const SHEET = `
   font-size:11px; letter-spacing:.1em; text-transform:uppercase;
   font-weight:500; margin:0;
 }
-.meta { margin-left:auto; font-size:11px; color:var(--sp-ink-2); letter-spacing:.04em; }
+.meta { font-size:11px; color:var(--sp-ink-2); letter-spacing:.04em; }
+/* A scene is named the same way everywhere it is named: its colour, its
+   symbol, its word. */
+.metagroup { margin-left:auto; display:flex; align-items:center; gap:5px; min-width:0; }
+.metagroup .dot { width:8px; height:8px; }
+.titlebar .metaicon { --mdc-icon-size:14px; color:var(--sp-ink-2); }
 
 /* primitives */
 .hero {
@@ -246,6 +251,7 @@ const SHEET = `
   pointer-events:none; z-index:5;
 }
 .picklens ha-icon { --mdc-icon-size:21px; }
+.picklens .dot { width:11px; height:11px; }
 .picker.picking .picklens { display:flex; }
 /* Dragged far enough away that the gesture is being abandoned. */
 .picker.adrift .picklens, .picker.adrift .thumb { opacity:.3; }
@@ -502,15 +508,15 @@ img.avatar { object-fit:cover; display:block; }
    rule that colour never carries meaning alone still holds. Flat: the knob
    moves, nothing about it lifts off the surface. */
 .switch {
-  position:relative; width:42px; height:24px; flex:none; cursor:pointer;
-  border:2px solid var(--sp-sink); border-radius:12px; background:var(--sp-sink);
+  position:relative; width:44px; height:27px; flex:none; cursor:pointer;
+  border:2px solid var(--sp-sink); border-radius:4px; background:var(--sp-sink);
 }
 .switch > i {
-  position:absolute; top:1px; left:1px; width:18px; height:18px; border-radius:50%;
+  position:absolute; top:1.5px; left:1.5px; width:18px; height:18px; border-radius:2px;
   background:var(--sp-ink-3); transition:left 140ms ease-out;
 }
 .switch.on { background:var(--sp-a4); border-color:var(--sp-a4); }
-.switch.on > i { left:19px; background:var(--sp-surface); }
+.switch.on > i { left:21px; background:var(--sp-surface); }
 .switch::after {
   content:""; position:absolute; left:50%; top:50%;
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
@@ -1107,18 +1113,42 @@ function pickerState(b) {
   return { segments, scheduled, current, manual, lit: b.on === undefined || Boolean(b.on) };
 }
 
+/* The catalogue entry for a scene the schedule names, if there is one. The
+   timeslots carry the colour and the catalogue carries the symbol, and a
+   name is the only key the two share. */
+function pickerScene(b, label) {
+  const catalogue = Array.isArray(b.scenes) ? b.scenes : [];
+  for (const scene of catalogue) {
+    if (scene && String(scene.name) === String(label)) return scene;
+  }
+  return null;
+}
+
 /* What a body would say about itself in the title bar, where config cannot
-   know it. One line, and the same line whatever the body is drawing. */
+   know it. Wherever this card names a scene it names it the same way — the
+   word, the scene's own colour, and its symbol — so the title bar and the
+   label under your finger are recognisably the same statement. */
 const BODY_STATUS = {
   picker(b) {
     if (!b || typeof b !== "object") return null;
-    if (b.on !== undefined && !b.on) return "Off";
-    const wanted = firstOf(b.picked, b.active);
-    if (!isBlank(wanted)) return String(wanted);
-    /* On something this card has no name for. */
-    if (b.manual) return "Manual";
+    if (b.on !== undefined && !b.on) return { text: "Off" };
+
     const state = pickerState(b);
-    return state ? String(state.segments[state.current].label) : null;
+    const wanted = firstOf(b.picked, b.active);
+    let label = null;
+    if (!isBlank(wanted)) label = String(wanted);
+    else if (b.manual) label = "Manual";
+    else if (state) label = String(state.segments[state.current].label);
+    if (label === null) return null;
+
+    let colour = null;
+    if (state) {
+      for (const seg of state.segments) {
+        if (String(seg.label) === label) { colour = seg.color; break; }
+      }
+    }
+    const scene = pickerScene(b, label);
+    return { text: label, color: colour, icon: scene ? scene.icon : null };
   },
 };
 
@@ -1839,6 +1869,7 @@ const BODIES = {
       /* Under a finger, the bar is hidden by the finger. The lens says what
          is being chosen, large, above the hand rather than beneath it. */
       + `<span class="picklens" data-picklens>`
+      + `<span class="dot" data-lensdot></span>`
       + `<ha-icon data-lensicon icon=""></ha-icon>`
       + `<span data-lensname></span></span></div>`
       + `</div>`;
@@ -1859,11 +1890,14 @@ const BODIES = {
        this room doing" is in the same place on every card. */
     out += `<div class="row pickrow" style="padding-left:0">`
       + `<p class="pickinfo">`
-      /* Extra whenever the room is lit; the next change only while the
-         schedule is actually driving it, because once overridden Hue holds
-         the scene rather than advancing to the next slot. */
+      /* The mode in words, because the control that sets it is a symbol and
+         a symbol on its own teaches nobody what it does. Then the extra, and
+         the next change — that last only while the schedule is actually
+         driving, since once overridden Hue holds the scene rather than
+         advancing to the next slot. */
       + esc(lit
-        ? [b.info, manual ? null : nextText].filter((v) => !isBlank(v)).join(" \u00b7 ")
+        ? [manual ? "Manual" : "Auto", b.info, manual ? null : nextText]
+          .filter((v) => !isBlank(v)).join(" \u00b7 ")
         : "")
       + `</p>`;
 
@@ -2529,18 +2563,25 @@ class SpectraCard extends HTMLElement {
     const { title, icon } = model;
     const type = this._config.body.type;
     const own = BODY_STATUS[type] ? BODY_STATUS[type](model.body) : null;
-    const meta = own === null ? model.meta : own;
+    const status = own === null
+      ? (isBlank(model.meta) ? null : { text: model.meta })
+      : own;
     const slot = BODY_STATUS[type]
       ? `<span class="spinslot">${
         phase === "busy" ? `<span class="spinner"></span>`
           : (phase === "done" ? `<span class="ok"></span>` : "")}</span>`
       : "";
-    if (isBlank(title) && isBlank(icon) && isBlank(meta) && !slot) return "";
+    if (isBlank(title) && isBlank(icon) && !status && !slot) return "";
     return `<div class="titlebar">`
       + `<span class="tick"></span>`
       + (isBlank(icon) ? "" : `<ha-icon icon="${esc(icon)}"></ha-icon>`)
       + (isBlank(title) ? "" : `<h3>${esc(title)}</h3>`)
-      + (isBlank(meta) ? "" : `<span class="meta">${esc(meta)}</span>`)
+      + (status
+        ? `<span class="metagroup">`
+          + (isBlank(status.color) ? "" : `<span class="dot" style="background:${status.color}"></span>`)
+          + (isBlank(status.icon) ? "" : `<ha-icon class="metaicon" icon="${esc(status.icon)}"></ha-icon>`)
+          + `<span class="meta">${esc(status.text)}</span></span>`
+        : "")
       + slot
       + `</div>`;
   }
@@ -2562,6 +2603,7 @@ class SpectraCard extends HTMLElement {
 
     const lensName = this._holder.querySelector("[data-lensname]");
     const lensIcon = this._holder.querySelector("[data-lensicon]");
+    const lensDot = this._holder.querySelector("[data-lensdot]");
 
     let index = cells.findIndex((c) => c.classList.contains("on"));
     if (index < 0) index = 0;
@@ -2573,6 +2615,7 @@ class SpectraCard extends HTMLElement {
       const label = cell.getAttribute("data-label") || "";
       if (lensName) lensName.textContent = label;
       if (lensIcon) lensIcon.setAttribute("icon", cell.getAttribute("data-icon") || "");
+      if (lensDot) lensDot.style.background = cell.getAttribute("data-color") || "";
       el.setAttribute("aria-valuenow", String(i));
       el.setAttribute("aria-valuetext", label);
     };
