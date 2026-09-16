@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.26.0";
+const VERSION = "0.27.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -925,6 +925,9 @@ const RAW_KEYS = new Set([
   "action", "tap_action", "hold_action", "double_tap_action", "adjust", "scenes",
 ]);
 
+const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+  "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+
 function applyFormat(value, spec) {
   let v = value;
   if (spec.map && (typeof v === "string" || typeof v === "number")
@@ -946,6 +949,28 @@ function applyFormat(value, spec) {
     case "weekday":
       v = weekdayLabel(v);
       break;
+    /* A bearing in degrees is a number nobody reads. Sixteen points, the
+       conventional set, because "WNW" is as short as "280" and says the thing
+       instead of encoding it.
+
+       Meteorological convention: a wind bearing is the direction the wind
+       comes FROM, which is what Home Assistant reports and what a person
+       standing in the garden means. No conversion. */
+    case "compass": {
+      const deg = Number(v);
+      v = isFinite(deg) ? COMPASS[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16] : null;
+      break;
+    }
+    /* A signed rate of change as a glyph. The deadband is the whole point: a
+       pressure wandering by hundredths is steady, and an arrow that twitches
+       between up and down all afternoon is worse than no arrow. */
+    case "arrow": {
+      const n = Number(v);
+      if (!isFinite(n)) { v = null; break; }
+      const band = isFinite(Number(spec.deadband)) ? Math.abs(Number(spec.deadband)) : 0.1;
+      v = n > band ? "\u2191" : (n < -band ? "\u2193" : "\u2192");
+      break;
+    }
     case "weather_icon":
       v = WEATHER_ICONS[v] || "mdi:weather-cloudy";
       break;
