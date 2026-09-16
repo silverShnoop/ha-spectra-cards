@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.21.0";
+const VERSION = "0.21.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -101,10 +101,17 @@ const SHEET = `
   font-weight:500; margin:0;
 }
 .meta { font-size:11px; color:var(--sp-ink-2); letter-spacing:.04em; }
-/* A scene is named the same way everywhere it is named: its colour, its
-   symbol, its word. */
-.metagroup { margin-left:auto; display:flex; align-items:center; gap:5px; min-width:0; }
-.metagroup .dot { width:8px; height:8px; }
+/* A scene is named the same way everywhere it is named: its symbol, its
+   word, then its swatch — in that order, and this group is the only thing
+   that draws it, so the three places it appears cannot drift apart.
+
+   The swatch goes last because it is the one part that is not language. A
+   dot in front is a thing to look at before you know what it belongs to;
+   behind the word it confirms what you have just read, which is the job it
+   is actually doing. */
+.scenename, .metagroup { display:flex; align-items:center; gap:5px; min-width:0; }
+.metagroup { margin-left:auto; }
+.scenename .dot, .metagroup .dot { width:8px; height:8px; }
 .titlebar .metaicon { --mdc-icon-size:14px; color:var(--sp-ink-2); }
 
 /* primitives */
@@ -1942,9 +1949,9 @@ const BODIES = {
       /* Under a finger, the bar is hidden by the finger. The lens says what
          is being chosen, large, above the hand rather than beneath it. */
       + `<span class="picklens" data-picklens>`
-      + `<span class="dot" data-lensdot></span>`
       + `<ha-icon data-lensicon icon=""></ha-icon>`
-      + `<span data-lensname></span></span></div>`
+      + `<span data-lensname></span>`
+      + `<span class="dot" data-lensdot></span></span></div>`
       + `</div>`;
 
     const chosen = segments[current];
@@ -2052,9 +2059,13 @@ const BODIES = {
       ? `→ ${next.label} ${clockLabel(next.start)}`
       : null;
 
+    /* No catalogue here, so no symbol to show — the group drops the part it
+       does not have rather than reordering around the gap. */
     out += `<div class="row" style="padding-left:0">`
-      + `<span class="dot" style="background:${active.color}"></span>`
+      + `<span class="scenename">`
       + `<p class="name">${esc(active.label)}</p>`
+      + `<span class="dot" style="background:${active.color}"></span>`
+      + `</span>`
       + (manual
         ? `<span class="pill" style="margin-left:auto;${accentStyle(1)}">Manual</span>`
         : (nextText ? `<span class="value">${esc(nextText)}</span>` : ""))
@@ -2704,9 +2715,10 @@ class SpectraCard extends HTMLElement {
       + (isBlank(title) ? "" : `<h3>${esc(title)}</h3>`)
       + (status
         ? `<span class="metagroup">`
-          + (isBlank(status.color) ? "" : `<span class="dot" style="background:${status.color}"></span>`)
           + (isBlank(status.icon) ? "" : `<ha-icon class="metaicon" icon="${esc(status.icon)}"></ha-icon>`)
-          + `<span class="meta">${esc(status.text)}</span></span>`
+          + `<span class="meta">${esc(status.text)}</span>`
+          + (isBlank(status.color) ? "" : `<span class="dot" style="background:${status.color}"></span>`)
+          + `</span>`
         : "")
       + slot
       + `</div>`;
