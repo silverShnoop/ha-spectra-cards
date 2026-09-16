@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.18.0";
+const VERSION = "0.18.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -211,6 +211,16 @@ const SHEET = `
    scene's own light, and tinting it would be a lie about the room. */
 .picker.choosing .strip i { opacity:.3; }
 .picker.choosing .strip i.on { opacity:1; }
+/* The chosen scene is outlined as well as bright, so "which one" does not
+   rest on a brightness difference alone and still reads from across a room.
+   outline rather than border: it costs no layout width, so the segments do
+   not shuffle as the choice moves under a finger. A dark room outlines
+   nothing, for the same reason it carries no circle — unless a finger is on
+   the bar, in which case something is being chosen after all. */
+.picker:not(.off) .strip i.on,
+.picker.picking .strip i.on {
+  outline:2px solid var(--seg-ink); outline-offset:-2px;
+}
 /* Nothing is driving this room, so nothing on the bar is lit. The bar stays
    legible enough to aim at, because dragging it is how you turn the room on. */
 .picker.off .strip { opacity:.32; }
@@ -1841,7 +1851,13 @@ const BODIES = {
         + ` data-icon="${esc(scene && scene.icon ? scene.icon : "")}"`
         + ` data-color="${esc(s.color)}"`
         + ` class="${i === current ? "on" : ""}"`
-        + ` style="flex:0 0 ${layout.widths[i].toFixed(3)}%;background:${s.color}"></i>`;
+        /* The outline has to read against the scene's own colour, which comes
+           from the bulbs and owes the palette nothing — a dark ink ring
+           disappears on Night-time, a pale one disappears on Arise. Picked by
+           luminance per segment, so it survives both themes and any scene
+           anyone adds later. */
+        + ` style="flex:0 0 ${layout.widths[i].toFixed(3)}%;background:${s.color}`
+        + `;--seg-ink:${textOn(s.color)}"></i>`;
     }).join("");
 
     /* One circle answers "what scene am I on", in all three cases. Following
