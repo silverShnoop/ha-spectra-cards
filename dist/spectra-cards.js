@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.18.1";
+const VERSION = "0.18.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -517,16 +517,25 @@ img.avatar { object-fit:cover; display:block; }
    side the knob sits on is a non-colour signal in its own right — so the
    rule that colour never carries meaning alone still holds. Flat: the knob
    moves, nothing about it lifts off the surface. */
+/* Geometry taken verbatim from the "power switch, then the mode pair"
+   proposal, integers and all: 40x22 outside, 2px border, a 16px knob inset
+   exactly 1px on every side in both positions. Scaling the track to sit
+   level with the button beside it and leaving the knob offsets alone is what
+   made it look wrong — the extra height all landed underneath the knob, 1.5
+   above against 3.5 below, and the resting gap stopped matching the
+   travelled one. Nothing here is a round number by accident; changing one
+   dimension means re-deriving the other three. */
 .switch {
-  position:relative; width:44px; height:27px; flex:none; cursor:pointer;
-  border:2px solid var(--sp-sink); border-radius:4px; background:var(--sp-sink);
+  position:relative; box-sizing:border-box;
+  width:40px; height:22px; flex:none; cursor:pointer;
+  border:2px solid var(--sp-sink); border-radius:3px; background:var(--sp-sink);
 }
 .switch > i {
-  position:absolute; top:1.5px; left:1.5px; width:18px; height:18px; border-radius:2px;
+  position:absolute; top:1px; left:1px; width:16px; height:16px; border-radius:2px;
   background:var(--sp-ink-3); transition:left 140ms ease-out;
 }
 .switch.on { background:var(--sp-a4); border-color:var(--sp-a4); }
-.switch.on > i { left:21px; background:var(--sp-surface); }
+.switch.on > i { left:19px; background:var(--sp-surface); }
 .switch::after {
   content:""; position:absolute; left:50%; top:50%;
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
