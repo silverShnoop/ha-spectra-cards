@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.21.1";
+const VERSION = "0.22.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -221,6 +221,11 @@ const SHEET = `
 .picker .striphold { position:relative; }
 .picker .strip { height:16px; transition:height 120ms ease-out; }
 .picker.picking .strip { height:30px; }
+/* Every segment carries the ring, transparent until it is the chosen one, so
+   there are two colours to move between rather than a ring that blinks into
+   existence. What does the moving is _paint, not a transition: see the note
+   above moveBarFrom. */
+.picker .strip i { outline:2px solid transparent; outline-offset:-2px; }
 /* Dim the unchosen, never recolour the chosen: the segment's colour is the
    scene's own light, and tinting it would be a lie about the room. */
 .picker.choosing .strip i { opacity:.3; }
@@ -240,9 +245,7 @@ const SHEET = `
    nothing, for the same reason it carries no circle — unless a finger is on
    the bar, in which case something is being chosen after all. */
 .picker:not(.off) .strip i.on,
-.picker.picking .strip i.on {
-  outline:2px solid var(--sp-ink); outline-offset:-2px;
-}
+.picker.picking .strip i.on { outline-color:var(--sp-ink); }
 /* Nothing is driving this room, so nothing on the bar is lit. The bar stays
    legible enough to aim at, because dragging it is how you turn the room on. */
 .picker.off .strip { opacity:.32; }
@@ -360,13 +363,11 @@ img.avatar { object-fit:cover; display:block; }
 }
 @keyframes sp-spin { to { transform: rotate(360deg); } }
 /* A scene changing is the card's one piece of news, and it used to arrive as
-   a pop: spinner, tick, then everything at its new value at once. The DOM is
-   replaced wholesale, so a true crossfade is not on offer; rising from a
-   quarter opacity is, and it reads as the change landing rather than as the
-   card being rebuilt. Only the two things that actually carry the scene move
-   — the name in the title bar and the bar itself — because fading the whole
-   card would take the controls with it, and a control that fades when you
-   did not touch it is a control you distrust. */
+   a pop. This is for the part that genuinely swaps — the scene's name and
+   symbol in the title bar, where one word is replaced by another and there
+   is nothing to interpolate. The bar underneath does not use it: its colours
+   and its marker move rather than swap, so they transition instead, which is
+   both smoother and honest about what actually changed. */
 @keyframes sp-swap {
   0%   { opacity:.25; }
   100% { opacity:1; }
@@ -381,7 +382,7 @@ img.avatar { object-fit:cover; display:block; }
 }
 
 .pressed { animation: sp-press 260ms ease-out; }
-.swap .metagroup, .swap .strip { animation: sp-swap 260ms ease-out; }
+.swap .metagroup { animation: sp-swap 260ms ease-out; }
 
 .spinner {
   width:13px; height:13px; flex:none; border-radius:50%;
@@ -420,7 +421,8 @@ img.avatar { object-fit:cover; display:block; }
 
 @media (prefers-reduced-motion: reduce) {
   .pressed { animation:none; box-shadow:inset 0 0 0 999px var(--sp-press); }
-  .swap .metagroup, .swap .strip { animation:none; }
+  .swap .metagroup { animation:none; }
+  .picker .strip { transition:none; }
   .spinner { animation-duration:2.4s; }
 }
 
@@ -2184,6 +2186,102 @@ const SPINNER_FLOOR_MS = 400;
    the 260ms flash, so the whole of it is seen. */
 const PRESS_HOLD_MS = 280;
 
+/* ---- moving the bar ----
+ * The bar is rebuilt on every render, and a node built fresh arrives already
+ * at its destination. A CSS transition cannot help with that: it animates the
+ * gap between two styles of one element, and there is only ever one style
+ * here. Carrying the old nodes across does not help either — re-parenting an
+ * element drops its computed style, so the new parent sees a first style
+ * rather than a change.
+ *
+ * The Web Animations API takes the previous value as an argument, which is
+ * the one thing the declarative version cannot be told. No library: this is
+ * four value changes with one easing curve, and anime.js or similar would be
+ * a bundled dependency to do what three lines of platform already do.
+ *
+ * It also fixes the stutter for free. A second render landing mid-animation
+ * used to restart the fade from the beginning, so the bar dipped, rose, and
+ * dipped again. The outgoing node's animation dies with the node, and
+ * getComputedStyle reports the *animated* value while one is running — so the
+ * snapshot catches the bar in flight and the next animation simply carries on
+ * from there.
+ */
+const MOVE_MS = 260;
+const MOVE_EASE = "ease-out";
+
+function stillWanted() {
+  return !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+
+/* Animates one property from a value the element no longer has. Silent about
+   a browser that cannot: the card is correct without any of this, and a
+   missing animation is not worth an exception on a wall panel. */
+function moveFrom(element, property, from, to) {
+  if (!element || from === null || to === null || from === to) return;
+  if (typeof element.animate !== "function") return;
+  const a = {};
+  const b = {};
+  a[property] = from;
+  b[property] = to;
+  try {
+    element.animate([a, b], { duration: MOVE_MS, easing: MOVE_EASE });
+  } catch (err) {
+    /* An unanimatable property is not a reason to stop rendering. */
+  }
+}
+
+/* What the bar looks like right now, read while any animation is still
+   running so an interrupted move continues rather than restarting.
+
+   Only what actually moves is captured. Not the segment colours: a scene's
+   hex is fixed by the schedule and does not change between renders. */
+function barSnapshot(root) {
+  const strip = root.querySelector(".strip");
+  if (!strip) return null;
+  const cells = strip.children;
+  const shot = {
+    count: cells.length,
+    strip: getComputedStyle(strip).opacity,
+    cells: [],
+    thumb: null,
+  };
+  for (let i = 0; i < cells.length; i += 1) {
+    const cs = getComputedStyle(cells[i]);
+    shot.cells.push({ opacity: cs.opacity, outline: cs.outlineColor });
+  }
+  const thumb = root.querySelector(".thumb");
+  /* The rendered position, not the inline one: on a lift this is where the
+     finger actually left it, which is where the marker has to set off from. */
+  if (thumb) shot.thumb = getComputedStyle(thumb).left;
+  return shot;
+}
+
+/* Bails on a bar it does not recognise. A schedule with a different number of
+   slots is a different day, and interpolating between two different days
+   would be an animation that means nothing. */
+function moveBarFrom(root, shot) {
+  if (!shot || !stillWanted()) return;
+  const strip = root.querySelector(".strip");
+  if (!strip) return;
+  const cells = strip.children;
+  if (!cells.length || cells.length !== shot.count) return;
+
+  moveFrom(strip, "opacity", shot.strip, getComputedStyle(strip).opacity);
+  for (let i = 0; i < cells.length; i += 1) {
+    const cs = getComputedStyle(cells[i]);
+    moveFrom(cells[i], "opacity", shot.cells[i].opacity, cs.opacity);
+    moveFrom(cells[i], "outlineColor", shot.cells[i].outline, cs.outlineColor);
+  }
+
+  const thumb = root.querySelector(".thumb");
+  /* A marker that was not on the bar a moment ago has nowhere to travel from:
+     it belongs at its new place immediately, not sliding in from the last
+     place the room happened to be lit. */
+  if (thumb && shot.thumb && shot.thumb !== "auto") {
+    moveFrom(thumb, "left", shot.thumb, getComputedStyle(thumb).left);
+  }
+}
+
 function flashPress(element) {
   if (!element) return;
   element.classList.remove("pressed");
@@ -2689,8 +2787,20 @@ class SpectraCard extends HTMLElement {
       `</div>`,
     ].join("");
 
-    this._holder.innerHTML = card;
+    this._paint(card);
     this._bind(model);
+  }
+
+  /* Replaces what is on screen, then tells the new bar where the old one had
+     got to so the things that are supposed to move can move. Everything else
+     simply swaps: for a word being replaced by another word there is nothing
+     to interpolate, and the title bar's fade covers it. */
+  _paint(html) {
+    const shot = this._holder.firstElementChild
+      ? barSnapshot(this._holder)
+      : null;
+    this._holder.innerHTML = html;
+    moveBarFrom(this._holder, shot);
   }
 
   /* Some bodies know their own state better than any config line can. Where
