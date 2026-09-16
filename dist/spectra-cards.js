@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.24.0";
+const VERSION = "0.25.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -151,6 +151,17 @@ const SHEET = `
   display:flex; justify-content:space-between;
   margin-top:5px; font-size:11px; color:var(--sp-ink-3);
 }
+
+/* quote — a sentence meant to be read rather than glanced at, which is why
+   it is not a stat. The hero is mono and sized for a number; a sentence set
+   in mono at 32px wraps into something you have to decode.
+
+   Sans, generous leading, and a measure that stops short of the card edge: at
+   arm's length a line that runs the full width of a wall panel is a line you
+   lose your place in. */
+.quote { margin:0; font-size:22px; line-height:1.36; color:var(--sp-ink);
+  max-width:34ch; text-wrap:pretty; }
+.quoteby { margin:9px 0 0; font-size:12px; color:var(--sp-ink-3); }
 
 /* primitives */
 .hero {
@@ -1461,6 +1472,16 @@ function pad2(n) {
 }
 
 const BODIES = {
+  /* What is worth reading today? */
+  quote(b) {
+    if (!b || isBlank(b.text)) return "";
+    let out = `<p class="quote">${esc(b.text)}</p>`;
+    /* Not every sentence has an author, and an empty dash under one that does
+       not is worse than nothing. */
+    if (!isBlank(b.by)) out += `<p class="quoteby">${esc(b.by)}</p>`;
+    return out;
+  },
+
   /* What time is it, and what day? */
   clock(b) {
     const now = b && b.now ? new Date(b.now) : new Date();
@@ -2257,6 +2278,8 @@ function bodyIsEmpty(type, b) {
       return !Array.isArray(b.events) || b.events.length === 0;
     case "alert":
       return isBlank(b.title);
+    case "quote":
+      return isBlank(b.text);
     case "control":
     case "scenes":
     case "people":
