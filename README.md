@@ -590,13 +590,13 @@ spinner.
 HACS → three-dot menu → Custom repositories → this repo, category
 **Lovelace**. HACS registers the resource itself.
 
-By hand: copy `dist/spectra-cards.js` to `config/www/` and add
-`/local/spectra-cards.js` as a dashboard resource of type JavaScript module.
+By hand: copy `dist/spectra-cards-2.js` to `config/www/` and add
+`/local/spectra-cards-2.js` as a dashboard resource of type JavaScript module.
 
 ## Adding a body
 
 HACS registers exactly one resource per plugin repository, so every body lives
-in `dist/spectra-cards.js`. There is no build step.
+in `dist/spectra-cards-2.js`. There is no build step.
 
 1. Name the **question** it answers in one sentence. If an existing body
    already answers it, use that one.
