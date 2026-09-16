@@ -58,10 +58,11 @@ const CONDITIONS = [
    glyph is. The element count is asserted against this list: if mdi redraws
    one, the script stops rather than colouring the wrong piece.
 
-   wc neutral (cloud, fog, wind) · ww water · wl ice · ws anything that gives
-   off light — sun, moon, stars, lightning. The moon sits with the sun rather
-   than with the snow: it is a light source, not a cold thing, and putting it
-   there leaves `wl` meaning ice and nothing else. */
+   wc neutral (cloud, fog, wind, moon) · ww water · wl ice · ws sun, stars,
+   lightning. The moon is neutral rather than warm — it is the shape of the
+   night, and a clear night is the one condition with nothing to warn about.
+   What matters is that it is not `wl`: that leaves ice meaning ice and
+   nothing else, so no condition needs a colour override. */
 const ROLES = {
   sunny: ["ws", "ws", "ws", "ws", "ws", "ws", "ws"],
   partlycloudy: ["ws", "wc", "ws", "ws", "ws", "ws"],
@@ -76,7 +77,7 @@ const ROLES = {
   fog: ["wc", "wc", "wc", "wc", "wc"],
   windy: ["wc", "wc", "wc"],
   "windy-variant": ["wc", "wc"],
-  "clear-night": ["ws", "ws", "ws"],
+  "clear-night": ["ws", "ws", "wc"],
 };
 
 /* partly-cloudy, the one glyph mdi draws as a boolean union.
