@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.27.0";
+const VERSION = "0.28.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1173,18 +1173,70 @@ function forecastKey(spec) {
   return `${spec.forecast}|${spec.type || "hourly"}`;
 }
 
+/* Does one forecast row satisfy a `where` clause?
+
+   Deliberately small: above, below, equals, and a field that must simply be
+   present. A query language inside a dashboard config is a language nobody
+   will remember the syntax of six months from now, and anything more involved
+   than this belongs in a template sensor where it can be read and tested. */
+function rowMatches(row, where) {
+  if (!row || !where || typeof where !== "object") return false;
+  const field = where.field;
+  if (typeof field !== "string") return false;
+  const raw = row[field];
+  if (raw === null || raw === undefined) return false;
+  if (where.equals !== undefined) return raw === where.equals;
+  const n = Number(raw);
+  if (where.above !== undefined) {
+    if (!isFinite(n) || !(n > Number(where.above))) return false;
+  }
+  if (where.below !== undefined) {
+    if (!isFinite(n) || !(n < Number(where.below))) return false;
+  }
+  /* No operator given means "this field has a value at all", which is how you
+     ask for the first hour that mentions a thing. */
+  return true;
+}
+
+/* readEntity has always honoured `fallback`; readForecast never did, so a
+   fallback on a forecast spec was silently ignored wherever anyone wrote one.
+   Single-value reads go through here now so the two agree. A series does not:
+   a fallback for a whole row of hours is a different idea, and nothing asks
+   for it. */
+function forecastValue(spec, value) {
+  if (value === null || value === undefined || value === "") {
+    return spec.fallback !== undefined ? spec.fallback : null;
+  }
+  return value;
+}
+
 function readForecast(forecasts, spec) {
   const rows = forecasts ? forecasts[forecastKey(spec)] : null;
   if (!Array.isArray(rows) || !rows.length) return null;
   const limit = Number(spec.limit) > 0 ? Number(spec.limit) : rows.length;
   const window = rows.slice(0, limit);
+
+  /* "When does it next rain" is a question about the first row that answers a
+     condition, not about a row at a fixed offset — and the offset is
+     different every hour, so an index cannot express it. Runs before `index`
+     so the two cannot both apply and leave the reader guessing which won. */
+  if (spec.where && typeof spec.where === "object") {
+    const hit = window.find((row) => rowMatches(row, spec.where));
+    /* Nothing matched, which is itself the answer: no rain in the window. The
+       fallback says so in words, and without one the cell renders nothing. */
+    if (!hit) return forecastValue(spec, null);
+    const found = typeof spec.field === "string" ? hit[spec.field] : hit;
+    if (found === null || found === undefined) return forecastValue(spec, null);
+    return typeof found === "object" ? found : forecastValue(spec, applyFormat(found, spec));
+  }
+
   /* A metric wants one number, not a series. */
   if (spec.index !== undefined) {
     const row = window[Number(spec.index)];
-    if (!row) return null;
+    if (!row) return forecastValue(spec, null);
     const value = typeof spec.field === "string" ? row[spec.field] : row;
-    if (value === null || value === undefined) return null;
-    return typeof value === "object" ? value : applyFormat(value, spec);
+    if (value === null || value === undefined) return forecastValue(spec, null);
+    return typeof value === "object" ? value : forecastValue(spec, applyFormat(value, spec));
   }
   if (typeof spec.field === "string") {
     return window.map((row) => {
