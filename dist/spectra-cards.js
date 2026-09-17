@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.51.0";
+const VERSION = "0.52.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -229,6 +229,10 @@ const SHEET = `
 .row.zebra { background:var(--sp-zebra); }
 .row.wash { background:var(--accent-soft); }
 .row .name { margin:0; font-size:13px; }
+/* Prose rows read as paragraphs, not labels, so they take the same muted ink
+   and looser leading as .festtext. Opt-in per card: a Needs-you alert's name
+   is a label and must stay at full strength. */
+.row.prose .name { color:var(--sp-ink-2); line-height:1.55; }
 .row .value { margin-left:auto; font-size:12px; color:var(--sp-ink-2); }
 .dot { width:9px; height:9px; border-radius:50%; flex:none; }
 .bar { height:5px; width:56px; background:var(--sp-sink); border-radius:3px; overflow:hidden; margin-left:auto; }
@@ -2876,6 +2880,10 @@ const BODIES = {
        — so this cannot be separate Lovelace cards. It has to be the card
        arranging its own rows. */
     const flow = Boolean(b.flow);
+    /* Rows whose name is a sentence rather than a label. Matches the festival
+       body's reading style so two cards of prose sitting side by side on the
+       panel do not look like different typefaces. */
+    const prose = Boolean(b.prose);
     /* Zebra is a reading aid for a column of rows. Tiles already have edges,
        and striping them alternately looks like a fault. */
     const zebra = !flow && b.zebra !== false;
@@ -2893,6 +2901,7 @@ const BODIES = {
       const washed = accentNumber(r.accent) !== null;
       const classes = ["row"];
       if (flow) classes.push("tile");
+      if (prose) classes.push("prose");
       if (washed) classes.push("wash");
       else if (zebra && index % 2 === 0) classes.push("zebra");
       if (hasAction) classes.push("hasact");
