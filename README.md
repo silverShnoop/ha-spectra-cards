@@ -522,6 +522,44 @@ there, the next render brings it back.
 
 All of it is off under `prefers-reduced-motion`.
 
+### Mapping a value whose tail moves
+
+`map` needs an exact key, which is no use when the value carries something
+that changes:
+
+```
+sensor.bin_after_1   "Recycling 8d"   today
+                     "Recycling 7d"   tomorrow
+```
+
+`match: prefix` (or `contains`) matches on the stable part instead:
+
+```yaml
+icon:
+  entity: sensor.home_waste_collection_schedule_bin_after_1
+  map: {Recycling: mdi:recycle, Garden: mdi:leaf, Refuse: mdi:trash-can}
+  match: prefix
+  default: mdi:trash-can
+```
+
+Keys are tried longest-first, so a specific key cannot be shadowed by a
+shorter one that happens to be a prefix of it. Without `match`, behaviour is
+unchanged: exact key, then `default`.
+
+### A chip with an icon
+
+A `pill` — chips included — takes an optional `icon`, shown in front of its
+words, boxed so the text never shifts between glyphs of different widths:
+
+```yaml
+chips:
+  - entity: sensor.home_waste_collection_schedule_bin_after_1
+    icon: {entity: sensor.home_waste_collection_schedule_bin_after_1, map: {...}, match: prefix}
+```
+
+Optional on purpose: most chips are a measurement, and a measurement has no
+icon.
+
 ## Rows from a collection
 
 A `list` (or any array) can be built one row per item:
