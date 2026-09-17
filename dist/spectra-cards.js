@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.40.0";
+const VERSION = "0.41.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1148,6 +1148,29 @@ function resolveValue(hass, spec, forecasts) {
   /* One line of text out of several readings — a forecast beside a real
      sensor, a start time beside a title. Parts that read as nothing are
      dropped rather than leaving a stray separator behind. */
+  /* The first case whose `when` reads as true, else `else`. Added because a
+     status line often has to say which of two things is true of one room,
+     and `join` cannot: it resolves each part against its own entity and
+     glues the survivors together, so no part can depend on another.
+
+     "Off" is the example that forced it. A zone that is off because its
+     schedule says so is the house working; a zone that is off because
+     someone toggled it is an override sitting on top of the schedule, and
+     it stays until it is cleared. Same word, opposite meanings — and the
+     difference lives in a *second* entity, the overlay. Cases are ordered
+     because these overlap: an open window is worth saying whatever else is
+     true underneath it. */
+  if (Array.isArray(spec.cases)) {
+    for (const branch of spec.cases) {
+      if (!branch || typeof branch !== "object") continue;
+      const when = resolveValue(hass, branch.when, forecasts);
+      if (when !== null && when !== undefined && when !== false && when !== "" && when !== 0) {
+        return resolveValue(hass, branch.then, forecasts);
+      }
+    }
+    return spec.else === undefined ? null : resolveValue(hass, spec.else, forecasts);
+  }
+
   if (Array.isArray(spec.join)) {
     const separator = typeof spec.separator === "string" ? spec.separator : "";
     const parts = spec.join
