@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.53.0";
+const VERSION = "0.54.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -266,6 +266,10 @@ const SHEET = `
    before, not clipped. */
 .eventbody .pill { min-width:56px; text-align:center; box-sizing:border-box; }
 .trail { flex:none; margin-left:auto; font-size:11px; color:var(--sp-ink-3); }
+/* An event that knows what kind of thing it is says so in front of its name.
+   Sized and baselined to sit in the line rather than beside it, so a row with
+   an icon is the same height as a row without one. */
+.eventbody .evicon { --mdc-icon-size:15px; margin-right:6px; vertical-align:-3px; }
 .railcol { width:22px; flex:none; display:flex; flex-direction:column;
   align-items:center; align-self:stretch; }
 .railcol ha-icon { --mdc-icon-size:15px; }
@@ -429,6 +433,10 @@ img.avatar { object-fit:cover; display:block; }
    timestamps makes you do the grouping in your head every time you look. */
 .dayrow { display:flex; align-items:baseline; gap:8px; margin:8px 0 2px; }
 .dayrow .dayhead { margin:0; }
+/* Set apart from the day word rather than butted against it, so "Tomorrow"
+   and "18th Sep" read as two facts and the first stays scannable on its own.
+   Dimmer than the day, because the day is the one you act on. */
+.daydate { font-size:10px; letter-spacing:.06em; color:var(--sp-ink-3); margin-left:4px; }
 .dayrule { flex:1; height:2px; background:var(--sp-sink); }
 .daycount { font-size:10px; color:var(--sp-ink-3); }
 
@@ -1087,6 +1095,25 @@ function weekdayLabel(value) {
   if (days === 0) return "Today";
   if (days === 1) return "Tomorrow";
   return then.toLocaleDateString([], { weekday: "short" });
+}
+
+/* "Tomorrow" alone is ambiguous once you look away and look back, and a bin
+   calendar is exactly the thing you check twice. The day word answers "do I
+   act tonight"; the date answers "which collection is this" -- so they are
+   two facts, set apart rather than run together. Year omitted on purpose:
+   nothing on a panel is a year out, and "18th Sep 2026" is three words where
+   two will do. */
+function ordinal(n) {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return n + "th";
+  return n + (["th", "st", "nd", "rd"][n % 10] || "th");
+}
+
+function dayDateLabel(value) {
+  const t = Date.parse(value);
+  if (isNaN(t)) return null;
+  const then = new Date(t);
+  return `${ordinal(then.getDate())} ${then.toLocaleDateString([], { month: "short" })}`;
 }
 
 function minutesSince(value) {
@@ -2114,6 +2141,12 @@ const BODIES = {
       .filter((event) => event && event.start);
     if (!events.length) return "";
 
+    /* A diary wants the clock; a bin calendar does not. "All day" on every
+       row of a collection schedule is a column of noise saying nothing that
+       the absence of a time would not say better. */
+    const showWhen = b.times !== false;
+    const showDate = Boolean(b.dates);
+
     const order = [];
     const byDay = {};
     for (const event of events) {
@@ -2128,6 +2161,9 @@ const BODIES = {
       const rows = byDay[key];
       const head = weekdayLabel(key + "T12:00:00") || key;
       let out = `<div class="dayrow"><p class="dayhead">${esc(head)}</p>`
+        + (showDate
+          ? `<span class="daydate">${esc(dayDateLabel(key + "T12:00:00") || "")}</span>`
+          : "")
         + `<span class="dayrule"></span>`
         + `<span class="daycount">${rows.length}</span></div>`;
 
@@ -2144,9 +2180,15 @@ const BODIES = {
           + (i < rows.length - 1 ? `<span class="line"></span>` : "")
           + `</div>`
           + `<div class="eventbody">`
-          + `<p class="name"><span class="pill" style="margin-right:6px">`
-          + `${esc(when)}</span>${esc(event.summary)}</p>`
-          + (isBlank(span) ? "" : `<span class="trail">${esc(span)}</span>`)
+          + `<p class="name">`
+          + (showWhen
+            ? `<span class="pill" style="margin-right:6px">${esc(when)}</span>`
+            : "")
+          + (isBlank(event.icon)
+            ? ""
+            : `<ha-icon class="evicon" icon="${esc(event.icon)}"></ha-icon>`)
+          + `${esc(event.summary)}</p>`
+          + (!showWhen || isBlank(span) ? "" : `<span class="trail">${esc(span)}</span>`)
           /* Deliberately not the description: Google fills it with markup
              and boilerplate, and the location is the part you act on — and
              the only thing here worth a second line. */

@@ -313,6 +313,34 @@ The sub line is the **location**, never the description. Google fills
 descriptions with markup and boilerplate; the location is the part you act
 on.
 
+#### A calendar that is not a diary
+
+A bin collection has no time and no location, and "All day" on every row is a
+column of noise. Two options turn the same body into a schedule:
+
+```yaml
+body:
+  type: agenda
+  dates: true      # "Tomorrow   18th Sep" on the day head
+  times: false     # no time pill, no duration
+  events:
+    from: {calendar: calendar.north_herts_council, days: 35, limit: 12}
+    each:
+      start:   {field: start}
+      summary: {field: summary}
+      icon:    {field: summary, map: {Food Caddy: mdi:food-apple, Garden waste: mdi:leaf}}
+```
+
+`dates` sets the date apart from the day word rather than running the two
+together, so "Tomorrow" stays scannable on its own and "18th Sep" answers
+*which* collection this is. The year is omitted — nothing on a panel is a
+year out.
+
+An event carrying an `icon` shows it in front of its name. There is no icon
+in a calendar event, so it is derived: `each` maps the summary to one, which
+is also what keeps a single source of truth for what each bin type looks
+like.
+
 ## Calendars
 
 A calendar's state is only "is something on right now", so events are fetched
