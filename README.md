@@ -482,10 +482,14 @@ fruit salad that means nothing.
 **Selection is said without colour on purpose**: a hue spent on "you are
 here" is a hue that can no longer mean "the door is open". It uses three
 neutral devices at once, because any one alone is weak across a room — a
-thick bar down the leading edge, a surface one step up from its neighbours,
-and the label in full ink at heavier weight. All three survive a button that
-is simultaneously filled red, and all three survive being looked at in the
-dark.
+thick bar along the bottom edge with a caret hanging off it, a surface one
+step up from its neighbours, and the label in full ink at heavier weight.
+All of them survive a button that is simultaneously filled red, and all of
+them survive being looked at in the dark.
+
+The caret is the one that says something an edge cannot: not merely "this
+button is different" but "this button owns the cards underneath", which on a
+rail sitting above its own content is the actual question.
 
 In every case the summary text says the same thing in words, because colour
 never carries meaning alone.
