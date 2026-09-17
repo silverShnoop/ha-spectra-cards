@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.56.0";
+const VERSION = "0.56.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1134,13 +1134,9 @@ function weekdayLabel(value) {
    act tonight"; the date answers "which collection is this" -- so they are
    two facts, set apart rather than run together. Year omitted on purpose:
    nothing on a panel is a year out, and "18th Sep 2026" is three words where
-   two will do. */
-function ordinal(n) {
-  const v = n % 100;
-  if (v >= 11 && v <= 13) return n + "th";
-  return n + (["th", "st", "nd", "rd"][n % 10] || "th");
-}
-
+   two will do. Ordinals come from the one ordinal() the file already had --
+   a second copy of it parsed fine as a script and killed the whole module as
+   a module, which is how it ships. */
 function dayDateLabel(value) {
   const t = Date.parse(value);
   if (isNaN(t)) return null;

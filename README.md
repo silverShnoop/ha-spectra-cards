@@ -696,6 +696,25 @@ in `dist/spectra-cards.js`. There is no build step.
    for `--sp-a3` directly. The only exception is raw entity colour.
 5. Teach `bodyIsEmpty` what empty means for it.
 
+## Checking a build
+
+```
+node tools/checkmodule.js
+```
+
+Loads `dist/spectra-cards.js` in a real browser, **as a real ES module**, and
+fails unless both custom elements register with no console errors. Needs
+`playwright`; point `CHROME_PATH` at a Chromium binary if it cannot find one.
+
+This exists because `node --check` and `require()` are not enough. Both parse
+the file as a CommonJS *script*, and a script tolerates things a module does
+not — a duplicate top-level `function` declaration is legal in a script, where
+the second simply wins, and a fatal `SyntaxError` in a module. A build with
+one passed every check, shipped, registered no custom elements at all, and
+turned every card on the dashboard into "Custom element doesn't exist".
+
+The card ships as `type="module"`. So it has to be checked as one.
+
 ## Licence
 
 MIT
