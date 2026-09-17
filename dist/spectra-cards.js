@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.49.0";
+const VERSION = "0.50.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -694,10 +694,16 @@ img.avatar { object-fit:cover; display:block; }
 .festcount .pip.on { background:var(--c); box-shadow:0 0 8px 1px var(--c); }
 
 /* Hung on the card's own border rather than an inner box. */
-/* Centred on the card's outer edge, so each bulb straddles the border and
-   half of it hangs outside the card. inset is -2px because an absolutely
-   positioned child anchors to the PADDING box, and the border is 2px. */
-.perim { position:absolute; inset:-2px; pointer-events:none; z-index:4; }
+/* Flush to the card's outer edge and fully inside it. Straddling the edge
+   looked better and does not survive: Home Assistant clips a custom card at
+   an ancestor, so the outer half of every bulb was cut away and the row read
+   as small dots sitting inside the border — which is exactly what it looked
+   like on the panel.
+
+   inset is +1px because an absolutely positioned child anchors to the
+   PADDING box: 2px in from the edge for the border, less 3px to bring a 6px
+   bulb's own edge back out to it. The bulb then covers the border exactly. */
+.perim { position:absolute; inset:1px; pointer-events:none; z-index:4; }
 .pb { position:absolute; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
   background:var(--c); box-shadow:0 0 5px 1px var(--c), 0 0 12px 2px var(--c);
   animation:sp-breathe 3.4s var(--d) ease-in-out infinite; }
