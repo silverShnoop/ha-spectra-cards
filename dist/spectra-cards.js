@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.55.0";
+const VERSION = "0.56.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -666,6 +666,21 @@ img.avatar { object-fit:cover; display:block; }
 /* An accented tile carries its accent on the edge, where a row carried it as
    a wash. A wash inside a bordered tile reads as two boxes. */
 .flow .row.tile.wash { background:none; border-color:var(--accent); }
+/* A row that has just been dealt with. It does not vanish under the finger
+   that dealt with it: the button flashes, the row is left alone long enough
+   to see that it was the right one, and only then does it go -- shrinking
+   rather than blinking, so the eye follows it out instead of being startled
+   by a gap. Pointer events go first, so the half-second cannot be spent
+   pressing a button that has already fired. */
+.row.leaving { animation: sp-leave 420ms cubic-bezier(.4,0,.7,.3) forwards;
+  pointer-events:none; }
+@keyframes sp-leave {
+  from { opacity:1; transform:none; }
+  to   { opacity:0; transform:scale(.93); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .row.leaving { animation:none; opacity:0; }
+}
 
 /* festival — the card celebrates, the controls do not. The decoration lives
    on the card itself: .card.festive carries the wash as its own background
@@ -3008,7 +3023,11 @@ const BODIES = {
         tail = `<span class="value">${esc(r.value)}</span>`;
       }
 
-      return `<div class="${classes.join(" ")}"${rowStyle}>${lead}${middle}${tail}</div>`;
+      /* The row's own id, where the source has one. Without it a re-render
+         can only match rows by position, and position is exactly what
+         changes when one of them leaves. */
+      const key = isBlank(r.id) ? "" : ` data-key="${esc(r.id)}"`;
+      return `<div class="${classes.join(" ")}"${key}${rowStyle}>${lead}${middle}${tail}</div>`;
     }).join("");
 
     return flow ? `<div class="flow">${body}</div>` : body;
@@ -3081,6 +3100,18 @@ const SPINNER_FLOOR_MS = 400;
    the 260ms flash, so the whole of it is seen. */
 const PRESS_HOLD_MS = 280;
 
+/* Dealing with a Needs-you row is the one press whose whole point is that
+   the thing goes away, and it was going away instantly -- the row was gone
+   before the flash finished, and everything below it jumped up a place.
+
+   So: the flash reads, then the row is left alone long enough to register as
+   the one that was pressed, then it shrinks out, and only then is the card
+   allowed to re-render into the space. The survivors slide into their new
+   places from their old ones rather than appearing there. */
+const LEAVE_DELAY_MS = 500;
+const LEAVE_MS = 420;
+const SETTLE_MS = 380;
+
 /* ---- moving the bar ----
  * The bar is rebuilt on every render, and a node built fresh arrives already
  * at its destination. A CSS transition cannot help with that: it animates the
@@ -3131,7 +3162,20 @@ function moveFrom(element, property, from, to, ms) {
    Only what actually moves is captured. Not the segment colours: a scene's
    hex is fixed by the schedule and does not change between renders. */
 function motionSnapshot(root) {
-  const shot = { count: 0, strip: null, cells: [], thumb: null, knob: null, dial: null };
+  const shot = {
+    count: 0, strip: null, cells: [], thumb: null, knob: null, dial: null,
+    rows: new Map(),
+  };
+
+  /* Where each row sits right now. A row leaving a flowed list moves every
+     row after it, and a grid cannot transition that by itself -- the items
+     simply appear in their new cells. So the positions are measured before
+     the swap and the survivors are animated back from them afterwards. */
+  const keyed = root.querySelectorAll(".row[data-key]");
+  for (let i = 0; i < keyed.length; i += 1) {
+    const box = keyed[i].getBoundingClientRect();
+    shot.rows.set(keyed[i].getAttribute("data-key"), { x: box.left, y: box.top });
+  }
 
   const strip = root.querySelector(".strip");
   if (strip) {
@@ -3168,6 +3212,21 @@ function motionSnapshot(root) {
    would be an animation that means nothing. */
 function motionFrom(root, shot) {
   if (!shot || !stillWanted()) return;
+
+  if (shot.rows && shot.rows.size) {
+    const keyed = root.querySelectorAll(".row[data-key]");
+    for (let i = 0; i < keyed.length; i += 1) {
+      const was = shot.rows.get(keyed[i].getAttribute("data-key"));
+      if (!was) continue;
+      const box = keyed[i].getBoundingClientRect();
+      const dx = was.x - box.left;
+      const dy = was.y - box.top;
+      /* A row that has not moved is not animated: a transform of zero still
+         promotes a layer and still costs a frame, for nothing to see. */
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      moveFrom(keyed[i], "transform", `translate(${dx}px, ${dy}px)`, "none", SETTLE_MS);
+    }
+  }
 
   const strip = root.querySelector(".strip");
   const cells = strip ? strip.children : null;
@@ -3684,6 +3743,20 @@ class SpectraCard extends HTMLElement {
       }
       return;
     }
+    /* A row is mid-exit. Re-rendering now would delete it out from under its
+       own animation, which is the abruptness this exists to remove. */
+    const left = this._leaveUntil ? this._leaveUntil - Date.now() : 0;
+    if (left > 0) {
+      if (!this._leaveTimer) {
+        this._leaveTimer = setTimeout(() => {
+          this._leaveTimer = null;
+          this._leaveUntil = 0;
+          this._signature = null;
+          this._update();
+        }, left + 20);
+      }
+      return;
+    }
     this._applyPending(model);
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
@@ -3828,6 +3901,21 @@ class SpectraCard extends HTMLElement {
      got to so the things that are supposed to move can move. Everything else
      simply swaps: for a word being replaced by another word there is nothing
      to interpolate, and the title bar's fade covers it. */
+  /* Sends one row out, and holds the card still until it has gone.
+
+     Optimistic on purpose: it starts on the press rather than on the state
+     coming back, because the point is that the press feels answered. If the
+     row turns out to still be there -- an action that did not clear it -- the
+     re-render simply brings it back without the class. */
+  _leave(row) {
+    if (!row) return;
+    this._leaveUntil = Date.now() + LEAVE_DELAY_MS + LEAVE_MS;
+    if (this._leaveTimer) { clearTimeout(this._leaveTimer); this._leaveTimer = null; }
+    setTimeout(() => {
+      if (row.isConnected) row.classList.add("leaving");
+    }, LEAVE_DELAY_MS);
+  }
+
   _paint(html) {
     const shot = this._holder.firstElementChild
       ? motionSnapshot(this._holder)
@@ -4268,6 +4356,7 @@ class SpectraCard extends HTMLElement {
       const run = (event) => {
         event.stopPropagation();
         onPress(el, () => this._callAction(row && row.action));
+        this._leave(el.closest(".row[data-key]"));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
