@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.45.0";
+const VERSION = "0.46.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -636,6 +636,67 @@ img.avatar { object-fit:cover; display:block; }
 /* Something is stopping the room heating that the room did not choose — an
    open window. Ochre, because it is a warning rather than a fault. */
 .pickinfo.warn { color:var(--sp-a2-on); }
+
+/* festival — the card celebrates, the controls do not. Everything here is
+   scoped inside .festival so no decoration can leak onto a card carrying a
+   switch someone needs to find. */
+.festival { position:relative; border-radius:6px; }
+.festtext { margin:0; padding:4px 13px 13px; font-size:13px; line-height:1.55;
+  color:var(--sp-ink-2); position:relative; z-index:2; }
+.festival.washed { background:var(--fg); margin:-1px; border-radius:7px; }
+/* The scrim is load-bearing: without it the pale band in almost any festival
+   palette swallows the words sitting on top of it. */
+.festival.washed::before { content:""; position:absolute; inset:0; border-radius:7px;
+  background:linear-gradient(180deg,rgba(8,5,12,.5),rgba(8,5,12,.82)); }
+.festival.washed .festtext { color:rgba(255,255,255,.9); }
+
+/* The count, directly under the title: lit for nights already had. */
+.festcount { display:flex; gap:9px; padding:11px 13px 0; position:relative; z-index:2; }
+.diya svg { width:24px; height:24px; display:block; }
+.diya .bowl { fill:#7C5227; }
+.diya .fl { fill:#443B32; }
+.diya.lit .bowl { fill:#C98A3E; }
+.diya.lit .fl { fill:#FFD166; filter:drop-shadow(0 0 5px #FFB020);
+  transform-origin:13px 11px; animation:sp-flicker 1.9s ease-in-out infinite; }
+@keyframes sp-flicker { 0%,100% { transform:scale(1) rotate(0deg); }
+  40% { transform:scale(1.13) rotate(-3deg); } 70% { transform:scale(.94) rotate(2deg); } }
+.festcount .pip { width:14px; height:14px; border-radius:50%;
+  background:var(--sp-sink); }
+.festcount .pip.on { background:var(--c); box-shadow:0 0 8px 1px var(--c); }
+
+.perim { position:absolute; inset:0; pointer-events:none; z-index:3; }
+.pb { position:absolute; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
+  background:var(--c); box-shadow:0 0 5px 1px var(--c), 0 0 12px 2px var(--c);
+  animation:sp-breathe 3.4s var(--d) ease-in-out infinite; }
+@keyframes sp-breathe { 0%,100% { opacity:1; transform:scale(1); }
+  50% { opacity:.45; transform:scale(.82); } }
+
+.strand { display:block; width:100%; height:22px; color:var(--sp-ink-2);
+  position:relative; z-index:2; }
+.strand .bulb { transform-box:fill-box; transform-origin:center;
+  animation:sp-breathe 3s var(--d) ease-in-out infinite; }
+
+.snow { position:absolute; inset:0; overflow:hidden; border-radius:7px;
+  pointer-events:none; z-index:1; }
+.fk { position:absolute; top:-10px; width:var(--s); height:var(--s); border-radius:50%;
+  background:#fff; opacity:var(--o); animation:sp-fall var(--t) var(--d) linear infinite; }
+@keyframes sp-fall { to { transform:translate(16px,240px); opacity:0; } }
+
+.bursts { position:absolute; inset:0; overflow:hidden; border-radius:7px;
+  pointer-events:none; z-index:1; }
+.burst { position:absolute; width:74px; height:74px; margin:-37px 0 0 -37px;
+  opacity:.5; animation:sp-bloom 4.2s var(--d) ease-in-out infinite; }
+.burst svg { width:100%; height:100%; display:block;
+  transform:rotate(var(--r)) scale(var(--k)); }
+@keyframes sp-bloom { 0%,100% { opacity:.34; transform:scale(.86); }
+  50% { opacity:.6; transform:scale(1.1); } }
+
+/* A panel is looked at all evening. Anyone who has asked their system to
+   stop animating things means it here too. */
+@media (prefers-reduced-motion: reduce) {
+  .pb, .strand .bulb, .fk, .burst, .diya.lit .fl { animation:none; }
+  .fk { opacity:0; }
+}
 /* The box is a fixed 20px whatever the flame inside it is doing, so a room
    working harder never nudges the sentence next to it along. */
 .flame { width:20px; height:20px; flex:none; display:flex; align-items:center;
@@ -1732,6 +1793,112 @@ function pad2(n) {
   return String(n).padStart(2, "0");
 }
 
+
+/* Festival art is generated rather than stored, so one function serves every
+   palette and every count. It lives beside WEATHER_ART for the same reason
+   that does: the card draws its own pictures, and a panel that depends on
+   hosted images is a panel that breaks when the host moves. */
+
+/* The count device. A festival with five nights shows five lamps, two lit —
+   which is the duration JAMES asked for, shown rather than spelled out. */
+function festCount(kind, day, of, palette) {
+  const total = Math.max(0, Math.min(31, Math.round(Number(of) || 0)));
+  if (!total) return "";
+  const done = Math.max(0, Math.min(total, Math.round(Number(day) || 0)));
+  const cells = [];
+  for (let i = 0; i < total; i += 1) {
+    const lit = i < done;
+    const colour = palette.length ? palette[i % palette.length] : "currentColor";
+    if (kind === "pip") {
+      cells.push(`<span class="pip${lit ? " on" : ""}"`
+        + `${lit ? ` style="--c:${esc(colour)}"` : ""}></span>`);
+    } else {
+      /* A lamp, drawn once: bowl, rim, flame. The flame is its own path so
+         it can flicker without the bowl moving with it. */
+      cells.push(`<span class="diya${lit ? " lit" : ""}">`
+        + `<svg viewBox="0 0 26 26" aria-hidden="true">`
+        + `<path class="fl" d="M13 4C10.6 7.4 10 9.2 10 11a3 3 0 0 0 6 0c0-1.8-.6-3.6-3-7z"/>`
+        + `<path class="bowl" d="M3.5 16h19a9.5 9.5 0 0 1-19 0z"/>`
+        + `<ellipse class="bowl" cx="13" cy="16" rx="9.5" ry="1.7"/>`
+        + `</svg></span>`);
+    }
+  }
+  return `<div class="festcount" role="img"`
+    + ` aria-label="Day ${done} of ${total}">${cells.join("")}</div>`;
+}
+
+/* Bulbs placed by percentage rather than measurement, so the strand fits
+   whatever width the panel gives the card without being told. */
+function festPerimeter(palette) {
+  if (!palette.length) return "";
+  const out = [];
+  let n = 0;
+  const bulb = (where) => {
+    const colour = palette[n % palette.length];
+    const delay = (n % 6) * 0.33;
+    n += 1;
+    return `<span class="pb" style="${where};--c:${esc(colour)};--d:${delay}s"></span>`;
+  };
+  for (let x = 5; x <= 95; x += 7.5) out.push(bulb(`left:${x}%;top:-1px`));
+  for (let x = 5; x <= 95; x += 7.5) out.push(bulb(`left:${x}%;bottom:-1px`));
+  for (let y = 22; y <= 78; y += 18) {
+    out.push(bulb(`top:${y}%;left:-1px`));
+    out.push(bulb(`top:${y}%;right:-1px`));
+  }
+  return `<span class="perim" aria-hidden="true">${out.join("")}</span>`;
+}
+
+/* A wire that dips between its fixings, with the bulbs drawn on the same
+   path so the two can never disagree about where a bulb hangs. */
+function festStrand(palette) {
+  if (!palette.length) return "";
+  const n = 14, w = 360, amp = 7;
+  let d = "M0 4", dots = "";
+  for (let i = 0; i < n; i += 1) {
+    const x = (i + 1) * (w / n);
+    const y = 4 + Math.abs(Math.sin((i + 1) * 0.9)) * amp;
+    const colour = esc(palette[i % palette.length]);
+    d += ` Q ${x - (w / n) / 2} ${4 + amp + 3} ${x} ${y}`;
+    dots += `<circle class="bulb" style="--c:${colour};--d:${(i % 7) * 0.29}s"`
+      + ` cx="${x}" cy="${y + 3}" r="3.2" fill="${colour}"/>`
+      + `<circle cx="${x}" cy="${y + 3}" r="6.5" fill="${colour}" opacity=".2"/>`;
+  }
+  return `<svg class="strand" viewBox="0 0 ${w} 22" preserveAspectRatio="none"`
+    + ` aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor"`
+    + ` stroke-opacity=".38" stroke-width="1"/>${dots}</svg>`;
+}
+
+/* Denser and slower than the first draft, where two flakes were caught
+   mid-fall and the rest of the time it looked like nothing was happening. */
+function festSnow() {
+  let out = "";
+  for (let i = 0; i < 46; i += 1) {
+    const left = ((i * 7.3) % 99).toFixed(1);
+    const size = 2 + (i % 3);
+    out += `<span class="fk" style="left:${left}%;--d:${((i % 13) * 0.75).toFixed(2)}s;`
+      + `--t:${(9 + (i % 7)).toFixed(0)}s;--s:${size}px;--o:${(0.4 + (i % 4) * 0.16).toFixed(2)}"></span>`;
+  }
+  return `<span class="snow" aria-hidden="true">${out}</span>`;
+}
+
+/* Thrown powder, not bokeh. An irregular splat path rotated and scaled per
+   instance — the first draft used soft round gradients and read as lens
+   blur, which is the opposite of what Holi looks like. */
+const FEST_SPLAT = "M50 8c7 14 22 10 30 20s-2 22 2 33-10 20-22 18-20 8-31 2"
+  + "S12 62 8 50s6-21 10-31S43-6 50 8z";
+function festBursts(palette) {
+  if (!palette.length) return "";
+  const at = [[14, 26, 1.0], [37, 70, 0.72], [60, 20, 0.86], [82, 58, 1.08],
+              [93, 30, 0.6], [24, 84, 0.66], [70, 90, 0.8], [48, 46, 0.54]];
+  const out = at.map(([x, y, scale], i) => {
+    const colour = esc(palette[i % palette.length]);
+    return `<span class="burst" style="left:${x}%;top:${y}%;--c:${colour};`
+      + `--r:${i * 47}deg;--k:${scale};--d:${(i % 4) * 0.8}s">`
+      + `<svg viewBox="0 0 100 100"><path d="${FEST_SPLAT}" fill="${colour}"/></svg></span>`;
+  });
+  return `<span class="bursts" aria-hidden="true">${out.join("")}</span>`;
+}
+
 const BODIES = {
   /* What is worth reading today? */
   quote(b) {
@@ -2086,6 +2253,58 @@ const BODIES = {
         + (cluster ? `<div class="cluster">${cluster}</div>` : "")
         + `</div>`;
     }).join("");
+  },
+
+  /* What are we celebrating today, and what actually is it?
+   *
+   * The second half matters as much as the first. A panel that says only
+   * "Raksha Bandhan" is useful to someone who already knows; the point here
+   * is a house where not everyone does, so the card carries a short plain
+   * explainer written to be read by anyone at the kitchen table.
+   *
+   * Decoration is assigned by config, not chosen here. This body knows how
+   * to draw a wash, a strand, a perimeter of bulbs, falling snow, thrown
+   * colour and a count — it does not know that Diwali gets lamps and Holi
+   * gets colour. Mechanisms in the card, assignment in the dashboard, the
+   * same split as `map`: the card knows how to map, the config says what.
+   *
+   * And an ordinary bank holiday is meant to look ordinary. A card that
+   * shouts every time anything is on stops meaning anything when something
+   * really is.
+   */
+  festival(b) {
+    if (!b || typeof b !== "object") return "";
+    const palette = (Array.isArray(b.palette) ? b.palette : [])
+      .filter((c) => typeof c === "string" && cssColor(c));
+    const decor = Array.isArray(b.decor) ? b.decor : [];
+    const has = (name) => decor.indexOf(name) >= 0;
+    const washed = has("wash") && !isBlank(b.wash);
+
+    let out = `<div class="festival${washed ? " washed" : " quiet"}"`;
+    const style = [];
+    if (washed) style.push(`--fg:${b.wash}`);
+    if (palette.length) style.push(`--edge:linear-gradient(90deg,${palette.join(",")})`);
+    out += style.length ? ` style="${esc(style.join(";"))}">` : ">";
+
+    /* Layered behind the words, in back-to-front order. */
+    if (has("snow")) out += festSnow();
+    if (has("bursts")) out += festBursts(palette);
+    if (has("lights")) out += festStrand(palette);
+
+    /* The count comes first inside the body, which puts it directly under
+       the card's title where it reads as a subtitle rather than competing
+       with it — the fault of the first draft, which floated it above. */
+    /* `count_art`, not `count`: a bare `count` key makes the marshaller read
+       the whole body as an entity-counting query, so the body resolved to a
+       number and the card rendered nothing at all. Named collisions with the
+       marshaller's own vocabulary fail silently and completely. */
+    if (Number(b.of) > 0) out += festCount(b.count_art, b.day, b.of, palette);
+
+    if (!isBlank(b.text)) out += `<p class="festtext">${esc(b.text)}</p>`;
+
+    /* Last, so its glow sits over everything including the wash. */
+    if (has("perimeter")) out += festPerimeter(palette);
+    return out + `</div>`;
   },
 
   /* What is this room set to, what is driving that, and can I change it?
@@ -2628,6 +2847,9 @@ function bodyIsEmpty(type, b) {
     case "scenes":
     case "people":
       return !Array.isArray(b.rows) || b.rows.length === 0;
+    /* Nothing to explain and no day to count is not a celebration. */
+    case "festival":
+      return isBlank(b.text) && !(Number(b.of) > 0);
     /* A zone with no target to show and nothing to drive is not a control,
        and a card with nothing to say renders nothing rather than a shell. */
     case "climate":
