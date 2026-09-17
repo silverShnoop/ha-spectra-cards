@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.42.0";
+const VERSION = "0.43.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -640,6 +640,15 @@ img.avatar { object-fit:cover; display:block; }
    working harder never nudges the sentence next to it along. */
 .flame { width:20px; height:20px; flex:none; display:flex; align-items:center;
   justify-content:center; color:var(--accent); }
+/* A flame at sixteen pixels is too quiet for "the boiler is running". The
+   number the room is driving towards carries the colour instead: warm
+   border, warm fill, warm digits, which is legible from across a room in a
+   way a glyph is not.
+
+   Colour says whether, size of the flame says how hard. Two channels, one
+   each, rather than both trying to say both. */
+.dial.hot { border-color:var(--accent); background:var(--accent-soft); }
+.dial.hot .dialnow { color:var(--accent-on); }
 .cmd {
   position:relative; font-size:11px; padding:6px 10px; border-radius:4px;
   border:2px solid var(--accent); color:var(--accent-on); cursor:pointer;
@@ -2112,7 +2121,8 @@ const BODIES = {
        does not — so the bands are the config's business and this only
        renders the level it is handed. */
     const power = Number(b.flame);
-    if (isFinite(power) && power > 0) {
+    const firing = isFinite(power) && power > 0;
+    if (firing) {
       const pct = Math.min(100, power);
       /* Continuous, because that is what Tado reports. The app draws three
          bars; the API returns a percentage, and rounding it into three
@@ -2133,7 +2143,10 @@ const BODIES = {
 
     out += `<span class="pickend">`;
     if (b.adjust) {
-      out += dialMarkup(b, 0)
+      /* A shallow copy rather than a flag on the body: the dial is shared
+         with `control`, and it should know that a row is running hot without
+         knowing that radiators exist. */
+      out += dialMarkup(firing ? Object.assign({}, b, { hot: true }) : b, 0)
         + `<span class="spinslot">${b.pending ? `<span class="spinner"></span>` : ""}</span>`;
     } else if (!isBlank(b.value)) {
       out += `<span class="ctlvalue">${esc(b.value)}</span>`;
@@ -2819,7 +2832,8 @@ function dialMarkup(row, position) {
   const cells = range.labels.map((label, n) =>
     `<i${n === range.index ? ` class="on"` : ""}>${esc(label)}</i>`).join("");
   const at = range.max - range.index * range.step;
-  return `<span class="dial${row.pending ? " pending" : ""}" data-dial="${position}"`
+  return `<span class="dial${row.hot ? " hot" : ""}`
+    + `${row.pending ? " pending" : ""}" data-dial="${position}"`
     + ` role="spinbutton" tabindex="0" aria-valuenow="${at}"`
     + ` aria-valuemin="${range.max - (range.labels.length - 1) * range.step}"`
     + ` aria-valuemax="${range.max}"`
