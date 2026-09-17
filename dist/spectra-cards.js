@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.56.1";
+const VERSION = "0.57.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -273,9 +273,19 @@ const SHEET = `
 .eventbody .pill { min-width:56px; text-align:center; box-sizing:border-box; }
 .trail { flex:none; margin-left:auto; font-size:11px; color:var(--sp-ink-3); }
 /* An event that knows what kind of thing it is says so in front of its name.
-   Sized and baselined to sit in the line rather than beside it, so a row with
-   an icon is the same height as a row without one. */
-.eventbody .evicon { --mdc-icon-size:15px; margin-right:6px; vertical-align:-3px; }
+
+   Given an explicit box rather than left to the glyph, because MDI icons do
+   not all fill their viewport the same way: a leaf is narrower than a
+   trash can, and inline that difference moves the name after it. A fixed
+   square means every name in the list starts at the same x.
+
+   The baseline offset is in em rather than px so it tracks the text instead
+   of drifting against it, which is what a fixed -3px did. */
+.eventbody .evicon {
+  --mdc-icon-size:15px; width:15px; height:15px;
+  display:inline-block; flex:none;
+  margin-right:7px; vertical-align:-0.2em;
+}
 .railcol { width:22px; flex:none; display:flex; flex-direction:column;
   align-items:center; align-self:stretch; }
 .railcol ha-icon { --mdc-icon-size:15px; }
