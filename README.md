@@ -418,12 +418,16 @@ buttons:
   - icon: mdi:lightbulb-group
     label: Lights
     accent: 2
-    live: {entity: light.home, map: {on: true, off: false}}
     summary: {entity: light.home, map: {on: On, off: All off}}
     tap_action:
       action: perform-action
       perform_action: browser_mod.popup
       data: {title: Lights, content: {...}}
+  - icon: mdi:shield-home
+    label: Security
+    accent: {entity: sensor.security_status, map: {green: 3, amber: 2, red: 1}}
+    fill: true
+    summary: {entity: sensor.security_status, attribute: detail}
 ```
 
 **Domain-based, never room-based** — you reach for "the lights" before you
@@ -431,9 +435,32 @@ reach for "the kitchen", so room selection belongs inside each pop-up.
 
 Each button carries a **live one-line summary**, which is what stops the rail
 being a menu. A row of five identical icons tells you nothing; this is a
-status bar you can press. A button whose `live` resolves truthy takes its
-accent on the edge — and the summary text says so too, because colour never
-carries meaning alone.
+status bar you can press.
+
+### The three rungs, and why selection is not one of them
+
+Colour on this rail means **status**, and nothing else:
+
+| | Device | For |
+|---|---|---|
+| `live` | accent on the edge | something is happening in here |
+| `fill` | accent as the background | this domain's state is the reason the button exists |
+| *selected* | no colour at all | which set of cards is on screen |
+
+`fill` is the loud one. Spend it on one or two domains — security, an alarm —
+and it reads from the doorway; spend it on every button and the rail is a
+fruit salad that means nothing.
+
+**Selection is said without colour on purpose**: a hue spent on "you are
+here" is a hue that can no longer mean "the door is open". It uses three
+neutral devices at once, because any one alone is weak across a room — a
+thick bar down the leading edge, a surface one step up from its neighbours,
+and the label in full ink at heavier weight. All three survive a button that
+is simultaneously filled red, and all three survive being looked at in the
+dark.
+
+In every case the summary text says the same thing in words, because colour
+never carries meaning alone.
 
 ## Rows from a collection
 
