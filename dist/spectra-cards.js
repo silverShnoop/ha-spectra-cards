@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.52.0";
+const VERSION = "0.53.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -862,22 +862,36 @@ img.avatar { object-fit:cover; display:block; }
 /* A domain with something live takes its accent on the edge. The summary
    text says so too — colour never carries it alone. */
 .dockbtn.live { border-color:var(--accent); }
-/* Which set of cards is on screen. A different question from "is anything
-   happening in here", so a different device: live is an edge, this is a soft
-   wash and the label in full ink. Two rungs of the ladder, never the same
-   one, or a lit kitchen would be indistinguishable from the page you are on.
+/* Which set of cards is on screen. Said entirely without colour, on purpose:
+   the wash on this rail is spoken for by status now, and a hue spent on "you
+   are here" is a hue that can no longer mean "the door is open".
 
-   The tick is the non-colour half. A rail that said "you are here" in colour
-   alone would be a rail that says nothing across a room in the dark. */
-.dockbtn.selected { background:var(--sp-a4-soft); border-color:var(--sp-a4); }
-.dockbtn.selected .dockhead h4 { color:var(--sp-a4-on); }
+   Three neutral devices at once, because any one of them alone is weak from
+   across a room: a thick bar down the leading edge, a surface one step up
+   from its neighbours, and the label in full ink at heavier weight. None of
+   them reads as a colour, so all three survive a button that is also filled
+   red, and all three survive being looked at in the dark. */
+.dockbtn.selected { border-color:var(--sp-ink-3); }
+.dockbtn.selected:not(.fill) { background:var(--sp-sink); }
+.dockbtn.selected:not(.fill) .dockhead h4 { color:var(--sp-ink); }
+.dockbtn.selected:not(.fill) .docksum { color:var(--sp-ink); }
+.dockbtn.selected .dockhead h4 { font-weight:700; }
+
+/* A domain whose whole point is its status wears it as a fill rather than an
+   edge: green, amber, red, read from the doorway without stopping to parse a
+   word. The rung above "live", for the one or two domains where the state is
+   the reason the button exists at all -- spend it on every button and the
+   rail is a fruit salad that means nothing. The summary text still says the
+   same thing in words, because colour never carries it alone. */
+.dockbtn.fill { background:var(--accent-soft); border-color:var(--accent); }
+.dockbtn.fill .dockhead h4, .dockbtn.fill .docksum { color:var(--accent-on); }
 /* The rail reuses the shared press animation but feeds it the firmer value,
-   because here the flash lands on top of the selection wash rather than on a
-   plain surface. No new keyframes: the same motion, more of it. */
+   because here the flash lands on a lifted or filled surface rather than on a
+   plain one. No new keyframes: the same motion, more of it. */
 .dockbtn { --sp-press: var(--sp-press-firm); }
 .dockbtn.selected::before {
-  content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
-  border-radius:6px 0 0 6px; background:var(--sp-a4);
+  content:""; position:absolute; left:0; top:0; bottom:0; width:5px;
+  border-radius:6px 0 0 6px; background:var(--sp-ink);
 }
 .dockhead { display:flex; align-items:center; gap:7px; }
 .dockhead ha-icon { --mdc-icon-size:18px; color:var(--accent); flex:none; }
@@ -4695,7 +4709,7 @@ class SpectraDock extends HTMLElement {
     this._holder.innerHTML = `<div class="dock">${buttons.map((button, index) => {
       const b = button || {};
       const on = here !== null && String(b.label) === here;
-      return `<div class="dockbtn${b.live ? " live" : ""}${on ? " selected" : ""}"`
+      return `<div class="dockbtn${b.live ? " live" : ""}${b.fill ? " fill" : ""}${on ? " selected" : ""}"`
         + ` role="button" tabindex="0" aria-current="${on ? "page" : "false"}"`
         + ` data-button="${index}" style="${accentStyle(b.accent)}">`
         + `<div class="dockhead">`
