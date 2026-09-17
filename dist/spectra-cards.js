@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.46.0";
+const VERSION = "0.47.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -636,6 +636,18 @@ img.avatar { object-fit:cover; display:block; }
 /* Something is stopping the room heating that the room did not choose — an
    open window. Ochre, because it is a warning rather than a fault. */
 .pickinfo.warn { color:var(--sp-a2-on); }
+
+/* A list that flows. auto-fit with a minimum does the deciding, so the card
+   never has to be told how wide it is or how many rows it has: one column on
+   a phone, as many as fit on a panel, and the last tile stretches rather than
+   leaving a ragged gap. */
+.flow { display:grid; gap:8px; padding:8px;
+  grid-template-columns:repeat(auto-fit, minmax(258px, 1fr)); }
+.flow .row.tile { border:2px solid var(--sp-edge); border-radius:6px;
+  padding:10px 12px; min-height:0; align-items:flex-start; }
+/* An accented tile carries its accent on the edge, where a row carried it as
+   a wash. A wash inside a bordered tile reads as two boxes. */
+.flow .row.tile.wash { background:none; border-color:var(--accent); }
 
 /* festival — the card celebrates, the controls do not. Everything here is
    scoped inside .festival so no decoration can leak onto a card carrying a
@@ -2773,9 +2785,20 @@ const BODIES = {
   /* What are the several things, and how does each stand? */
   list(b) {
     const rows = Array.isArray(b.rows) ? b.rows : [];
-    const zebra = b.zebra !== false;
+    /* Tiles rather than a column. A wall panel is mostly much wider than a
+       phone, and a list of three alerts stacked down the left of a 1280px
+       screen leaves two thirds of the row empty. Flowed, they fill it, and
+       on a phone the grid collapses to one column and nothing changes.
 
-    return rows.map((source, index) => {
+       The count is not known in advance — it comes off a sensor's attribute
+       — so this cannot be separate Lovelace cards. It has to be the card
+       arranging its own rows. */
+    const flow = Boolean(b.flow);
+    /* Zebra is a reading aid for a column of rows. Tiles already have edges,
+       and striping them alternately looks like a fault. */
+    const zebra = !flow && b.zebra !== false;
+
+    const body = rows.map((source, index) => {
       const r = source || {};
       /* home_signals' Needs you contract names these title and detail. */
       const name = firstOf(r.name, r.title);
@@ -2787,6 +2810,7 @@ const BODIES = {
          overrides zebra. Never both — see the emphasis ladder. */
       const washed = accentNumber(r.accent) !== null;
       const classes = ["row"];
+      if (flow) classes.push("tile");
       if (washed) classes.push("wash");
       else if (zebra && index % 2 === 0) classes.push("zebra");
       if (hasAction) classes.push("hasact");
@@ -2822,6 +2846,8 @@ const BODIES = {
 
       return `<div class="${classes.join(" ")}"${rowStyle}>${lead}${middle}${tail}</div>`;
     }).join("");
+
+    return flow ? `<div class="flow">${body}</div>` : body;
   },
 };
 
