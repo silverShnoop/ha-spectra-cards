@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.43.0";
+const VERSION = "0.44.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3308,8 +3308,16 @@ class SpectraCard extends HTMLElement {
       }
     }
 
-    const rows = model.body && model.body.rows;
-    if (!Array.isArray(rows)) return;
+    /* The third place that had to learn a body can be one room rather than a
+       list of them — after the dial binding and bounds discovery. Without it
+       a climate card fell straight through this loop, so a temperature you
+       had just set sat at the old number until Tado got round to confirming
+       it, which is the better part of a minute. The optimistic contract
+       exists precisely so that never shows. */
+    const body = model.body || {};
+    const rows = body.type === "climate" ? [body]
+      : (Array.isArray(body.rows) ? body.rows : null);
+    if (!rows) return;
     for (const row of rows) {
       const entity = row && row.adjust && row.adjust.entity;
       const pending = entity && this._optimistic[entity];
