@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.50.0";
+const VERSION = "0.51.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1585,6 +1585,7 @@ function pickerState(b) {
       label: seg.label,
       minutes: Number(seg.pct) > 0 ? Number(seg.pct) : 1,
       start: null,
+      offset: null,
     }))
     : segmentsFromTimeslots(b.timeslots, b.sun);
   if (!segments.length) return null;
@@ -1678,44 +1679,70 @@ function minutesOfDay(value) {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-/* A sunset slot can resolve after the slot that follows it, which is not a
-   bug to correct — the bridge really does schedule it that way, and it shows
-   up as a sliver. Slot order is never used to decide what is active; that is
-   active_index's job. */
+/* The bridge runs timeslots in the order it lists them, not in clock order,
+   and the two disagree: a sunset slot can resolve after the slot that follows
+   it, and the slot behind it then never runs at all. Slot order is never used
+   to decide what is active either; that is active_index's job. */
 const MIN_SEGMENT_MINUTES = 15;
 
 function segmentsFromTimeslots(slots, sun) {
   if (!Array.isArray(slots) || !slots.length) return [];
+  const list = slots.filter(Boolean);
+  if (!list.length) return [];
+
+  /* start is the wall clock, for labels and for the arc's 24-hour dial.
+     offset is the position within the cycle the schedule actually runs,
+     which begins at its first slot and not at midnight. The two are only
+     the same for a schedule that happens to start at 00:00. */
+  const seg = (slot, start, offset, minutes) => ({
+    index: slot.index,
+    color: cssColor(slot.color) || "var(--sp-sink)",
+    label: slot.scene,
+    start,
+    offset,
+    minutes: Math.max(MIN_SEGMENT_MINUTES, minutes),
+  });
+
+  /* The integration resolves sunrise and sunset and places every slot on the
+     cycle the bridge will run, so where those fields exist they are the
+     answer and nothing here has to infer an order. */
+  const placed = list.every((slot) => Number.isFinite(slot.offset_minutes)
+    && Number.isFinite(slot.duration_minutes));
+  if (placed) {
+    return list
+      /* A slot the bridge skips holds no window at all. Drawing it as a
+         sliver would claim a scene runs that never does. */
+      .filter((slot) => slot.duration_minutes > 0)
+      .map((slot) => seg(
+        slot,
+        minutesOfDay(slot.start_resolved),
+        slot.offset_minutes,
+        slot.duration_minutes,
+      ));
+  }
+
+  /* Older integration versions publish a clock time and nothing else, so the
+     order has to be guessed, and clock order guesses wrong wherever a sunset
+     slot overtakes the one after it. This keeps such a card drawing; it
+     cannot make it correct. */
   const resolved = [];
-  for (const slot of slots) {
-    if (!slot) continue;
+  for (const slot of list) {
     let start = null;
     if (slot.start_kind === "sunset") start = minutesOfDay(sun && sun.set);
     else if (slot.start_kind === "sunrise") start = minutesOfDay(sun && sun.rise);
     else start = minutesOfDay(slot.start);
     if (start === null) continue;
-    resolved.push({
-      index: slot.index,
-      start,
-      color: cssColor(slot.color) || "var(--sp-sink)",
-      label: slot.scene,
-    });
+    resolved.push({ slot, start });
   }
   if (!resolved.length) return [];
 
-  /* Laid out in clock order; the schedule is keyed by index, and index 0 is
-     not necessarily the start of the day. */
   resolved.sort((a, b) => a.start - b.start);
-
-  return resolved.map((seg, i) => {
-    const next = i + 1 < resolved.length ? resolved[i + 1].start : DAY_MINUTES;
-    return {
-      index: seg.index,
-      color: seg.color,
-      label: seg.label,
-      start: seg.start,
-      minutes: Math.max(MIN_SEGMENT_MINUTES, next - seg.start),
-    };
+  const anchor = resolved[0].start;
+  return resolved.map((item, i) => {
+    const next = i + 1 < resolved.length
+      ? resolved[i + 1].start
+      : anchor + DAY_MINUTES;
+    return seg(item.slot, item.start, item.start - anchor, next - item.start);
   });
 }
 
@@ -1757,16 +1784,29 @@ function pickerLayout(segments) {
    slot starts — the schedule does not claim the small hours, and guessing
    would put the caret somewhere it cannot defend. */
 function caretAt(segments, layout, minutes) {
-  if (!segments.length || segments[0].start === null) return null;
+  if (!segments.length || !Number.isFinite(segments[0].offset)) return null;
+  /* Segments are placed along the cycle, which starts at the first slot
+     rather than at midnight, so the clock has to be put into the same space
+     before it can be compared. */
+  const at = cycleOffset(segments, minutes);
+  if (at === null) return null;
   for (let i = segments.length - 1; i >= 0; i -= 1) {
     const seg = segments[i];
-    if (seg.start === null) return null;
-    if (minutes >= seg.start) {
-      const through = Math.min(1, (minutes - seg.start) / Math.max(1, seg.minutes));
+    if (!Number.isFinite(seg.offset)) return null;
+    if (at >= seg.offset) {
+      const through = Math.min(1, (at - seg.offset) / Math.max(1, seg.minutes));
       return layout.offsets[i] + through * layout.widths[i];
     }
   }
   return 0;
+}
+
+/* Where a wall-clock minute falls within the cycle the segments describe. */
+function cycleOffset(segments, minutes) {
+  if (!segments.length || !Number.isFinite(segments[0].offset)) return null;
+  const anchor = segments[0].start;
+  if (!Number.isFinite(anchor)) return null;
+  return ((minutes - anchor) % DAY_MINUTES + DAY_MINUTES) % DAY_MINUTES;
 }
 
 function clockLabel(minutes) {
@@ -2773,6 +2813,7 @@ const BODIES = {
         label: s.label,
         minutes: Number(s.pct) > 0 ? Number(s.pct) : 1,
         start: null,
+        offset: null,
       }))
       : segmentsFromTimeslots(b.timeslots, b.sun);
     if (!segments.length) return "";
@@ -2786,12 +2827,20 @@ const BODIES = {
     const manual = Boolean(b.manual);
 
     const now = new Date();
-    const elapsed = ((now.getHours() * 60 + now.getMinutes()) / DAY_MINUTES) * 100;
+    /* The blocks run along the cycle, which begins at the schedule's first
+       slot. Placing the caret at a fraction of the day from midnight put it
+       in a different block from the one active_index had ringed, whenever
+       the schedule did not itself start at 00:00. */
+    const total = segments.reduce((sum, s) => sum + s.minutes, 0) || 1;
+    const at = cycleOffset(segments, now.getHours() * 60 + now.getMinutes());
+    const elapsed = at === null ? null : Math.min(100, (at / total) * 100);
 
     let out = `<div class="strip${manual ? " manual" : ""}">`
       + segments.map((s) => `<i style="flex:${(s.minutes / 60).toFixed(2)};background:${s.color}"></i>`).join("")
       + `</div>`
-      + `<div class="caretrow"><span class="caret" style="left:${elapsed.toFixed(1)}%"></span></div>`;
+      + (elapsed === null
+        ? ""
+        : `<div class="caretrow"><span class="caret" style="left:${elapsed.toFixed(1)}%"></span></div>`);
 
     const next = active && active.start !== null
       ? segments[(segments.indexOf(active) + 1) % segments.length]
