@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.48.0";
+const VERSION = "0.49.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -694,7 +694,10 @@ img.avatar { object-fit:cover; display:block; }
 .festcount .pip.on { background:var(--c); box-shadow:0 0 8px 1px var(--c); }
 
 /* Hung on the card's own border rather than an inner box. */
-.perim { position:absolute; inset:-2px; pointer-events:none; z-index:3; }
+/* Centred on the card's outer edge, so each bulb straddles the border and
+   half of it hangs outside the card. inset is -2px because an absolutely
+   positioned child anchors to the PADDING box, and the border is 2px. */
+.perim { position:absolute; inset:-2px; pointer-events:none; z-index:4; }
 .pb { position:absolute; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
   background:var(--c); box-shadow:0 0 5px 1px var(--c), 0 0 12px 2px var(--c);
   animation:sp-breathe 3.4s var(--d) ease-in-out infinite; }
@@ -1868,11 +1871,17 @@ function festPerimeter(palette) {
     n += 1;
     return `<span class="pb" style="${where};--c:${esc(colour)};--d:${delay}s"></span>`;
   };
-  for (let x = 5; x <= 95; x += 7.5) out.push(bulb(`left:${x}%;top:-1px`));
-  for (let x = 5; x <= 95; x += 7.5) out.push(bulb(`left:${x}%;bottom:-1px`));
+  /* Every bulb is placed by left/top only. Using `right` or `bottom` for the
+     far edges looked equivalent and was not: the negative margin that centres
+     a bulb on its coordinate applies to the left and top, so bulbs on those
+     edges straddled by a pixel while the others straddled by four. */
+  for (let x = 5; x <= 95; x += 7.5) {
+    out.push(bulb(`left:${x}%;top:0`));
+    out.push(bulb(`left:${x}%;top:100%`));
+  }
   for (let y = 22; y <= 78; y += 18) {
-    out.push(bulb(`top:${y}%;left:-1px`));
-    out.push(bulb(`top:${y}%;right:-1px`));
+    out.push(bulb(`left:0;top:${y}%`));
+    out.push(bulb(`left:100%;top:${y}%`));
   }
   return `<span class="perim" aria-hidden="true">${out.join("")}</span>`;
 }
@@ -2316,9 +2325,11 @@ const BODIES = {
        this same body and dresses itself; this only lays out the contents. */
     let out = `<div class="festival${washed ? " washed" : " quiet"}">`;
 
-    /* Layered behind the words, in back-to-front order. */
-    if (has("snow")) out += festSnow();
-    if (has("bursts")) out += festBursts(palette);
+    /* Only the strand stays: it sits in the flow, above the title's text.
+       Snow, thrown colour and the perimeter bulbs all span the whole card, so
+       the shell renders them — inside here they would anchor to this box and
+       be inset by the card's padding, which is exactly why the bulbs sat
+       inside the border instead of on it. */
     if (has("lights")) out += festStrand(palette);
 
     /* The count comes first inside the body, which puts it directly under
@@ -2332,8 +2343,6 @@ const BODIES = {
 
     if (!isBlank(b.text)) out += `<p class="festtext">${esc(b.text)}</p>`;
 
-    /* Last, so its glow sits over everything including the wash. */
-    if (has("perimeter")) out += festPerimeter(palette);
     return out + `</div>`;
   },
 
@@ -3659,10 +3668,18 @@ class SpectraCard extends HTMLElement {
       ` style="${accentStyle(model.accent)}${festive ? `;--fg:${esc(fb.wash)}` : ""}"`,
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
+      /* Behind the words and anchored to the card, so snow falls the full
+         height and the bulbs hang on the real border. */
+      festive && Array.isArray(fb.decor) && fb.decor.indexOf("snow") >= 0
+        ? festSnow() : "",
+      festive && Array.isArray(fb.decor) && fb.decor.indexOf("bursts") >= 0
+        ? festBursts(Array.isArray(fb.palette) ? fb.palette : []) : "",
       this._titlebar(model, this._phase),
       waiting
         ? `<p class="sub">${esc(waiting)}</p>`
         : BODIES[type](model.body),
+      /* Last, so the glow sits over everything including the wash. */
+      lit ? festPerimeter(Array.isArray(fb.palette) ? fb.palette : []) : "",
       `</div>`,
     ].join("");
 
