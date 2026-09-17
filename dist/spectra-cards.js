@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.54.0";
+const VERSION = "0.55.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -229,10 +229,16 @@ const SHEET = `
 .row.zebra { background:var(--sp-zebra); }
 .row.wash { background:var(--accent-soft); }
 .row .name { margin:0; font-size:13px; }
-/* Prose rows read as paragraphs, not labels, so they take the same muted ink
-   and looser leading as .festtext. Opt-in per card: a Needs-you alert's name
-   is a label and must stay at full strength. */
-.row.prose .name { color:var(--sp-ink-2); line-height:1.55; }
+/* Prose rows read as paragraphs, not labels, so they take the looser leading
+   of .festtext. Opt-in per card: a Needs-you alert's name is a label, and
+   wants the tighter line.
+
+   The leading is what made these read as prose; the muted ink that came with
+   it was a mistake. A card whose whole point is a few sentences of text --
+   On this day, an observance -- is there to be read, and dimming the one
+   thing on it that carries the content made it harder to read across a room
+   for no gain. Full ink, looser line. */
+.row.prose .name { line-height:1.55; }
 .row .value { margin-left:auto; font-size:12px; color:var(--sp-ink-2); }
 .dot { width:9px; height:9px; border-radius:50%; flex:none; }
 .bar { height:5px; width:56px; background:var(--sp-sink); border-radius:3px; overflow:hidden; margin-left:auto; }
@@ -897,9 +903,20 @@ img.avatar { object-fit:cover; display:block; }
    because here the flash lands on a lifted or filled surface rather than on a
    plain one. No new keyframes: the same motion, more of it. */
 .dockbtn { --sp-press: var(--sp-press-firm); }
+/* The bar sits along the bottom edge and a caret hangs off it, pointing at
+   the cards below. That is the one thing an edge alone cannot say: not
+   merely "this button is different" but "this button owns what is
+   underneath", which on a rail above its own content is the actual
+   question. Both in ink, so selection still spends no colour. */
 .dockbtn.selected::before {
-  content:""; position:absolute; left:0; top:0; bottom:0; width:5px;
-  border-radius:6px 0 0 6px; background:var(--sp-ink);
+  content:""; position:absolute; left:0; right:0; bottom:0; height:4px;
+  border-radius:0 0 4px 4px; background:var(--sp-ink);
+}
+.dockbtn.selected::after {
+  content:""; position:absolute; left:50%; bottom:-7px; width:0; height:0;
+  transform:translateX(-50%);
+  border-left:7px solid transparent; border-right:7px solid transparent;
+  border-top:7px solid var(--sp-ink);
 }
 .dockhead { display:flex; align-items:center; gap:7px; }
 .dockhead ha-icon { --mdc-icon-size:18px; color:var(--accent); flex:none; }
