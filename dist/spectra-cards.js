@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.41.0";
+const VERSION = "0.42.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -636,6 +636,10 @@ img.avatar { object-fit:cover; display:block; }
 /* Something is stopping the room heating that the room did not choose — an
    open window. Ochre, because it is a warning rather than a fault. */
 .pickinfo.warn { color:var(--sp-a2-on); }
+/* The box is a fixed 20px whatever the flame inside it is doing, so a room
+   working harder never nudges the sentence next to it along. */
+.flame { width:20px; height:20px; flex:none; display:flex; align-items:center;
+  justify-content:center; color:var(--accent); }
 .cmd {
   position:relative; font-size:11px; padding:6px 10px; border-radius:4px;
   border:2px solid var(--accent); color:var(--accent-on); cursor:pointer;
@@ -2095,6 +2099,32 @@ const BODIES = {
         + ` title="${auto ? "Following the schedule" : "Follow the schedule"}"`
         + ` data-climauto style="${accentStyle(3)}">`
         + `<ha-icon icon="${esc(firstOf(b.auto_icon, "mdi:sun-clock"))}"></ha-icon></span>`;
+    }
+
+    /* A room actually burning gas says so with a symbol rather than a word:
+       it is the one thing on this card you want to catch across a room, and
+       "heating" tacked onto a sentence does not catch anything.
+
+       Size carries how hard it is working, inside a box of fixed width, so
+       the sentence beside it never shifts as the level changes. Tado reports
+       a heating percentage; whether it ever reports anything between 0 and
+       100 depends on the device — a radiator valve does, a wall thermostat
+       does not — so the bands are the config's business and this only
+       renders the level it is handed. */
+    const power = Number(b.flame);
+    if (isFinite(power) && power > 0) {
+      const pct = Math.min(100, power);
+      /* Continuous, because that is what Tado reports. The app draws three
+         bars; the API returns a percentage, and rounding it into three
+         buckets would invent a precision the number does not claim.
+         Thirteen pixels to twenty is a range you can read at a glance
+         without having to measure it. */
+      const size = Math.round(13 + (pct / 100) * 7);
+      out += `<span class="flame" style="${accentStyle(1)}"`
+        + ` role="img" aria-label="Heating ${Math.round(pct)}%"`
+        + ` title="Heating ${Math.round(pct)}%">`
+        + `<ha-icon icon="mdi:fire" style="--mdc-icon-size:${size}px;`
+        + `width:${size}px;height:${size}px"></ha-icon></span>`;
     }
 
     /* Reserved whether or not it has anything to say, so nothing below it
