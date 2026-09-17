@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.47.0";
+const VERSION = "0.48.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -649,21 +649,38 @@ img.avatar { object-fit:cover; display:block; }
    a wash. A wash inside a bordered tile reads as two boxes. */
 .flow .row.tile.wash { background:none; border-color:var(--accent); }
 
-/* festival — the card celebrates, the controls do not. Everything here is
-   scoped inside .festival so no decoration can leak onto a card carrying a
-   switch someone needs to find. */
-.festival { position:relative; border-radius:6px; }
-.festtext { margin:0; padding:4px 13px 13px; font-size:13px; line-height:1.55;
-  color:var(--sp-ink-2); position:relative; z-index:2; }
-.festival.washed { background:var(--fg); margin:-1px; border-radius:7px; }
+/* festival — the card celebrates, the controls do not. The decoration lives
+   on the card itself: .card.festive carries the wash as its own background
+   and the bulbs hang on its own border. Drawing them inside the shell made a
+   box within a box, with the real border still visible around the outside.
+
+   Everything else stays scoped under .festival, so no decoration can leak
+   onto a card carrying a switch someone needs to find. */
+.card.festive {
+  background:var(--fg); border-color:transparent; overflow:visible;
+}
 /* The scrim is load-bearing: without it the pale band in almost any festival
-   palette swallows the words sitting on top of it. */
-.festival.washed::before { content:""; position:absolute; inset:0; border-radius:7px;
-  background:linear-gradient(180deg,rgba(8,5,12,.5),rgba(8,5,12,.82)); }
-.festival.washed .festtext { color:rgba(255,255,255,.9); }
+   palette swallows the words sitting on top of it. inset:-2px so it covers
+   the border box too, now that the border is transparent. */
+.card.festive::before {
+  content:""; position:absolute; inset:-2px; border-radius:6px;
+  background:linear-gradient(180deg,rgba(8,5,12,.5),rgba(8,5,12,.82));
+  pointer-events:none;
+}
+.card.lit { padding:14px 17px; }
+.card.festive > .titlebar, .card.festive > .festival { position:relative; z-index:2; }
+.card.festive h3, .card.festive .meta { color:#fff; }
+.card.festive .festtext { color:rgba(255,255,255,.9); }
+.card.festive .titlebar ha-icon { color:#fff; }
+
+/* Contents only — the card is the box. Padding lines the text up with the
+   title above it rather than indenting it a second time. */
+.festival { }
+.festtext { margin:0; padding:4px 0 2px; font-size:13px; line-height:1.55;
+  color:var(--sp-ink-2); }
 
 /* The count, directly under the title: lit for nights already had. */
-.festcount { display:flex; gap:9px; padding:11px 13px 0; position:relative; z-index:2; }
+.festcount { display:flex; gap:9px; padding:9px 0 2px; }
 .diya svg { width:24px; height:24px; display:block; }
 .diya .bowl { fill:#7C5227; }
 .diya .fl { fill:#443B32; }
@@ -676,7 +693,8 @@ img.avatar { object-fit:cover; display:block; }
   background:var(--sp-sink); }
 .festcount .pip.on { background:var(--c); box-shadow:0 0 8px 1px var(--c); }
 
-.perim { position:absolute; inset:0; pointer-events:none; z-index:3; }
+/* Hung on the card's own border rather than an inner box. */
+.perim { position:absolute; inset:-2px; pointer-events:none; z-index:3; }
 .pb { position:absolute; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
   background:var(--c); box-shadow:0 0 5px 1px var(--c), 0 0 12px 2px var(--c);
   animation:sp-breathe 3.4s var(--d) ease-in-out infinite; }
@@ -685,17 +703,16 @@ img.avatar { object-fit:cover; display:block; }
 
 .strand { display:block; width:100%; height:22px; color:var(--sp-ink-2);
   position:relative; z-index:2; }
+.card.festive .strand { color:rgba(255,255,255,.75); }
 .strand .bulb { transform-box:fill-box; transform-origin:center;
   animation:sp-breathe 3s var(--d) ease-in-out infinite; }
 
-.snow { position:absolute; inset:0; overflow:hidden; border-radius:7px;
-  pointer-events:none; z-index:1; }
+/* Clipped to the card, so falling snow stops at its edge. */
+.snow, .bursts { position:absolute; inset:-2px; overflow:hidden;
+  border-radius:6px; pointer-events:none; z-index:1; }
 .fk { position:absolute; top:-10px; width:var(--s); height:var(--s); border-radius:50%;
   background:#fff; opacity:var(--o); animation:sp-fall var(--t) var(--d) linear infinite; }
 @keyframes sp-fall { to { transform:translate(16px,240px); opacity:0; } }
-
-.bursts { position:absolute; inset:0; overflow:hidden; border-radius:7px;
-  pointer-events:none; z-index:1; }
 .burst { position:absolute; width:74px; height:74px; margin:-37px 0 0 -37px;
   opacity:.5; animation:sp-bloom 4.2s var(--d) ease-in-out infinite; }
 .burst svg { width:100%; height:100%; display:block;
@@ -2292,11 +2309,12 @@ const BODIES = {
     const has = (name) => decor.indexOf(name) >= 0;
     const washed = has("wash") && !isBlank(b.wash);
 
-    let out = `<div class="festival${washed ? " washed" : " quiet"}"`;
-    const style = [];
-    if (washed) style.push(`--fg:${b.wash}`);
-    if (palette.length) style.push(`--edge:linear-gradient(90deg,${palette.join(",")})`);
-    out += style.length ? ` style="${esc(style.join(";"))}">` : ">";
+    /* No box of its own. The wash and the bulbs belong to the card's real
+       border and background — a decorated card drawing its own rounded
+       rectangle inside the shell's is visibly a box within a box, which is
+       exactly what it looked like. The shell reads `wash` and `decor` off
+       this same body and dresses itself; this only lays out the contents. */
+    let out = `<div class="festival${washed ? " washed" : " quiet"}">`;
 
     /* Layered behind the words, in back-to-front order. */
     if (has("snow")) out += festSnow();
@@ -3620,13 +3638,25 @@ class SpectraCard extends HTMLElement {
     const swapped = this._scene !== undefined && this._scene !== scene && !this._dragging;
     this._scene = scene;
 
+    /* A festival dresses the card itself rather than a div inside it, so the
+       wash reaches the real edge and the bulbs sit on the real border. */
+    const fb = type === "festival" ? (model.body || {}) : null;
+    const festive = Boolean(fb && Array.isArray(fb.decor)
+      && fb.decor.indexOf("wash") >= 0 && !isBlank(fb.wash));
+    /* Bulbs hang on the border and glow inwards, so a card wearing them needs
+       room or the first word of every line sits under a light. */
+    const lit = Boolean(fb && Array.isArray(fb.decor)
+      && fb.decor.indexOf("perimeter") >= 0);
+
     const classes = "card"
       + (config.invert ? " invert" : "")
       + (tappable ? " tappable" : "")
+      + (festive ? " festive" : "")
+      + (lit ? " lit" : "")
       + (swapped ? " swap" : "");
     const card = [
       `<div class="${classes}"`,
-      ` style="${accentStyle(model.accent)}"`,
+      ` style="${accentStyle(model.accent)}${festive ? `;--fg:${esc(fb.wash)}` : ""}"`,
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
       this._titlebar(model, this._phase),
