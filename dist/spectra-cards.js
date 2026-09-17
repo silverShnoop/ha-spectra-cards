@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.57.0";
+const VERSION = "0.58.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -210,6 +210,12 @@ const SHEET = `
   display:inline-block; background:var(--accent-soft); color:var(--accent-on);
 }
 .pill.solid { background:var(--accent); color:var(--sp-surface); }
+/* Boxed for the same reason .evicon is: the glyphs are not all the same
+   width, and inline that difference would move the chip's text. */
+.pillicon {
+  --mdc-icon-size:12px; width:12px; height:12px;
+  display:inline-block; margin-right:5px; vertical-align:-0.15em;
+}
 .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
 
 /* metric strip */
@@ -1264,6 +1270,20 @@ function applyFormat(value, spec) {
   if (spec.map && (typeof v === "string" || typeof v === "number")) {
     if (Object.prototype.hasOwnProperty.call(spec.map, v)) {
       v = spec.map[v];
+    } else if (spec.match === "prefix" || spec.match === "contains") {
+      /* Some values carry a tail that moves: a bin sensor reads "Recycling
+         8d" today and "Recycling 7d" tomorrow, so an exact key can never
+         match it, and enumerating every day count is not a mapping, it is a
+         calendar. Keys are tried longest-first so a specific one cannot be
+         shadowed by a shorter key that happens to be a prefix of it. */
+      const text = String(v);
+      const keys = Object.keys(spec.map).sort((a, b) => b.length - a.length);
+      const hit = keys.find((k) => (spec.match === "prefix"
+        ? text.startsWith(k)
+        : text.indexOf(k) >= 0));
+      v = hit !== undefined
+        ? spec.map[hit]
+        : (spec.default !== undefined ? spec.default : v);
     } else if (spec.default !== undefined) {
       v = spec.default;
     }
@@ -1927,7 +1947,14 @@ function pillMarkup(pill, extraStyle) {
   if (!p || isBlank(p.text)) return "";
   const style = [extraStyle, accentNumber(p.accent) ? accentStyle(p.accent) : null]
     .filter(Boolean).join(";");
-  return `<span class="pill${p.solid ? " solid" : ""}"${style ? ` style="${style}"` : ""}>${esc(p.text)}</span>`;
+  /* A chip naming a kind of thing can show that kind in front of the words,
+     the same way a list row does. Optional: most chips are a measurement, and
+     a measurement has no icon. */
+  const lead = isBlank(p.icon)
+    ? ""
+    : `<ha-icon class="pillicon" icon="${esc(p.icon)}"></ha-icon>`;
+  return `<span class="pill${p.solid ? " solid" : ""}"${style ? ` style="${style}"` : ""}>`
+    + `${lead}${esc(p.text)}</span>`;
 }
 
 /* English, spelled out rather than localised. Every other word on this panel
