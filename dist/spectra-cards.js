@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.44.0";
+const VERSION = "0.45.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1069,9 +1069,22 @@ function iconMarkup(name, cls) {
 
 function applyFormat(value, spec) {
   let v = value;
-  if (spec.map && (typeof v === "string" || typeof v === "number")
-      && Object.prototype.hasOwnProperty.call(spec.map, v)) {
-    v = spec.map[v];
+  /* A value the map does not name passes through as itself, which is right
+     for a partial relabelling and wrong the moment the map is meant to be
+     the whole answer. `default` says what a miss means: "" for a lookup that
+     should simply go quiet, false for a test that must not read true on a
+     state nobody anticipated.
+
+     Two bugs today came out of the silence — an offline test that matched
+     every room because "auto" was not in its map and a non-empty string is
+     truthy, and a holiday description that would have printed the holiday's
+     own name. Both would have been a one-word fix at the config. */
+  if (spec.map && (typeof v === "string" || typeof v === "number")) {
+    if (Object.prototype.hasOwnProperty.call(spec.map, v)) {
+      v = spec.map[v];
+    } else if (spec.default !== undefined) {
+      v = spec.default;
+    }
   }
   switch (spec.format) {
     case "relative":
