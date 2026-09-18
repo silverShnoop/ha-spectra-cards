@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.69.0";
+const VERSION = "0.70.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -295,6 +295,14 @@ ha-icon { display:inline-flex; line-height:0; }
 .chev[aria-expanded="true"] ha-icon { transform:rotate(180deg); }
 .chev[aria-expanded="true"] { color:var(--sp-ink); }
 .chev:focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
+/* The markup always says closed and the element says otherwise straight
+   after, so every re-render of an open card flipped the chevron false then
+   true again -- and a 260ms transition turns that into a full spin. The card
+   re-renders whenever the house says anything, so the chevron span every few
+   seconds, and on every scene press and brightness commit, which force one.
+   Same cause as the drawer replaying its fold; this is the half that was
+   missed. */
+.chev.instant ha-icon { transition:none; }
 @media (prefers-reduced-motion: reduce) { .chev ha-icon { transition:none; } }
 
 /* the two drawer controls — one gesture, told twice
@@ -323,19 +331,52 @@ ha-icon { display:inline-flex; line-height:0; }
 }
 .bands i:last-child { border-right:0; }
 .bands i ha-icon { --mdc-icon-size:14px; width:14px; height:14px; opacity:.85; }
-.bands i.on { box-shadow:inset 0 0 0 2px var(--sp-ink); }
-.slide.picking .bands i.at { box-shadow:inset 0 0 0 2px var(--sp-ink); }
+/* The same three statements the schedule strip above makes, so the two read
+   as one control split in half rather than two controls that happen to sit
+   together: the chosen one is ringed, the rest recede while a choice is
+   being expressed, and the whole thing dulls when the room is off. */
+.scenetrack.choosing .bands i { opacity:.3; }
+.scenetrack.choosing .bands i.on { opacity:1; }
+
+/* The ring is one element that MOVES rather than a border handed from band
+   to band. Handing it over can only cross-fade; a thing that slides is the
+   same thing in a new place, which is what choosing a scene is -- and it is
+   what the marker on the strip above already does. */
+.bandmark {
+  position:absolute; top:0; height:26px; border-radius:4px;
+  box-shadow:inset 0 0 0 2px var(--sp-ink); pointer-events:none;
+  transition:left 200ms cubic-bezier(.25,.1,.25,1), opacity 160ms linear;
+}
+.bandmark.gone { opacity:0; }
+/* Placed before its first move, or restored after a re-render: it must
+   appear where it already was, not slide in from wherever the markup put
+   it. */
+.bandmark.instant { transition:none; }
 
 .dimtrack {
   height:26px; border-radius:4px; overflow:hidden; background:var(--sp-sink);
 }
-.dimfill { display:block; height:100%; background:var(--accent); }
+/* A scene that changes the brightness should be seen to change it. Without
+   this the bar is simply somewhere else the next time you look, which reads
+   as a redraw rather than as the room responding. */
+.dimfill {
+  display:block; height:100%; background:var(--accent);
+  transition:width 320ms cubic-bezier(.25,.1,.25,1);
+}
 .dimthumb {
   position:absolute; top:50%; width:22px; height:22px;
   margin:-11px 0 0 -11px; border-radius:50%;
   background:var(--sp-surface); border:3px solid var(--sp-ink);
   pointer-events:none;
+  transition:left 320ms cubic-bezier(.25,.1,.25,1);
 }
+/* Under a finger there is nothing to animate towards: the value IS where the
+   finger is, and easing towards it would just lag the hand. Same for the
+   first paint after a re-render, which has to land where the control already
+   was before it is allowed to move. */
+.slide.picking .dimfill, .slide.picking .dimthumb,
+.dimfill.instant, .dimthumb.instant { transition:none; }
+.slide .dimtrack, .slide .bands { transition:opacity 260ms linear; }
 .slide.off .dimtrack, .slide.off .bands { opacity:.32; }
 .slide.off .dimthumb { display:none; }
 .slide.picking .picklens { display:flex; }
@@ -664,6 +705,7 @@ img.avatar { object-fit:cover; display:block; }
   .pressed { animation:none; box-shadow:inset 0 0 0 999px var(--sp-press); }
   .swap .metagroup { animation:none; }
   .picker .strip { transition:none; }
+  .bandmark, .dimfill, .dimthumb, .chev ha-icon { transition:none; }
   .spinner { animation-duration:2.4s; }
 }
 
@@ -1846,11 +1888,24 @@ function pickerState(b) {
      the bridge has not confirmed. It outranks both. */
   const wanted = firstOf(b.picked, manual ? b.active : null);
   let current = scheduled;
+  /* A scene the schedule never runs -- one of the drawer's -- has no segment
+     to move to, and the strip used to answer that by leaving the marker on
+     whichever block the CLOCK pointed at, still captioned Auto. So pressing
+     Nightlight in the drawer made the strip claim the room was following its
+     schedule onto something else entirely: the one reading that is certainly
+     wrong, stated in the most confident way the card has.
+
+     Off the schedule, the strip has nothing to point at, and says so. */
+  let offSchedule = false;
   if (!isBlank(wanted)) {
     const found = segments.findIndex((seg) => String(seg.label) === String(wanted));
     if (found >= 0) current = found;
+    else offSchedule = true;
   }
-  return { segments, scheduled, current, manual, lit: b.on === undefined || Boolean(b.on) };
+  return {
+    segments, scheduled, current, manual, offSchedule,
+    lit: b.on === undefined || Boolean(b.on),
+  };
 }
 
 /* "Auto \u2192 Storybook 19:13 \u00b7 3 lights on" \u2014 two statements, not three. The
@@ -3043,6 +3098,7 @@ const BODIES = {
        about a room that has no automatic behaviour to depart from. */
     const current = state ? state.current : -1;
     const manual = state ? state.manual : false;
+    const offSchedule = state ? state.offSchedule : false;
     const lit = state ? state.lit : (b.on === undefined || Boolean(b.on));
 
     /* Dim the unchosen only when a choice is being expressed. While the
@@ -3060,7 +3116,7 @@ const BODIES = {
         + ` data-label="${esc(s.label)}"`
         + ` data-icon="${esc(scene && scene.icon ? scene.icon : "")}"`
         + ` data-color="${esc(s.color)}"`
-        + ` class="${i === current ? "on" : ""}"`
+        + ` class="${i === current && !offSchedule ? "on" : ""}"`
         + ` style="flex:0 0 ${layout.widths[i].toFixed(3)}%;background:${s.color}"></i>`;
     }).join("");
 
@@ -3073,7 +3129,7 @@ const BODIES = {
        finger goes. */
     const middle = state
       ? layout.offsets[current] + layout.widths[current] / 2 : 0;
-    const auto = Boolean(state) && lit && !manual;
+    const auto = Boolean(state) && lit && !manual && !offSchedule;
     const thumbAt = auto && caret !== null ? caret : middle;
     const autoIcon = firstOf(b.auto_icon, "mdi:sun-clock");
     let out = !state ? "" : `<div class="picker${choosing ? " choosing" : ""}${lit ? "" : " off"}"`
@@ -3083,7 +3139,7 @@ const BODIES = {
       + ` aria-valuenow="${current}"`
       + ` aria-valuetext="${esc(segments[current].label)}">`
       + `<div class="striphold"><div class="strip">${bar}</div>`
-      + `<span class="thumb${lit ? " shown" : ""}${auto ? " auto" : ""}"`
+      + `<span class="thumb${lit && !offSchedule ? " shown" : ""}${auto ? " auto" : ""}"`
       + ` style="left:${thumbAt.toFixed(2)}%">`
       + (auto ? `<ha-icon icon="${esc(autoIcon)}"></ha-icon>` : "")
       + `</span>`
@@ -3095,7 +3151,7 @@ const BODIES = {
       + `<span class="dot" data-lensdot></span></span></div>`
       + `</div>`;
 
-    const chosen = state ? segments[current] : null;
+    const chosen = state && !offSchedule ? segments[current] : null;
     /* The scene the room is on. With a schedule that is whichever block is
        current; without one the sensor says so directly, and the catalogue
        supplies its symbol. */
@@ -3152,7 +3208,14 @@ const BODIES = {
       /* No schedule, no mode, so no "Auto" to lead with -- just whatever
          the room has to say for itself. Saying "Auto" about a room nothing
          is automating would be the card inventing a behaviour. */
-      + esc(lit ? (state ? pickerInfo(b.info, manual, nextText) : firstOf(b.info, "")) : "")
+      /* Off the schedule there is no next change to promise and no mode
+         worth naming, so the line says what the room is, same as a room
+         that has no schedule at all. */
+      + esc(lit
+        ? ((state && !offSchedule)
+          ? pickerInfo(b.info, manual, nextText)
+          : firstOf(b.info, ""))
+        : "")
       + `</p>`;
 
     /* Status and controls share one right-hand group so the buttons sit in
@@ -3651,6 +3714,35 @@ function chevronMarkup(key, open) {
     + `<ha-icon icon="mdi:chevron-down"></ha-icon></span>`;
 }
 
+/* Animate a fresh element from where its predecessor was.
+
+   The card re-renders by replacing its markup, so a CSS transition has
+   nothing to run from: every element is new, already at its final value,
+   and the browser has no previous frame to ease out of. That is why
+   brightness jumped and the ring blinked from band to band -- not a missing
+   transition, but a missing STARTING POINT.
+
+   So the value the control last showed is remembered, painted onto the new
+   element first with the transition suppressed, forced through layout, and
+   only then released to the real value. Reading offsetWidth is what makes
+   that a real frame rather than two assignments the browser collapses into
+   one. */
+function animateFrom(el, previous, paint, current) {
+  if (!el) return;
+  if (previous === undefined || previous === null || previous === current) {
+    el.classList.add("instant");
+    paint(current);
+    void el.offsetWidth;
+    el.classList.remove("instant");
+    return;
+  }
+  el.classList.add("instant");
+  paint(previous);
+  void el.offsetWidth;
+  el.classList.remove("instant");
+  paint(current);
+}
+
 /* The lens both drawer controls share with the schedule strip above them. */
 function slideLens() {
   return `<span class="picklens" data-lens>`
@@ -3658,7 +3750,7 @@ function slideLens() {
     + `<span data-lensname></span></span>`;
 }
 
-function sceneTrackMarkup(key, scenes, activeName) {
+function sceneTrackMarkup(key, scenes, activeName, lit, choosing) {
   const active = isBlank(activeName) ? null : String(activeName).toLowerCase();
   const bands = scenes.map((scene, index) => {
     const name = firstOf(scene.name, "");
@@ -3675,12 +3767,18 @@ function sceneTrackMarkup(key, scenes, activeName) {
   }).join("");
   const at = scenes.findIndex((scene) => active !== null
     && String(firstOf(scene.name, "")).toLowerCase() === active);
-  return `<div class="slide scenetrack" data-track="${esc(key)}" role="slider"`
-    + ` tabindex="0" aria-label="Scene" aria-valuemin="0"`
+  const width = 100 / Math.max(1, scenes.length);
+  return `<div class="slide scenetrack${lit ? "" : " off"}`
+    + `${choosing ? " choosing" : ""}" data-track="${esc(key)}" role="slider"`
+    + ` tabindex="${lit ? "0" : "-1"}" aria-label="Scene" aria-valuemin="0"`
     + ` aria-valuemax="${Math.max(0, scenes.length - 1)}"`
+    + `${lit ? "" : ` aria-disabled="true"`}`
     + ` aria-valuenow="${at < 0 ? 0 : at}">`
     + `<p class="slidelabel">Scenes</p>`
     + `<div class="slidehold"><div class="bands">${bands}</div>`
+    + `<span class="bandmark${at < 0 ? " gone" : ""}" data-bandmark`
+    + ` style="width:${width.toFixed(4)}%;left:${((at < 0 ? 0 : at) * width).toFixed(4)}%">`
+    + `</span>`
     + slideLens() + `</div></div>`;
 }
 
@@ -3724,7 +3822,15 @@ function drawerMarkup(key, body) {
   const light = firstOf(body.light, "");
   const lit = body.on === undefined ? true : Boolean(body.on);
   const parts = [];
-  if (scenes.length) parts.push(sceneTrackMarkup(key, scenes, body.active));
+  if (scenes.length) {
+    /* `picked` before `active`: the press has to show immediately, and the
+       bridge takes a moment to agree. Reading only `active` meant the band
+       you had just pressed stayed unmarked until the house caught up, which
+       is exactly the wait the optimistic contract exists to hide -- and the
+       strip above has honoured it since it was written. */
+    parts.push(sceneTrackMarkup(key, scenes,
+      firstOf(body.picked, body.active), lit, Boolean(body.picked)));
+  }
   if (!isBlank(light) && body.brightness !== undefined) {
     parts.push(dimmerMarkup(key, light, body.brightness, lit));
   }
@@ -4808,7 +4914,15 @@ class SpectraCard extends HTMLElement {
         /* Already open, and re-asserted without animating, so there is no
            transition coming to tell us it has settled. It already has. */
         drawer.classList.add("instant", "open", "settled");
-        if (chev) chev.setAttribute("aria-expanded", "true");
+        /* The chevron is re-pointed in the same breath, and its own 260ms
+           transition would read that as a spin -- on every re-render, which
+           is several a minute and one for every press. */
+        if (chev) {
+          chev.classList.add("instant");
+          chev.setAttribute("aria-expanded", "true");
+          void chev.offsetWidth;
+          chev.classList.remove("instant");
+        }
         requestAnimationFrame(() => drawer.classList.remove("instant"));
       }
       drawer.addEventListener("transitionend", (event) => {
@@ -5101,8 +5215,23 @@ class SpectraCard extends HTMLElement {
     if (!cells.length) return;
     const count = cells.length;
     const marked = cells.findIndex((cell) => cell.classList.contains("on"));
+    const mark = el.querySelector("[data-bandmark]");
+    const key = el.getAttribute("data-track") || "";
+    const width = 100 / count;
+    const place = (index) => {
+      if (!mark) return;
+      mark.style.left = `${(index * width).toFixed(4)}%`;
+    };
+    /* Where this track's ring was before the re-render that replaced it. */
+    if (!this._wasBand) this._wasBand = {};
+    if (mark && marked >= 0) {
+      animateFrom(mark, this._wasBand[key], place, marked);
+    }
+    if (marked >= 0) this._wasBand[key] = marked;
+    else delete this._wasBand[key];
 
     this._bindSlide(el, {
+      inert: () => el.classList.contains("off"),
       read: () => (marked < 0 ? 0 : marked),
       valueAt: (ratio) => Math.min(count - 1, Math.max(0, Math.floor(ratio * count))),
       step: (v, by) => Math.min(count - 1, Math.max(0, v + by)),
@@ -5112,6 +5241,11 @@ class SpectraCard extends HTMLElement {
       }),
       paint: (v) => {
         cells.forEach((cell, index) => cell.classList.toggle("at", index === v));
+        /* Under a finger the ring is the thing being moved, so it follows
+           even when nothing is chosen yet. */
+        if (mark) mark.classList.remove("gone");
+        place(v);
+        this._wasBand[key] = v;
         el.setAttribute("aria-valuenow", String(v));
         el.setAttribute("aria-valuetext", cells[v].getAttribute("data-label") || "");
       },
@@ -5127,6 +5261,20 @@ class SpectraCard extends HTMLElement {
     const thumb = el.querySelector("[data-dimthumb]");
     const light = el.getAttribute("data-light");
     const start = Number(el.getAttribute("aria-valuenow")) || 1;
+    const key = el.getAttribute("data-dim") || "";
+    const put = (v) => {
+      if (fill) fill.style.width = `${v}%`;
+      if (thumb) thumb.style.left = `${v}%`;
+    };
+    /* A scene that dims the room should be watched doing it. */
+    if (!this._wasDim) this._wasDim = {};
+    animateFrom(fill, this._wasDim[key], put, start);
+    if (thumb) {
+      thumb.classList.add("instant");
+      void thumb.offsetWidth;
+      thumb.classList.remove("instant");
+    }
+    this._wasDim[key] = start;
 
     this._bindSlide(el, {
       inert: () => el.classList.contains("off"),
@@ -5140,8 +5288,8 @@ class SpectraCard extends HTMLElement {
       step: (v, by) => Math.min(100, Math.max(1, v + by * 5)),
       describe: (v) => ({ text: `${v}%`, icon: "" }),
       paint: (v) => {
-        if (fill) fill.style.width = `${v}%`;
-        if (thumb) thumb.style.left = `${v}%`;
+        put(v);
+        this._wasDim[key] = v;
         el.setAttribute("aria-valuenow", String(v));
         el.setAttribute("aria-valuetext", `${v}%`);
       },
