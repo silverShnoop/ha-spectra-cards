@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.61.0";
+const VERSION = "0.62.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -92,6 +92,21 @@ const SHEET = `
    precisely why they did not line up. A border here is a border, not four
    extra pixels nobody asked for. */
 *, *::before, *::after { box-sizing:border-box; }
+
+/* Home Assistant's <ha-icon> carries no box of its own. Its whole stylesheet
+   is "fill: currentcolor" -- the size, and an inline-flex, live on the
+   <ha-svg-icon> inside its shadow root. So an ha-icon left at its default
+   display lays that icon out in an inner LINE box, and a line box carries
+   the strut of whatever font it has inherited. Beside a 32px hero that is a
+   32px strut inside a 25px box, and the glyph rides the strut down: every
+   icon on the panel drew low, by more the larger the text it led. It is also
+   why tuning the offsets against a stand-in <ha-icon> got them wrong -- a
+   stand-in with no shadow DOM has no inner line box to go wrong.
+
+   inline-flex gives it no line box and no strut, so its box is the icon and
+   the offsets below mean what they say. line-height:0 is belt and braces for
+   anywhere a rule puts it back to a block. */
+ha-icon { display:inline-flex; line-height:0; }
 
 /* shell */
 .card {
@@ -214,7 +229,7 @@ const SHEET = `
    width, and inline that difference would move the chip's text. */
 .pillicon {
   --mdc-icon-size:12px; width:12px; height:12px;
-  display:inline-block; margin-right:5px; vertical-align:-0.15em;
+  margin-right:5px; vertical-align:-0.41em;
 }
 .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
 /* An icon leads the name it belongs to, so a name and its icon must not be
@@ -225,12 +240,12 @@ const SHEET = `
    read as part of the writing: the hero's cap height measures 0.72em, and
    an mdi glyph carries its own padding inside its box, so a box a little
    over the cap height draws ink at about it. -0.19em then centres that box
-   on the cap band to within 0.1px. Both measured in the browser, at 32px,
-   against the rendered font rather than assumed from the em size. */
+   on the cap band to within 0.1px. Both measured in the browser against the
+   rendered font and a faithful <ha-icon>, not assumed -- tools/checkicons.js. */
 .heropart { white-space:nowrap; }
 .heroicon {
   --mdc-icon-size:0.78em; width:0.78em; height:0.78em;
-  display:inline-block; margin-right:0.2em; vertical-align:-0.19em;
+  margin-right:0.2em; vertical-align:-0.19em;
 }
 /* pre, because the separator's spaces are the gap either side of it. */
 .herojoin { white-space:pre; }
@@ -303,11 +318,15 @@ const SHEET = `
    square means every name in the list starts at the same x.
 
    The baseline offset is in em rather than px so it tracks the text instead
-   of drifting against it, which is what a fixed -3px did. */
+   of drifting against it, which is what a fixed -3px did.
+
+   It looks too large for what it does, and it is: an icon box taller than
+   the line it sits on grows the line, and the text baseline moves down with
+   it, so the first part of the nudge only cancels itself. Solved by
+   measurement, not arithmetic -- tools/checkicons.js. */
 .eventbody .evicon {
   --mdc-icon-size:15px; width:15px; height:15px;
-  display:inline-block; flex:none;
-  margin-right:7px; vertical-align:-0.2em;
+  flex:none; margin-right:7px; vertical-align:-0.57em;
 }
 .railcol { width:22px; flex:none; display:flex; flex-direction:column;
   align-items:center; align-self:stretch; }
