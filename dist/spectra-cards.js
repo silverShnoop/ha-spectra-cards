@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.65.0";
+const VERSION = "0.66.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3342,6 +3342,21 @@ const PRESS_HOLD_MS = 280;
    the one that was pressed, then it shrinks out, and only then is the card
    allowed to re-render into the space. The survivors slide into their new
    places from their old ones rather than appearing there. */
+/* How often the brightness slider is allowed to speak to the bridge while
+   a finger is moving. Dragging a room's brightness is ONE command per frame
+   -- the bridge distributes it -- which is the only reason live dragging is
+   affordable at all; the per-bulb alternative would be eleven commands per
+   frame in the Kitchen. Five a second still looks continuous and leaves the
+   bridge a wide margin against Hue's rate limiting, which is stricter for
+   groups than for lights. */
+const SLIDE_LIVE_MS = 200;
+/* How long the slider goes on showing what you asked for. Hue stores
+   brightness as a percentage, so a value round-trips through 8 bits ±1 and
+   an exact match would never arrive; and if the bridge never answers at all,
+   the card has to stop lying eventually. */
+const DIM_SETTLE = 2;
+const DIM_GIVE_UP_MS = 12000;
+
 const LEAVE_DELAY_MS = 500;
 const LEAVE_MS = 420;
 const SETTLE_MS = 380;
@@ -3827,6 +3842,7 @@ class SpectraCard extends HTMLElement {
     if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
     if (this._powerGiveUp) { clearTimeout(this._powerGiveUp); this._powerGiveUp = null; }
     if (this._modeGiveUp) { clearTimeout(this._modeGiveUp); this._modeGiveUp = null; }
+    if (this._dimGiveUp) { clearTimeout(this._dimGiveUp); this._dimGiveUp = null; }
     if (this._pressTimer) { clearTimeout(this._pressTimer); this._pressTimer = null; }
     if (this._keyPick) { clearTimeout(this._keyPick); this._keyPick = null; }
     for (const pending of this._subscriptions.values()) {
@@ -4144,6 +4160,32 @@ class SpectraCard extends HTMLElement {
       } else {
         model.body.picked = pick.label;
         model.body.pending = true;
+      }
+    }
+
+    /* The slider goes on showing what you asked for until the house agrees.
+
+       Without this the lift is followed immediately by a render built from a
+       brightness the bridge has not changed yet, so the knob snaps back to
+       where it started and then forward again a second later. The whole
+       optimistic contract on this card exists to stop exactly that. */
+    const dim = this._dim;
+    if (dim) {
+      const holder = model.body || {};
+      const targets = Array.isArray(holder.rows) ? holder.rows : [holder];
+      for (const row of targets) {
+        if (!row || row.light !== dim.light) continue;
+        const live = Math.round((Number(row.brightness) / 255) * 100);
+        /* A room switched off while the hold is running has no brightness to
+           argue about, and holding one would paint a lit bar under an off
+           control. Whoever turned it off gets the last word. */
+        if (row.on === false
+          || (isFinite(live) && Math.abs(live - dim.pct) <= DIM_SETTLE)) {
+          this._dim = null;
+          if (this._dimGiveUp) { clearTimeout(this._dimGiveUp); this._dimGiveUp = null; }
+        } else {
+          row.brightness = Math.round((dim.pct / 100) * 255);
+        }
       }
     }
 
@@ -4763,6 +4805,36 @@ class SpectraCard extends HTMLElement {
     let began = spec.read();
     let value = began;
     let adrift = false;
+    /* Throttled, and the trailing edge matters as much as the leading one:
+       without the timer the last move of a slow drag -- the one you actually
+       stopped on -- would be the one that never got sent. */
+    let liveAt = 0;
+    let liveTimer = null;
+    let spoke = null;
+    const say = (v) => { liveAt = Date.now(); spoke = v; spec.live(v); };
+    const speak = (v) => {
+      if (!spec.live) return;
+      const wait = Math.max(0, SLIDE_LIVE_MS - (Date.now() - liveAt));
+      if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
+      if (!wait) { say(v); return; }
+      liveTimer = setTimeout(() => { liveTimer = null; say(value); }, wait);
+    };
+    const hush = () => {
+      if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
+    };
+    /* Abandoning a drag has to mean abandoning it.
+
+       Without live dragging this was free: nothing had been said, so saying
+       nothing was the whole of it. Now the room has been moving under the
+       finger, and a gesture that ends in a shrug -- dragged away from the
+       control, or cancelled by the browser -- would otherwise leave the house
+       at the last value the throttle happened to send while the card goes
+       back to showing where it started. So put the room back. */
+    const recant = () => {
+      hush();
+      if (spoke === null || spoke === began) return;
+      say(began);
+    };
 
     const show = (v) => {
       const seen = spec.describe(v);
@@ -4805,8 +4877,12 @@ class SpectraCard extends HTMLElement {
     const finish = (commit) => {
       if (!this._dragging) return;
       this._dragging = false;
+      /* Whatever the throttle was still holding is about to be superseded by
+         the commit, so it must not land after it. */
+      hush();
       el.classList.remove("picking", "adrift");
       if (commit && !adrift && value !== began) spec.commit(value);
+      else recant();
       this._signature = null;
       this._update();
     };
@@ -4838,11 +4914,11 @@ class SpectraCard extends HTMLElement {
       if (away !== adrift) {
         adrift = away;
         el.classList.toggle("adrift", adrift);
-        if (adrift) { value = began; show(value); }
+        if (adrift) { value = began; show(value); recant(); }
       }
       if (!adrift) {
         const next = at(event.clientX);
-        if (next !== value) { value = next; show(value); }
+        if (next !== value) { value = next; show(value); speak(value); }
         moveLens(event.clientX);
       }
       event.preventDefault();
@@ -4922,11 +4998,35 @@ class SpectraCard extends HTMLElement {
         el.setAttribute("aria-valuenow", String(v));
         el.setAttribute("aria-valuetext", `${v}%`);
       },
+      /* Under the finger. No spinner and no optimistic bookkeeping: the
+         slider is already painted where the finger is, a render cannot
+         interrupt a drag, and a spinner appearing five times a second is
+         noise rather than an answer. */
+      live: (v) => {
+        if (isBlank(light)) return;
+        this._callAction({
+          service: "hue_active_scene.set_room_brightness",
+          target: { entity_id: light },
+          data: { brightness_pct: v, transition: SLIDE_LIVE_MS / 1000 },
+        });
+      },
       /* One call to the bridge, which dims the lights that are on and leaves
          the ones a scene deliberately left off alone -- which is the whole
-         reason this does not go through light.turn_on. */
+         reason this does not go through light.turn_on.
+
+         Sent again on the lift even though the throttle has almost certainly
+         sent it already: it is idempotent, and it is the only way to be sure
+         the value you stopped on is the value the room ends on. */
       commit: (v) => {
         if (isBlank(light)) return;
+        this._dim = { light: light, pct: v };
+        if (this._dimGiveUp) clearTimeout(this._dimGiveUp);
+        this._dimGiveUp = setTimeout(() => {
+          this._dim = null;
+          this._dimGiveUp = null;
+          this._signature = null;
+          this._update();
+        }, DIM_GIVE_UP_MS);
         this._work(() => this._callAction({
           service: "hue_active_scene.set_room_brightness",
           target: { entity_id: light },
