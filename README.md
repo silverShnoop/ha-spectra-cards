@@ -522,6 +522,30 @@ there, the next render brings it back.
 
 All of it is off under `prefers-reduced-motion`.
 
+### A hero that names more than one thing
+
+`"Refuse + Food"` is two bins in one phrase, and no single icon in front of it
+is honest. `hero_icons` is a list, one entry per thing:
+
+```yaml
+body:
+  type: stat
+  hero: {entity: sensor.bin_next}
+  hero_icons:
+    - {entity: sensor.bin_next_type_1, map: {Food Caddy: mdi:food-apple, ...}}
+    - {entity: sensor.bin_next_type_2, map: {Food Caddy: mdi:food-apple, ...}}
+```
+
+Blank entries drop out, so one bin going out shows one icon with no change to
+the config. Icons are sized in `em` off the hero, so they stay in proportion
+to a number that is deliberately large.
+
+Anything that is not an icon name is dropped too. A `map` with no entry for a
+value passes that value straight through, so without that guard an unmapped
+bin type would be handed to `<ha-icon>` as its icon name and draw an empty
+slot. Any namespace is accepted — `mdi:`, `spectra:`, a custom set — but a
+bare word is not an icon.
+
 ### Mapping a value whose tail moves
 
 `map` needs an exact key, which is no use when the value carries something
