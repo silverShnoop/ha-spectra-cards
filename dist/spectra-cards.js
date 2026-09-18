@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.62.0";
+const VERSION = "0.63.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -249,6 +249,90 @@ ha-icon { display:inline-flex; line-height:0; }
 }
 /* pre, because the separator's spaces are the gap either side of it. */
 .herojoin { white-space:pre; }
+
+/* drawer — the second half of a light cell, folded away until asked for
+
+   A room has more scenes than its schedule uses, and a brightness, and
+   neither belongs on the face of the cell: the face answers "what is this
+   room doing", which is what you read from the doorway. These are what you
+   came over to change. So they live behind a chevron, and only one is ever
+   open at once -- a wall of half-open cells is the clutter this replaces. */
+.drawer {
+  display:grid; grid-template-rows:0fr;
+  transition:grid-template-rows 260ms cubic-bezier(.25,.1,.25,1);
+}
+.drawer.open { grid-template-rows:1fr; }
+/* min-height:0 is what lets a grid row actually reach 0fr; without it the
+   content's own height wins and nothing folds. */
+.drawerinner { overflow:hidden; min-height:0; }
+.drawerbody { display:flex; flex-direction:column; gap:10px; padding:11px 0 3px; }
+/* Re-applied after a re-render, which happens several times a minute. Without
+   this the drawer would replay its opening animation every time the house
+   said anything. */
+.drawer.instant { transition:none; }
+@media (prefers-reduced-motion: reduce) { .drawer { transition:none; } }
+.roomblock { display:block; }
+.roomscene {
+  margin-left:auto; font-size:12px; color:var(--sp-ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+}
+.chev {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; flex:none; border-radius:4px; cursor:pointer;
+  color:var(--sp-ink-2); background:var(--sp-sink);
+}
+.chev ha-icon {
+  --mdc-icon-size:18px; width:18px; height:18px;
+  transition:transform 260ms cubic-bezier(.25,.1,.25,1);
+}
+.chev[aria-expanded="true"] ha-icon { transform:rotate(180deg); }
+.chev[aria-expanded="true"] { color:var(--sp-ink); }
+.chev:focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce) { .chev ha-icon { transition:none; } }
+
+/* the two drawer controls — one gesture, told twice
+
+   Both are the schedule strip's gesture with a different question: press,
+   drag, read the lens, commit on the lift. Keeping the shape identical is
+   the point -- there is one thing to learn on this panel, not three. */
+.slide { position:relative; touch-action:none; cursor:pointer; }
+.slide:focus-visible { outline:2px solid var(--sp-a4); outline-offset:3px; }
+.slidehold { position:relative; }
+.slidelabel {
+  font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--sp-ink-3); margin:0 0 4px;
+}
+/* A band per scene, coloured by what the scene actually looks like. The name
+   is never drawn: seven names in a row is the chip wall this replaces, and
+   the lens says the one under your finger, which is the only one you are
+   asking about. */
+.bands {
+  display:flex; height:26px; border-radius:4px; overflow:hidden;
+  background:var(--sp-sink);
+}
+.bands i {
+  display:flex; align-items:center; justify-content:center;
+  min-width:0; border-right:1px solid var(--sp-surface);
+}
+.bands i:last-child { border-right:0; }
+.bands i ha-icon { --mdc-icon-size:14px; width:14px; height:14px; opacity:.85; }
+.bands i.on { box-shadow:inset 0 0 0 2px var(--sp-ink); }
+.slide.picking .bands i.at { box-shadow:inset 0 0 0 2px var(--sp-ink); }
+
+.dimtrack {
+  height:26px; border-radius:4px; overflow:hidden; background:var(--sp-sink);
+}
+.dimfill { display:block; height:100%; background:var(--accent); }
+.dimthumb {
+  position:absolute; top:50%; width:22px; height:22px;
+  margin:-11px 0 0 -11px; border-radius:50%;
+  background:var(--sp-surface); border:3px solid var(--sp-ink);
+  pointer-events:none;
+}
+.slide.off .dimtrack, .slide.off .bands { opacity:.32; }
+.slide.off .dimthumb { display:none; }
+.slide.picking .picklens { display:flex; }
+.slide.adrift .picklens, .slide.adrift .dimthumb { opacity:.3; }
 
 /* metric strip */
 .metrics {
@@ -1271,8 +1355,17 @@ function applyTheme(element, hass) {
    icon with it, and a scene never yet activated resolves to nothing at all
    and vanishes. Which is why a row of scenes came out as a row of empty
    boxes, and why rooms used more often had more of them. */
+/* Passed to the body exactly as configured, never marshalled.
+
+   A list of scenes is the reason this set exists. Each entry carries an
+   `entity` naming the scene to turn on -- and a bare top-level `entity` is
+   precisely what the marshaller reads as "fetch this state", so resolving one
+   would collapse the whole object to a scalar and throw its name, icon and
+   colour away. Silently: the card would render nothing and nothing would
+   explain why. */
 const RAW_KEYS = new Set([
-  "action", "tap_action", "hold_action", "double_tap_action", "adjust", "scenes",
+  "action", "tap_action", "hold_action", "double_tap_action", "adjust",
+  "scenes", "drawer_scenes",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -2453,6 +2546,13 @@ const BODIES = {
       const active = isBlank(r.active) ? null : String(r.active).toLowerCase();
       const scenes = Array.isArray(r.scenes) ? r.scenes.filter(Boolean) : [];
 
+      /* Only the scenes the schedule does not already drive. A room whose
+         schedule covers a scene has it on the strip above, placed where the
+         clock puts it; offering it again here would be the same choice in two
+         controls, and the one in the drawer would look like the off-schedule
+         list it is meant to be. */
+      const offSchedule = scenes.filter((scene) => !scene.scheduled && !scene.smart);
+
       const chips = scenes.map((scene, position) => {
         const label = firstOf(scene.name, "");
         const isActive = active !== null && String(label).toLowerCase() === active;
@@ -2479,10 +2579,29 @@ const BODIES = {
           + `<ha-icon icon="mdi:power"></ha-icon></span>`
         : "";
 
-      return `<div class="scenerow${zebra && index % 2 === 0 ? " zebra" : ""}">`
+      /* A room is one calm line until you ask it for more: what it is
+         called, what it is doing, and a chevron. Eleven chips in a row was
+         the whole cell shouting its options at you before you had asked a
+         question. */
+      const key = `room-${index}`;
+      const drawer = drawerMarkup(key, {
+        drawer_scenes: offSchedule,
+        light: r.light,
+        on: r.on,
+        brightness: r.brightness,
+        active: r.active,
+      });
+
+      return `<div class="roomblock">`
+        + `<div class="scenerow${zebra && index % 2 === 0 ? " zebra" : ""}">`
         + power
         + `<p class="roomname">${esc(r.name)}</p>`
-        + `<div class="chiprow">${chips}</div>`
+        + (drawer
+          ? `<span class="roomscene">${esc(firstOf(r.active, ""))}</span>`
+            + chevronMarkup(key, false)
+          : `<div class="chiprow">${chips}</div>`)
+        + `</div>`
+        + drawer
         + `</div>`;
     }).join("");
   },
@@ -2993,7 +3112,15 @@ const BODIES = {
         + ` tabindex="0" data-pickpower><i></i></span>`;
     }
 
-    return out + `</span></div>`;
+    /* Rightmost, after the power switch, because it is the least urgent
+       thing on the row: everything else here answers a question, this one
+       asks for more. The markup always says closed -- whether this card is
+       the one holding the drawer open is the element's business, re-applied
+       after the render rather than baked into it. */
+    const drawer = drawerMarkup("picker", b);
+    if (drawer) out += chevronMarkup("picker", false);
+
+    return out + `</span></div>` + drawer;
   },
 
   /* Where are we in a cycle? */
@@ -3408,6 +3535,105 @@ function dialRange(adjust, current) {
 /* At rest this is one number. Pressing it opens the barrel over the row —
    over, not in, because a row that grows under a finger moves everything
    below it out from under that finger. */
+/* One drawer open at a time, across every cell on the tab.
+
+   Each card is its own custom element with its own shadow root, so they
+   cannot see one another -- but they are all built from this one module, so a
+   module-scoped holder is the whole of the coordination needed, and nothing
+   has to listen on the document or know what else is on the page. */
+let OPEN_DRAWER = null;
+
+function releaseDrawer(card) {
+  if (OPEN_DRAWER === card) OPEN_DRAWER = null;
+}
+
+/* The chevron is the affordance. The face of the cell cannot be the target:
+   the schedule strip already owns pointerdown across its whole width, and a
+   panel the whole family uses should not answer to a gesture nobody can
+   see. */
+function chevronMarkup(key, open) {
+  return `<span class="chev" role="button" tabindex="0" data-chev="${esc(key)}"`
+    + ` aria-expanded="${open ? "true" : "false"}"`
+    + ` aria-label="${open ? "Hide scenes and brightness" : "Scenes and brightness"}">`
+    + `<ha-icon icon="mdi:chevron-down"></ha-icon></span>`;
+}
+
+/* The lens both drawer controls share with the schedule strip above them. */
+function slideLens() {
+  return `<span class="picklens" data-lens>`
+    + `<ha-icon data-lensicon icon=""></ha-icon>`
+    + `<span data-lensname></span></span>`;
+}
+
+function sceneTrackMarkup(key, scenes, activeName) {
+  const active = isBlank(activeName) ? null : String(activeName).toLowerCase();
+  const bands = scenes.map((scene, index) => {
+    const name = firstOf(scene.name, "");
+    const on = active !== null && String(name).toLowerCase() === active;
+    const colour = cssColor(scene.color) || "var(--sp-sink)";
+    return `<i data-cell="${index}" data-label="${esc(name)}"`
+      + ` data-entity="${esc(firstOf(scene.entity, ""))}"`
+      + ` data-icon="${esc(firstOf(scene.icon, ""))}"`
+      + ` data-color="${esc(colour)}"`
+      + ` class="${on ? "on" : ""}" style="flex:1 1 0;background:${colour};`
+      + `color:${textOn(colour)}">`
+      + (isBlank(scene.icon) ? "" : `<ha-icon icon="${esc(scene.icon)}"></ha-icon>`)
+      + `</i>`;
+  }).join("");
+  const at = scenes.findIndex((scene) => active !== null
+    && String(firstOf(scene.name, "")).toLowerCase() === active);
+  return `<div class="slide scenetrack" data-track="${esc(key)}" role="slider"`
+    + ` tabindex="0" aria-label="Scene" aria-valuemin="0"`
+    + ` aria-valuemax="${Math.max(0, scenes.length - 1)}"`
+    + ` aria-valuenow="${at < 0 ? 0 : at}">`
+    + `<p class="slidelabel">Scenes</p>`
+    + `<div class="slidehold"><div class="bands">${bands}</div>`
+    + slideLens() + `</div></div>`;
+}
+
+/* Brightness as a percentage of the room, which is what the bridge takes and
+   what the lens says. Home Assistant hands it over 0-255 because that is what
+   the light domain speaks, so the conversion happens here rather than asking
+   every config line to do it. */
+function dimmerMarkup(key, light, raw, lit) {
+  const value = Number(raw);
+  const pct = isFinite(value)
+    ? Math.min(100, Math.max(1, Math.round((value / 255) * 100)))
+    : 1;
+  return `<div class="slide dimmer${lit ? "" : " off"}" data-dim="${esc(key)}"`
+    + ` data-light="${esc(light)}" role="slider" tabindex="${lit ? "0" : "-1"}"`
+    + ` aria-label="Brightness" aria-valuemin="1" aria-valuemax="100"`
+    + ` aria-valuenow="${pct}" aria-valuetext="${pct}%"`
+    + `${lit ? "" : ` aria-disabled="true"`}>`
+    + `<p class="slidelabel">Brightness</p>`
+    + `<div class="slidehold">`
+    + `<div class="dimtrack"><i class="dimfill" data-dimfill`
+    + ` style="width:${pct}%"></i></div>`
+    + `<span class="dimthumb" data-dimthumb style="left:${pct}%"></span>`
+    + slideLens() + `</div></div>`;
+}
+
+/* Everything a light cell keeps behind its chevron. Either half may be
+   absent: a room with no unscheduled scenes gets only the brightness, and a
+   light with no dimming gets only the scenes. */
+function drawerMarkup(key, body) {
+  const scenes = Array.isArray(body.drawer_scenes)
+    ? body.drawer_scenes.filter((scene) => scene && !isBlank(scene.entity))
+    : [];
+  const light = firstOf(body.light, "");
+  const lit = body.on === undefined ? true : Boolean(body.on);
+  const parts = [];
+  if (scenes.length) parts.push(sceneTrackMarkup(key, scenes, body.active));
+  if (!isBlank(light) && body.brightness !== undefined) {
+    parts.push(dimmerMarkup(key, light, body.brightness, lit));
+  }
+  if (!parts.length) return "";
+  return `<div class="drawer" data-drawer="${esc(key)}">`
+    + `<div class="drawerinner"><div class="drawerbody">`
+    + parts.join("")
+    + `</div></div></div>`;
+}
+
 function dialMarkup(row, position) {
   const now = firstOf(row.value, "\u2014");
   const range = dialRange(row.adjust || {}, parseFloat(row.value));
@@ -4017,6 +4243,13 @@ class SpectraCard extends HTMLElement {
     }, LEAVE_DELAY_MS);
   }
 
+  disconnectedCallback() {
+    /* A tab switch takes the card off the page with its drawer still open,
+       which would leave the module holding a slot no one can close. */
+    releaseDrawer(this);
+    if (super.disconnectedCallback) super.disconnectedCallback();
+  }
+
   _paint(html) {
     const shot = this._holder.firstElementChild
       ? motionSnapshot(this._holder)
@@ -4429,6 +4662,266 @@ class SpectraCard extends HTMLElement {
 
   /* Held so the bar keeps showing what you asked for until the bridge agrees
      — the same contract as a pending temperature. */
+  /* Opens, closes, and survives the render.
+
+     The card rebuilds itself several times a minute -- a lamp count, a
+     spinner, the clock -- and each rebuild replaces the whole body. So the
+     open drawer is not a fact about the markup, it is a fact about this
+     element, re-asserted after every paint. `instant` is what stops that
+     re-assertion replaying the opening animation each time. */
+  _bindDrawer() {
+    const drawers = this._holder.querySelectorAll("[data-drawer]");
+    if (!drawers.length) return;
+
+    drawers.forEach((drawer) => {
+      const key = drawer.getAttribute("data-drawer");
+      const chev = this._holder.querySelector(`[data-chev="${key}"]`);
+      if (this._open === key) {
+        drawer.classList.add("instant", "open");
+        if (chev) chev.setAttribute("aria-expanded", "true");
+        requestAnimationFrame(() => drawer.classList.remove("instant"));
+      }
+      if (!chev) return;
+      const toggle = (event) => {
+        event.stopPropagation();
+        this._toggleDrawer(key);
+      };
+      chev.addEventListener("click", toggle);
+      chev.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggle(event);
+        }
+      });
+    });
+
+    this._holder.querySelectorAll("[data-track]").forEach((el) => {
+      this._bindSceneTrack(el);
+    });
+    this._holder.querySelectorAll("[data-dim]").forEach((el) => {
+      this._bindDimmer(el);
+    });
+  }
+
+  _toggleDrawer(key) {
+    if (this._open === key) {
+      this._open = null;
+      releaseDrawer(this);
+    } else {
+      /* Opening one closes whatever else was open, on this card or any
+         other. */
+      if (OPEN_DRAWER && OPEN_DRAWER !== this) OPEN_DRAWER._closeDrawer();
+      this._open = key;
+      OPEN_DRAWER = this;
+    }
+    const drawer = this._holder.querySelector(`[data-drawer="${key}"]`);
+    const chev = this._holder.querySelector(`[data-chev="${key}"]`);
+    if (drawer) drawer.classList.toggle("open", this._open === key);
+    if (chev) {
+      chev.setAttribute("aria-expanded", this._open === key ? "true" : "false");
+    }
+  }
+
+  _closeDrawer() {
+    if (!this._open) return;
+    const drawer = this._holder.querySelector(`[data-drawer="${this._open}"]`);
+    const chev = this._holder.querySelector(`[data-chev="${this._open}"]`);
+    if (drawer) drawer.classList.remove("open");
+    if (chev) chev.setAttribute("aria-expanded", "false");
+    this._open = null;
+    releaseDrawer(this);
+  }
+
+  /* The gesture, once.
+
+     The schedule strip, the scene track and the brightness slider all ask the
+     same thing of a finger: press, drag, watch the lens, and it counts when
+     you lift. Three copies of a pointer-capture dance is three places for it
+     to drift apart, so what differs is passed in -- how to read a position,
+     what the lens should say, and what to do with the answer. */
+  _bindSlide(el, spec) {
+    const hold = el.querySelector(".slidehold");
+    const lens = el.querySelector("[data-lens]");
+    const lensIcon = el.querySelector("[data-lensicon]");
+    const lensName = el.querySelector("[data-lensname]");
+    if (!hold) return;
+
+    let began = spec.read();
+    let value = began;
+    let adrift = false;
+
+    const show = (v) => {
+      const seen = spec.describe(v);
+      if (lensName) lensName.textContent = seen.text;
+      if (lensIcon) {
+        if (isBlank(seen.icon)) {
+          lensIcon.style.display = "none";
+        } else {
+          lensIcon.style.display = "";
+          lensIcon.setAttribute("icon", seen.icon);
+        }
+      }
+      spec.paint(v);
+    };
+
+    const moveLens = (clientX) => {
+      if (!lens) return;
+      const box = hold.getBoundingClientRect();
+      if (!box.width) return;
+      const pct = ((Math.min(box.right, Math.max(box.left, clientX)) - box.left)
+        / box.width) * 100;
+      lens.style.left = `${Math.min(84, Math.max(16, pct)).toFixed(2)}%`;
+    };
+
+    /* Same rule as the schedule strip: lifting off far from the control is a
+       gesture being abandoned, not a choice being made. */
+    const strayed = (event) => {
+      const box = hold.getBoundingClientRect();
+      return event.clientY < box.top - 48 || event.clientY > box.bottom + 48;
+    };
+
+    const at = (clientX) => {
+      const box = hold.getBoundingClientRect();
+      if (!box.width) return value;
+      const ratio = (Math.min(box.right, Math.max(box.left, clientX)) - box.left)
+        / box.width;
+      return spec.valueAt(ratio);
+    };
+
+    const finish = (commit) => {
+      if (!this._dragging) return;
+      this._dragging = false;
+      el.classList.remove("picking", "adrift");
+      if (commit && !adrift && value !== began) spec.commit(value);
+      this._signature = null;
+      this._update();
+    };
+
+    el.addEventListener("pointerdown", (event) => {
+      if (event.button) return;
+      if (spec.inert && spec.inert()) return;
+      /* Capture is an optimisation -- it keeps the drag alive when the finger
+         leaves the control -- and it can throw for reasons that have nothing
+         to do with this gesture. Letting that abort pointerdown would leave
+         the drag never started and the control dead to the touch, which is a
+         far worse failure than a drag that stops at the edge. */
+      if (el.setPointerCapture) {
+        try { el.setPointerCapture(event.pointerId); } catch (ignored) { /* as above */ }
+      }
+      this._dragging = true;
+      adrift = false;
+      began = spec.read();
+      value = at(event.clientX);
+      el.classList.add("picking");
+      flashPress(el);
+      show(value);
+      moveLens(event.clientX);
+      event.preventDefault();
+    });
+    el.addEventListener("pointermove", (event) => {
+      if (!this._dragging) return;
+      const away = strayed(event);
+      if (away !== adrift) {
+        adrift = away;
+        el.classList.toggle("adrift", adrift);
+        if (adrift) { value = began; show(value); }
+      }
+      if (!adrift) {
+        const next = at(event.clientX);
+        if (next !== value) { value = next; show(value); }
+        moveLens(event.clientX);
+      }
+      event.preventDefault();
+    });
+    el.addEventListener("pointerup", () => finish(true));
+    el.addEventListener("pointercancel", () => finish(false));
+
+    /* Arrows walk it; the commit waits for you to stop, for the same reason
+       the drag waits for the lift. */
+    el.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" ? 1
+        : (event.key === "ArrowLeft" ? -1 : 0);
+      if (!step) return;
+      if (spec.inert && spec.inert()) return;
+      event.preventDefault();
+      const next = spec.step(value, step);
+      if (next === value) return;
+      value = next;
+      el.classList.add("picking");
+      show(value);
+      if (this._slideKey) clearTimeout(this._slideKey);
+      this._slideKey = setTimeout(() => {
+        el.classList.remove("picking");
+        spec.commit(value);
+        this._signature = null;
+        this._update();
+      }, 600);
+    });
+  }
+
+  _bindSceneTrack(el) {
+    const cells = Array.from(el.querySelectorAll("[data-cell]"));
+    if (!cells.length) return;
+    const count = cells.length;
+    const marked = cells.findIndex((cell) => cell.classList.contains("on"));
+
+    this._bindSlide(el, {
+      read: () => (marked < 0 ? 0 : marked),
+      valueAt: (ratio) => Math.min(count - 1, Math.max(0, Math.floor(ratio * count))),
+      step: (v, by) => Math.min(count - 1, Math.max(0, v + by)),
+      describe: (v) => ({
+        text: cells[v].getAttribute("data-label"),
+        icon: cells[v].getAttribute("data-icon"),
+      }),
+      paint: (v) => {
+        cells.forEach((cell, index) => cell.classList.toggle("at", index === v));
+        el.setAttribute("aria-valuenow", String(v));
+        el.setAttribute("aria-valuetext", cells[v].getAttribute("data-label") || "");
+      },
+      commit: (v) => {
+        const entity = cells[v].getAttribute("data-entity");
+        if (entity) this._choose(cells[v].getAttribute("data-label"), entity);
+      },
+    });
+  }
+
+  _bindDimmer(el) {
+    const fill = el.querySelector("[data-dimfill]");
+    const thumb = el.querySelector("[data-dimthumb]");
+    const light = el.getAttribute("data-light");
+    const start = Number(el.getAttribute("aria-valuenow")) || 1;
+
+    this._bindSlide(el, {
+      inert: () => el.classList.contains("off"),
+      read: () => start,
+      /* Never zero. Hue keeps dimming and on/off as separate features, so a
+         brightness of nothing is not "off" -- it is a floor the bridge may
+         refuse, and a slider that could be dragged to a value it cannot be
+         dragged back from is a trap. Turning the room off is the switch's
+         job. */
+      valueAt: (ratio) => Math.min(100, Math.max(1, Math.round(ratio * 100))),
+      step: (v, by) => Math.min(100, Math.max(1, v + by * 5)),
+      describe: (v) => ({ text: `${v}%`, icon: "" }),
+      paint: (v) => {
+        if (fill) fill.style.width = `${v}%`;
+        if (thumb) thumb.style.left = `${v}%`;
+        el.setAttribute("aria-valuenow", String(v));
+        el.setAttribute("aria-valuetext", `${v}%`);
+      },
+      /* One call to the bridge, which dims the lights that are on and leaves
+         the ones a scene deliberately left off alone -- which is the whole
+         reason this does not go through light.turn_on. */
+      commit: (v) => {
+        if (isBlank(light)) return;
+        this._work(() => this._callAction({
+          service: "hue_active_scene.set_room_brightness",
+          target: { entity_id: light },
+          data: { brightness_pct: v, transition: 0.2 },
+        }));
+      },
+    });
+  }
+
   _choose(label, entity) {
     if (this._pickGiveUp) clearTimeout(this._pickGiveUp);
     this._pick = { label: label, at: Date.now() };
@@ -4451,6 +4944,7 @@ class SpectraCard extends HTMLElement {
   }
 
   _bind(model) {
+    this._bindDrawer();
     const rows = (model.body && model.body.rows) || [];
     this._holder.querySelectorAll(".act").forEach((el) => {
       const row = rows[Number(el.dataset.row)];
