@@ -17,6 +17,20 @@
  *     so 0 is a floor the bridge may refuse rather than "off", and a slider
  *     that can be dragged somewhere it cannot be dragged back from is a trap.
  *
+ * And four more that only exist because the brightness slider drives the room
+ * WHILE the finger moves, which is the one thing the grouped_light call buys:
+ *
+ *   - the live calls are throttled, so a drag across the card is a handful of
+ *     commands rather than one per frame.
+ *   - the value you STOP on is the value the room ends on, even if you stop
+ *     inside a throttle window -- the trailing edge, which a naive throttle
+ *     drops, and it is the only one anybody would notice.
+ *   - abandoning the gesture puts the room back where it was. Nothing had
+ *     been said before live dragging, so there was nothing to take back;
+ *     now there is.
+ *   - the slider holds what you asked for until the house agrees, so a lift
+ *     is not followed by a snap back to the old brightness and forward again.
+ *
  *   node tools/checkdrawer.js
  */
 const { chromium } = require("playwright");
@@ -59,6 +73,7 @@ const js = fs.readFileSync(file);
       console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : "  -> " + got}`);
       if (!ok) problems.push(`${name}: ${got}`);
     };
+    const last = (a) => (a.length ? a[a.length - 1] : { data: {}, target: {} });
 
     const calls = [];
     const hass = {
@@ -242,13 +257,19 @@ const js = fs.readFileSync(file);
     drag(dim, dbox.left + dbox.width * 0.5, dbox.left + dbox.width * 0.25,
       dbox.top + dbox.height / 2);
     await new Promise((r) => requestAnimationFrame(r));
-    check("dragging the dimmer calls set_room_brightness",
-      calls.length === 1 && calls[0].service === "hue_active_scene.set_room_brightness"
-        && calls[0].target.entity_id === "light.kitchen",
+    /* Every call, not the count: a drag now speaks while the finger moves as
+       well as on the lift, and what matters is that they all go to the room
+       brightness service and none of them to light.turn_on, which would
+       switch on the bulbs a scene deliberately left off. */
+    const dimCalls = () => calls.filter(
+      (c) => c.service === "hue_active_scene.set_room_brightness");
+    check("dragging the dimmer calls set_room_brightness, and nothing else",
+      calls.length > 0 && dimCalls().length === calls.length
+        && calls.every((c) => c.target.entity_id === "light.kitchen"),
       JSON.stringify(calls));
     check("with the percentage under the finger",
-      calls[0] && calls[0].data.brightness_pct === 25,
-      calls[0] && calls[0].data.brightness_pct);
+      last(calls).data.brightness_pct === 25,
+      JSON.stringify(calls));
 
     // never zero -- re-measure, the card has re-rendered since
     calls.length = 0;
@@ -256,16 +277,118 @@ const js = fs.readFileSync(file);
     drag(q(a, "[data-dim]"), dbox2.left + dbox2.width * 0.5, dbox2.left - 200,
       dbox2.top + dbox2.height / 2);
     check("dragged to the far left it commits 1, never 0",
-      calls.length === 1 && calls[0].data.brightness_pct === 1,
+      calls.length > 0 && calls.every((c) => c.data.brightness_pct === 1),
       JSON.stringify(calls));
 
-    // abandoned gesture
+    // ---- live dragging: throttled, and the last word is the one you stopped on
+    await new Promise((r) => requestAnimationFrame(r));
+    calls.length = 0;
+    let lbox = q(a, ".dimmer .slidehold").getBoundingClientRect();
+    let live = q(a, "[data-dim]");
+    const at = (frac) => lbox.left + lbox.width * frac;
+    const y = lbox.top + lbox.height / 2;
+    const pt = (x) => new PointerEvent("pointermove",
+      { clientX: x, clientY: y, button: 0, bubbles: true, pointerId: 1 });
+
+    live.dispatchEvent(new PointerEvent("pointerdown",
+      { clientX: at(0.5), clientY: y, button: 0, bubbles: true, pointerId: 1 }));
+    /* Twenty moves back to back, as a finger crossing the card in one sweep
+       would produce. Untothrottled that is twenty commands to a bridge that
+       rate-limits groups harder than lights. */
+    for (let i = 0; i < 20; i++) live.dispatchEvent(pt(at(0.5 + i * 0.02)));
+    const midDrag = calls.length;
+    check("a sweep of the finger does not become a command per move",
+      midDrag > 0 && midDrag <= 3, `${midDrag} calls for 20 moves`);
+    check("and the room is already moving before the lift",
+      midDrag > 0 && calls[0].data.brightness_pct === 52,
+      JSON.stringify(calls[0]));
+
+    /* Stop, without lifting, inside the throttle window. The trailing edge is
+       the whole reason speak() holds a timer: a plain leading-edge throttle
+       drops the last move of a drag, which is the only one being looked at. */
+    const spokenBefore = calls.length;
+    await new Promise((r) => setTimeout(r, 300));
+    check("stopping mid-drag still sends where you stopped",
+      calls.length > spokenBefore && last(calls).data.brightness_pct === 88,
+      JSON.stringify(calls.slice(spokenBefore)));
+
+    live.dispatchEvent(new PointerEvent("pointerup",
+      { clientX: at(0.88), clientY: y, button: 0, bubbles: true, pointerId: 1 }));
+    check("and the lift confirms it",
+      last(calls).data.brightness_pct === 88 && last(calls).data.transition === 0.2,
+      JSON.stringify(last(calls)));
+
+    // ---- the optimistic hold
+    await new Promise((r) => requestAnimationFrame(r));
+    check("the slider holds what you asked for",
+      q(a, "[data-dim]").getAttribute("aria-valuenow") === "88",
+      q(a, "[data-dim]").getAttribute("aria-valuenow"));
+    /* The house answering with the OLD brightness is exactly the moment the
+       hold exists for: the bridge has not got round to it yet. */
+    hass.states = Object.assign({}, hass.states,
+      { "sensor.x": { state: String(Date.now()) } });
+    a._signature = null;
+    a.hass = hass;
+    check("and keeps holding it through a render carrying stale state",
+      q(a, "[data-dim]").getAttribute("aria-valuenow") === "88",
+      q(a, "[data-dim]").getAttribute("aria-valuenow"));
+
+    /* Hue stores brightness as a percentage, so a value asked for in eighths
+       comes back a point out and an exact match never arrives. 87 has to end
+       the hold; if it did not, the slider would stay frozen for twelve
+       seconds after every drag. */
+    a._config.body.brightness = Math.round((87 / 100) * 255);
+    a._signature = null;
+    a._update();
+    check("a brightness a point out ends the hold rather than fighting it",
+      a._dim === null, JSON.stringify(a._dim));
+
+    // ---- abandoned gesture
+    await new Promise((r) => requestAnimationFrame(r));
     calls.length = 0;
     const dbox3 = q(a, ".dimmer .slidehold").getBoundingClientRect();
+    const began = Number(q(a, "[data-dim]").getAttribute("aria-valuenow"));
     drag(q(a, "[data-dim]"), dbox3.left + dbox3.width * 0.5,
       dbox3.left + dbox3.width * 0.9, dbox3.top + 400);
-    check("lifting off far away abandons the gesture",
+    check("straying before it ever spoke says nothing at all",
       calls.length === 0, JSON.stringify(calls));
+
+    /* The one that matters: move the room first, THEN stray. The straightforward
+       version above never gets as far as speaking, so on its own it proves
+       nothing about taking anything back. */
+    calls.length = 0;
+    const abox = q(a, ".dimmer .slidehold").getBoundingClientRect();
+    const ay = abox.top + abox.height / 2;
+    const apt = (x, yy) => new PointerEvent("pointermove",
+      { clientX: x, clientY: yy, button: 0, bubbles: true, pointerId: 1 });
+    const away = q(a, "[data-dim]");
+    away.dispatchEvent(new PointerEvent("pointerdown",
+      { clientX: abox.left + abox.width * 0.5, clientY: ay,
+        button: 0, bubbles: true, pointerId: 1 }));
+    away.dispatchEvent(apt(abox.left + abox.width * 0.2, ay));
+    const spokenWhileIn = calls.length;
+    check("a drag that moved the room and then strayed did speak first",
+      spokenWhileIn > 0, "never spoke, so the next check proves nothing");
+
+    away.dispatchEvent(apt(abox.left + abox.width * 0.2, ay + 400));
+    /* Checked here, BEFORE the lift, and that is the whole point. The slider
+       snaps back and greys the moment the finger strays, so the room has to
+       go back then too -- not when the finger is finally lifted, which may be
+       seconds later and leaves the house somewhere the card is not showing
+       for all of them.
+       On the value, not the transition: a live call and a commit happen to
+       carry the same 0.2s fade, so where the room ended up is the only thing
+       that says the gesture was taken back rather than honoured. */
+    check("straying puts the room back at once, not at the lift",
+      last(calls).data.brightness_pct === began,
+      `began ${began}, ${JSON.stringify(calls)}`);
+
+    const beforeLift = calls.length;
+    away.dispatchEvent(new PointerEvent("pointerup",
+      { clientX: abox.left + abox.width * 0.2, clientY: ay + 400,
+        button: 0, bubbles: true, pointerId: 1 }));
+    check("and the lift then commits nothing at all",
+      calls.length === beforeLift, JSON.stringify(calls.slice(beforeLift)));
 
     return problems;
   });
