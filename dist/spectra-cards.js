@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.71.0";
+const VERSION = "0.72.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -337,6 +337,12 @@ ha-icon { display:inline-flex; line-height:0; }
    being expressed, and the whole thing dulls when the room is off. */
 .scenetrack.choosing .bands i { opacity:.3; }
 .scenetrack.choosing .bands i.on { opacity:1; }
+/* And under a finger, where the one that recedes is whichever the finger is
+   NOT on. Without this a drag dimmed nothing: the only thing moving was the
+   ring, against six bands all still at full strength. */
+.scenetrack.picking .bands i { opacity:.3; }
+.scenetrack.picking .bands i.at { opacity:1; }
+.bands i { transition:opacity 160ms linear; }
 
 /* The ring is one element that MOVES rather than a border handed from band
    to band. Handing it over can only cross-fade; a thing that slides is the
@@ -3753,7 +3759,7 @@ function slideLens() {
     + `<span data-lensname></span></span>`;
 }
 
-function sceneTrackMarkup(key, scenes, activeName, lit, choosing) {
+function sceneTrackMarkup(key, scenes, activeName, lit) {
   const active = isBlank(activeName) ? null : String(activeName).toLowerCase();
   const bands = scenes.map((scene, index) => {
     const name = firstOf(scene.name, "");
@@ -3771,8 +3777,14 @@ function sceneTrackMarkup(key, scenes, activeName, lit, choosing) {
   const at = scenes.findIndex((scene) => active !== null
     && String(firstOf(scene.name, "")).toLowerCase() === active);
   const width = 100 / Math.max(1, scenes.length);
+  /* The room being ON one of these IS the choice, so the rest recede for as
+     long as it lasts. Keying this off `picked` instead meant the dimming
+     lived exactly as long as the optimistic window -- a couple of seconds
+     after a press -- and then quietly went away while the room was still
+     sitting on the scene you had chosen. The strip above dims for the whole
+     time it is overridden, not for a moment after the press. */
   return `<div class="slide scenetrack${lit ? "" : " off"}`
-    + `${choosing ? " choosing" : ""}" data-track="${esc(key)}" role="slider"`
+    + `${at >= 0 ? " choosing" : ""}" data-track="${esc(key)}" role="slider"`
     + ` tabindex="${lit ? "0" : "-1"}" aria-label="Scene" aria-valuemin="0"`
     + ` aria-valuemax="${Math.max(0, scenes.length - 1)}"`
     + `${lit ? "" : ` aria-disabled="true"`}`
@@ -3832,7 +3844,7 @@ function drawerMarkup(key, body) {
        is exactly the wait the optimistic contract exists to hide -- and the
        strip above has honoured it since it was written. */
     parts.push(sceneTrackMarkup(key, scenes,
-      firstOf(body.picked, body.active), lit, Boolean(body.picked)));
+      firstOf(body.picked, body.active), lit));
   }
   if (!isBlank(light) && body.brightness !== undefined) {
     parts.push(dimmerMarkup(key, light, body.brightness, lit));
