@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.70.0";
+const VERSION = "0.71.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3727,19 +3727,22 @@ function chevronMarkup(key, open) {
    only then released to the real value. Reading offsetWidth is what makes
    that a real frame rather than two assignments the browser collapses into
    one. */
-function animateFrom(el, previous, paint, current) {
-  if (!el) return;
-  if (previous === undefined || previous === null || previous === current) {
-    el.classList.add("instant");
-    paint(current);
-    void el.offsetWidth;
-    el.classList.remove("instant");
-    return;
-  }
-  el.classList.add("instant");
-  paint(previous);
-  void el.offsetWidth;
-  el.classList.remove("instant");
+function animateFrom(targets, previous, paint, current) {
+  /* EVERY element the paint moves, not just one of them. The brightness
+     paint moves the bar and the circle together, and suppressing only the
+     bar meant the circle took the jump to the starting value as a real
+     move: it animated backwards to where the control had been, then sat
+     there while the bar eased forward without it. */
+  const els = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
+  if (!els.length) return;
+  const hold = () => els.forEach((e) => e.classList.add("instant"));
+  const free = () => els.forEach((e) => e.classList.remove("instant"));
+  hold();
+  paint(previous === undefined || previous === null ? current : previous);
+  /* One read is enough to flush the whole tree. */
+  void els[0].offsetWidth;
+  free();
+  if (previous === undefined || previous === null || previous === current) return;
   paint(current);
 }
 
@@ -5268,12 +5271,7 @@ class SpectraCard extends HTMLElement {
     };
     /* A scene that dims the room should be watched doing it. */
     if (!this._wasDim) this._wasDim = {};
-    animateFrom(fill, this._wasDim[key], put, start);
-    if (thumb) {
-      thumb.classList.add("instant");
-      void thumb.offsetWidth;
-      thumb.classList.remove("instant");
-    }
+    animateFrom([fill, thumb], this._wasDim[key], put, start);
     this._wasDim[key] = start;
 
     this._bindSlide(el, {
