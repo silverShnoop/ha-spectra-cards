@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.63.0";
+const VERSION = "0.64.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1357,15 +1357,23 @@ function applyTheme(element, hass) {
    boxes, and why rooms used more often had more of them. */
 /* Passed to the body exactly as configured, never marshalled.
 
-   A list of scenes is the reason this set exists. Each entry carries an
-   `entity` naming the scene to turn on -- and a bare top-level `entity` is
-   precisely what the marshaller reads as "fetch this state", so resolving one
-   would collapse the whole object to a scalar and throw its name, icon and
-   colour away. Silently: the card would render nothing and nothing would
-   explain why. */
+   `scenes` is the reason this set exists. Each entry carries an `entity`
+   naming the scene to turn on -- and a bare top-level `entity` is precisely
+   what the marshaller reads as "fetch this state", so resolving one would
+   collapse the whole object to a scalar and throw its name, icon and colour
+   away. Silently: the card would render nothing and nothing would explain
+   why.
+
+   `drawer_scenes` is deliberately NOT here, and was briefly. It is built
+   from the room's own scene list with `from`/`each`, so it has to be
+   resolved -- and the collapse cannot bite it, because inside an `each`
+   template the entity arrives as `{field: entity_id}`, a read of the item,
+   not a bare string. Listing a drawer's scenes by hand is the thing that
+   would break, and the whole point of the room reporting them is that
+   nobody has to. */
 const RAW_KEYS = new Set([
   "action", "tap_action", "hold_action", "double_tap_action", "adjust",
-  "scenes", "drawer_scenes",
+  "scenes",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -2546,13 +2554,6 @@ const BODIES = {
       const active = isBlank(r.active) ? null : String(r.active).toLowerCase();
       const scenes = Array.isArray(r.scenes) ? r.scenes.filter(Boolean) : [];
 
-      /* Only the scenes the schedule does not already drive. A room whose
-         schedule covers a scene has it on the strip above, placed where the
-         clock puts it; offering it again here would be the same choice in two
-         controls, and the one in the drawer would look like the off-schedule
-         list it is meant to be. */
-      const offSchedule = scenes.filter((scene) => !scene.scheduled && !scene.smart);
-
       const chips = scenes.map((scene, position) => {
         const label = firstOf(scene.name, "");
         const isActive = active !== null && String(label).toLowerCase() === active;
@@ -2585,7 +2586,7 @@ const BODIES = {
          question. */
       const key = `room-${index}`;
       const drawer = drawerMarkup(key, {
-        drawer_scenes: offSchedule,
+        drawer_scenes: scenes,
         light: r.light,
         on: r.on,
         brightness: r.brightness,
@@ -3617,8 +3618,16 @@ function dimmerMarkup(key, light, raw, lit) {
    absent: a room with no unscheduled scenes gets only the brightness, and a
    light with no dimming gets only the scenes. */
 function drawerMarkup(key, body) {
+  /* Only the scenes the schedule does not already drive.
+
+     A scheduled scene is on the strip above, placed where the clock puts it.
+     Offering it again here would be the same choice in two controls, and
+     would stop the drawer being what it says it is: the ones you cannot
+     otherwise reach. The room reports which is which, so neither this nor
+     the config has to know. */
   const scenes = Array.isArray(body.drawer_scenes)
-    ? body.drawer_scenes.filter((scene) => scene && !isBlank(scene.entity))
+    ? body.drawer_scenes.filter((scene) => scene
+      && !isBlank(scene.entity) && !scene.scheduled && !scene.smart)
     : [];
   const light = firstOf(body.light, "");
   const lit = body.on === undefined ? true : Boolean(body.on);
