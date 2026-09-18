@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.64.0";
+const VERSION = "0.65.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2585,8 +2585,13 @@ const BODIES = {
          the whole cell shouting its options at you before you had asked a
          question. */
       const key = `room-${index}`;
+      /* A row's own `drawer_scenes` when it has one, and only then its
+         `scenes`. The two cannot be the same key: `scenes` is in RAW_KEYS
+         and has to stay there, because a picker's catalogue lists bare
+         entity strings that the marshaller would collapse -- so a row
+         wanting the from/each form needs a key that is actually resolved. */
       const drawer = drawerMarkup(key, {
-        drawer_scenes: scenes,
+        drawer_scenes: Array.isArray(r.drawer_scenes) ? r.drawer_scenes : scenes,
         light: r.light,
         on: r.on,
         brightness: r.brightness,
