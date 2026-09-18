@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.60.0";
+const VERSION = "0.61.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -218,13 +218,19 @@ const SHEET = `
 }
 .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
 /* An icon leads the name it belongs to, so a name and its icon must not be
-   split across a line break. Sized off the hero rather than fixed, so they
-   stay in proportion to text that is deliberately large, and boxed and
-   baselined like every other icon that sits in front of words. */
+   split across a line break.
+
+   Sized off the hero rather than fixed, so they hold their proportion to
+   text that is deliberately large. 0.78em is the number that makes them
+   read as part of the writing: the hero's cap height measures 0.72em, and
+   an mdi glyph carries its own padding inside its box, so a box a little
+   over the cap height draws ink at about it. -0.19em then centres that box
+   on the cap band to within 0.1px. Both measured in the browser, at 32px,
+   against the rendered font rather than assumed from the em size. */
 .heropart { white-space:nowrap; }
 .heroicon {
-  --mdc-icon-size:0.5em; width:0.5em; height:0.5em;
-  display:inline-block; margin-right:0.18em; vertical-align:-0.05em;
+  --mdc-icon-size:0.78em; width:0.78em; height:0.78em;
+  display:inline-block; margin-right:0.2em; vertical-align:-0.19em;
 }
 /* pre, because the separator's spaces are the gap either side of it. */
 .herojoin { white-space:pre; }
