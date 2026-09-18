@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.68.0";
+const VERSION = "0.69.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4927,13 +4927,18 @@ class SpectraCard extends HTMLElement {
       return tail;
     };
 
-    const dispatch = (v) => {
+    /* `final` marks the one send that is the answer rather than a step
+       towards it. Everything goes down the same wire -- that is the point of
+       the queue -- but only the last one is worth telling the user about if
+       it fails. Threaded through rather than inferred, because the commit's
+       value is often identical to the step before it. */
+    const dispatch = (v, final) => {
       if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
       pending = null;
       spoke = v;
       liveAt = Date.now();
       inFlight = true;
-      const done = queue(() => spec.live(v));
+      const done = queue(() => spec.live(v, final));
       done.then(() => { inFlight = false; pump(); });
       return done;
     };
@@ -4941,7 +4946,7 @@ class SpectraCard extends HTMLElement {
     const pump = () => {
       if (inFlight || pending === null) return;
       const wait = Math.max(0, SLIDE_LIVE_MS - (Date.now() - liveAt));
-      if (!wait) { dispatch(pending); return; }
+      if (!wait) { dispatch(pending, false); return; }
       if (!liveTimer) {
         liveTimer = setTimeout(() => { liveTimer = null; pump(); }, wait);
       }
@@ -4961,7 +4966,7 @@ class SpectraCard extends HTMLElement {
     /* The last word, on the lift. It skips the floor -- it is the value you
        stopped on and nothing should follow it -- but still goes through the
        queue, so it cannot overtake a step already on the wire. */
-    const sendFinal = (v) => (spec.live ? dispatch(v) : Promise.resolve());
+    const sendFinal = (v) => (spec.live ? dispatch(v, true) : Promise.resolve());
 
     /* Abandoning a drag has to mean abandoning it.
 
@@ -5148,13 +5153,13 @@ class SpectraCard extends HTMLElement {
          The promise is returned and it matters: it is how the queue above
          knows the bridge has finished with one step before starting the
          next, which is the whole of the pacing. */
-      live: (v) => {
+      live: (v, final) => {
         if (isBlank(light)) return Promise.resolve();
         return this._callAction({
           service: "hue_active_scene.set_room_brightness",
           target: { entity_id: light },
           data: { brightness_pct: v, transition: SLIDE_LIVE_MS / 1000 },
-        });
+        }, !final);
       },
       /* The lift. The sending itself belongs to the queue -- `send` is the
          same one call to the bridge, ordered behind anything still on the
@@ -5564,7 +5569,16 @@ class SpectraCard extends HTMLElement {
     }
   }
 
-  _callAction(action) {
+  /* `quiet` suppresses Home Assistant's own failure toast for this one
+     call. It is for the steps of a live drag, and only those.
+
+     Five calls a second means five toasts a second when something is wrong:
+     a wall of identical red boxes covering the card, from ONE mistake, which
+     reads like the panel has broken rather than like one control cannot do
+     one thing. The commit on the lift is not quiet, so a failure is still
+     reported -- once, after the finger leaves, which is when there is
+     somewhere to read it. */
+  _callAction(action, quiet) {
     if (!action || !this._hass) return Promise.resolve();
     const name = action.service || action.perform_action || action.action;
     if (typeof name !== "string" || !name.includes(".")) {
@@ -5576,7 +5590,9 @@ class SpectraCard extends HTMLElement {
        with no explanation is the worst thing a panel can do. Returned so a
        spinner can wait on it. */
     return Promise.resolve(
-      this._hass.callService(domain, service, action.data || {}, action.target || undefined),
+      /* The fifth argument is Home Assistant's `notifyOnError`. */
+      this._hass.callService(domain, service, action.data || {},
+        action.target || undefined, !quiet),
     ).catch((error) => LOGGER_WARN(`spectra-card: ${name} failed`, error));
   }
 

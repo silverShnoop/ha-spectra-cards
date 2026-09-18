@@ -85,8 +85,9 @@ const js = fs.readFileSync(file);
     let mostAtOnce = 0;
     const hass = {
       states: {},
-      callService: (domain, service, data, target) => {
-        calls.push({ service: `${domain}.${service}`, data, target, at: Date.now() });
+      callService: (domain, service, data, target, notifyOnError) => {
+        calls.push({ service: `${domain}.${service}`, data, target,
+          at: Date.now(), notify: notifyOnError });
         onWire += 1;
         mostAtOnce = Math.max(mostAtOnce, onWire);
         return new Promise((done) => setTimeout(() => {
@@ -489,6 +490,54 @@ const js = fs.readFileSync(file);
       `${last(calls).at - lifted}ms after the lift, ${
         calls.length - duringDrag} calls behind it`);
     latency = 0;
+
+    /* ---- a drag that cannot work must say so ONCE.
+
+       Five calls a second means five failure toasts a second when the target
+       is wrong -- a wall of identical red boxes from a single mistake, which
+       reads like the whole panel has broken rather than like one control
+       cannot do one thing. This is not hypothetical: it happened on the
+       panel, from a room card pointed at a bulb instead of its room.
+
+       So the live steps ask Home Assistant not to report, and the commit --
+       which lands after the finger has gone, when there is somewhere to read
+       it -- reports normally. */
+    await tick(SLIDE_MS + 60);
+    calls.length = 0;
+    const qbox = q(a, ".dimmer .slidehold").getBoundingClientRect();
+    const qy = qbox.top + qbox.height / 2;
+    const quiet = q(a, "[data-dim]");
+    quiet.dispatchEvent(new PointerEvent("pointerdown", {
+      clientX: qbox.left + qbox.width * 0.2, clientY: qy,
+      button: 0, bubbles: true, pointerId: 1,
+    }));
+    for (let i = 1; i <= 10; i++) {
+      quiet.dispatchEvent(new PointerEvent("pointermove", {
+        clientX: qbox.left + qbox.width * (0.2 + i * 0.05), clientY: qy,
+        button: 0, bubbles: true, pointerId: 1,
+      }));
+      await tick(30);
+    }
+    const steps = calls.slice();
+    check("a drag makes several live calls",
+      steps.length > 1, `${steps.length} calls`);
+    check("and every one of them asks not to be reported",
+      steps.every((c) => c.notify === false),
+      JSON.stringify(steps.map((c) => c.notify)));
+
+    const before = calls.length;
+    quiet.dispatchEvent(new PointerEvent("pointerup", {
+      clientX: qbox.left + qbox.width * 0.7, clientY: qy,
+      button: 0, bubbles: true, pointerId: 1,
+    }));
+    await tick(60);
+    const after = calls.slice(before);
+    check("the lift does report, so a real failure is still seen",
+      after.length > 0 && after.some((c) => c.notify !== false),
+      JSON.stringify(after.map((c) => c.notify)));
+    check("which is one report for the whole gesture, not one per step",
+      calls.filter((c) => c.notify !== false).length === 1,
+      `${calls.filter((c) => c.notify !== false).length} reporting calls`);
 
     return problems;
   });
