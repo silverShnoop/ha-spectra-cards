@@ -248,6 +248,42 @@ const js = fs.readFileSync(file);
         && getComputedStyle(inner).overflow === "hidden",
       `settled=${draw.classList.contains("settled")} overflow=${getComputedStyle(inner).overflow}`);
 
+    /* The flag and the computed style are necessary but not sufficient: what
+       actually matters is whether the lens, in real layout, sticks out past
+       the drawer's top edge -- because if it does not, the overflow rule is
+       protecting nothing and the clipping reported from the panel had some
+       other cause. So measure it. */
+    q(plain, "[data-chev]").click();
+    draw.dispatchEvent(new TransitionEvent("transitionend",
+      { propertyName: "grid-template-rows", bubbles: false }));
+    const track = q(plain, "[data-track]");
+    const hold = q(plain, ".scenetrack .slidehold");
+    const tbox = hold.getBoundingClientRect();
+    track.dispatchEvent(new PointerEvent("pointerdown", {
+      clientX: tbox.left + tbox.width / 2, clientY: tbox.top + tbox.height / 2,
+      button: 0, bubbles: true, pointerId: 1,
+    }));
+    const lens = q(plain, ".scenetrack [data-lens]");
+    const lensBox = lens.getBoundingClientRect();
+    const innerBox = (plain.shadowRoot || plain)
+      .querySelector(".drawerinner").getBoundingClientRect();
+
+    check("the lens is actually showing during a drag",
+      lensBox.height > 0 && getComputedStyle(lens).display !== "none",
+      `h=${lensBox.height} display=${getComputedStyle(lens).display}`);
+    check("and it genuinely sticks out above the drawer, so clipping would bite",
+      lensBox.top < innerBox.top,
+      `lens top ${lensBox.top.toFixed(1)} vs drawer top ${innerBox.top.toFixed(1)}`);
+    check("which is exactly what the open drawer no longer does",
+      getComputedStyle((plain.shadowRoot || plain)
+        .querySelector(".drawerinner")).overflow === "visible",
+      getComputedStyle((plain.shadowRoot || plain)
+        .querySelector(".drawerinner")).overflow);
+    track.dispatchEvent(new PointerEvent("pointerup", {
+      clientX: tbox.left + tbox.width / 2, clientY: tbox.top + tbox.height / 2,
+      button: 0, bubbles: true, pointerId: 1,
+    }));
+
     /* ---- a schedule that has gone away.
 
        Not hypothetical: `segments` comes from the smart-scene schedule
