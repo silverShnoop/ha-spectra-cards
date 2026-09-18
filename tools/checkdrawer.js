@@ -69,11 +69,33 @@ const js = fs.readFileSync(file);
       },
     };
 
-    const SCENES = [
-      { name: "Relax", entity: "scene.bedroom_relax", icon: "mdi:sofa", color: "#ff942b" },
-      { name: "Read", entity: "scene.bedroom_read", icon: "mdi:book", color: "#ffad66" },
-      { name: "Rest", entity: "scene.bedroom_rest", icon: "mdi:bed", color: "#ffa128" },
+    /* Shaped exactly as hue_active_scene reports it, because that is where
+       a real drawer's scenes come from -- including the two the schedule
+       drives, which must not reach the track. */
+    const REPORTED = [
+      { name: "Arise", entity_id: "scene.k_arise", color: "#ffcc88", scheduled: true },
+      { name: "Relax", entity_id: "scene.bedroom_relax", color: "#ff942b", scheduled: false },
+      { name: "Read", entity_id: "scene.bedroom_read", color: "#ffad66", scheduled: false },
+      { name: "Rest", entity_id: "scene.bedroom_rest", color: "#ffa128", scheduled: false },
     ];
+    hass.states["sensor.room_active_scene"] = {
+      entity_id: "sensor.room_active_scene", state: "Relax",
+      attributes: { scenes: REPORTED },
+    };
+    const DRAWER_SCENES = {
+      from: { entity: "sensor.room_active_scene", attribute: "scenes" },
+      each: {
+        name: { field: "name" },
+        entity: { field: "entity_id" },
+        color: { field: "color" },
+        scheduled: { field: "scheduled" },
+        icon: {
+          field: "name",
+          map: { Relax: "mdi:sofa", Read: "mdi:book", Rest: "mdi:bed" },
+          default: "mdi:palette",
+        },
+      },
+    };
 
     function makeCard(host, config) {
       const el = document.createElement("spectra-card");
@@ -88,7 +110,7 @@ const js = fs.readFileSync(file);
       body: {
         type: "picker", light: "light.kitchen", on: true, active: "Relax",
         brightness: 128,
-        drawer_scenes: SCENES,
+        drawer_scenes: DRAWER_SCENES,
         scenes: [{ name: "Golden hours", entity: "scene.k_gh", smart: true }],
         segments: [
           { index: 0, label: "Arise", color: "#ffcc88", pct: 40 },
@@ -104,7 +126,7 @@ const js = fs.readFileSync(file);
         rows: [{
           name: "Bedroom", light: "light.bedroom", on: true, active: "Read",
           brightness: 101,
-          scenes: SCENES.map((s) => Object.assign({ scheduled: false }, s)),
+          scenes: DRAWER_SCENES,
         }],
       },
     };
@@ -165,8 +187,14 @@ const js = fs.readFileSync(file);
     chevA.click();
     const track = q(a, "[data-track]");
     const cells = (a.shadowRoot || a).querySelectorAll("[data-cell]");
-    check("scene track draws one band per off-schedule scene",
+    check("scene track draws one band per off-schedule scene, and no more",
       cells.length === 3, cells.length);
+    check("the scheduled scene is kept off the track",
+      !Array.from(cells).some((c) => c.getAttribute("data-label") === "Arise"),
+      "Arise leaked onto the track");
+    check("icons come through the name map",
+      cells[0] && cells[0].getAttribute("data-icon") === "mdi:sofa",
+      cells[0] && cells[0].getAttribute("data-icon"));
     check("scene track marks the active scene",
       cells[0] && cells[0].classList.contains("on"), "not marked");
     check("bands carry their colour",
