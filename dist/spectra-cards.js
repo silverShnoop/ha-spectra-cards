@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.58.0";
+const VERSION = "0.59.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -217,6 +217,13 @@ const SHEET = `
   display:inline-block; margin-right:5px; vertical-align:-0.15em;
 }
 .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
+/* Sized off the hero rather than fixed, so they stay in proportion to a
+   number that is deliberately large. Boxed and baselined like every other
+   icon that sits in front of words. */
+.heroicons { display:inline-flex; gap:5px; margin-right:9px; vertical-align:-0.05em; }
+.heroicons ha-icon {
+  --mdc-icon-size:0.5em; width:0.5em; height:0.5em; display:inline-block;
+}
 
 /* metric strip */
 .metrics {
@@ -2144,7 +2151,24 @@ const BODIES = {
   /* What is the one number or word? */
   stat(b) {
     let out = "";
-    if (!isBlank(b.hero)) out += `<p class="hero">${esc(b.hero)}</p>`;
+    /* A hero naming more than one thing can say so in icons. "Refuse + Food"
+       is two bins in one phrase, and no single icon in front of it is
+       honest -- so the icons are a list, one per thing, and the blanks drop
+       out. One bin going out shows one icon without the config changing. */
+    const heroIcons = (Array.isArray(b.hero_icons) ? b.hero_icons : [])
+      /* An icon name, not whatever the source happened to say. A map with no
+         entry for a value passes that value straight through, so without this
+         a bin type nobody has mapped yet would be handed to <ha-icon> as its
+         icon name and draw an empty slot. Any namespace is fine -- mdi:,
+         spectra:, a custom set -- but a bare word is not an icon. */
+      .filter((icon) => !isBlank(icon) && String(icon).indexOf(":") > 0);
+    if (!isBlank(b.hero)) {
+      const lead = heroIcons.length
+        ? `<span class="heroicons">${heroIcons.map((icon) =>
+            `<ha-icon icon="${esc(icon)}"></ha-icon>`).join("")}</span>`
+        : "";
+      out += `<p class="hero">${lead}${esc(b.hero)}</p>`;
+    }
     if (!isBlank(b.sub)) out += `<p class="sub">${escLines(b.sub)}</p>`;
     const chips = (Array.isArray(b.chips) ? b.chips : [])
       .map((c) => (typeof c === "string" ? { text: c } : c))
