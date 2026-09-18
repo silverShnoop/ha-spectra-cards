@@ -74,15 +74,30 @@ const js = fs.readFileSync(file);
       if (!ok) problems.push(`${name}: ${got}`);
     };
     const last = (a) => (a.length ? a[a.length - 1] : { data: {}, target: {} });
+    const SLIDE_MS = 200;
 
     const calls = [];
+    /* The bridge is not instant, and the card's pacing is built on noticing
+       that, so the fake has to be able to take its time -- and to say whether
+       two calls were ever on the wire at once. */
+    let latency = 0;
+    let onWire = 0;
+    let mostAtOnce = 0;
     const hass = {
       states: {},
       callService: (domain, service, data, target) => {
-        calls.push({ service: `${domain}.${service}`, data, target });
-        return Promise.resolve();
+        calls.push({ service: `${domain}.${service}`, data, target, at: Date.now() });
+        onWire += 1;
+        mostAtOnce = Math.max(mostAtOnce, onWire);
+        return new Promise((done) => setTimeout(() => {
+          onWire -= 1;
+          done();
+        }, latency));
       },
     };
+    /* A send is queued on a promise chain, so it leaves one microtask after
+       the pointer event rather than during it. */
+    const tick = (ms) => new Promise((r) => setTimeout(r, ms || 0));
 
     /* Shaped exactly as hue_active_scene reports it, because that is where
        a real drawer's scenes come from -- including the two the schedule
@@ -276,6 +291,7 @@ const js = fs.readFileSync(file);
     const dbox2 = q(a, ".dimmer .slidehold").getBoundingClientRect();
     drag(q(a, "[data-dim]"), dbox2.left + dbox2.width * 0.5, dbox2.left - 200,
       dbox2.top + dbox2.height / 2);
+    await tick();
     check("dragged to the far left it commits 1, never 0",
       calls.length > 0 && calls.every((c) => c.data.brightness_pct === 1),
       JSON.stringify(calls));
@@ -292,13 +308,21 @@ const js = fs.readFileSync(file);
 
     live.dispatchEvent(new PointerEvent("pointerdown",
       { clientX: at(0.5), clientY: y, button: 0, bubbles: true, pointerId: 1 }));
-    /* Twenty moves back to back, as a finger crossing the card in one sweep
-       would produce. Untothrottled that is twenty commands to a bridge that
-       rate-limits groups harder than lights. */
-    for (let i = 0; i < 20; i++) live.dispatchEvent(pt(at(0.5 + i * 0.02)));
+    /* Twenty moves over four tenths of a second, as a finger crossing the
+       card would produce, against a bridge answering instantly.
+
+       The real time matters. Fire them inside one tick and the queue alone
+       collapses them to a single call whatever the floor is set to, so the
+       floor is what this measures: an instant bridge is exactly the case
+       where serialising imposes no limit of its own, and Hue rate-limits
+       groups harder than lights. */
+    for (let i = 0; i < 20; i++) {
+      live.dispatchEvent(pt(at(0.5 + i * 0.02)));
+      await tick(20);
+    }
     const midDrag = calls.length;
     check("a sweep of the finger does not become a command per move",
-      midDrag > 0 && midDrag <= 3, `${midDrag} calls for 20 moves`);
+      midDrag > 0 && midDrag <= 4, `${midDrag} calls for 20 moves over 400ms`);
     check("and the room is already moving before the lift",
       midDrag > 0 && calls[0].data.brightness_pct === 52,
       JSON.stringify(calls[0]));
@@ -366,11 +390,13 @@ const js = fs.readFileSync(file);
       { clientX: abox.left + abox.width * 0.5, clientY: ay,
         button: 0, bubbles: true, pointerId: 1 }));
     away.dispatchEvent(apt(abox.left + abox.width * 0.2, ay));
+    await tick();
     const spokenWhileIn = calls.length;
     check("a drag that moved the room and then strayed did speak first",
       spokenWhileIn > 0, "never spoke, so the next check proves nothing");
 
     away.dispatchEvent(apt(abox.left + abox.width * 0.2, ay + 400));
+    await tick(SLIDE_MS + 60);
     /* Checked here, BEFORE the lift, and that is the whole point. The slider
        snaps back and greys the moment the finger strays, so the room has to
        go back then too -- not when the finger is finally lifted, which may be
@@ -387,8 +413,82 @@ const js = fs.readFileSync(file);
     away.dispatchEvent(new PointerEvent("pointerup",
       { clientX: abox.left + abox.width * 0.2, clientY: ay + 400,
         button: 0, bubbles: true, pointerId: 1 }));
+    await tick(SLIDE_MS + 60);
     check("and the lift then commits nothing at all",
       calls.length === beforeLift, JSON.stringify(calls.slice(beforeLift)));
+
+    /* ---- the queue itself.
+
+       aiohue answers a bridge that is refusing commands by retrying, up to
+       twenty-five times, backing off further each go, over three parallel
+       connections. Over-driving it therefore does not fail -- it BACKS UP,
+       and drains in an order nothing promises, so the room would settle on a
+       brightness from the middle of the drag seconds after the finger left.
+       Everything below is about that never being possible. */
+    await tick(SLIDE_MS + 60);
+    calls.length = 0;
+    mostAtOnce = 0;
+    onWire = 0;
+    /* Slower than the floor, deliberately. A bridge FASTER than the floor
+       cannot overlap however the card is written, so it proves nothing about
+       serialising; only a bridge that takes longer than the gap the card
+       wants to leave can catch a second command going out over the first. */
+    latency = 300;
+
+    const sbox = q(a, ".dimmer .slidehold").getBoundingClientRect();
+    const sy = sbox.top + sbox.height / 2;
+    const slow = q(a, "[data-dim]");
+    const spt = (frac) => new PointerEvent("pointermove",
+      { clientX: sbox.left + sbox.width * frac, clientY: sy,
+        button: 0, bubbles: true, pointerId: 1 });
+
+    slow.dispatchEvent(new PointerEvent("pointerdown",
+      { clientX: sbox.left + sbox.width * 0.1, clientY: sy,
+        button: 0, bubbles: true, pointerId: 1 }));
+    /* A slow sweep: a move every 32ms for the better part of a second,
+       against a bridge taking 300ms a command. A card that merely throttled
+       would put one out every 200ms and have two in the air at a time. */
+    for (let i = 1; i <= 25; i++) {
+      slow.dispatchEvent(spt(0.1 + i * 0.03));
+      await tick(32);
+    }
+    check("never two commands on the wire at once",
+      mostAtOnce === 1, `${mostAtOnce} overlapped`);
+    check("a bridge that is slower than the floor slows the card down",
+      calls.length > 0 && calls.length <= 5,
+      `${calls.length} calls in ~800ms at 300ms each`);
+    /* Values are dropped, never queued: what is skipped is the middle of the
+       drag, which nobody is looking at by the time it would arrive. */
+    const pcts = calls.map((c) => c.data.brightness_pct);
+    check("and the values it does send only ever go forward",
+      pcts.every((p, i) => i === 0 || p > pcts[i - 1]), JSON.stringify(pcts));
+
+    const duringDrag = calls.length;
+    const lifted = Date.now();
+    slow.dispatchEvent(new PointerEvent("pointerup",
+      { clientX: sbox.left + sbox.width * 0.85, clientY: sy,
+        button: 0, bubbles: true, pointerId: 1 }));
+    await tick(1200);
+    check("the lift lands after everything already on the wire",
+      calls.length > duringDrag, "the commit never arrived");
+    check("and the room ends on the value the finger stopped on",
+      last(calls).data.brightness_pct === 85,
+      `${last(calls).data.brightness_pct}, all: ${JSON.stringify(
+        calls.map((c) => c.data.brightness_pct))}`);
+    check("with nothing overlapping across the whole gesture",
+      mostAtOnce === 1, `${mostAtOnce} overlapped`);
+    /* The point of holding a step back rather than queueing it. A card that
+       queued every step would not overlap either -- the chain would see to
+       that -- but the backlog would still be there, draining at the bridge's
+       pace long after the finger had gone, so the room would go on creeping
+       towards the value for as long again as the drag took. Skipping the
+       middle is what makes the lift the end of it: nothing is waiting but
+       the one step already on the wire. */
+    check("and it finishes within one command of the lift, not a backlog",
+      last(calls).at - lifted < latency * 2,
+      `${last(calls).at - lifted}ms after the lift, ${
+        calls.length - duringDrag} calls behind it`);
+    latency = 0;
 
     return problems;
   });
