@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.72.0";
+const VERSION = "0.73.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1614,7 +1614,9 @@ function resolveValue(hass, spec, forecasts) {
   if (typeof spec.forecast === "string") return readForecast(forecasts, spec);
   if (typeof spec.todo === "string") return readTodo(forecasts && forecasts.__todo, spec);
   if (typeof spec.calendar === "string") return readCalendar(forecasts && forecasts.__cal, spec);
-  if (typeof spec.count === "string") return readCount(hass, spec);
+  if (typeof spec.count === "string" || Array.isArray(spec.count)) {
+    return readCount(hass, spec);
+  }
   const out = {};
   for (const [key, value] of Object.entries(spec)) {
     out[key] = RAW_KEYS.has(key) ? value : resolveValue(hass, value, forecasts);
@@ -1660,9 +1662,20 @@ function resolveEach(hass, template, item, forecasts) {
    different and more useful fact, and it is marshalling, so it lives here
    rather than in a template somebody has to maintain. */
 function readCount(hass, spec) {
-  const group = hass && hass.states ? hass.states[spec.count] : null;
-  if (!group) return null;
-  const members = group.attributes && group.attributes.entity_id;
+  /* Two shapes, because two questions. A group id answers "how many of this
+     room's bulbs are lit", which the group already knows. A LIST answers
+     "how many of these rooms are lit", which nothing in Home Assistant
+     groups for you -- a floor is not an entity. Writing a helper group per
+     floor just to be counted would be a second place to keep the membership
+     right, and it would drift. */
+  let members = null;
+  if (Array.isArray(spec.count)) {
+    members = spec.count.filter((id) => typeof id === "string" && id);
+  } else {
+    const group = hass && hass.states ? hass.states[spec.count] : null;
+    if (!group) return null;
+    members = group.attributes && group.attributes.entity_id;
+  }
   if (!Array.isArray(members)) return null;
   const want = isBlank(spec.state) ? "on" : String(spec.state);
   let n = 0;
@@ -1675,6 +1688,11 @@ function readCount(hass, spec) {
   const shape = n === 1 && !isBlank(spec.singular)
     ? Object.assign({}, spec, { suffix: spec.singular })
     : spec;
+  /* Nothing on is worth saying in words rather than as a zero, and it
+     replaces the whole phrase rather than the tail of it: `map` would
+     substitute the number and then the suffix would still be appended,
+     giving "All off rooms on". */
+  if (n === 0 && !isBlank(spec.none)) return spec.none;
   return applyFormat(n, shape);
 }
 
@@ -1853,6 +1871,13 @@ function collectSources(spec, found) {
        group's state object when any member moves, so the card re-marshals
        anyway and the member list can stay dynamic. */
     found.entities.add(spec.count);
+    return found;
+  }
+  if (Array.isArray(spec.count)) {
+    /* No group to stand in for them, so every one is watched directly. */
+    for (const id of spec.count) {
+      if (typeof id === "string" && id) found.entities.add(id);
+    }
     return found;
   }
   if (typeof spec.calendar === "string") {
@@ -2377,6 +2402,33 @@ const BODIES = {
   },
 
   /* What is the one number or word? */
+  /* A floor, in one line: how much of it is on, and one way to end that.
+
+     The button only ever turns things OFF. That is the whole of its
+     contract and the reason it is a button rather than the switch every
+     room card carries: a switch implies the other direction, and "turn on
+     every light downstairs" is not a thing anyone wants a thumb's width
+     from the edge of a wall panel. Nothing here can turn a light on.
+
+     With the floor already dark it goes inert rather than disappearing --
+     a control that vanishes when it has nothing to do is a control you have
+     to hunt for when it does. */
+  summary(b) {
+    const lit = b.on === undefined ? false : Boolean(b.on);
+    let out = `<div class="row summaryrow" style="padding-left:0">`
+      + `<p class="pickinfo">${esc(firstOf(b.info, ""))}</p>`
+      + `<span class="pickend">`;
+    if (b.action) {
+      out += `<span class="iconbtn alloff${lit ? "" : " inert"}"`
+        + ` role="button" tabindex="${lit ? "0" : "-1"}"`
+        + `${lit ? "" : ` aria-disabled="true"`}`
+        + ` aria-label="Turn these lights off"`
+        + ` title="${lit ? "Turn these lights off" : "Already off"}"`
+        + ` data-alloff><ha-icon icon="mdi:power"></ha-icon></span>`;
+    }
+    return out + `</span></div>`;
+  },
+
   stat(b) {
     let out = "";
     /* A hero naming more than one thing puts an icon in front of each name
@@ -3412,6 +3464,9 @@ function bodyIsEmpty(type, b) {
     case "scenes":
     case "people":
       return !Array.isArray(b.rows) || b.rows.length === 0;
+    /* A floor with nothing to say and nothing to press is not a heading. */
+    case "summary":
+      return isBlank(b.info) && !b.action;
     /* Nothing to explain and no day to count is not a celebration. */
     case "festival":
       return isBlank(b.text) && !(Number(b.of) > 0);
@@ -5366,6 +5421,27 @@ class SpectraCard extends HTMLElement {
 
   _bind(model) {
     this._bindDrawer();
+
+    /* The one-way switch. Bound only when the body says something is on, so
+       a dark floor cannot be "turned off" again -- which would be a service
+       call that does nothing, a spinner for nothing, and a button that
+       feels broken because it responds without changing anything. */
+    this._holder.querySelectorAll("[data-alloff]").forEach((el) => {
+      const action = model.body && model.body.action;
+      if (!action || el.classList.contains("inert")) return;
+      const run = (event) => {
+        event.stopPropagation();
+        onPress(el, () => this._work(() => this._callAction(action)));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
+      });
+    });
+
     const rows = (model.body && model.body.rows) || [];
     this._holder.querySelectorAll(".act").forEach((el) => {
       const row = rows[Number(el.dataset.row)];
