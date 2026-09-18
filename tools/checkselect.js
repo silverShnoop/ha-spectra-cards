@@ -199,15 +199,25 @@ const js = fs.readFileSync(file);
     el._dim = null;
     await rerender();
     const fill = q("[data-dimfill]");
+    const knob = q("[data-dimthumb]");
     check("a scene that dims the room is watched doing it",
       fill.getAnimations().length > 0, "the bar just moved, no transition");
-    check("and it ends at the new level",
-      fill.style.width === "10%", fill.style.width);
+    /* The bar and the circle are one control and have to travel together.
+       Asserting only on the bar is what let them come apart: the circle was
+       jumping to the starting value as a real move, animating backwards,
+       then sitting still while the bar eased forward without it. */
+    check("and the circle travels with the bar, not without it",
+      knob.getAnimations().length > 0, "the bar animates alone");
+    check("both ending at the new level",
+      fill.style.width === "10%" && knob.style.left === "10%",
+      `bar ${fill.style.width}, circle ${knob.style.left}`);
 
     // ---- an unchanged brightness must not animate for no reason
     await rerender();
     check("an unchanged brightness does not animate",
-      q("[data-dimfill]").getAnimations().length === 0, "animating for nothing");
+      q("[data-dimfill]").getAnimations().length === 0
+        && q("[data-dimthumb]").getAnimations().length === 0,
+      "animating for nothing");
 
     // ---- the chevron must not spin every time anything happens
     const chev = q("[data-chev]");
