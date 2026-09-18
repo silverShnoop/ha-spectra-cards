@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.67.0";
+const VERSION = "0.68.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -265,6 +265,13 @@ ha-icon { display:inline-flex; line-height:0; }
 /* min-height:0 is what lets a grid row actually reach 0fr; without it the
    content's own height wins and nothing folds. */
 .drawerinner { overflow:hidden; min-height:0; }
+/* The lens sits ABOVE the control it names -- deliberately, so a finger does
+   not cover the one thing worth reading during a drag -- and inside a drawer
+   that means above the drawer's own top edge. The clipping that makes the
+   fold possible is therefore in genuine conflict with it, and the resolution
+   is time rather than geometry: clip while folding, stop once open. Anything
+   else either breaks the animation or hides the label under the hand. */
+.drawer.settled .drawerinner { overflow:visible; }
 .drawerbody { display:flex; flex-direction:column; gap:10px; padding:11px 0 3px; }
 /* Re-applied after a re-render, which happens several times a minute. Without
    this the drawer would replay its opening animation every time the house
@@ -1858,11 +1865,25 @@ function pickerInfo(extra, manual, nextText) {
   return [driving, extra].filter((v) => !isBlank(v)).join(" \u00b7 ");
 }
 
+/* Every scene the card knows about, however it was told.
+
+   `scenes` is the schedule's catalogue and carries the symbols; a room with
+   no schedule has no catalogue, and its scenes arrive as `drawer_scenes`
+   instead -- the same rooms, the same names, the same colours, reported by
+   the same sensor. Reading both here is what lets one card serve a room with
+   a schedule and a room without, rather than the absence of a catalogue
+   quietly costing the second one its scene colour and symbol. */
+function sceneCatalogue(b) {
+  if (Array.isArray(b.scenes) && b.scenes.length) return b.scenes;
+  if (Array.isArray(b.drawer_scenes)) return b.drawer_scenes;
+  return [];
+}
+
 /* The catalogue entry for a scene the schedule names, if there is one. The
    timeslots carry the colour and the catalogue carries the symbol, and a
    name is the only key the two share. */
 function pickerScene(b, label) {
-  const catalogue = Array.isArray(b.scenes) ? b.scenes : [];
+  const catalogue = sceneCatalogue(b);
   for (const scene of catalogue) {
     if (scene && String(scene.name) === String(label)) return scene;
   }
@@ -1893,6 +1914,11 @@ const BODY_STATUS = {
       }
     }
     const scene = pickerScene(b, label);
+    /* With no schedule there are no segments to take a colour from, so the
+       catalogue answers for both. Without this a scheduleless room named its
+       scene in plain grey while every scheduled room named its own in the
+       scene's colour -- the same statement, made two different ways. */
+    if (colour === null && scene) colour = cssColor(scene.color);
     return { text: label, color: colour, icon: scene ? scene.icon : null };
   },
 };
@@ -2984,34 +3010,50 @@ const BODIES = {
      watch the room flash through every one of them on the way to the one you
      wanted. The bar says what you are about to choose; the release chooses. */
   picker(b) {
+    /* A room without a smart scene is the SAME card with its schedule left
+       out, not a different one. Most rooms in a house have no schedule: they
+       still have a light to switch, a scene they are currently on, and a
+       brightness. Returning "" here is what used to force a second card type
+       to exist for them, and a second card type is a second set of bugs.
+
+       So everything below treats the schedule as the optional part. Where a
+       thing needs segments -- the bar, the marker, the auto button, the time
+       of the next change -- it is left out. Everything else is common. */
     const state = pickerState(b);
-    if (!state) return "";
-    const segments = state.segments;
+    const segments = state ? state.segments : [];
 
     /* Timeslots name a scene; only the catalogue knows which entity that is
        and what it looks like. Matched by name because that is the only key
        the two sides share. */
-    const catalogue = Array.isArray(b.scenes) ? b.scenes : [];
+    const catalogue = sceneCatalogue(b);
     const known = {};
     for (const scene of catalogue) {
       if (scene && !isBlank(scene.name)) known[String(scene.name)] = scene;
     }
 
-    const layout = pickerLayout(segments);
+    const layout = state ? pickerLayout(segments) : null;
     /* A dark room and an overridden room look identical through the active
        scene alone — both report "not the schedule" — and calling a room
        "Manual" when somebody simply turned the lights off is the card
        asserting an override nobody made. When the light says it is off,
-       that is the more specific truth and it wins. */
-    const { current, manual, lit } = state;
+       that is the more specific truth and it wins.
+
+       With no schedule there is nothing to override, so there is no mode:
+       `manual` is meaningless and stays false rather than being asserted
+       about a room that has no automatic behaviour to depart from. */
+    const current = state ? state.current : -1;
+    const manual = state ? state.manual : false;
+    const lit = state ? state.lit : (b.on === undefined || Boolean(b.on));
 
     /* Dim the unchosen only when a choice is being expressed. While the
        schedule is driving, no segment is more chosen than the clock says. */
     const choosing = lit && (manual || Boolean(b.picked));
     const now = new Date();
-    const caret = caretAt(segments, layout, now.getHours() * 60 + now.getMinutes());
+    const caret = state
+      ? caretAt(segments, layout, now.getHours() * 60 + now.getMinutes())
+      : null;
 
-    const bar = segments.map((s, i) => {
+    const bar = !state ? "" : segments.map((s, i) => {
       const scene = known[String(s.label)];
       return `<i data-seg="${i}"`
         + ` data-scene-entity="${esc(scene && scene.entity ? scene.entity : "")}"`
@@ -3029,11 +3071,12 @@ const BODIES = {
        in the middle of the scene you chose and carries nothing, because the
        clock is no longer what decides. Under a finger it goes where the
        finger goes. */
-    const middle = layout.offsets[current] + layout.widths[current] / 2;
-    const auto = lit && !manual;
+    const middle = state
+      ? layout.offsets[current] + layout.widths[current] / 2 : 0;
+    const auto = Boolean(state) && lit && !manual;
     const thumbAt = auto && caret !== null ? caret : middle;
     const autoIcon = firstOf(b.auto_icon, "mdi:sun-clock");
-    let out = `<div class="picker${choosing ? " choosing" : ""}${lit ? "" : " off"}"`
+    let out = !state ? "" : `<div class="picker${choosing ? " choosing" : ""}${lit ? "" : " off"}"`
       + ` role="slider" tabindex="0" data-pick`
       + ` aria-label="Scene"`
       + ` aria-valuemin="0" aria-valuemax="${segments.length - 1}"`
@@ -3052,15 +3095,22 @@ const BODIES = {
       + `<span class="dot" data-lensdot></span></span></div>`
       + `</div>`;
 
-    const chosen = segments[current];
-    const scene = known[String(chosen.label)];
-    const next = chosen.start !== null
+    const chosen = state ? segments[current] : null;
+    /* The scene the room is on. With a schedule that is whichever block is
+       current; without one the sensor says so directly, and the catalogue
+       supplies its symbol. */
+    const scene = chosen
+      ? known[String(chosen.label)]
+      : pickerScene(b, firstOf(b.picked, b.active));
+    const next = chosen && chosen.start !== null
       ? segments[(current + 1) % segments.length]
       : null;
     const nextText = next && next.start !== null
       ? `→ ${next.label} ${clockLabel(next.start)}`
       : null;
-    const smart = catalogue.find((sc) => sc && sc.smart);
+    /* The button that hands a room back to its schedule needs a schedule to
+       hand it back to. */
+    const smart = state ? catalogue.find((sc) => sc && sc.smart) : null;
 
     /* The scene's name lives in the title bar now, with one spinner beside
        it for the whole card. This row is the supporting line and the
@@ -3099,7 +3149,10 @@ const BODIES = {
          and a symbol on its own teaches nobody what it does. There is nothing
          to promise once overridden: Hue holds the scene rather than advancing
          to the next slot. */
-      + esc(lit ? pickerInfo(b.info, manual, nextText) : "")
+      /* No schedule, no mode, so no "Auto" to lead with -- just whatever
+         the room has to say for itself. Saying "Auto" about a room nothing
+         is automating would be the card inventing a behaviour. */
+      + esc(lit ? (state ? pickerInfo(b.info, manual, nextText) : firstOf(b.info, "")) : "")
       + `</p>`;
 
     /* Status and controls share one right-hand group so the buttons sit in
@@ -3307,8 +3360,17 @@ function bodyIsEmpty(type, b) {
         && !(Array.isArray(b.icons) && b.icons.length);
     case "strip":
     case "arc":
-    case "picker":
       return !(Array.isArray(b.segments) && b.segments.length)
+        && !(Array.isArray(b.timeslots) && b.timeslots.length);
+    /* A room is a room whether or not a smart scene drives it. Most rooms in
+       a house have no schedule at all, and they still have a light to switch,
+       a scene to name and a brightness to set -- so a picker earns its card on
+       having a light, and the schedule is the part that is optional. Hiding
+       them was what forced a second, different card to exist for "the other
+       rooms", which is the split this removes. */
+    case "picker":
+      return isBlank(b.light)
+        && !(Array.isArray(b.segments) && b.segments.length)
         && !(Array.isArray(b.timeslots) && b.timeslots.length);
     default:
       return false;
@@ -3567,6 +3629,12 @@ function dialRange(adjust, current) {
    module-scoped holder is the whole of the coordination needed, and nothing
    has to listen on the document or know what else is on the page. */
 let OPEN_DRAWER = null;
+/* Read once rather than per toggle. With motion reduced the fold does not
+   transition, so no transitionend arrives to say the drawer has settled and
+   the lens would stay clipped for ever. */
+const REDUCED_MOTION = typeof matchMedia === "function"
+  ? matchMedia("(prefers-reduced-motion: reduce)")
+  : { matches: false };
 
 function releaseDrawer(card) {
   if (OPEN_DRAWER === card) OPEN_DRAWER = null;
@@ -4737,10 +4805,19 @@ class SpectraCard extends HTMLElement {
       const key = drawer.getAttribute("data-drawer");
       const chev = this._holder.querySelector(`[data-chev="${key}"]`);
       if (this._open === key) {
-        drawer.classList.add("instant", "open");
+        /* Already open, and re-asserted without animating, so there is no
+           transition coming to tell us it has settled. It already has. */
+        drawer.classList.add("instant", "open", "settled");
         if (chev) chev.setAttribute("aria-expanded", "true");
         requestAnimationFrame(() => drawer.classList.remove("instant"));
       }
+      drawer.addEventListener("transitionend", (event) => {
+        /* Only the fold itself, not a colour or opacity finishing somewhere
+           inside the drawer's content. */
+        if (event.propertyName !== "grid-template-rows") return;
+        if (event.target !== drawer) return;
+        drawer.classList.toggle("settled", drawer.classList.contains("open"));
+      });
       if (!chev) return;
       const toggle = (event) => {
         event.stopPropagation();
@@ -4776,9 +4853,19 @@ class SpectraCard extends HTMLElement {
     }
     const drawer = this._holder.querySelector(`[data-drawer="${key}"]`);
     const chev = this._holder.querySelector(`[data-chev="${key}"]`);
-    if (drawer) drawer.classList.toggle("open", this._open === key);
+    const opening = this._open === key;
+    if (drawer) {
+      drawer.classList.toggle("open", opening);
+      /* Cleared the moment a close starts, so the lens cannot hang outside a
+         drawer that is folding away; set again by transitionend on the way
+         open. Reduced-motion turns the transition off entirely, so there is
+         no event then -- hence the immediate set here too. */
+      if (!opening || REDUCED_MOTION.matches) {
+        drawer.classList.toggle("settled", opening);
+      }
+    }
     if (chev) {
-      chev.setAttribute("aria-expanded", this._open === key ? "true" : "false");
+      chev.setAttribute("aria-expanded", opening ? "true" : "false");
     }
   }
 
@@ -4786,7 +4873,7 @@ class SpectraCard extends HTMLElement {
     if (!this._open) return;
     const drawer = this._holder.querySelector(`[data-drawer="${this._open}"]`);
     const chev = this._holder.querySelector(`[data-chev="${this._open}"]`);
-    if (drawer) drawer.classList.remove("open");
+    if (drawer) drawer.classList.remove("open", "settled");
     if (chev) chev.setAttribute("aria-expanded", "false");
     this._open = null;
     releaseDrawer(this);
