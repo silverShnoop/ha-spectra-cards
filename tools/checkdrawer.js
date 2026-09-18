@@ -126,7 +126,10 @@ const js = fs.readFileSync(file);
         rows: [{
           name: "Bedroom", light: "light.bedroom", on: true, active: "Read",
           brightness: 101,
-          scenes: DRAWER_SCENES,
+          /* drawer_scenes, not scenes: `scenes` is in RAW_KEYS and must stay
+             there for the picker's catalogue, so a row asking for the
+             from/each form needs the key that is actually resolved. */
+          drawer_scenes: DRAWER_SCENES,
         }],
       },
     };
@@ -182,6 +185,19 @@ const js = fs.readFileSync(file);
     q(b, '[data-chev="room-0"]').click();
     check("chevron closes it again",
       !q(b, '[data-drawer="room-0"]').classList.contains("open"), "still open");
+
+    /* The row's own track, which is a different code path from the picker's
+       and was briefly rendering nothing at all: the chevron still appeared,
+       because the dimmer alone is enough to earn one, so only asking about
+       the picker's track hid it completely. */
+    q(b, '[data-chev="room-0"]').click();
+    const rowCells = (b.shadowRoot || b).querySelectorAll("[data-cell]");
+    check("a room row builds its own scene track",
+      rowCells.length === 3, rowCells.length);
+    check("and keeps the scheduled scene off it",
+      !Array.from(rowCells).some((c) => c.getAttribute("data-label") === "Arise"),
+      "Arise leaked onto the row track");
+    q(b, '[data-chev="room-0"]').click();
 
     // ---- the scene track
     chevA.click();
