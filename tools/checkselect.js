@@ -184,6 +184,72 @@ const js = fs.readFileSync(file);
         && parseFloat(fade(chosenBand)) > 0.9,
       `chosen ${fade(chosenBand)}, other ${fade(otherBand)}`);
 
+    /* ---- the ring is where the band is.
+
+       style.left matching a number proves the attribute was written, not
+       that anything lines up: the marker is absolutely positioned, so the
+       wrong positioned ancestor or the wrong width puts it over the label
+       or across two bands while every string assertion still passes. So
+       measure it against the band it is supposed to be ringing. */
+    /* Measured at REST. Everything here now animates, so a rectangle or an
+       opacity read the instant after a change is a frame part-way through a
+       transition, not the state being asserted. 400ms clears the longest of
+       them (320ms). */
+    const settle = () => new Promise((r) => setTimeout(r, 400));
+    const boxOf = (n) => n.getBoundingClientRect();
+    await settle();
+    const ringed = all("[data-cell]").find((c) => c.classList.contains("on"));
+    const mbox = boxOf(q("[data-bandmark]"));
+    const bbox = boxOf(ringed);
+    check("the ring sits exactly on the band it marks",
+      Math.abs(mbox.left - bbox.left) < 1.5 && Math.abs(mbox.width - bbox.width) < 1.5,
+      `ring ${mbox.left.toFixed(1)}+${mbox.width.toFixed(1)},`
+      + ` band ${bbox.left.toFixed(1)}+${bbox.width.toFixed(1)}`);
+    check("and vertically over the bands, not over the label",
+      Math.abs(mbox.top - bbox.top) < 1.5,
+      `ring top ${mbox.top.toFixed(1)}, band top ${bbox.top.toFixed(1)}`);
+
+    /* ---- the dimming has to outlive the press.
+
+       Keyed off `picked` it lasted exactly as long as the optimistic window
+       and then went away while the room was still on the scene. */
+    el._pick = null;
+    el._pickGiveUp = null;
+    el._config.body.active = "Rest";
+    await rerender();
+    await settle();
+    const litBand = all("[data-cell]").find((c) => c.classList.contains("on"));
+    const dimBand = all("[data-cell]").find((c) => !c.classList.contains("on"));
+    check("the rest stay dim while the room is on that scene, press or no press",
+      parseFloat(getComputedStyle(dimBand).opacity) < 0.6
+        && parseFloat(getComputedStyle(litBand).opacity) > 0.9,
+      `chosen ${getComputedStyle(litBand).opacity},`
+      + ` other ${getComputedStyle(dimBand).opacity}`);
+
+    /* ---- and during a drag, around whichever band the finger is over */
+    const dbox = q(".scenetrack .slidehold").getBoundingClientRect();
+    const dopt = (x) => ({ clientX: x, clientY: dbox.top + dbox.height / 2,
+      button: 0, bubbles: true, pointerId: 2 });
+    const dtrack = q("[data-track]");
+    dtrack.dispatchEvent(new PointerEvent("pointerdown", dopt(dbox.left + dbox.width * 0.1)));
+    await settle();
+    const under = all("[data-cell]").find((c) => c.classList.contains("at"));
+    const notUnder = all("[data-cell]").find((c) => !c.classList.contains("at"));
+    check("dragging dims every band but the one under the finger",
+      parseFloat(getComputedStyle(notUnder).opacity) < 0.6
+        && parseFloat(getComputedStyle(under).opacity) > 0.9,
+      `under ${getComputedStyle(under).opacity},`
+      + ` other ${getComputedStyle(notUnder).opacity}`);
+    check("and the ring follows the finger onto that band",
+      Math.abs(boxOf(q("[data-bandmark]")).left - boxOf(under).left) < 1.5,
+      `ring ${boxOf(q("[data-bandmark]")).left.toFixed(1)},`
+      + ` band ${boxOf(under).left.toFixed(1)}`);
+    dtrack.dispatchEvent(new PointerEvent("pointerup", dopt(dbox.left + dbox.width * 0.1)));
+    calls.length = 0;
+    el._pick = { label: "Rest", at: Date.now() };
+    el._config.body.active = "Shine";
+    await rerender();
+
     // ---- the strip above must stop claiming the schedule
     check("the strip marks no block, because the room is off its schedule",
       all(".strip i.on").length === 0,
