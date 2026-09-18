@@ -525,20 +525,31 @@ All of it is off under `prefers-reduced-motion`.
 ### A hero that names more than one thing
 
 `"Refuse + Food"` is two bins in one phrase, and no single icon in front of it
-is honest. `hero_icons` is a list, one entry per thing:
+is honest. Nor is a row of icons in front of the whole phrase: bunched at the
+front, neither one says which bin it means. So the hero is built from parts,
+each name carrying its own icon:
 
 ```yaml
 body:
   type: stat
   hero: {entity: sensor.bin_next}
-  hero_icons:
-    - {entity: sensor.bin_next_type_1, map: {Food Caddy: mdi:food-apple, ...}}
-    - {entity: sensor.bin_next_type_2, map: {Food Caddy: mdi:food-apple, ...}}
+  hero_parts:
+    - icon: {entity: sensor.bin_next_type_1, map: {Food Caddy: mdi:food-apple, ...}}
+      text: {entity: sensor.bin_next_type_1, map: {Food Caddy: Food, ...}}
+    - icon: {entity: sensor.bin_next_type_2, map: {Food Caddy: mdi:food-apple, ...}}
+      text: {entity: sensor.bin_next_type_2, map: {Food Caddy: Food, ...}}
 ```
 
-Blank entries drop out, so one bin going out shows one icon with no change to
-the config. Icons are sized in `em` off the hero, so they stay in proportion
-to a number that is deliberately large.
+renders `[bin] Refuse + [apple] Food`. `hero_join` sets what goes between the
+parts; it defaults to `" + "`.
+
+Parts whose text reads as nothing drop out, so one bin going out shows one
+name and one icon with no change to the config, and no separator left hanging.
+If every part reads as nothing — a boot where the sources have not filled in
+yet — the plain `hero` is used instead, which is why it is worth keeping
+configured. Icons are sized in `em` off the hero, so they stay in proportion
+to text that is deliberately large, and a name never breaks away from its icon
+across a line end.
 
 Anything that is not an icon name is dropped too. A `map` with no entry for a
 value passes that value straight through, so without that guard an unmapped

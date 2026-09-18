@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.59.0";
+const VERSION = "0.60.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -217,13 +217,17 @@ const SHEET = `
   display:inline-block; margin-right:5px; vertical-align:-0.15em;
 }
 .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
-/* Sized off the hero rather than fixed, so they stay in proportion to a
-   number that is deliberately large. Boxed and baselined like every other
-   icon that sits in front of words. */
-.heroicons { display:inline-flex; gap:5px; margin-right:9px; vertical-align:-0.05em; }
-.heroicons ha-icon {
-  --mdc-icon-size:0.5em; width:0.5em; height:0.5em; display:inline-block;
+/* An icon leads the name it belongs to, so a name and its icon must not be
+   split across a line break. Sized off the hero rather than fixed, so they
+   stay in proportion to text that is deliberately large, and boxed and
+   baselined like every other icon that sits in front of words. */
+.heropart { white-space:nowrap; }
+.heroicon {
+  --mdc-icon-size:0.5em; width:0.5em; height:0.5em;
+  display:inline-block; margin-right:0.18em; vertical-align:-0.05em;
 }
+/* pre, because the separator's spaces are the gap either side of it. */
+.herojoin { white-space:pre; }
 
 /* metric strip */
 .metrics {
@@ -1949,6 +1953,17 @@ function textOn(colour) {
   return luminance > 0.45 ? "#2B2724" : "#FAF8F2";
 }
 
+/* An icon name, not whatever the source happened to say. A `map` with no
+   entry for a value passes that value straight through, so without this a bin
+   type nobody has mapped yet would be handed to <ha-icon> as its icon name and
+   draw an empty slot. Any namespace is fine -- mdi:, spectra:, a custom set --
+   but a bare word is not an icon. */
+function heroIconMarkup(icon) {
+  return isBlank(icon) || String(icon).indexOf(":") <= 0
+    ? ""
+    : `<ha-icon class="heroicon" icon="${esc(icon)}"></ha-icon>`;
+}
+
 function pillMarkup(pill, extraStyle) {
   const p = typeof pill === "string" ? { text: pill } : pill;
   if (!p || isBlank(p.text)) return "";
@@ -2151,23 +2166,26 @@ const BODIES = {
   /* What is the one number or word? */
   stat(b) {
     let out = "";
-    /* A hero naming more than one thing can say so in icons. "Refuse + Food"
-       is two bins in one phrase, and no single icon in front of it is
-       honest -- so the icons are a list, one per thing, and the blanks drop
-       out. One bin going out shows one icon without the config changing. */
-    const heroIcons = (Array.isArray(b.hero_icons) ? b.hero_icons : [])
-      /* An icon name, not whatever the source happened to say. A map with no
-         entry for a value passes that value straight through, so without this
-         a bin type nobody has mapped yet would be handed to <ha-icon> as its
-         icon name and draw an empty slot. Any namespace is fine -- mdi:,
-         spectra:, a custom set -- but a bare word is not an icon. */
-      .filter((icon) => !isBlank(icon) && String(icon).indexOf(":") > 0);
-    if (!isBlank(b.hero)) {
-      const lead = heroIcons.length
-        ? `<span class="heroicons">${heroIcons.map((icon) =>
-            `<ha-icon icon="${esc(icon)}"></ha-icon>`).join("")}</span>`
-        : "";
-      out += `<p class="hero">${lead}${esc(b.hero)}</p>`;
+    /* A hero naming more than one thing puts an icon in front of each name
+       rather than a row of icons in front of the phrase. "Refuse + Food" is
+       two bins, and the trash can belongs to the first word only -- bunched
+       at the front, neither icon says which bin it means. Parts that read as
+       nothing drop out, so one bin going out shows one name and one icon
+       without the config changing. */
+    const heroParts = (Array.isArray(b.hero_parts) ? b.hero_parts : [])
+      .map((p) => (typeof p === "string" ? { text: p } : p))
+      .filter((p) => p && !isBlank(p.text));
+    if (heroParts.length) {
+      const join = isBlank(b.hero_join) ? " + " : b.hero_join;
+      const parts = heroParts.map((p) =>
+        `<span class="heropart">${heroIconMarkup(p.icon)}${esc(p.text)}</span>`);
+      out += `<p class="hero">`
+        + parts.join(`<span class="herojoin">${esc(join)}</span>`)
+        + `</p>`;
+    } else if (!isBlank(b.hero)) {
+      /* The whole phrase from one source, for a hero that names one thing --
+         and the fallback on a boot where the parts have not filled in yet. */
+      out += `<p class="hero">${esc(b.hero)}</p>`;
     }
     if (!isBlank(b.sub)) out += `<p class="sub">${escLines(b.sub)}</p>`;
     const chips = (Array.isArray(b.chips) ? b.chips : [])
@@ -3098,6 +3116,7 @@ function bodyIsEmpty(type, b) {
       return !Array.isArray(b.rows) || b.rows.length === 0;
     case "stat":
       return isBlank(b.hero) && isBlank(b.sub)
+        && (!Array.isArray(b.hero_parts) || b.hero_parts.length === 0)
         && (!Array.isArray(b.chips) || b.chips.length === 0);
     case "status":
       return isBlank(b.hero) && isBlank(b.sub) && isBlank(b.hero_note)
