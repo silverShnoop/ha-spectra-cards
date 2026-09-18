@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.66.0";
+const VERSION = "0.67.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3342,13 +3342,17 @@ const PRESS_HOLD_MS = 280;
    the one that was pressed, then it shrinks out, and only then is the card
    allowed to re-render into the space. The survivors slide into their new
    places from their old ones rather than appearing there. */
-/* How often the brightness slider is allowed to speak to the bridge while
-   a finger is moving. Dragging a room's brightness is ONE command per frame
-   -- the bridge distributes it -- which is the only reason live dragging is
-   affordable at all; the per-bulb alternative would be eleven commands per
-   frame in the Kitchen. Five a second still looks continuous and leaves the
-   bridge a wide margin against Hue's rate limiting, which is stricter for
-   groups than for lights. */
+/* The shortest gap between two things the slider says to the bridge while
+   a finger is moving. A FLOOR, not a rate: a command also waits for the one
+   before it to come back, so the card paces itself to whatever the bridge is
+   actually keeping up with rather than to a number guessed here.
+
+   Dragging a room's brightness is ONE command however many bulbs the room
+   holds -- the bridge distributes it -- which is the only reason live
+   dragging is affordable at all. The per-bulb alternative would be eleven
+   commands per frame in the Kitchen. Five a second reads as continuous, and
+   Hue's own guidance is stricter for groups than for lights, so the floor
+   matters; the serialising below is what makes exceeding it impossible. */
 const SLIDE_LIVE_MS = 200;
 /* How long the slider goes on showing what you asked for. Hue stores
    brightness as a percentage, so a value round-trips through 8 bits ±1 and
@@ -4808,32 +4812,82 @@ class SpectraCard extends HTMLElement {
     /* Throttled, and the trailing edge matters as much as the leading one:
        without the timer the last move of a slow drag -- the one you actually
        stopped on -- would be the one that never got sent. */
+    /* Talking to the house while the finger moves needs more than a timer.
+
+       aiohue does not drop a command the bridge refuses. On a 429 it retries,
+       up to twenty-five times, backing off further each go, over a pool of
+       three connections. So over-driving it does not fail loudly -- it
+       queues, and that queue drains in an order nothing promises. The room
+       would settle on a brightness from the MIDDLE of the drag, seconds after
+       the finger left, with the card confidently showing the end of it.
+
+       So: one command in flight at a time, the newest value wins, and
+       everything the slider says -- each live step, the commit on the lift,
+       and the restore when a drag is abandoned -- goes through one queue in
+       order. Nothing here can outrun the bridge, whatever the floor is set
+       to and whatever else is talking to it. */
+    let spoke = null;
+    let pending = null;
+    let inFlight = false;
     let liveAt = 0;
     let liveTimer = null;
-    let spoke = null;
-    const say = (v) => { liveAt = Date.now(); spoke = v; spec.live(v); };
+    let tail = Promise.resolve();
+
+    /* Errors are swallowed rather than propagated: _callAction has already
+       logged them, and a rejection here would poison every later send. */
+    const queue = (send) => {
+      tail = tail.then(send).catch(() => {});
+      return tail;
+    };
+
+    const dispatch = (v) => {
+      if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
+      pending = null;
+      spoke = v;
+      liveAt = Date.now();
+      inFlight = true;
+      const done = queue(() => spec.live(v));
+      done.then(() => { inFlight = false; pump(); });
+      return done;
+    };
+
+    const pump = () => {
+      if (inFlight || pending === null) return;
+      const wait = Math.max(0, SLIDE_LIVE_MS - (Date.now() - liveAt));
+      if (!wait) { dispatch(pending); return; }
+      if (!liveTimer) {
+        liveTimer = setTimeout(() => { liveTimer = null; pump(); }, wait);
+      }
+    };
+
     const speak = (v) => {
       if (!spec.live) return;
-      const wait = Math.max(0, SLIDE_LIVE_MS - (Date.now() - liveAt));
-      if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
-      if (!wait) { say(v); return; }
-      liveTimer = setTimeout(() => { liveTimer = null; say(value); }, wait);
+      pending = v;
+      pump();
     };
+
     const hush = () => {
+      pending = null;
       if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
     };
+
+    /* The last word, on the lift. It skips the floor -- it is the value you
+       stopped on and nothing should follow it -- but still goes through the
+       queue, so it cannot overtake a step already on the wire. */
+    const sendFinal = (v) => (spec.live ? dispatch(v) : Promise.resolve());
+
     /* Abandoning a drag has to mean abandoning it.
 
        Without live dragging this was free: nothing had been said, so saying
        nothing was the whole of it. Now the room has been moving under the
        finger, and a gesture that ends in a shrug -- dragged away from the
        control, or cancelled by the browser -- would otherwise leave the house
-       at the last value the throttle happened to send while the card goes
-       back to showing where it started. So put the room back. */
+       where the last step happened to land while the card goes back to
+       showing where it started. So put the room back. */
     const recant = () => {
       hush();
       if (spoke === null || spoke === began) return;
-      say(began);
+      speak(began);
     };
 
     const show = (v) => {
@@ -4881,8 +4935,9 @@ class SpectraCard extends HTMLElement {
          the commit, so it must not land after it. */
       hush();
       el.classList.remove("picking", "adrift");
-      if (commit && !adrift && value !== began) spec.commit(value);
-      else recant();
+      if (commit && !adrift && value !== began) {
+        spec.commit(value, () => sendFinal(value));
+      } else recant();
       this._signature = null;
       this._update();
     };
@@ -4942,7 +4997,7 @@ class SpectraCard extends HTMLElement {
       if (this._slideKey) clearTimeout(this._slideKey);
       this._slideKey = setTimeout(() => {
         el.classList.remove("picking");
-        spec.commit(value);
+        spec.commit(value, () => sendFinal(value));
         this._signature = null;
         this._update();
       }, 600);
@@ -5001,23 +5056,29 @@ class SpectraCard extends HTMLElement {
       /* Under the finger. No spinner and no optimistic bookkeeping: the
          slider is already painted where the finger is, a render cannot
          interrupt a drag, and a spinner appearing five times a second is
-         noise rather than an answer. */
+         noise rather than an answer.
+
+         The promise is returned and it matters: it is how the queue above
+         knows the bridge has finished with one step before starting the
+         next, which is the whole of the pacing. */
       live: (v) => {
-        if (isBlank(light)) return;
-        this._callAction({
+        if (isBlank(light)) return Promise.resolve();
+        return this._callAction({
           service: "hue_active_scene.set_room_brightness",
           target: { entity_id: light },
           data: { brightness_pct: v, transition: SLIDE_LIVE_MS / 1000 },
         });
       },
-      /* One call to the bridge, which dims the lights that are on and leaves
-         the ones a scene deliberately left off alone -- which is the whole
-         reason this does not go through light.turn_on.
+      /* The lift. The sending itself belongs to the queue -- `send` is the
+         same one call to the bridge, ordered behind anything still on the
+         wire -- so what is left here is the promise the card makes to the
+         eye: hold this value until the house agrees, and show that something
+         is happening until it does.
 
-         Sent again on the lift even though the throttle has almost certainly
-         sent it already: it is idempotent, and it is the only way to be sure
+         Sent again even though a live step has almost certainly sent it
+         already: it is idempotent, and it is the only thing that guarantees
          the value you stopped on is the value the room ends on. */
-      commit: (v) => {
+      commit: (v, send) => {
         if (isBlank(light)) return;
         this._dim = { light: light, pct: v };
         if (this._dimGiveUp) clearTimeout(this._dimGiveUp);
@@ -5027,11 +5088,7 @@ class SpectraCard extends HTMLElement {
           this._signature = null;
           this._update();
         }, DIM_GIVE_UP_MS);
-        this._work(() => this._callAction({
-          service: "hue_active_scene.set_room_brightness",
-          target: { entity_id: light },
-          data: { brightness_pct: v, transition: 0.2 },
-        }));
+        this._work(send);
       },
     });
   }
