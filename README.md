@@ -587,31 +587,47 @@ rail sitting above its own content is the actual question.
 In every case the summary text says the same thing in words, because colour
 never carries meaning alone.
 
-### A row that has been dealt with
+### A row arriving, and a row leaving
 
-Pressing a row's action button used to make the row vanish inside the flash,
-with everything below it jumping up a place. Now:
+Rows do not blink in and out. A row that joins the list fades and grows in
+over 260ms; a row that leaves shrinks and fades out over 420ms, and the rows
+after it **slide** into their new places rather than appearing there.
 
-1. the button flashes, as before;
-2. the row is left alone for half a second, long enough to register as the
-   one that was pressed;
-3. it shrinks and fades out over 420ms;
-4. the rows after it **slide** into their new places rather than appearing
-   there.
+**The transition belongs to the list, not to what caused the change.** This
+was got wrong once and it is worth saying why. The exit used to be started
+by the press handler, on the reasoning that the point was to make the press
+feel answered. The result was that half the disappearances animated and half
+did not: a row you dismissed slid away, and a row that went because the
+house stopped needing it — a door opened, a snooze expired, a battery
+recovered — simply vanished. Worse than inconsistent, it was *misleading*,
+because it taught the eye that a row leaving quietly meant nobody had done
+anything.
 
-Step 4 needs the row to be identifiable across a re-render, so a row carrying
-an `id` renders it as `data-key`. `home_signals`' Needs-you and System-health
-items already carry one. Without an id the row still leaves; only the sliding
-is lost, since nothing can tell which row moved where.
+So arrivals and departures are decided in one place, by comparing the keys
+on the page with the keys in the markup about to replace them. A press, a
+snooze expiring and a door opening all reach that comparison the same way,
+so they all look the same. The press has its own answer already: the button
+flashes, and spins until the house agrees.
+
+A departure has to run **before** the swap, because after it the row does
+not exist to animate. So the swap waits one animation: the doomed rows are
+marked, the paint is deferred, and the re-render finds them genuinely gone.
+That deferral is latched — without the latch the deferred paint finds the
+same doomed rows still on the page and defers again, forever, which is a
+worse bug than the one being fixed.
+
+Nothing animates on the first paint. A card that deals itself in one row at
+a time on every page load looks broken.
+
+Identifying a row across a re-render needs a key, so a row carrying an `id`
+renders it as `data-key`. `home_signals`' Needs-you and System-health items
+already carry one. Without an id a row is not tracked: it will not arrive or
+leave, and it cannot slide, since nothing can tell which row moved where.
 
 A flowed list is a CSS grid, and a grid cannot transition its own reflow —
 items simply appear in their new cells. So positions are measured before the
 swap and the survivors are animated back from them afterwards, the same
 snapshot-and-move the strip already uses for its marker.
-
-The exit starts on the **press**, not on the state coming back, because the
-point is that the press feels answered. If the row turns out to still be
-there, the next render brings it back.
 
 All of it is off under `prefers-reduced-motion`.
 
