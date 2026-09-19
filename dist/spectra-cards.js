@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.81.0";
+const VERSION = "0.82.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -420,6 +420,18 @@ ha-icon { display:inline-flex; line-height:0; }
 }
 .estopbtn ha-icon { --mdc-icon-size:20px; }
 .estop:active .estopbtn { background:var(--accent); color:var(--sp-paper); }
+/* The press flash is an inset box-shadow, and an inset shadow paints
+   BEHIND its element's children. This button is a transparent wrapper --
+   the background lives on the face inside it -- so the wash landed under
+   an opaque child and was never seen. So it is moved onto the face,
+   which is the part that has a background to wash. */
+.estop.pressed { animation:none; }
+.estop.pressed .estopbtn { animation: sp-press 260ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .estop.pressed .estopbtn {
+    animation:none; box-shadow:inset 0 0 0 999px var(--sp-press);
+  }
+}
 
 /* Water on the floor outranks everything else on the card, so it is the
    only thing here allowed to take the full width and a solid fill. */
@@ -2618,18 +2630,20 @@ const BODIES = {
          which is now the only place the meaning lives: the two glyphs
          have to carry it, so they are a plug being pulled and a plug
          going back in, not one ambiguous power toggle. */
-      /* Terracotta, always, and never the card's accent. Accent 1 is the
-         alert role, and an emergency stop IS that role -- it is not
-         decoration inheriting whatever hue the card was given, which is
-         how this shipped purple beside a red leak band.
+      /* Terracotta to cut, moss to restore, and never the card's accent.
+         Accent 1 is the alert role and an emergency stop IS that role --
+         not decoration inheriting whatever hue the card was given, which
+         is how this shipped purple beside a red leak band.
 
-         It stays red in the restore state too. A real stop is red whether
-         or not it is currently latched out, and a control that changes
-         colour is a control you have to find again: looking the same in
-         every state is the safety property, not a missed chance to be
-         informative. What it will do is said by the glyph and the label. */
+         The two states are different colours because they are different
+         acts. Red kills a running machine; putting the power back is the
+         ordinary, safe direction and green says so. The earlier argument
+         for one colour -- that a stop you have to re-find is a worse stop
+         -- only holds while there is a stop to find. With the plug
+         already off there is nothing to stop, and a red button whose
+         whole job is to undo the red one reads as a second emergency. */
       out += `<button type="button" class="estop" data-estop`
-        + ` style="${accentStyle(1)}"`
+        + ` style="${accentStyle(powered ? 1 : 3)}"`
         + ` title="${esc(powered ? "Cut power at the plug" : "Restore power at the plug")}"`
         + ` aria-label="${esc(powered ? "Cut power at the plug" : "Restore power at the plug")}">`
         + `<span class="estoplip"></span>`
@@ -3797,6 +3811,12 @@ const DIM_SETTLE = 2;
 const DIM_GIVE_UP_MS = 12000;
 
 const LEAVE_MS = 420;
+/* Matches the sp-press keyframes. A flash outliving its own animation
+   would be carried onto a node that then never clears it. */
+const PRESS_MS = 260;
+/* Everything a finger can reach. One list, so a flash carried across a
+   re-render lands on the same control it left. */
+const PRESSABLE = 'button, [role="button"], [data-estop], .act, .iconbtn';
 const SETTLE_MS = 380;
 
 /* ---- moving the bar ----
@@ -4917,9 +4937,30 @@ class SpectraCard extends HTMLElement {
     }
     this._leavingNow = false;
 
+    /* A press flash lives on a DOM node, and a re-render throws that node
+       away. `_work` re-renders the instant it is called -- that IS the
+       spinner appearing -- so every control reporting progress flashed
+       for less than one frame and looked dead under the finger. The list
+       rows survived only because they do not report progress, which is
+       why this looked like a washer bug rather than a general one.
+
+       Carried across the swap by position among the pressables, which is
+       stable across a re-render of the same card, and only for as long as
+       the animation itself would have lasted. */
+    const pressables = () => Array.from(holder.querySelectorAll(PRESSABLE));
+    const wasLit = pressables().findIndex((el) => el.classList.contains("pressed"));
+    if (wasLit >= 0 && !this._flashUntil) this._flashUntil = Date.now() + PRESS_MS;
+
     const shot = had ? motionSnapshot(holder) : null;
     holder.innerHTML = html;
     motionFrom(holder, shot);
+
+    if (wasLit >= 0 && Date.now() < this._flashUntil) {
+      const again = pressables()[wasLit];
+      if (again) again.classList.add("pressed");
+    } else {
+      this._flashUntil = 0;
+    }
 
     /* Nothing arrives on the first paint. A card that deals itself in one
        row at a time on every page load is a card that looks broken. */

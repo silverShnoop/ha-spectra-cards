@@ -209,10 +209,15 @@ const js = fs.readFileSync(file);
     check("and not the card's accent",
       edge() !== card && card !== alert, `${edge()} (a6 is ${card})`);
     await show({ powered: false });
-    /* Same colour latched out. A stop you have to re-find because it
-       changed colour is a worse stop. */
-    check("restore keeps the same colour, so the control stays findable",
-      edge() === alert, `${edge()} (a1 is ${alert})`);
+    /* Cut and restore are different acts and do not look alike. The
+       earlier version of this check asserted one colour for both, on the
+       argument that a stop you have to re-find is a worse stop. That only
+       holds while there IS a stop to find: with the plug already off
+       there is nothing to stop, and a red button whose whole job is to
+       undo the red one reads as a second emergency. */
+    const safe = tokenColour("--sp-a3");
+    check("restore is the positive colour, not the alert one",
+      edge() === safe && safe !== alert, `${edge()} (a3 is ${safe})`);
 
     // ---- the shrunk target still says what it is
     await show({ powered: true, state: "running" });
