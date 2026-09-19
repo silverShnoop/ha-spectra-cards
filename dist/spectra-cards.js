@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.91.0";
+const VERSION = "0.92.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -404,6 +404,37 @@ ha-icon { display:inline-flex; line-height:0; }
   font-family:var(--sp-mono); font-size:15px; font-weight:600;
   line-height:1; color:var(--accent);
 }
+/* The phase strip. Cells, not a track.
+   Wrapping rather than scrolling: a wall panel is not scrolled, and a
+   long wash can run past a dozen cells. Past cells are muted ink and the
+   live one takes the card's accent, which is the whole of the emphasis --
+   four hues for four phases would put a second colour system on a card
+   that already has one. */
+.phstrip {
+  display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px;
+  margin-top:12px;
+}
+/* Past cells wear ink-2, not the fainter ink-3 they started in. These
+   glyphs are content -- they are the answer to "what did it do" -- and
+   ink-3 put them at 3.1:1 against light paper, which is furniture
+   contrast for a sentence somebody is meant to read. The live cell is
+   separated by taking the accent, not by everything else receding. */
+.phcell {
+  display:inline-flex; align-items:center; gap:5px;
+  color:var(--sp-ink-2); line-height:1;
+}
+.phcell ha-icon { --mdc-icon-size:17px; }
+.phcell.now { color:var(--accent); }
+.phword {
+  font-size:12px; font-weight:500; letter-spacing:.01em;
+  color:var(--accent);
+}
+/* The live cell breathes, at the same rate as every other live thing on
+   the panel. It is the one part of the strip making a claim about RIGHT
+   NOW, and a still strip beside a running machine looked like a
+   screenshot of one. */
+.phcell.now ha-icon { animation:sp-breathe 3s ease-in-out infinite; }
+
 .washmain, .lockmain { flex:1 1 auto; min-width:0; }
 /* One hero size for both. The lock card and the washer card sit on
    different pages but are the same shape, and a hero that changed size
@@ -1135,7 +1166,8 @@ img.avatar { object-fit:cover; display:block; }
 /* A panel is looked at all evening. Anyone who has asked their system to
    stop animating things means it here too. */
 @media (prefers-reduced-motion: reduce) {
-  .pb, .strand .bulb, .fk, .burst, .diya.lit .fl { animation:none; }
+  .pb, .strand .bulb, .fk, .burst, .diya.lit .fl,
+  .phcell.now ha-icon { animation:none; }
   .fk { opacity:0; }
 }
 /* The box is a fixed 20px whatever the flame inside it is doing, so a room
@@ -1539,10 +1571,15 @@ function spanOf(start, end) {
 }
 
 /** "2m", "1h 12m", "3d 4h" — the rail's and the strip's unit of time. */
-function shortSince(value) {
-  const t = Date.parse(value);
-  if (isNaN(t)) return null;
-  const secs = Math.max(0, Math.round((Date.now() - t) / 1000));
+/* How long, in the panel's one way of saying it.
+ *
+ * Split out of `shortSince` when the phase strip needed to say how long a
+ * wash spent heating. That is a duration, not an age, but it is read on
+ * the same card as "47m ago" and a second vocabulary for the same
+ * quantity -- "3 min" beside "3m" -- is the kind of drift the `since`
+ * format was introduced to end. */
+function shortDuration(secs) {
+  secs = Math.max(0, Math.round(secs));
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);
   if (mins < 60) return `${mins}m`;
@@ -1550,6 +1587,12 @@ function shortSince(value) {
   if (hours < 24) return hours + "h" + (mins % 60 ? ` ${mins % 60}m` : "");
   const days = Math.floor(hours / 24);
   return days + "d" + (hours % 24 ? ` ${hours % 24}h` : "");
+}
+
+function shortSince(value) {
+  const t = Date.parse(value);
+  if (isNaN(t)) return null;
+  return shortDuration((Date.now() - t) / 1000);
 }
 
 /* Every past timestamp on the panel reads the same way: how long ago, then
@@ -2738,6 +2781,18 @@ const BODIES = {
         + `</button>`;
     }
     out += `</div>`;
+
+    /* Under the row, not beside it. The strip grows with the wash -- eight
+       cells by the end of the measured cycle -- and anything that changes
+       width beside the hero would push the hero around as the machine
+       worked. It also only appears while there is something to say: a
+       machine that has not run since a restart has no timeline, and an
+       empty rule across the card would be a heading for nothing.
+
+       Shown while running, and while the washing is still in the drum.
+       Those are the two moments somebody walks over to ask what happened:
+       the first wants "what is it doing", the second "what did it do". */
+    if (running || b.drum_full) out += washerPhases(b, running);
 
     const finished = Array.isArray(b.finished) ? b.finished : [];
     if (finished.length) {
@@ -4433,6 +4488,87 @@ function washerDrum(b, cycle, leak, powered, waiting) {
     + `<circle class="drumring${powered ? "" : " broken"}" cx="${c}" cy="${c}" r="${r}"></circle>`
     + `<circle class="drumface" cx="${c}" cy="${c}" r="24"></circle>${arc}</svg>`
     + inner + `</div>`;
+}
+
+/* What the machine has done this cycle, left to right.
+ *
+ * A wash is not four steps in order. The measured cycle behind this heats
+ * twice and spins three times, with tumbling between, and the integration
+ * reports it as a LIST of runs rather than a position in a sequence. So
+ * this is a record, not a progress bar: no connecting track, no
+ * arrowheads, nothing that says how much is left. Drawing it as a track
+ * would be promising an end time nothing here knows.
+ *
+ * Four glyphs, and the pair that had to be argued about is tumble against
+ * spin, because both are the drum going round:
+ *
+ *   fill    mdi:water           water going in
+ *   heat    mdi:thermometer     the element
+ *   tumble  mdi:sync            two arrows opposed -- the drum reverses
+ *   spin    mdi:rotate-right    one arrow, one direction, flat out
+ *
+ * Mirror images (rotate-left against rotate-right) were the obvious pair
+ * and the worst one: at 17px two glyphs that differ only in handedness
+ * are one glyph. Opposed-versus-single is a difference in FORM, which
+ * survives the size. `mdi:autorenew` is deliberately not used here even
+ * though it is the closest thing to a spin -- it is already the drum's
+ * own "running" glyph, three centimetres to the left.
+ *
+ * Only the live cell is named in words. Eight labelled cells is a
+ * paragraph; one label teaches the reader what the glyph beside it means
+ * and the rest of the strip then reads itself. Every cell carries the
+ * full sentence as its accessible name regardless, because a glyph with
+ * no name is nothing at all to a screen reader.
+ *
+ * When the machine is idle nothing is live, and the whole strip goes
+ * quiet: it is then a record of a wash that has finished, and the last
+ * cell is the last thing it did, not the thing it is doing. Lighting it
+ * would be the card claiming a machine is running when it is not. */
+const PHASE_GLYPH = {
+  fill: "mdi:water",
+  heat: "mdi:thermometer",
+  tumble: "mdi:sync",
+  spin: "mdi:rotate-right",
+};
+const PHASE_DOING = {
+  fill: "Filling", heat: "Heating", tumble: "Tumbling", spin: "Spinning",
+};
+const PHASE_DID = {
+  fill: "Filled", heat: "Heated", tumble: "Tumbled", spin: "Spun",
+};
+
+function washerPhases(b, running) {
+  const phases = Array.isArray(b.phases) ? b.phases : [];
+  const cells = [];
+  phases.forEach((phase, i) => {
+    if (!phase || typeof phase !== "object") return;
+    const kind = String(phase.kind || "").toLowerCase();
+    const glyph = PHASE_GLYPH[kind];
+    /* An unknown kind is skipped rather than drawn as a question mark. A
+       new phase the integration learns to report should appear on this
+       card as nothing until somebody decides what it looks like -- not as
+       a glyph that says "the card does not know". */
+    if (!glyph) return;
+    const now = running && i === phases.length - 1;
+    /* The live cell dates itself from when it started, so it keeps
+       counting between the plug's readings; a finished one reports what
+       it actually measured. */
+    const ran = now
+      ? (shortSince(phase.started_at) || shortDuration(Number(phase.seconds) || 0))
+      : shortDuration(Number(phase.seconds) || 0);
+    const said = now
+      ? `${PHASE_DOING[kind]}, ${ran} so far`
+      : `${PHASE_DID[kind]} for ${ran}`;
+    cells.push(`<span class="phcell${now ? " now" : ""}" role="listitem"`
+      + ` title="${esc(said)}" aria-label="${esc(said)}">`
+      + `<ha-icon icon="${glyph}"></ha-icon>`
+      + (now ? `<span class="phword">${esc(PHASE_DOING[kind])}</span>` : "")
+      + `</span>`);
+  });
+  if (!cells.length) return "";
+  return `<div class="phstrip" role="list"`
+    + ` aria-label="${esc(running ? "What it is doing" : "What it did")}">`
+    + cells.join("") + `</div>`;
 }
 
 /* The state, as a shape, at the size the washer's drum is -- because a
