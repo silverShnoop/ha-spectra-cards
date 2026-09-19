@@ -174,11 +174,10 @@ const js = fs.readFileSync(file);
     el._config.body.active = "Shine";
     el._pick = { label: "Rest", at: Date.now() };
     await rerender();
-    check("the rest recede while a choice is being expressed",
-      q(".scenetrack").classList.contains("choosing"), "no choosing class");
-    /* On the rendered opacity, not the class: a class that styles nothing
-       looks identical to a class that works, and the whole point is what
-       the eye sees. */
+    /* On the rendered opacity, and only that. This checked a `choosing`
+       class first, which has since been removed: the dimming is no longer
+       conditional on anything, so there is no class left to assert and a
+       class that styles nothing looked identical to one that worked. */
     const bands = all("[data-cell]");
     const chosenBand = bands.find((c) => c.classList.contains("on"));
     const otherBand = bands.find((c) => !c.classList.contains("on"));
@@ -331,10 +330,63 @@ const js = fs.readFileSync(file);
       `${chev.querySelector("ha-icon").getAnimations().length} animations,`
       + ` expanded=${chev.getAttribute("aria-expanded")}`);
 
-    // ---- an off room dulls the whole track
+    /* ---- nothing selected has to LOOK like nothing selected.
+
+       On Auto the room is on its schedule, so none of the drawer's scenes
+       is the live one -- and the dimming used to be conditional on one of
+       them being it, so all six sat at full strength, every one of them
+       reading as chosen. */
+    el._pick = null;
+    el._pickGiveUp = null;
+    el._config.body.active = "Golden hours";
+    await rerender();
+    await settle();
+    const idle = all("[data-cell]");
+    check("on Auto no drawer scene claims to be the live one",
+      idle.every((c) => !c.classList.contains("on")),
+      `${idle.filter((c) => c.classList.contains("on")).length} bands marked on`);
+    check("so every one of them is dim, not every one of them lit",
+      idle.every((c) => parseFloat(getComputedStyle(c).opacity) < 0.6),
+      idle.map((c) => getComputedStyle(c).opacity).join(", "));
+    check("and the ring is hidden rather than parked on band one",
+      parseFloat(getComputedStyle(q("[data-bandmark]")).opacity) < 0.05,
+      getComputedStyle(q("[data-bandmark]")).opacity);
+
+    /* Back on a scene, that one and only that one comes up. */
+    el._config.body.active = "Read";
+    await rerender();
+    await settle();
+    const oneOn = all("[data-cell]").filter(
+      (c) => parseFloat(getComputedStyle(c).opacity) > 0.9);
+    check("choosing one lights exactly one",
+      oneOn.length === 1 && oneOn[0].getAttribute("data-label") === "Read",
+      `${oneOn.length} lit: ${oneOn.map((c) => c.getAttribute("data-label")).join(",")}`);
+
+    /* ---- an off room dulls the whole track, and is SEEN to.
+
+       The card re-renders by replacing its markup, so the bars come back
+       as new elements already at the off opacity, with no frame at the old
+       one for their CSS transition to ease from. They popped, while the
+       schedule strip above them -- which is carried across the swap by the
+       same mechanism this now uses -- faded.
+
+       Asserted as a running animation on the frame of the change: by the
+       next one it is over either way, and the element being new is exactly
+       why a CSS transition cannot be what is running. The node identity is
+       checked too, so this cannot quietly start passing because the markup
+       began surviving the swap and the plain CSS took over. */
+    const bandsBefore = q(".bands");
     el._config.body.on = false;
     el._pick = null;
     await rerender();
+    check("the bars really are replaced, so a CSS transition cannot fade them",
+      bandsBefore !== q(".bands"), "the node survived the re-render");
+    check("the scene strip fades out when the room goes off, rather than popping",
+      q(".bands").getAnimations().length > 0,
+      `${q(".bands").getAnimations().length} animations on .bands`);
+    check("and so does the brightness bar beside it",
+      q(".dimtrack").getAnimations().length > 0,
+      `${q(".dimtrack").getAnimations().length} animations on .dimtrack`);
     check("the scene track dulls when the room is off",
       q(".scenetrack").classList.contains("off"), "not dulled");
     check("and cannot be tabbed into",
