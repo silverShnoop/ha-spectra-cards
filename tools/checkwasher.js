@@ -176,6 +176,44 @@ const js = fs.readFileSync(file);
         && !q(".drum [tabindex]"),
       "something in the drum can be tabbed to");
 
+    /* ---- the drum's machine glyph, which shipped hardcoded.
+
+       The biggest glyph on the card was a washing machine on both cards,
+       so the tumble dryer had a washing machine in the middle of it. The
+       state glyphs are the other half of the rule and matter more: a leak
+       is water and a full drum is a basket on EVERY machine, so those must
+       stay fixed however a card is configured. A card that could choose
+       them could choose what they mean. */
+    const DRYER = { machine: "mdi:tumble-dryer", machine_off: "mdi:tumble-dryer-off" };
+    const drumGlyph = () => {
+      const g = q(".drumglyph ha-icon");
+      return g ? g.getAttribute("icon") : "(none)";
+    };
+
+    await show({ state: "idle" });
+    check("a washer's drum shows a washing machine by default",
+      drumGlyph() === "mdi:washing-machine", drumGlyph());
+
+    await show(Object.assign({ state: "idle" }, DRYER));
+    check("and a dryer's drum shows a dryer, not a washing machine",
+      drumGlyph() === "mdi:tumble-dryer", drumGlyph());
+
+    await show({ powered: false });
+    const washerOff = drumGlyph();
+    await show(Object.assign({ powered: false }, DRYER));
+    check("with no power each machine still shows its own",
+      washerOff === "mdi:washing-machine-off"
+        && drumGlyph() === "mdi:tumble-dryer-off",
+      `${washerOff} / ${drumGlyph()}`);
+
+    await show(Object.assign({ leak: true }, DRYER));
+    check("but a leak is water on every machine",
+      drumGlyph() === "mdi:water", drumGlyph());
+
+    await show(Object.assign({ drum_full: true, pending: 0 }, DRYER));
+    check("and a full drum is a basket on every machine",
+      drumGlyph() === "mdi:basket-unfill", drumGlyph());
+
     /* ---- the idle drum says WHICH MACHINE; every other state says WHAT.
 
        Two near-identical appliance cards sat side by side on the panel and

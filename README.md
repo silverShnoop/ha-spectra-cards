@@ -450,6 +450,8 @@ body:
   state: {entity: sensor.washing_machine}          # off | idle | running
   powered: {entity: sensor.washing_machine, attribute: powered}
   leak: {entity: sensor.washing_machine, attribute: leak}
+  machine: mdi:washing-machine       # the drum's glyph; a dryer sets its own
+  machine_off: mdi:washing-machine-off
   door_open: {entity: sensor.washing_machine, attribute: door_open}
   drum_full: {entity: sensor.washing_machine, attribute: drum_full}
   pending: {entity: sensor.washing_machine, attribute: pending_count}
@@ -497,6 +499,14 @@ only job is to undo the red one reads as a second emergency.
 other.** A leak pad stays damp long after the floor has been dealt with, and
 the cycle still has to be finished, so a wet sensor must never make the card
 claim the machine is off while somebody is standing in front of it.
+
+**The drum's machine glyph is configured; its state glyphs are not.**
+`machine` and `machine_off` say which appliance this is, because that is
+the one part of the drum that differs between them — it shipped hardcoded,
+which put a washing machine in the middle of the tumble dryer's card. A
+leak is water and a full drum is a basket on every machine in the house,
+so those are fixed: a card that could choose them could choose what they
+mean.
 
 **The drum is never a control.** It carries the state colour, and shows the
 waiting count when there is one.

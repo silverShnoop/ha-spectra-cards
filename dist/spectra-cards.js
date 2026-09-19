@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.83.0";
+const VERSION = "0.84.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4218,10 +4218,23 @@ function washerDrum(b, cycle, leak, powered, waiting) {
     ? `<circle class="drumarc" cx="${c}" cy="${c}" r="${r}"`
       + ` stroke-dasharray="${(circ * frac).toFixed(1)} ${(circ * (1 - frac)).toFixed(1)}"></circle>`
     : "";
-  let glyph = "mdi:washing-machine";
+  /* The machine itself, which is the one part of the drum that differs
+     between appliances -- so it is configured rather than assumed. It
+     shipped hardcoded to a washing machine, which put a washing machine in
+     the middle of the tumble dryer's card: the biggest glyph on a pair of
+     near-identical cards, identical.
+
+     The state glyphs below are NOT configurable and must not become so. A
+     leak is water and a full drum is a basket on every machine in the
+     house; letting a card choose those would be letting it choose what
+     they mean. */
+  let glyph = isBlank(b.machine) ? "mdi:washing-machine" : String(b.machine);
   if (leak) glyph = "mdi:water";
-  else if (!powered) glyph = "mdi:washing-machine-off";
-  else if (b.drum_full) glyph = "mdi:basket-unfill";
+  else if (!powered) {
+    glyph = isBlank(b.machine_off)
+      ? "mdi:washing-machine-off"
+      : String(b.machine_off);
+  } else if (b.drum_full) glyph = "mdi:basket-unfill";
   const inner = waiting
     ? `<span class="drumcount">${esc(String(waiting))}</span>`
     : `<span class="drumglyph"><ha-icon icon="${esc(glyph)}"></ha-icon></span>`;
