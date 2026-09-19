@@ -389,9 +389,54 @@ const js = fs.readFileSync(file);
       `${q(".dimtrack").getAnimations().length} animations on .dimtrack`);
     check("the scene track dulls when the room is off",
       q(".scenetrack").classList.contains("off"), "not dulled");
-    check("and cannot be tabbed into",
-      q(".scenetrack").getAttribute("tabindex") === "-1",
-      q(".scenetrack").getAttribute("tabindex"));
+
+    /* ---- dulled, but still yours to press.
+
+       This asserted tabindex="-1" -- the track was genuinely disabled with
+       the room off. Picking a scene from a dark room is how you turn the
+       room ON, and the schedule strip above has always allowed exactly
+       that, so the drawer refusing the same press was the odd one out.
+       `off` now means dulled and nothing more, which is all it means up
+       there. */
+    check("but is still reachable, like the strip above",
+      q(".scenetrack").getAttribute("tabindex") === "0",
+      `tabindex ${q(".scenetrack").getAttribute("tabindex")}`);
+    check("and does not tell a screen reader it is disabled",
+      q(".scenetrack").getAttribute("aria-disabled") === null,
+      q(".scenetrack").getAttribute("aria-disabled"));
+    check("the schedule strip has said the same all along",
+      q("[data-pick]").getAttribute("tabindex") === "0"
+        && q("[data-pick]").getAttribute("aria-disabled") === null,
+      `tabindex ${q("[data-pick]").getAttribute("tabindex")},`
+      + ` aria-disabled ${q("[data-pick]").getAttribute("aria-disabled")}`);
+
+    /* And the press has to actually reach the bridge, not merely be
+       focusable: the pointer path carried its own refusal, separate from
+       the attribute. */
+    calls.length = 0;
+    const offbox = q(".scenetrack .slidehold").getBoundingClientRect();
+    const offopt = (x) => ({ clientX: x, clientY: offbox.top + offbox.height / 2,
+      button: 0, bubbles: true, pointerId: 3 });
+    const offtrack = q("[data-track]");
+    offtrack.dispatchEvent(new PointerEvent("pointerdown", offopt(offbox.left + offbox.width * 0.85)));
+    offtrack.dispatchEvent(new PointerEvent("pointerup", offopt(offbox.left + offbox.width * 0.85)));
+    check("choosing a scene from a dark room turns it on",
+      calls.length === 1 && calls[0].service === "scene.turn_on"
+        && calls[0].target.entity_id === "scene.rest",
+      JSON.stringify(calls));
+
+    /* The brightness slider keeps its refusal, and should: the bridge
+       leaves lights that are off off, so a drag there moves a bar and
+       changes nothing in the room. */
+    calls.length = 0;
+    const dimbox = q(".dimmer .slidehold").getBoundingClientRect();
+    const dimopt = (x) => ({ clientX: x, clientY: dimbox.top + dimbox.height / 2,
+      button: 0, bubbles: true, pointerId: 4 });
+    const dimel = q("[data-dim]");
+    dimel.dispatchEvent(new PointerEvent("pointerdown", dimopt(dimbox.left + dimbox.width * 0.5)));
+    dimel.dispatchEvent(new PointerEvent("pointerup", dimopt(dimbox.left + dimbox.width * 0.5)));
+    check("but brightness stays inert on a dark room",
+      calls.length === 0, JSON.stringify(calls));
 
     return problems;
   });

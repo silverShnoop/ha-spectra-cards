@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.75.0";
+const VERSION = "0.76.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3869,11 +3869,16 @@ function sceneTrackMarkup(key, scenes, activeName, lit) {
      band that is `on` and dims the rest, so a strip with no `on` band --
      the room following its schedule -- dims all of them, which is what
      "none of these is selected" looks like. */
+  /* Reachable with the room off, which is when you most often want it:
+     picking a scene from a dark room is how you turn the room on, and
+     scene.turn_on does exactly that. The schedule strip above has always
+     allowed it -- it never stops being tabbable and never says disabled --
+     and a drawer that refused the same press was the odd one out. So `off`
+     dulls it and nothing more, which is all it means up there too. */
   return `<div class="slide scenetrack${lit ? "" : " off"}`
     + `" data-track="${esc(key)}" role="slider"`
-    + ` tabindex="${lit ? "0" : "-1"}" aria-label="Scene" aria-valuemin="0"`
+    + ` tabindex="0" aria-label="Scene" aria-valuemin="0"`
     + ` aria-valuemax="${Math.max(0, scenes.length - 1)}"`
-    + `${lit ? "" : ` aria-disabled="true"`}`
     + ` aria-valuenow="${at < 0 ? 0 : at}">`
     + `<p class="slidelabel">Scenes</p>`
     + `<div class="slidehold"><div class="bands">${bands}</div>`
@@ -5332,7 +5337,10 @@ class SpectraCard extends HTMLElement {
     else delete this._wasBand[key];
 
     this._bindSlide(el, {
-      inert: () => el.classList.contains("off"),
+      /* No `inert`. The brightness slider below keeps its own, because
+         setting a level on a dark room changes nothing anyone can see --
+         the bridge leaves lights that are off off. Choosing a scene is
+         the opposite: it is the thing that turns the room on. */
       read: () => (marked < 0 ? 0 : marked),
       valueAt: (ratio) => Math.min(count - 1, Math.max(0, Math.floor(ratio * count))),
       step: (v, by) => Math.min(count - 1, Math.max(0, v + by)),
