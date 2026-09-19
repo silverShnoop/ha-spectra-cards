@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.78.0";
+const VERSION = "0.79.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2609,7 +2609,18 @@ const BODIES = {
          which is now the only place the meaning lives: the two glyphs
          have to carry it, so they are a plug being pulled and a plug
          going back in, not one ambiguous power toggle. */
+      /* Terracotta, always, and never the card's accent. Accent 1 is the
+         alert role, and an emergency stop IS that role -- it is not
+         decoration inheriting whatever hue the card was given, which is
+         how this shipped purple beside a red leak band.
+
+         It stays red in the restore state too. A real stop is red whether
+         or not it is currently latched out, and a control that changes
+         colour is a control you have to find again: looking the same in
+         every state is the safety property, not a missed chance to be
+         informative. What it will do is said by the glyph and the label. */
       out += `<button type="button" class="estop" data-estop`
+        + ` style="${accentStyle(1)}"`
         + ` title="${esc(powered ? "Cut power at the plug" : "Restore power at the plug")}"`
         + ` aria-label="${esc(powered ? "Cut power at the plug" : "Restore power at the plug")}">`
         + `<span class="estoplip"></span>`
