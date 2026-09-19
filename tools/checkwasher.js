@@ -219,6 +219,28 @@ const js = fs.readFileSync(file);
     check("and so is a dead plug",
       !(await differs({ powered: false })), "no power took the card's colour");
 
+    /* The wattage chip was accent 4, from when teal meant running. It
+       outlived that scheme, and being the same teal on every machine it
+       undid the identity the drum had just been given: one card saying
+       "this is the washer" and "something is running" in two colours, one
+       of which no longer meant anything.
+
+       A wattage is a measurement. The card says three other times that it
+       is running. */
+    const chipTone = (label) => {
+      const c = all(".pill").find((p) => p.textContent.includes(label));
+      return c ? getComputedStyle(c).backgroundColor : "(no chip)";
+    };
+    await show({ state: "running", power: 600 }, 6);
+    const wattWasher = chipTone("600 W");
+    const neutral = chipTone("Door closed");
+    check("the wattage chip is neutral, like any other measurement",
+      wattWasher === neutral, `${wattWasher} against ${neutral} for Door closed`);
+
+    await show(Object.assign({ state: "running", power: 600 }, DRYER), 5);
+    check("and it does not repaint a running card the same on both machines",
+      chipTone("600 W") === neutral, chipTone("600 W"));
+
     /* ---- the glyph, which is now the thing carrying the state. */
     await show({ state: "idle" });
     check("idle shows the machine itself",
