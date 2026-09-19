@@ -435,6 +435,95 @@ Text colour on a chip is the one colour the theme does not choose. It sits on
 that scene's own hex, so relative luminance decides whether it is ink or
 paper.
 
+### `washer` — is the appliance running, and has it left you anything?
+
+One appliance, stated rather than operated.
+
+```yaml
+body:
+  type: washer
+  state: {entity: sensor.washing_machine}          # off | idle | running
+  powered: {entity: sensor.washing_machine, attribute: powered}
+  leak: {entity: sensor.washing_machine, attribute: leak}
+  door_open: {entity: sensor.washing_machine, attribute: door_open}
+  drum_full: {entity: sensor.washing_machine, attribute: drum_full}
+  pending: {entity: sensor.washing_machine, attribute: pending_count}
+  power: {entity: sensor.washing_machine, attribute: power_w}
+  info: "Started 47m ago"
+  finished:
+    from: {entity: sensor.washing_machine, attribute: finished_today}
+    each:
+      at: {field: finished_at, format: time}
+      ran: {field: duration_minutes, prefix: "ran ", suffix: " min"}
+      used: {field: energy_kwh, suffix: " kWh"}
+  action:
+    cut:
+      service: switch.turn_off
+      target: {entity_id: switch.washing_machine_plug}
+      confirm:
+        title: Cut power to the washing machine?
+        text: It kills the plug mid-cycle; the drum will not drain.
+        ok: Cut power
+    restore:
+      service: switch.turn_on
+      target: {entity_id: switch.washing_machine_plug}
+```
+
+**The card carries no jobs.** A load waiting to be hung is a job, and jobs
+live in `Needs you`. Putting it here as well would be the same sentence in
+two places, with the copy on the card being the one a phone cannot finish.
+So `pending` shows as a count in the drum — a fact — and there is no button
+to clear it.
+
+**The one control is the emergency stop, and it is deliberately not a
+switch.** A switch says "this is how you turn the machine off", and it is
+not: the knob on the machine is. So it is a latched button behind a hazard
+lip, with a confirmation that says the rest. `restore` asks nothing — by
+then the emergency has passed, and a dialog there only teaches people to tap
+through dialogs.
+
+**`leak` and `powered` are independent and neither is inferred from the
+other.** A leak pad stays damp long after the floor has been dealt with, and
+the cycle still has to be finished, so a wet sensor must never make the card
+claim the machine is off while somebody is standing in front of it.
+
+**The drum is never a control.** It carries the state colour, and shows the
+waiting count when there is one. It does not wear a power symbol even when
+the machine has no power: a circle with a power glyph, on a card that also
+has a power button, reads as a second button — and the first thing anyone
+did with an earlier draft was try to press it. Off is a struck-through
+machine on a broken ring.
+
+## Confirming an action
+
+Any `action` anywhere can carry a `confirm`, and the card asks before
+calling it:
+
+```yaml
+action:
+  service: light.turn_off
+  target: {floor_id: downstairs}
+  confirm:
+    title: Turn every light downstairs off?
+    text: Optional second line.
+    note: Optional third line, quieter.
+    ok: Turn off        # default "Confirm"
+    cancel: Leave them   # default "Cancel"
+    icon: mdi:alert
+    accent: 1
+```
+
+It is a property of the **action**, not of the body, so nothing needs new
+code to gain one. The dialog is drawn inside the card rather than with the
+browser's `confirm()`: the panel has no keyboard and no window chrome, a
+native dialog cannot be styled or dismissed with a thumb, and it blocks the
+whole frontend while it is open.
+
+Anything that is not an explicit yes is a no — Escape, the backdrop, Cancel.
+An action **without** a `confirm` is still called synchronously, in the same
+tick as the press; routing every press through the dialog's promise made
+every existing button fire a microtask late.
+
 ## `spectra-dock` — the domain rail
 
 Not a cell. It is chrome along the bottom of the screen, so it does not use
