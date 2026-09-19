@@ -132,11 +132,19 @@ const js = fs.readFileSync(file);
       button: 0, bubbles: true, pointerId: 1 });
     const track = q("[data-track]");
     track.dispatchEvent(new PointerEvent("pointerdown", opts(box.left + box.width * 0.85)));
-    /* Checked with the finger still down: this is when the ring travels, and
-       a transition is spent by the time anything else happens. */
-    check("the ring travels to the band under the finger",
-      q("[data-bandmark]").getAnimations().length > 0,
-      `no transition; left was ${before}, now ${q("[data-bandmark]").style.left}`);
+    /* Checked with the finger still down. This asserted a TRANSITION once,
+       on the reasoning that a ring which slides is the same ring in a new
+       place. Under a thumb it is not: the hand has already left the band
+       the ring is easing towards, so the one thing the control has to say
+       -- which scene a lift would choose -- is the one thing it does not.
+       So: moved, and arrived, on this frame. The easing is still asserted
+       further down, for the case it was written for, the room moving the
+       scene while nothing is being touched. */
+    check("the ring lands on the band under the finger, not eases towards it",
+      Math.abs(at("[data-bandmark]") - 200 / 3) < 0.01
+        && q("[data-bandmark]").getAnimations().length === 0,
+      `left was ${before}, now ${q("[data-bandmark]").style.left},`
+      + ` ${q("[data-bandmark]").getAnimations().length} animations`);
     track.dispatchEvent(new PointerEvent("pointerup", opts(box.left + box.width * 0.85)));
     check("choosing a scene turns it on",
       calls.length === 1 && calls[0].target.entity_id === "scene.rest",
@@ -166,11 +174,10 @@ const js = fs.readFileSync(file);
     el._config.body.active = "Shine";
     el._pick = { label: "Rest", at: Date.now() };
     await rerender();
-    check("the rest recede while a choice is being expressed",
-      q(".scenetrack").classList.contains("choosing"), "no choosing class");
-    /* On the rendered opacity, not the class: a class that styles nothing
-       looks identical to a class that works, and the whole point is what
-       the eye sees. */
+    /* On the rendered opacity, and only that. This checked a `choosing`
+       class first, which has since been removed: the dimming is no longer
+       conditional on anything, so there is no class left to assert and a
+       class that styles nothing looked identical to one that worked. */
     const bands = all("[data-cell]");
     const chosenBand = bands.find((c) => c.classList.contains("on"));
     const otherBand = bands.find((c) => !c.classList.contains("on"));
@@ -244,7 +251,37 @@ const js = fs.readFileSync(file);
       Math.abs(boxOf(q("[data-bandmark]")).left - boxOf(under).left) < 1.5,
       `ring ${boxOf(q("[data-bandmark]")).left.toFixed(1)},`
       + ` band ${boxOf(under).left.toFixed(1)}`);
-    dtrack.dispatchEvent(new PointerEvent("pointerup", dopt(dbox.left + dbox.width * 0.1)));
+
+    /* ---- and it is ON the band, not on its way there.
+
+       Everything above settles for 400ms before it measures, which is long
+       enough for an eased ring to arrive -- so a ring that CHASED the
+       finger passed every one of those checks while reading, under a
+       thumb, as a box trailing behind the band it claimed to be marking.
+       These two measure the frame the move happens on: no transition
+       running, and already in place. Drag across several bands first, so
+       what is asserted is a ring that has kept up, not one that never had
+       to move. */
+    for (const frac of [0.45, 0.75, 0.3]) {
+      const x = dbox.left + dbox.width * frac;
+      dtrack.dispatchEvent(new PointerEvent("pointermove", dopt(x)));
+      const now = all("[data-cell]").find((c) => c.classList.contains("at"));
+      const ring = q("[data-bandmark]");
+      check(`no easing under the finger at ${frac}`,
+        ring.getAnimations().length === 0,
+        `${ring.getAnimations().length} animations running`);
+      check(`the ring is on the pressed band at ${frac}, that same frame`,
+        Math.abs(boxOf(ring).left - boxOf(now).left) < 1.5,
+        `ring ${boxOf(ring).left.toFixed(1)}, band ${boxOf(now).left.toFixed(1)}`);
+    }
+
+    /* Released, the room may still move it, and that move IS eased -- the
+       scene changing under you is the case the slide was written for. */
+    dtrack.dispatchEvent(new PointerEvent("pointerup", dopt(dbox.left + dbox.width * 0.3)));
+    await settle();
+    check("but off the finger the easing is back",
+      getComputedStyle(q("[data-bandmark]")).transitionDuration !== "0s",
+      getComputedStyle(q("[data-bandmark]")).transitionDuration);
     calls.length = 0;
     el._pick = { label: "Rest", at: Date.now() };
     el._config.body.active = "Shine";
@@ -293,15 +330,113 @@ const js = fs.readFileSync(file);
       `${chev.querySelector("ha-icon").getAnimations().length} animations,`
       + ` expanded=${chev.getAttribute("aria-expanded")}`);
 
-    // ---- an off room dulls the whole track
+    /* ---- nothing selected has to LOOK like nothing selected.
+
+       On Auto the room is on its schedule, so none of the drawer's scenes
+       is the live one -- and the dimming used to be conditional on one of
+       them being it, so all six sat at full strength, every one of them
+       reading as chosen. */
+    el._pick = null;
+    el._pickGiveUp = null;
+    el._config.body.active = "Golden hours";
+    await rerender();
+    await settle();
+    const idle = all("[data-cell]");
+    check("on Auto no drawer scene claims to be the live one",
+      idle.every((c) => !c.classList.contains("on")),
+      `${idle.filter((c) => c.classList.contains("on")).length} bands marked on`);
+    check("so every one of them is dim, not every one of them lit",
+      idle.every((c) => parseFloat(getComputedStyle(c).opacity) < 0.6),
+      idle.map((c) => getComputedStyle(c).opacity).join(", "));
+    check("and the ring is hidden rather than parked on band one",
+      parseFloat(getComputedStyle(q("[data-bandmark]")).opacity) < 0.05,
+      getComputedStyle(q("[data-bandmark]")).opacity);
+
+    /* Back on a scene, that one and only that one comes up. */
+    el._config.body.active = "Read";
+    await rerender();
+    await settle();
+    const oneOn = all("[data-cell]").filter(
+      (c) => parseFloat(getComputedStyle(c).opacity) > 0.9);
+    check("choosing one lights exactly one",
+      oneOn.length === 1 && oneOn[0].getAttribute("data-label") === "Read",
+      `${oneOn.length} lit: ${oneOn.map((c) => c.getAttribute("data-label")).join(",")}`);
+
+    /* ---- an off room dulls the whole track, and is SEEN to.
+
+       The card re-renders by replacing its markup, so the bars come back
+       as new elements already at the off opacity, with no frame at the old
+       one for their CSS transition to ease from. They popped, while the
+       schedule strip above them -- which is carried across the swap by the
+       same mechanism this now uses -- faded.
+
+       Asserted as a running animation on the frame of the change: by the
+       next one it is over either way, and the element being new is exactly
+       why a CSS transition cannot be what is running. The node identity is
+       checked too, so this cannot quietly start passing because the markup
+       began surviving the swap and the plain CSS took over. */
+    const bandsBefore = q(".bands");
     el._config.body.on = false;
     el._pick = null;
     await rerender();
+    check("the bars really are replaced, so a CSS transition cannot fade them",
+      bandsBefore !== q(".bands"), "the node survived the re-render");
+    check("the scene strip fades out when the room goes off, rather than popping",
+      q(".bands").getAnimations().length > 0,
+      `${q(".bands").getAnimations().length} animations on .bands`);
+    check("and so does the brightness bar beside it",
+      q(".dimtrack").getAnimations().length > 0,
+      `${q(".dimtrack").getAnimations().length} animations on .dimtrack`);
     check("the scene track dulls when the room is off",
       q(".scenetrack").classList.contains("off"), "not dulled");
-    check("and cannot be tabbed into",
-      q(".scenetrack").getAttribute("tabindex") === "-1",
-      q(".scenetrack").getAttribute("tabindex"));
+
+    /* ---- dulled, but still yours to press.
+
+       This asserted tabindex="-1" -- the track was genuinely disabled with
+       the room off. Picking a scene from a dark room is how you turn the
+       room ON, and the schedule strip above has always allowed exactly
+       that, so the drawer refusing the same press was the odd one out.
+       `off` now means dulled and nothing more, which is all it means up
+       there. */
+    check("but is still reachable, like the strip above",
+      q(".scenetrack").getAttribute("tabindex") === "0",
+      `tabindex ${q(".scenetrack").getAttribute("tabindex")}`);
+    check("and does not tell a screen reader it is disabled",
+      q(".scenetrack").getAttribute("aria-disabled") === null,
+      q(".scenetrack").getAttribute("aria-disabled"));
+    check("the schedule strip has said the same all along",
+      q("[data-pick]").getAttribute("tabindex") === "0"
+        && q("[data-pick]").getAttribute("aria-disabled") === null,
+      `tabindex ${q("[data-pick]").getAttribute("tabindex")},`
+      + ` aria-disabled ${q("[data-pick]").getAttribute("aria-disabled")}`);
+
+    /* And the press has to actually reach the bridge, not merely be
+       focusable: the pointer path carried its own refusal, separate from
+       the attribute. */
+    calls.length = 0;
+    const offbox = q(".scenetrack .slidehold").getBoundingClientRect();
+    const offopt = (x) => ({ clientX: x, clientY: offbox.top + offbox.height / 2,
+      button: 0, bubbles: true, pointerId: 3 });
+    const offtrack = q("[data-track]");
+    offtrack.dispatchEvent(new PointerEvent("pointerdown", offopt(offbox.left + offbox.width * 0.85)));
+    offtrack.dispatchEvent(new PointerEvent("pointerup", offopt(offbox.left + offbox.width * 0.85)));
+    check("choosing a scene from a dark room turns it on",
+      calls.length === 1 && calls[0].service === "scene.turn_on"
+        && calls[0].target.entity_id === "scene.rest",
+      JSON.stringify(calls));
+
+    /* The brightness slider keeps its refusal, and should: the bridge
+       leaves lights that are off off, so a drag there moves a bar and
+       changes nothing in the room. */
+    calls.length = 0;
+    const dimbox = q(".dimmer .slidehold").getBoundingClientRect();
+    const dimopt = (x) => ({ clientX: x, clientY: dimbox.top + dimbox.height / 2,
+      button: 0, bubbles: true, pointerId: 4 });
+    const dimel = q("[data-dim]");
+    dimel.dispatchEvent(new PointerEvent("pointerdown", dimopt(dimbox.left + dimbox.width * 0.5)));
+    dimel.dispatchEvent(new PointerEvent("pointerup", dimopt(dimbox.left + dimbox.width * 0.5)));
+    check("but brightness stays inert on a dark room",
+      calls.length === 0, JSON.stringify(calls));
 
     return problems;
   });
