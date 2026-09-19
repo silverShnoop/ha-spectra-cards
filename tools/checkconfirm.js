@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /* Anything that can be pressed can be made to ask first.
  *
- * Four surfaces call services: the summary body's all-off button, the
- * washer's emergency stop, a list row's action, and a control row's
- * buttons. Three of them ran their action through `_guard`, which shows
+ * Five surfaces call services: the summary body's all-off button, the
+ * washer's emergency stop, a list row's action, a control row's buttons
+ * and the lock's one control. All but one ran their action through
+ * `_guard`, which shows
  * the dialog when the action carries a `confirm`. The control row's
  * buttons did not -- they called straight through, so an `Unlock` on the
  * front door fired the moment it was touched, confirmation config and
@@ -93,6 +94,16 @@ const js = fs.readFileSync(file);
           name: "Front door", value: "Unlocked",
           buttons: [{ label: "Unlock", accent: 1, action: act("lock.unlock") }],
         }],
+      }],
+      /* The fifth surface, and the reason the rule is checked rather than
+         the sites: the lock body was written after this file and would
+         have been trusted to have got it right on its own. */
+      ["the lock's one control", "[data-lockact]", {
+        type: "lock", state: "Locked", accent: 3, sub: "3h ago \u00b7 11:40",
+        action: {
+          lock: { service: "lock.lock", target: { entity_id: "x.y" } },
+          unlock: act("lock.unlock"),
+        },
       }],
     ];
 
