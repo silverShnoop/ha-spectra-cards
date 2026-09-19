@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.90.0";
+const VERSION = "0.91.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
