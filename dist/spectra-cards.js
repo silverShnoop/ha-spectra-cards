@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.90.0";
+const VERSION = "0.91.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -404,11 +404,39 @@ ha-icon { display:inline-flex; line-height:0; }
   font-family:var(--sp-mono); font-size:15px; font-weight:600;
   line-height:1; color:var(--accent);
 }
-.washmain { flex:1 1 auto; min-width:0; }
-.washstate {
+.washmain, .lockmain { flex:1 1 auto; min-width:0; }
+/* One hero size for both. The lock card and the washer card sit on
+   different pages but are the same shape, and a hero that changed size
+   between them would make them look like different kinds of thing. */
+.washstate, .lockstate {
   margin:0; font-size:23px; font-weight:500; letter-spacing:-.01em;
   line-height:1.1;
 }
+
+.lockrow { display:flex; align-items:center; gap:12px; }
+.lockdisc { position:relative; flex:none; width:78px; height:78px; }
+.lockdisc svg { display:block; }
+.lockring { fill:none; stroke:var(--accent-soft); stroke-width:5; }
+.lockface { fill:var(--sp-paper); }
+.lockdisc.filled .lockring { stroke:var(--accent); }
+.lockdisc.filled .lockface { fill:var(--accent-soft); }
+.lockglyph {
+  position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:center; color:var(--accent);
+}
+.lockglyph ha-icon { --mdc-icon-size:26px; }
+.lockdisc.filled .lockglyph { color:var(--accent-on); }
+/* 44px tall because everything touched on this panel is, and wide enough
+   that "Unlock" does not wrap -- a control whose label breaks over two
+   lines stops reading as one press. */
+.lockbtn {
+  flex:none; min-width:84px; height:44px; padding:0 14px;
+  border:2px solid var(--accent); border-radius:4px;
+  background:var(--accent-soft); color:var(--accent-on);
+  font:inherit; font-size:13px; font-weight:600; white-space:nowrap;
+  cursor:pointer;
+}
+.lockbtn:active { background:var(--accent); color:var(--sp-paper); }
 
 /* The emergency stop is deliberately not a switch. A switch says "this is
    how you turn the machine off", and it is not -- the knob on the machine
@@ -2175,6 +2203,16 @@ function pickerScene(b, label) {
    word, the scene's own colour, and its symbol — so the title bar and the
    label under your finger are recognisably the same statement. */
 const BODY_STATUS = {
+  /* Registered for the spinner slot, not for a status line. The hero
+     already says what the door is, so a second copy of it in the title
+     bar would be the same word twice -- but a body has to be in here to
+     get the top-right slot, which is where every spinner on this panel
+     is meant to live. Returning null leaves `meta` to whatever the card
+     was configured with. */
+  lock() {
+    return null;
+  },
+
   picker(b) {
     if (!b || typeof b !== "object") return null;
     if (b.on !== undefined && !b.on) return { text: "Off" };
@@ -2715,6 +2753,76 @@ const BODIES = {
         + `</div>`;
     }
     return out;
+  },
+
+  /* Is it shut, and what do I do about it?
+   *
+   * A lock is not the `control` body wearing a lock glyph. `control`
+   * answers "what can I set, and what is it set to", which is a question
+   * about a dial with a range. A door has two states and one worthwhile
+   * act, and the thing you want from across a hall is the state, in a
+   * word, large enough to read without stopping.
+   *
+   * Four decisions, all of them corrections to an earlier draft:
+   *
+   * The hero says what the door IS, and the answers to that are closed:
+   * Locked, Unlocked, Unknown. Everything else is a REASON, and reasons
+   * are chips.
+   *
+   * A jam is the clearest case. It is not a fourth state of the door --
+   * it is the mechanism failing to reach one of the first two, and the
+   * honest reading of a jammed lock is that the door is not locked. So
+   * the hero says Unlocked and the jam is a chip. A draft that put "Not
+   * secure" in the hero grew the vocabulary to carry a fault, and the
+   * next fault would have grown it again.
+   *
+   * Unknown earns its place where a jam does not, because "I cannot tell"
+   * is a real answer to "is it shut" and the Nuki gives it several times
+   * a day. It is never rendered as Locked: not proof of a problem, and
+   * not proof of safety either.
+   *
+   * Chips carry status the card does not otherwise state, and nothing
+   * else. There is no "bolt thrown" chip because the Nuki does not
+   * report one, and no duration chip because how long something has been
+   * true is already the sub line and was never a status.
+   *
+   * The button is named for the act, not the state. Repeating the hero
+   * word on the control makes the control look like a readout, and the
+   * one thing it must look like is a button.
+   *
+   * And whether pressing it asks first is config, not markup: the action
+   * carries a `confirm` or it does not. Unlocking a front door from a
+   * wall panel is the one direction worth a question; locking it is not.
+   */
+  lock(b) {
+    const word = lockWord(b.state);
+    const action = lockAction(b);
+    const chips = (Array.isArray(b.chips) ? b.chips : [])
+      .filter((chip) => chip && !isBlank(chip.text))
+      .map((chip) => chipOf(String(chip.text), firstOf(chip.icon, "mdi:alert"),
+        accentNumber(chip.accent)));
+
+    let out = `<div class="lockrow">` + lockDisc(b, word);
+    out += `<div class="lockmain">`
+      + `<p class="lockstate">${esc(word)}</p>`
+      + `<p class="sub">${esc(firstOf(b.sub, ""))}</p>`
+      + (chips.length ? `<div class="chips">${chips.join("")}</div>` : "")
+      + `</div>`;
+
+    if (action) {
+      /* The button wears the card's state colour -- green while the door
+         is shut, ochre and terracotta as it escalates -- so the one
+         coloured thing on the card and the one pressable thing on the
+         card agree. Border at full strength, fill at the soft tint: the
+         rail's proportions, not an inversion.
+
+         It is NOT coloured by the act. A terracotta Unlock on an
+         otherwise calm card spends the alert colour on nothing, and a
+         moss Lock on a red one argues with the card it is sitting in. */
+      out += `<button type="button" class="lockbtn" data-lockact`
+        + ` style="${accentStyle(b.accent)}">${esc(action.label)}</button>`;
+    }
+    return out + `</div>`;
   },
 
   summary(b) {
@@ -4327,6 +4435,71 @@ function washerDrum(b, cycle, leak, powered, waiting) {
     + inner + `</div>`;
 }
 
+/* The state, as a shape, at the size the washer's drum is -- because a
+   pair of cards whose heroes are different sizes read as different kinds
+   of card, and these are the same kind.
+
+   Filled rather than inverted. Inversion is step 7 of the emphasis ladder
+   and is rationed to one thing on screen at a time; a front door that is
+   simply locked has no claim on it. Fill is the rail's device: the soft
+   tint behind, the base colour as the ring, which is a much lower
+   strength than the border it sits in and does not shout the good news. */
+/* The hero says what the door IS, and the answers are closed. Anything
+   else a lock can report is a REASON, and reasons are chips. */
+const LOCK_WORDS = new Set(["Locked", "Unlocked", "Unknown"]);
+
+function lockWord(state) {
+  const word = String(firstOf(state, "Unknown"));
+  return LOCK_WORDS.has(word) ? word : "Unknown";
+}
+
+/* Derived from the word, never configured.
+
+   A jammed lock says "Unlocked", and it used to be given a padlock with a
+   warning flash on it -- which is a picture of a locked door. The glyph
+   and the hero were two config lines that had to be kept agreeing by
+   hand, and the first time they were written they disagreed.
+
+   Same argument the washer makes about its state glyphs: letting a card
+   choose these would be letting it choose what they mean. */
+function lockGlyph(word) {
+  if (word === "Locked") return "mdi:lock";
+  if (word === "Unlocked") return "mdi:lock-open-variant";
+  return "mdi:lock-question";
+}
+
+/* The act the door is not already in, the way the washer's stop offers
+   cut or restore. A button offering "Unlock" on an open door is a service
+   call that changes nothing and a control that feels broken.
+
+   Unknown offers Lock. You can always try to shut a door you cannot read;
+   offering to open one is the wrong way to be wrong. */
+function lockAction(b) {
+  const action = b.action || {};
+  const word = lockWord(b.state);
+  const chosen = word === "Locked" ? action.unlock : action.lock;
+  if (!chosen || !chosen.service) return null;
+  return Object.assign({}, chosen, {
+    label: word === "Locked" ? "Unlock" : "Lock",
+  });
+}
+
+function lockDisc(b, word) {
+  const size = 78;
+  const r = 31;
+  const c = size / 2;
+  const filled = b.fill === undefined ? true : Boolean(b.fill);
+  const glyph = lockGlyph(word);
+  return `<div class="lockdisc${filled ? " filled" : ""}"`
+    + ` style="${accentStyle(b.accent)}">`
+    + `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`
+    + `<circle class="lockring" cx="${c}" cy="${c}" r="${r}"></circle>`
+    + `<circle class="lockface" cx="${c}" cy="${c}" r="24"></circle></svg>`
+    + `<span class="lockglyph">`
+    + `<ha-icon icon="${esc(glyph)}"></ha-icon>`
+    + `</span></div>`;
+}
+
 function drawerMarkup(key, body) {
   /* Only the scenes the schedule does not already drive.
 
@@ -4459,6 +4632,7 @@ class SpectraCard extends HTMLElement {
     this._phase = "idle";
     this._busy = 0;
     this._power = null;
+    this._lock = null;
     this._mode = null;
   }
 
@@ -4536,6 +4710,7 @@ class SpectraCard extends HTMLElement {
     this._optimistic = {};
     this._dragging = false;
     this._power = null;
+    this._lock = null;
     this._mode = null;
     if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
     if (this._powerGiveUp) { clearTimeout(this._powerGiveUp); this._powerGiveUp = null; }
@@ -4833,6 +5008,18 @@ class SpectraCard extends HTMLElement {
            outline, whether the mode tab is live — so they all move together
            rather than the switch arguing with the rest of the card. */
         model.body.on = power.want;
+      }
+    }
+
+    const lock = this._lock;
+    if (lock && model.body && model.body.type === "lock") {
+      if (String(model.body.state) === lock.want) {
+        this._lock = null;
+        if (this._lockGiveUp) { clearTimeout(this._lockGiveUp); this._lockGiveUp = null; }
+      } else {
+        /* One value, and the word, the glyph and the button all come off
+           it -- so nothing on the card can be half-pressed. */
+        model.body.state = lock.want;
       }
     }
 
@@ -5468,6 +5655,29 @@ class SpectraCard extends HTMLElement {
     }, 12000);
   }
 
+  /* The door answers on the press. A Nuki takes a second or two to throw
+     the bolt and report back, and a hero word that sits on "Locked" for
+     that long after you asked it to unlock reads as a card that did not
+     hear you.
+
+     The claim is on the WORD only -- never on the accent. What the lock
+     is doing is a fact this press just caused, and the card is entitled
+     to it. Whether the house is secure is a judgement `home_signals`
+     makes out of the grace period, the other contacts and the jam, and
+     the card is not entitled to guess it. So the disc, the button and
+     the outline keep whatever the house last said and correct themselves
+     a moment later; the spinner is what covers the gap, which is the
+     whole reason it is there. */
+  _wantLock(word) {
+    if (this._lockGiveUp) clearTimeout(this._lockGiveUp);
+    this._lock = { want: word };
+    this._lockGiveUp = setTimeout(() => {
+      this._lock = null;
+      this._signature = null;
+      this._update();
+    }, 12000);
+  }
+
   /* Auto and Manual answer on the press and are corrected by the bridge, not
      waited on: a mode button that does nothing for a second is a mode button
      you press twice. */
@@ -5977,6 +6187,42 @@ class SpectraCard extends HTMLElement {
         event.stopPropagation();
         this._guard(chosen.confirm,
           () => onPress(el, () => this._work(() => this._callAction(chosen))));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
+      });
+    });
+
+    /* The lock's one control. Guarded from the first line it was written,
+       because the whole point of the button is that unlocking a front
+       door from a wall panel is the press worth asking about -- and a
+       control that silently drops its `confirm` leaves config that still
+       reads as safe. */
+    this._holder.querySelectorAll("[data-lockact]").forEach((el) => {
+      const action = lockAction(model.body || {});
+      if (!action) return;
+      /* Claimed after the question is answered, not before it is asked --
+         a card that says "Unlocked" while the dialog is still up has
+         announced something nobody agreed to. */
+      const want = action.label === "Unlock" ? "Unlocked" : "Locked";
+      const run = (event) => {
+        event.stopPropagation();
+        this._guard(action.confirm, () => {
+          /* Order matters, and getting it wrong is invisible in code and
+             obvious on the wall. Rendering here would replace this very
+             button before it could flash -- which is the whole reason
+             `_pressedAt` exists. So: hold the render, stake the claim,
+             flash the live node, then call. The claim lands on the first
+             render after the hold, 280ms later, which nobody sees as a
+             delay and everybody sees as an answer. */
+          this._pressedAt = Date.now();
+          this._wantLock(want);
+          onPress(el, () => this._work(() => this._callAction(action)));
+        });
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
