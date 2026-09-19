@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.82.0";
+const VERSION = "0.83.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4178,12 +4178,19 @@ function washerWord(cycle, leak, powered) {
 
 /* Accent by meaning, matching the rest of the house: 1 alerts, 2 warnings,
    3 positive, 4 the colour of something happening. */
+/* The drum's colour, or null to let the card's own accent through.
+   Every state that MEANS something keeps its own colour on every machine,
+   so running looks like running and a leak looks like a leak wherever it
+   happens. Idle means nothing is going on -- there is no state worth a
+   colour -- so the drum is free to say WHICH MACHINE instead, which on a
+   pair of near-identical cards is the more useful thing for the biggest
+   shape on them to be saying. */
 function washerAccent(cycle, leak, powered, waiting) {
   if (leak) return 1;
   if (!powered) return 2;
   if (cycle === "running") return 4;
   if (waiting) return 2;
-  return 6;
+  return null;
 }
 
 function chipOf(text, icon, accent) {
@@ -4218,8 +4225,11 @@ function washerDrum(b, cycle, leak, powered, waiting) {
   const inner = waiting
     ? `<span class="drumcount">${esc(String(waiting))}</span>`
     : `<span class="drumglyph"><ha-icon icon="${esc(glyph)}"></ha-icon></span>`;
-  return `<div class="drum" style="--accent:var(--sp-a${accent});`
-    + `--accent-soft:var(--sp-a${accent}-soft);--accent-on:var(--sp-a${accent}-on)">`
+  const tone = accent
+    ? ` style="--accent:var(--sp-a${accent});`
+      + `--accent-soft:var(--sp-a${accent}-soft);--accent-on:var(--sp-a${accent}-on)"`
+    : "";
+  return `<div class="drum"${tone}>`
     + `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`
     + `<circle class="drumring${powered ? "" : " broken"}" cx="${c}" cy="${c}" r="${r}"></circle>`
     + `<circle class="drumface" cx="${c}" cy="${c}" r="24"></circle>${arc}</svg>`

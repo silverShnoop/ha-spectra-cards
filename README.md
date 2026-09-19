@@ -499,7 +499,21 @@ the cycle still has to be finished, so a wet sensor must never make the card
 claim the machine is off while somebody is standing in front of it.
 
 **The drum is never a control.** It carries the state colour, and shows the
-waiting count when there is one. It does not wear a power symbol even when
+waiting count when there is one.
+
+**Except when idle, where it carries the card's accent instead.** Every
+state that means something — running, no power, a leak, washing waiting —
+keeps its own colour on every machine, so running looks like running
+wherever it happens. Idle means nothing is going on, so there is no state
+worth a colour, and the biggest shape on the card is free to say *which
+machine* rather than repeating *nothing*. That matters because a washer and
+a dryer sit side by side, are in this state almost all the time, and were
+otherwise identical at a glance.
+
+The cost is real and worth knowing: give an appliance card an accent that
+is already a state — 1, 2 or 4 — and its idle drum will match one of them.
+Use 5 and 6 for a pair of machines. In every case the state is also written
+in words beside the drum, because colour never carries meaning alone. It does not wear a power symbol even when
 the machine has no power: a circle with a power glyph, on a card that also
 has a power button, reads as a second button — and the first thing anyone
 did with an earlier draft was try to press it. Off is a struck-through
