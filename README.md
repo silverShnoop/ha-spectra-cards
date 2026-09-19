@@ -77,7 +77,7 @@ rows: {entity: sensor.needs_you, attribute: items}
 | `entity` | Required; marks the object as a reference. |
 | `attribute` | Read this attribute instead of the state. |
 | `index` | With `forecast`: take one entry rather than a series, for a metric that wants a number. |
-| `format` | `relative` (a timestamp as `2m`, `1h 12m`, `3d 4h`), `time` (a timestamp as local `19:15`), `round` with `digits`, `title`. |
+| `format` | `since` (a past timestamp as `47m ago · 13:51` — **the default for anything that has already happened**), `relative` (the duration half alone, `2m`, `1h 12m`, `3d 4h`), `time` (a timestamp as local `19:15`, for times still to come), `round` with `digits`, `title`. |
 | `map` | Value-to-value lookup, applied before `format`. |
 | `prefix`, `suffix` | Concatenated onto the result. |
 | `fallback` | Used when the entity is missing, `unknown` or `unavailable`. |
@@ -111,6 +111,26 @@ Only the entities a card actually reads are watched, and the card re-renders
 only when its marshalled data changes — a wall panel sees a great deal of
 state it does not care about. A card showing a relative time also ticks every
 30 seconds, because that value goes stale with no state change to prompt it.
+
+### Saying when something happened
+
+Anything the panel reports as having *already happened* uses `format: since`,
+which renders both halves: `47m ago · 13:51`. The panel used to choose one
+per card, and two cards side by side could not be put in order without doing
+the arithmetic yourself. The duration is the half you act on; the clock is
+the half you check against your own memory of the morning.
+
+The absolute half widens as the event recedes — today is the clock, this week
+is the weekday and the clock, older than that is the date — because a bare
+`14:02` is a lie once the day has turned.
+
+A time still to come is not a status and keeps `format: time`: sunrise, the
+next scheduled backup, the hour it starts raining. `since` would read `0s ago`
+for all of them.
+
+`format: relative` remains for the places with no room for both — the rail's
+status line, a chip — where the duration alone is the half that earns the
+space.
 
 ## Bodies
 
