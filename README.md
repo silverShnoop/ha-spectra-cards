@@ -45,9 +45,17 @@ tap_action:                # optional
 | `accent` | 1 terracotta (alerts) · 2 ochre (warnings, override) · 3 moss (positive) · 4 teal (primary, live) · 5 slate (secondary series) · 6 plum (third category). Default 4. |
 | `icon`, `title`, `meta` | All optional. Omit all three and the title bar is not drawn. |
 | `body` | Required, with a `type`. |
+| `outline` | An accent number, or falsy. Colours the card's border, the way a Needs-you row is outlined. |
 | `tap_action` | `more-info`, `navigate`, `url`, `perform-action`, `none`. |
 | `hide_when_empty` | Default `true`. See below. |
 | `invert` | Accent fill, paper text. Step 7 of the emphasis ladder and the only one in the system — see below. |
+
+`outline` is deliberately **not** a mode of `accent`. The accent says what
+this card *is*; the outline says something on it wants a person. A card is
+often both at once — a plum washing machine outlined terracotta because the
+floor is wet — and collapsing them into one value would make an alert card
+forget which machine it was. It uses the border the card already has, so
+nothing moves and nothing is pushed down the card.
 
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
@@ -494,6 +502,13 @@ acts. The argument for one colour throughout — that a stop you have to
 re-find is a worse stop — only holds while there is a stop to find. With
 the plug already off there is nothing left to cut, and a red button whose
 only job is to undo the red one reads as a second emergency.
+
+**A leak has no band.** It used to get a solid terracotta bar across the
+top of the card, which said the same thing four more times over: the hero
+word is "Leaking", the drum is terracotta with a droplet in it, there is a
+`Sensor wet` chip, and the card is outlined in the alert colour. The bar
+was the loudest of the five and the only one that pushed everything else
+down the card.
 
 **`leak` and `powered` are independent and neither is inferred from the
 other.** A leak pad stays damp long after the floor has been dealt with, and
