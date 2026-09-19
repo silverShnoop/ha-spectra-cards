@@ -555,8 +555,24 @@ appliance is the only part that differs between cards. The rest are fixed:
 a card that could choose what water or a basket meant could choose what
 they mean.
 
-**The drum is never a control.** It carries the state colour, and shows the
-waiting count when there is one.
+**The drum shows the job in hand, not the one after it.** `drum_full` and
+`pending` both go true the moment a cycle ends, and they are consecutive
+rather than rival: the washing has to come *out* before it can be hung,
+and the door is what clears the first.
+
+| drum | queue | shows |
+| --- | --- | --- |
+| full | any | `mdi:basket-unfill` — empty me |
+| empty | 1 | `mdi:hanger` |
+| empty | 2+ | `mdi:hanger` with the count beside it |
+| empty | 0 | the machine |
+
+A lone hanger already means one load, so a `1` would be noise. The count
+used to *replace* the glyph, which erased everything else the drum was
+saying — including, while the drum was still full, the fact that it was
+full.
+
+**The drum is never a control.**
 
 Give a pair of machines accents that are not already exceptions — 5 and 6
 here, never 1 or 2 — so a card's own colour is never mistaken for an alarm.
