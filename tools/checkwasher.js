@@ -97,6 +97,15 @@ const js = fs.readFileSync(file);
     const q = (sel) => root().querySelector(sel);
     const all = (sel) => Array.from(root().querySelectorAll(sel));
     const text = (sel) => (q(sel) ? q(sel).textContent.trim() : null);
+    /* The stop is icon-only, so its meaning lives in the accessible name
+       rather than in textContent. A check that reads the text would pass
+       against a button with no label at all, which is the regression that
+       actually matters once the words are gone. */
+    const label = (sel) => (q(sel) ? (q(sel).getAttribute("aria-label") || "") : "");
+    const glyph = (sel) => {
+      const i = q(sel + " ha-icon");
+      return i ? i.getAttribute("icon") : null;
+    };
     const show = async (over) => {
       el.setConfig(JSON.parse(JSON.stringify(conf(over))));
       el._signature = null;
@@ -161,18 +170,42 @@ const js = fs.readFileSync(file);
       !all(".pill").some((p) => p.textContent.includes("Plug off")),
       all(".pill").map((p) => p.textContent.trim()).join(" | "));
     check("and the card still offers to cut, not to restore",
-      (text("[data-estop]") || "").toLowerCase().includes("cut"),
-      text("[data-estop]"));
+      label("[data-estop]").toLowerCase().includes("cut"),
+      label("[data-estop]"));
     check("while saying plainly that it is leaking",
       text(".washstate") === "Leaking" && !!q(".leakband"), text(".washstate"));
 
     await show({ leak: true, powered: false });
     check("wet and off offers to restore",
-      (text("[data-estop]") || "").toLowerCase().includes("restore"),
-      text("[data-estop]"));
+      label("[data-estop]").toLowerCase().includes("restore"),
+      label("[data-estop]"));
+    check("and the two states do not wear the same glyph",
+      glyph("[data-estop]") === "mdi:power-plug",
+      glyph("[data-estop]"));
+
+    // ---- the shrunk target still says what it is
+    await show({ powered: true, state: "running" });
+    /* Words are gone, so a missing label leaves the control mute -- to a
+       screen reader and to the hover tooltip alike. This is the check that
+       stops "icon only" quietly becoming "unlabelled". */
+    check("an icon-only stop is still named",
+      label("[data-estop]").toLowerCase().includes("cut")
+        && label("[data-estop]").toLowerCase().includes("plug"),
+      label("[data-estop]"));
+    check("and is pulling the plug, not toggling power",
+      glyph("[data-estop]") === "mdi:power-plug-off",
+      glyph("[data-estop]"));
+    /* The whole point of the change. 46px clears the 44px touch minimum
+       with nothing to spare, so a later tidy-up that rounds it down breaks
+       a real finger. */
+    const box = q("[data-estop]").getBoundingClientRect();
+    check("the target is small but still thumb-sized",
+      box.width >= 44 && box.width <= 56 && box.height >= 44 && box.height <= 56,
+      `${Math.round(box.width)} x ${Math.round(box.height)}`);
+    check("and it kept the hazard lip that says emergency",
+      !!q("[data-estop] .estoplip"), "the lip is gone");
 
     // ---- the confirmation
-    await show({ powered: true, state: "running" });
     calls.length = 0;
     await press("[data-estop]");
     check("cutting power asks first", !!q(".confirmwrap"), "no dialog");
