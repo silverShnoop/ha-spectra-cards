@@ -77,8 +77,9 @@ const js = fs.readFileSync(file);
       target: { entity_id: "switch.washer" },
     };
 
-    const conf = (over) => ({
-      type: "custom:spectra-card", accent: 6, icon: "mdi:washing-machine",
+    const conf = (over, accent) => ({
+      type: "custom:spectra-card", accent: accent || 6,
+      icon: "mdi:washing-machine",
       title: "Washing machine",
       body: Object.assign({
         type: "washer",
@@ -117,8 +118,8 @@ const js = fs.readFileSync(file);
       probe.remove();
       return c;
     };
-    const show = async (over) => {
-      el.setConfig(JSON.parse(JSON.stringify(conf(over))));
+    const show = async (over, accent) => {
+      el.setConfig(JSON.parse(JSON.stringify(conf(over, accent))));
       el._signature = null;
       el.hass = hass;
       await new Promise((r) => requestAnimationFrame(r));
@@ -174,6 +175,107 @@ const js = fs.readFileSync(file);
       !q(".drum [role=button]") && !q(".drum button")
         && !q(".drum [tabindex]"),
       "something in the drum can be tabbed to");
+
+    /* ---- the drum's machine glyph, which shipped hardcoded.
+
+       The biggest glyph on the card was a washing machine on both cards,
+       so the tumble dryer had a washing machine in the middle of it. The
+       state glyphs are the other half of the rule and matter more: a leak
+       is water and a full drum is a basket on EVERY machine, so those must
+       stay fixed however a card is configured. A card that could choose
+       them could choose what they mean. */
+    const DRYER = { machine: "mdi:tumble-dryer", machine_off: "mdi:tumble-dryer-off" };
+    const drumGlyph = () => {
+      const g = q(".drumglyph ha-icon");
+      return g ? g.getAttribute("icon") : "(none)";
+    };
+
+    await show({ state: "idle" });
+    check("a washer's drum shows a washing machine by default",
+      drumGlyph() === "mdi:washing-machine", drumGlyph());
+
+    await show(Object.assign({ state: "idle" }, DRYER));
+    check("and a dryer's drum shows a dryer, not a washing machine",
+      drumGlyph() === "mdi:tumble-dryer", drumGlyph());
+
+    await show({ powered: false });
+    const washerOff = drumGlyph();
+    await show(Object.assign({ powered: false }, DRYER));
+    check("with no power each machine still shows its own",
+      washerOff === "mdi:washing-machine-off"
+        && drumGlyph() === "mdi:tumble-dryer-off",
+      `${washerOff} / ${drumGlyph()}`);
+
+    await show(Object.assign({ leak: true }, DRYER));
+    check("but a leak is water on every machine",
+      drumGlyph() === "mdi:water", drumGlyph());
+
+    await show(Object.assign({ drum_full: true, pending: 0 }, DRYER));
+    check("and a full drum is a basket on every machine",
+      drumGlyph() === "mdi:basket-unfill", drumGlyph());
+
+    /* ---- the idle drum says WHICH MACHINE; every other state says WHAT.
+
+       Two near-identical appliance cards sat side by side on the panel and
+       the biggest shape on each was the same colour, because the drum
+       pinned itself to plum in every state including idle. Idle is the one
+       state that means nothing is going on, so it is the one that can
+       afford to carry the card's own accent instead -- and it is the state
+       these cards are in almost all the time.
+
+       The other half matters more: running must look like running on every
+       machine in the house. A drum that took the card's accent throughout
+       would make teal mean "washer" here and "running" there. */
+    const ringOf = () => {
+      const r = q(".drumring");
+      return r ? getComputedStyle(r).stroke : "(no ring)";
+    };
+
+    await show({ state: "idle" }, 6);
+    const idlePlum = ringOf();
+    await show({ state: "idle" }, 5);
+    const idleSlate = ringOf();
+    check("an idle drum takes the card's accent, so two machines differ",
+      idlePlum !== idleSlate, `${idlePlum} on both`);
+
+    await show({ state: "running", power: 600 }, 6);
+    const runPlum = ringOf();
+    await show({ state: "running", power: 600 }, 5);
+    check("but a running drum means running whatever card it is on",
+      runPlum === ringOf(), `${runPlum} vs ${ringOf()}`);
+
+    await show({ powered: false }, 6);
+    const offPlum = ringOf();
+    await show({ powered: false }, 5);
+    check("and so does one with no power",
+      offPlum === ringOf(), `${offPlum} vs ${ringOf()}`);
+
+    await show({ leak: true }, 6);
+    const leakPlum = ringOf();
+    await show({ leak: true }, 5);
+    check("and a leak, which must never be a house style",
+      leakPlum === ringOf(), `${leakPlum} vs ${ringOf()}`);
+
+    /* The cost of letting idle borrow the accent, stated rather than
+       hidden: a card configured accent 4 has an idle drum the same colour
+       as a running one, because running IS accent 4. The colours really do
+       collide and no assertion can wish that away.
+
+       What must hold is the system's own rule -- colour never carries
+       meaning alone -- so the check is on the words, which are what a
+       person actually reads. This is also why an appliance card should be
+       given an accent that is not already a state: 6 and 5 for the two
+       machines here, never 1, 2 or 4. */
+    await show({ state: "idle" }, 4);
+    const idleTeal = ringOf();
+    const idleWord = text(".washstate");
+    await show({ state: "running", power: 600 }, 4);
+    check("at the live accent the idle and running drums do collide",
+      idleTeal === ringOf(),
+      "they differ here, so this note is now wrong rather than the code");
+    check("but the two still say which they are, in words",
+      idleWord !== text(".washstate") && !!idleWord && !!text(".washstate"),
+      `${idleWord} vs ${text(".washstate")}`);
 
     // ---- wet and unpowered are independent, both ways
     await show({ leak: true, powered: true, state: "running", power: 300 });

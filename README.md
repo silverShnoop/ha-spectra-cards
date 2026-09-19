@@ -450,6 +450,8 @@ body:
   state: {entity: sensor.washing_machine}          # off | idle | running
   powered: {entity: sensor.washing_machine, attribute: powered}
   leak: {entity: sensor.washing_machine, attribute: leak}
+  machine: mdi:washing-machine       # the drum's glyph; a dryer sets its own
+  machine_off: mdi:washing-machine-off
   door_open: {entity: sensor.washing_machine, attribute: door_open}
   drum_full: {entity: sensor.washing_machine, attribute: drum_full}
   pending: {entity: sensor.washing_machine, attribute: pending_count}
@@ -498,8 +500,30 @@ other.** A leak pad stays damp long after the floor has been dealt with, and
 the cycle still has to be finished, so a wet sensor must never make the card
 claim the machine is off while somebody is standing in front of it.
 
+**The drum's machine glyph is configured; its state glyphs are not.**
+`machine` and `machine_off` say which appliance this is, because that is
+the one part of the drum that differs between them — it shipped hardcoded,
+which put a washing machine in the middle of the tumble dryer's card. A
+leak is water and a full drum is a basket on every machine in the house,
+so those are fixed: a card that could choose them could choose what they
+mean.
+
 **The drum is never a control.** It carries the state colour, and shows the
-waiting count when there is one. It does not wear a power symbol even when
+waiting count when there is one.
+
+**Except when idle, where it carries the card's accent instead.** Every
+state that means something — running, no power, a leak, washing waiting —
+keeps its own colour on every machine, so running looks like running
+wherever it happens. Idle means nothing is going on, so there is no state
+worth a colour, and the biggest shape on the card is free to say *which
+machine* rather than repeating *nothing*. That matters because a washer and
+a dryer sit side by side, are in this state almost all the time, and were
+otherwise identical at a glance.
+
+The cost is real and worth knowing: give an appliance card an accent that
+is already a state — 1, 2 or 4 — and its idle drum will match one of them.
+Use 5 and 6 for a pair of machines. In every case the state is also written
+in words beside the drum, because colour never carries meaning alone. It does not wear a power symbol even when
 the machine has no power: a circle with a power glyph, on a card that also
 has a power button, reads as a second button — and the first thing anyone
 did with an earlier draft was try to press it. Off is a struck-through
