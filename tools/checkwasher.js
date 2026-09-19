@@ -176,106 +176,87 @@ const js = fs.readFileSync(file);
         && !q(".drum [tabindex]"),
       "something in the drum can be tabbed to");
 
-    /* ---- the drum's machine glyph, which shipped hardcoded.
+    /* ---- colour says WHICH MACHINE, the glyph says WHAT IS HAPPENING.
 
-       The biggest glyph on the card was a washing machine on both cards,
-       so the tumble dryer had a washing machine in the middle of it. The
-       state glyphs are the other half of the rule and matter more: a leak
-       is water and a full drum is a basket on EVERY machine, so those must
-       stay fixed however a card is configured. A card that could choose
-       them could choose what they mean. */
+       It was the other way round. The cost was that two appliance cards
+       side by side were tellable apart only while both were idle: the
+       moment either did anything it took that state's colour and the pair
+       matched again. The state is written in words beside the drum in the
+       largest text on the card; identity was written nowhere.
+
+       Two exceptions, and the tests below pin the count at two. A leak and
+       a dead plug have to catch the eye before anybody reads a word, so
+       they keep their roles on every machine. Everything else spends the
+       colour on saying which machine it is. */
     const DRYER = { machine: "mdi:tumble-dryer", machine_off: "mdi:tumble-dryer-off" };
-    const drumGlyph = () => {
-      const g = q(".drumglyph ha-icon");
-      return g ? g.getAttribute("icon") : "(none)";
-    };
-
-    await show({ state: "idle" });
-    check("a washer's drum shows a washing machine by default",
-      drumGlyph() === "mdi:washing-machine", drumGlyph());
-
-    await show(Object.assign({ state: "idle" }, DRYER));
-    check("and a dryer's drum shows a dryer, not a washing machine",
-      drumGlyph() === "mdi:tumble-dryer", drumGlyph());
-
-    await show({ powered: false });
-    const washerOff = drumGlyph();
-    await show(Object.assign({ powered: false }, DRYER));
-    check("with no power each machine still shows its own",
-      washerOff === "mdi:washing-machine-off"
-        && drumGlyph() === "mdi:tumble-dryer-off",
-      `${washerOff} / ${drumGlyph()}`);
-
-    await show(Object.assign({ leak: true }, DRYER));
-    check("but a leak is water on every machine",
-      drumGlyph() === "mdi:water", drumGlyph());
-
-    await show(Object.assign({ drum_full: true, pending: 0 }, DRYER));
-    check("and a full drum is a basket on every machine",
-      drumGlyph() === "mdi:basket-unfill", drumGlyph());
-
-    /* ---- the idle drum says WHICH MACHINE; every other state says WHAT.
-
-       Two near-identical appliance cards sat side by side on the panel and
-       the biggest shape on each was the same colour, because the drum
-       pinned itself to plum in every state including idle. Idle is the one
-       state that means nothing is going on, so it is the one that can
-       afford to carry the card's own accent instead -- and it is the state
-       these cards are in almost all the time.
-
-       The other half matters more: running must look like running on every
-       machine in the house. A drum that took the card's accent throughout
-       would make teal mean "washer" here and "running" there. */
     const ringOf = () => {
       const r = q(".drumring");
       return r ? getComputedStyle(r).stroke : "(no ring)";
     };
+    const drumGlyph = () => {
+      const g = q(".drumglyph ha-icon");
+      return g ? g.getAttribute("icon") : "(none)";
+    };
+    /* Two cards at different accents in the same state: do they differ? */
+    const differs = async (over) => {
+      await show(over, 6);
+      const a = ringOf();
+      await show(Object.assign({}, over, DRYER), 5);
+      return a !== ringOf();
+    };
 
-    await show({ state: "idle" }, 6);
-    const idlePlum = ringOf();
-    await show({ state: "idle" }, 5);
-    const idleSlate = ringOf();
-    check("an idle drum takes the card's accent, so two machines differ",
-      idlePlum !== idleSlate, `${idlePlum} on both`);
+    check("idle: the two machines differ", await differs({ state: "idle" }), "same");
+    check("running: they still differ",
+      await differs({ state: "running", power: 600 }), "running overrode identity");
+    check("a full drum: they still differ",
+      await differs({ state: "idle", drum_full: true }), "full overrode identity");
+    check("washing waiting: they still differ",
+      await differs({ state: "idle", pending: 2, drum_full: true }),
+      "the waiting count overrode identity");
 
-    await show({ state: "running", power: 600 }, 6);
-    const runPlum = ringOf();
-    await show({ state: "running", power: 600 }, 5);
-    check("but a running drum means running whatever card it is on",
-      runPlum === ringOf(), `${runPlum} vs ${ringOf()}`);
+    check("a leak is the same alarm on both, whatever machine it is",
+      !(await differs({ leak: true })), "a leak took the card's colour");
+    check("and so is a dead plug",
+      !(await differs({ powered: false })), "no power took the card's colour");
 
-    await show({ powered: false }, 6);
-    const offPlum = ringOf();
-    await show({ powered: false }, 5);
-    check("and so does one with no power",
-      offPlum === ringOf(), `${offPlum} vs ${ringOf()}`);
+    /* ---- the glyph, which is now the thing carrying the state. */
+    await show({ state: "idle" });
+    check("idle shows the machine itself",
+      drumGlyph() === "mdi:washing-machine", drumGlyph());
+    await show(Object.assign({ state: "idle" }, DRYER));
+    check("and a dryer shows a dryer, not a washing machine",
+      drumGlyph() === "mdi:tumble-dryer", drumGlyph());
 
-    await show({ leak: true }, 6);
-    const leakPlum = ringOf();
-    await show({ leak: true }, 5);
-    check("and a leak, which must never be a house style",
-      leakPlum === ringOf(), `${leakPlum} vs ${ringOf()}`);
+    await show({ state: "running", power: 600 });
+    check("running has a glyph of its own, since it no longer has a colour",
+      drumGlyph() === "mdi:autorenew", drumGlyph());
+    await show(Object.assign({ state: "running", power: 600 }, DRYER));
+    check("and it is the same one on every machine",
+      drumGlyph() === "mdi:autorenew", drumGlyph());
 
-    /* The cost of letting idle borrow the accent, stated rather than
-       hidden: a card configured accent 4 has an idle drum the same colour
-       as a running one, because running IS accent 4. The colours really do
-       collide and no assertion can wish that away.
+    /* The pair that used to be distinguished only by colour. This is the
+       check that would have caught shipping C+ without a running glyph. */
+    await show({ state: "idle" });
+    const idleGlyph = drumGlyph();
+    await show({ state: "running", power: 600 });
+    check("so idle and running are not the same picture",
+      idleGlyph !== drumGlyph(), `${idleGlyph} for both`);
 
-       What must hold is the system's own rule -- colour never carries
-       meaning alone -- so the check is on the words, which are what a
-       person actually reads. This is also why an appliance card should be
-       given an accent that is not already a state: 6 and 5 for the two
-       machines here, never 1, 2 or 4. */
-    await show({ state: "idle" }, 4);
-    const idleTeal = ringOf();
-    const idleWord = text(".washstate");
-    await show({ state: "running", power: 600 }, 4);
-    check("at the live accent the idle and running drums do collide",
-      idleTeal === ringOf(),
-      "they differ here, so this note is now wrong rather than the code");
-    check("but the two still say which they are, in words",
-      idleWord !== text(".washstate") && !!idleWord && !!text(".washstate"),
-      `${idleWord} vs ${text(".washstate")}`);
+    await show(Object.assign({ powered: false }, DRYER));
+    check("no power shows that machine switched off",
+      drumGlyph() === "mdi:tumble-dryer-off", drumGlyph());
+    await show(Object.assign({ leak: true }, DRYER));
+    check("a leak is water on every machine",
+      drumGlyph() === "mdi:water", drumGlyph());
+    await show(Object.assign({ drum_full: true, pending: 0 }, DRYER));
+    check("and a full drum is a basket on every machine",
+      drumGlyph() === "mdi:basket-unfill", drumGlyph());
+
+    /* Running wins over a full drum: a second load started without the
+       drum being emptied is running, not waiting. */
+    await show({ state: "running", power: 600, drum_full: true });
+    check("a load started on top of a full drum reads as running",
+      drumGlyph() === "mdi:autorenew", drumGlyph());
 
     // ---- wet and unpowered are independent, both ways
     await show({ leak: true, powered: true, state: "running", power: 300 });
