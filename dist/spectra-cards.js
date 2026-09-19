@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.85.0";
+const VERSION = "0.86.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2604,7 +2604,17 @@ const BODIES = {
       : chipOf("Door closed", "mdi:door-closed", 0));
     if (leak) chips.push(chipOf("Sensor wet", "mdi:water", 1));
     if (!powered) chips.push(chipOf("Plug off", "mdi:power-plug-off", 2));
-    else if (running) chips.push(chipOf(`${Math.round(Number(b.power) || 0)} W`, "mdi:flash", 4));
+    /* Neutral, because a wattage is a MEASUREMENT and not a status. It was
+       accent 4, left over from when teal meant running -- so a running card
+       ended up saying two things at once: a drum coloured for which machine
+       it is, and a chip coloured for a state, in a hue that stopped meaning
+       anything. Being the same teal on every machine, it also undid the
+       identity the drum had just been given.
+
+       Nothing is lost by dropping it. That the machine is running is
+       already said by the hero word, by the drum's glyph and by the line
+       beneath; the chip's job is only to say how hard. */
+    else if (running) chips.push(chipOf(`${Math.round(Number(b.power) || 0)} W`, "mdi:flash", 0));
     if (b.drum_full) chips.push(chipOf("Full", "mdi:basket-unfill", 2));
     if (waiting) {
       chips.push(chipOf(`${waiting} to hang`, "mdi:hanger", 2));
