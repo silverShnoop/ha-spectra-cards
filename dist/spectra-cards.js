@@ -1552,6 +1552,46 @@ function shortSince(value) {
   return days + "d" + (hours % 24 ? ` ${hours % 24}h` : "");
 }
 
+/* Every past timestamp on the panel reads the same way: how long ago, then
+   when. The halves answer different questions and neither stands in for the
+   other -- "3m ago" is the one you act on, "14:02" is the one you check
+   against your own memory of the morning. Picking one per card was the
+   status quo, and it meant that reading two cards side by side required
+   arithmetic: the washer said "Started 47m ago", the door said "Since
+   14:02", and nothing on the panel said whether one came before the other.
+
+   The absolute half widens as the event recedes. A clock time alone is a
+   lie once the day has turned, and a clock time is noise once the week has,
+   so: today is the clock, this week is the weekday and the clock, and
+   anything older is the date.
+
+   Future times are NOT statuses and must not use this. shortSince clamps at
+   zero, so a sunrise four hours away would read "0s ago". They keep
+   `format: time`. */
+function sinceBoth(value) {
+  const t = Date.parse(value);
+  if (isNaN(t)) return null;
+  const ago = shortSince(value);
+  if (ago === null) return null;
+  const then = new Date(t);
+  const now = new Date();
+  const clock = then.toLocaleTimeString([], {
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const sameDay = then.getFullYear() === now.getFullYear()
+    && then.getMonth() === now.getMonth()
+    && then.getDate() === now.getDate();
+  let when;
+  if (sameDay) {
+    when = clock;
+  } else if (now - then < 7 * 86400000) {
+    when = `${then.toLocaleDateString([], { weekday: "short" })} ${clock}`;
+  } else {
+    when = `${then.getDate()} ${then.toLocaleDateString([], { month: "short" })}`;
+  }
+  return `${ago} ago \u00b7 ${when}`;
+}
+
 /* Home Assistant resolves "auto" against the operating system for us, so
    hass.themes.darkMode is already the answer to "is this panel dark right
    now" — no need to watch the media query separately. Stamping it on the
@@ -1658,6 +1698,9 @@ function applyFormat(value, spec) {
   switch (spec.format) {
     case "relative":
       v = shortSince(v);
+      break;
+    case "since":
+      v = sinceBoth(v);
       break;
     case "round": {
       const n = Number(v);
@@ -2017,9 +2060,13 @@ function collectSources(spec, found) {
     spec.forEach((v) => collectSources(v, found));
     return found;
   }
+  /* A clock that only advances when some entity happens to change is not a
+     clock. Checked before the entity branch because a row inside a list
+     reads a `field` off a collection and carries no entity of its own --
+     the finished-today times went stale for exactly that reason. */
+  if (spec.format === "relative" || spec.format === "since") found.live = true;
   if (typeof spec.entity === "string") {
     found.entities.add(spec.entity);
-    if (spec.format === "relative") found.live = true;
     return found;
   }
   if (spec.from !== undefined && spec.each !== undefined) {
@@ -6255,7 +6302,15 @@ class SpectraCard extends HTMLElement {
       const command = row && row.buttons && row.buttons[Number(el.dataset.position)];
       const run = (event) => {
         event.stopPropagation();
-        onPress(el, () => this._callAction(command && command.action));
+        /* The last control path that could not ask first. The all-off
+           button, the emergency stop and a list row all honour a
+           `confirm` on their action; a control row's buttons quietly did
+           not, so an `Unlock` that carried one fired anyway. Which way a
+           button is pointing is a fact about the house, not about the
+           card, so the rule is the same everywhere: the action carries
+           the question or it does not. */
+        this._guard(command && command.action && command.action.confirm,
+          () => onPress(el, () => this._callAction(command && command.action)));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
