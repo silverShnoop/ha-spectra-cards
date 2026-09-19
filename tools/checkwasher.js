@@ -151,8 +151,11 @@ const js = fs.readFileSync(file);
     check("an idle machine says so", text(".washstate") === "Idle", text(".washstate"));
     await show({ state: "running", power: 612, info: "47m elapsed" });
     check("a running one says so", text(".washstate") === "Running", text(".washstate"));
-    check("and shows the draw",
-      all(".pill").some((p) => p.textContent.includes("612 W")),
+    /* Reversed deliberately: this asserted the draw appeared as a chip.
+       The draw belongs in the card's `meta`, top right, with every other
+       measurement -- a chip as well was the same number twice. */
+    check("and does not repeat the draw as a chip",
+      !all(".pill").some((p) => p.textContent.includes("612 W")),
       all(".pill").map((p) => p.textContent.trim()).join(" | "));
 
     // ---- no jobs on the card
@@ -266,27 +269,19 @@ const js = fs.readFileSync(file);
     check("and so is a dead plug",
       !(await differs({ powered: false })), "no power took the card's colour");
 
-    /* The wattage chip was accent 4, from when teal meant running. It
-       outlived that scheme, and being the same teal on every machine it
-       undid the identity the drum had just been given: one card saying
-       "this is the washer" and "something is running" in two colours, one
-       of which no longer meant anything.
+    /* No wattage chip at all. The draw is in the card's `meta`, top right,
+       with every other measurement on the panel -- so a chip was the same
+       number twice, a few centimetres apart. It was tried as accent 4 and
+       then as neutral before the simpler answer.
 
-       A wattage is a measurement. The card says three other times that it
-       is running. */
-    const chipTone = (label) => {
-      const c = all(".pill").find((p) => p.textContent.includes(label));
-      return c ? getComputedStyle(c).backgroundColor : "(no chip)";
-    };
+       The chips that remain all say something the card does not say
+       anywhere else. */
     await show({ state: "running", power: 600 }, 6);
-    const wattWasher = chipTone("600 W");
-    const neutral = chipTone("Door closed");
-    check("the wattage chip is neutral, like any other measurement",
-      wattWasher === neutral, `${wattWasher} against ${neutral} for Door closed`);
-
-    await show(Object.assign({ state: "running", power: 600 }, DRYER), 5);
-    check("and it does not repaint a running card the same on both machines",
-      chipTone("600 W") === neutral, chipTone("600 W"));
+    check("a running card does not repeat the wattage as a chip",
+      !all(".pill").some((p) => /\d+\s*W/.test(p.textContent)),
+      all(".pill").map((p) => p.textContent.trim()).join(" | "));
+    check("and still says it is running",
+      text(".washstate") === "Running", text(".washstate"));
 
     /* ---- the glyph, which is now the thing carrying the state. */
     await show({ state: "idle" });
