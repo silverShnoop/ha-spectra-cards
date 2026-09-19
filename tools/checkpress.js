@@ -64,10 +64,12 @@ const CARDS = [
     config: {
       type: "custom:spectra-card", accent: 3, title: "Front door",
       body: {
-        type: "lock", state: "Locked", glyph: "mdi:lock", accent: 3,
+        type: "lock", state: "Locked", accent: 3,
         sub: "3h 12m ago \u00b7 11:40",
-        action: { label: "Unlock", service: "lock.unlock",
-                  target: { entity_id: "lock.front_door" } },
+        action: {
+          lock: { service: "lock.lock", target: { entity_id: "lock.front_door" } },
+          unlock: { service: "lock.unlock", target: { entity_id: "lock.front_door" } },
+        },
       },
     },
   },
