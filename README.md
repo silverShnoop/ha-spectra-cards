@@ -566,6 +566,7 @@ body:
   door_open: {entity: sensor.washing_machine, attribute: door_open}
   drum_full: {entity: sensor.washing_machine, attribute: drum_full}
   pending: {entity: sensor.washing_machine, attribute: pending_count}
+  phases: {entity: sensor.washing_machine, attribute: phases}
   info: "Started 47m ago"
   finished:
     from: {entity: sensor.washing_machine, attribute: finished_today}
@@ -585,6 +586,27 @@ body:
       service: switch.turn_on
       target: {entity_id: switch.washing_machine_plug}
 ```
+
+**`phases` is a record, not a progress bar.** It draws one cell per run of
+a phase, left to right: a glyph for each of fill, heat, tumble and spin,
+in the order the machine did them. The measured wash behind it heats twice
+and spins twice with tumbling between, so the strip has eight cells and
+repeats are the point — a four-step track would be promising an end time
+nothing on this panel knows. There is no connector, no arrowhead and
+nothing to press.
+
+It appears while the machine is running and while the washing is still in
+the drum, which are the two moments somebody walks over to ask about it:
+the first wants *what is it doing*, the second *what did it do*. Only the
+live cell is named in words and lit in the card's accent; once the wash
+ends nothing is live, because a lit cell on a stopped machine is the card
+claiming it is still going. Every cell carries the full sentence — `Heated
+for 3m 50s`, `Spinning, 4m so far` — as its accessible name.
+
+Tumble and spin are both the drum going round, so they differ in form
+rather than direction: `mdi:sync` (two arrows opposed — the drum reverses)
+against `mdi:rotate-right` (one arrow, flat out). Mirror images were the
+obvious pair and the worst one; at 17px, handedness is not a difference.
 
 **The card carries no jobs.** A load waiting to be hung is a job, and jobs
 live in `Needs you`. Putting it here as well would be the same sentence in
