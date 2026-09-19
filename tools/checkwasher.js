@@ -118,6 +118,14 @@ const js = fs.readFileSync(file);
       probe.remove();
       return c;
     };
+    const showCard = async (over, accent, outline) => {
+      const c = conf(over, accent);
+      if (outline !== null && outline !== undefined) c.outline = outline;
+      el.setConfig(JSON.parse(JSON.stringify(c)));
+      el._signature = null;
+      el.hass = hass;
+      await new Promise((r) => requestAnimationFrame(r));
+    };
     const show = async (over, accent) => {
       el.setConfig(JSON.parse(JSON.stringify(conf(over, accent))));
       el._signature = null;
@@ -175,6 +183,45 @@ const js = fs.readFileSync(file);
       !q(".drum [role=button]") && !q(".drum button")
         && !q(".drum [tabindex]"),
       "something in the drum can be tabbed to");
+
+    /* ---- a card that wants a person is outlined, like a Needs-you row.
+
+       `outline` is its own value, not a mode of the accent: the accent
+       says what this card IS and the outline says something on it wants
+       attention. A card can be both, and on the appliance pair it always
+       is -- a plum washer outlined terracotta. */
+    const border = () => getComputedStyle(q(".card")).borderColor;
+    const token = (n) => {
+      const probe = document.createElement("span");
+      probe.style.color = `var(--sp-a${n})`;
+      root().appendChild(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    };
+
+    await showCard({ state: "idle" }, 6, null);
+    const plain = border();
+    await showCard({ state: "idle" }, 6, 1);
+    check("an outlined card takes the alert colour on its edge",
+      border() === token(1), `${border()} (alert is ${token(1)})`);
+    check("and an un-outlined one does not",
+      plain !== token(1), plain);
+
+    await showCard({ state: "idle" }, 6, 2);
+    check("amber outlines amber", border() === token(2), border());
+
+    /* The bug this guards: reusing the accent for the outline would make
+       an alert card forget which machine it is. */
+    await showCard({ state: "idle" }, 5, 1);
+    check("outlining does not repaint the drum, so identity survives it",
+      getComputedStyle(q(".drumring")).stroke
+        !== getComputedStyle(q(".card")).borderColor,
+      "the drum took the outline's colour");
+
+    await showCard({ state: "idle" }, 6, 0);
+    check("an outline of 0 is no outline",
+      border() === plain, border());
 
     /* ---- colour says WHICH MACHINE, the glyph says WHAT IS HAPPENING.
 
@@ -289,7 +336,12 @@ const js = fs.readFileSync(file);
       label("[data-estop]").toLowerCase().includes("cut"),
       label("[data-estop]"));
     check("while saying plainly that it is leaking",
-      text(".washstate") === "Leaking" && !!q(".leakband"), text(".washstate"));
+      text(".washstate") === "Leaking", text(".washstate"));
+    /* The band said the same thing a fifth time and pushed the rest of the
+       card down to do it. The hero word, the drum, the chip and the card's
+       own outline all still say it. */
+    check("and does not shout it from a band as well",
+      !q(".leakband"), "the leak band is back");
 
     await show({ leak: true, powered: false });
     check("wet and off offers to restore",
