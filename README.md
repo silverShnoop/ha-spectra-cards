@@ -8,8 +8,9 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `stat`, `status`, `list`, `rail`, `strip`, `arc`, `chart`, `forecast`, `agenda`, `alert`, `control`, `scenes`.
-**Planned:** `people`.
+**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `washer`.
+
+The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
 ## Why there is no template language
 
@@ -485,6 +486,12 @@ not: the knob on the machine is. So it is a latched button behind a hazard
 lip, with a confirmation that says the rest. `restore` asks nothing — by
 then the emergency has passed, and a dialog there only teaches people to tap
 through dialogs.
+
+**Cut is accent 1 and restore is accent 3**, because they are different
+acts. The argument for one colour throughout — that a stop you have to
+re-find is a worse stop — only holds while there is a stop to find. With
+the plug already off there is nothing left to cut, and a red button whose
+only job is to undo the red one reads as a second emergency.
 
 **`leak` and `powered` are independent and neither is inferred from the
 other.** A leak pad stays damp long after the floor has been dealt with, and
