@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.79.0";
+const VERSION = "0.80.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1469,10 +1469,6 @@ function minutesSince(value) {
   if (isNaN(t)) return 0;
   return (Date.now() - t) / 60000;
 }
-
-/* The activity feed's own vocabulary; kept as a constant so the one kind
-   with special treatment is named rather than spelled inline. */
-const KIND_LOCK_NAME = "lock";
 
 function shortTime(value) {
   const t = Date.parse(value);
@@ -3293,11 +3289,18 @@ const BODIES = {
     return shown.map(({ event, count }, i) => {
       const ago = firstOf(event.ago, shortSince(event.at));
       /* An hour is the line between "just now" and "earlier"; past it a row
-         is context rather than news. A lock never greys out — it is the one
-         kind that still matters hours later. */
-      const isLock = event.kind === KIND_LOCK_NAME;
-      const stale = !isLock && minutesSince(event.at) > 60;
-      const colour = isLock ? "var(--sp-a2)" : (stale ? "" : "var(--accent)");
+         is context rather than news, and that goes for every kind.
+
+         A lock used to be exempt, on the argument that it still matters
+         hours later. On the wall it just read as broken: a rail of grey
+         rows with three ochre locks sitting bright at the top of it, all
+         from the same two minutes, looking like the only thing that had
+         happened. Whether the door is locked is a question the Front Door
+         cell answers in the present tense; the rail's job is only when
+         things happened, and an hour-old lock is as old as an hour-old
+         anything. */
+      const stale = minutesSince(event.at) > 60;
+      const colour = stale ? "" : "var(--accent)";
       const parts = [event.area, event.kind].filter((v) => !isBlank(v));
       const name = parts.length ? parts.join(" · ") : (event.name || "");
       const suffix = count > 1 ? ` ×${count}` : "";
