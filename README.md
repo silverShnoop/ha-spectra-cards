@@ -463,7 +463,6 @@ body:
   door_open: {entity: sensor.washing_machine, attribute: door_open}
   drum_full: {entity: sensor.washing_machine, attribute: drum_full}
   pending: {entity: sensor.washing_machine, attribute: pending_count}
-  power: {entity: sensor.washing_machine, attribute: power_w}
   info: "Started 47m ago"
   finished:
     from: {entity: sensor.washing_machine, attribute: finished_today}
@@ -502,6 +501,12 @@ acts. The argument for one colour throughout — that a stop you have to
 re-find is a worse stop — only holds while there is a stop to find. With
 the plug already off there is nothing left to cut, and a red button whose
 only job is to undo the red one reads as a second emergency.
+
+**A figure the card already states is not repeated as a chip.** The draw
+goes in the card's `meta`, top right, with every other measurement on the
+panel; a `600 W` chip as well was the same number twice, a few centimetres
+apart. The chips that remain each say something said nowhere else on the
+card.
 
 **A leak has no band.** It used to get a solid terracotta bar across the
 top of the card, which said the same thing four more times over: the hero
