@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -447,6 +447,63 @@ every time the scene changed.
 Text colour on a chip is the one colour the theme does not choose. It sits on
 that scene's own hex, so relative luminance decides whether it is ink or
 paper.
+
+### `lock` — is it shut, and what do I do about it?
+
+```yaml
+body:
+  type: lock
+  state: {entity: lock.front_door, map: {locked: Locked}, default: Unlocked}
+  glyph: {entity: lock.front_door, map: {locked: mdi:lock, jammed: mdi:lock-alert},
+          default: mdi:lock-open-variant}
+  accent: {entity: sensor.security_status, map: {green: 3, amber: 2, red: 1}, default: 3}
+  fill: true                       # the disc is tinted; default true
+  sub: {entity: lock.front_door, attribute: last_changed, format: since}
+  chips:                           # omit entirely when there is nothing extra
+    - {text: Jammed, icon: mdi:lock-alert, accent: 1}
+  action:
+    label: Unlock                  # the act, never the state
+    accent: 1
+    service: lock.unlock
+    target: {entity_id: lock.front_door}
+    confirm: {title: Unlock the front door?, ok: Unlock, accent: 1}
+```
+
+Not `control` wearing a lock glyph. `control` answers *what can I set, and
+what is it set to*, which is a question about a dial with a range. A door
+has two states and one worthwhile act, and what you want from across a
+hall is the state, in a word, big enough to read without stopping.
+
+**The hero vocabulary is closed at two words** — `Locked` and `Unlocked`.
+A jam is not a third state of the bolt; it is the mechanism failing to
+reach one of the two, and the honest reading of a jammed lock is that the
+door is *not* locked. So it says `Unlocked` and the jam is a chip. An
+earlier draft put `Not secure` in the hero, which grew the vocabulary to
+carry a fault — and the next fault would have grown it again.
+
+**Chips carry status the card does not otherwise state, and nothing else.**
+There is no *bolt thrown* chip, because the Nuki does not report one. There
+is no duration chip, because how long something has been true is the `sub`
+line and was never a status.
+
+**The button is named for the act.** Repeating the hero word on the control
+makes the control look like a readout, and the one thing it has to look
+like is a button.
+
+**Whether it asks first is config.** The action carries a `confirm` or it
+does not — unlocking a front door from a wall panel is the one direction
+worth a question, and locking it is not. Same rule as the washer's
+emergency stop, for the same reason: which presses need asking about is a
+fact about the house, not about the body.
+
+**The disc is filled, not inverted.** Inversion is step 7 of the emphasis
+ladder and is rationed to one thing on screen at a time; a door that is
+simply locked has no claim on it. Fill is the rail's device — the soft tint
+behind, the base colour as the ring — which is a much lower strength than
+the border it sits in.
+
+Urgency rides the card's `outline`, not the title accent: plain when
+locked, then amber and red as the Needs-you row escalates.
 
 ### `washer` — is the appliance running, and has it left you anything?
 
