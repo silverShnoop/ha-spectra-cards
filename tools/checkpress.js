@@ -60,6 +60,20 @@ const CARDS = [
     },
   },
   {
+    what: "lock · the one control",
+    config: {
+      type: "custom:spectra-card", accent: 3, title: "Front door",
+      body: {
+        type: "lock", state: "Locked", accent: 3,
+        sub: "3h 12m ago \u00b7 11:40",
+        action: {
+          lock: { service: "lock.lock", target: { entity_id: "lock.front_door" } },
+          unlock: { service: "lock.unlock", target: { entity_id: "lock.front_door" } },
+        },
+      },
+    },
+  },
+  {
     what: "list · action row",
     config: {
       type: "custom:spectra-card", accent: 1, title: "Needs you",
