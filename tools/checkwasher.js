@@ -158,10 +158,40 @@ const js = fs.readFileSync(file);
       !all(".pill").some((p) => p.textContent.includes("612 W")),
       all(".pill").map((p) => p.textContent.trim()).join(" | "));
 
-    // ---- no jobs on the card
+    /* ---- the drum shows the job in hand, not the one after it.
+
+       `drum_full` and `pending` both go true the moment a cycle ends, and
+       they are consecutive rather than rival: the washing has to come OUT
+       before it can be hung, and the door clears the first. The count used
+       to REPLACE the glyph, so a queue erased everything else the drum was
+       saying -- including, while it was still full, that it was full. */
+    const drumIs = () => {
+      const g = q(".drumglyph ha-icon");
+      return g ? g.getAttribute("icon") : "(none)";
+    };
+
     await show({ pending: 2, drum_full: true });
-    check("two loads waiting are counted in the drum",
-      text(".drumcount") === "2", text(".drumcount"));
+    check("a full drum outranks the hanging queue",
+      drumIs() === "mdi:basket-unfill", drumIs());
+    check("and does not wear the count while it is still full",
+      !q(".drumn"), `it shows ${text(".drumn")}`);
+
+    await show({ pending: 2, drum_full: false });
+    check("emptied, it becomes a hanger",
+      drumIs() === "mdi:hanger", drumIs());
+    check("with the count beside it when more than one is waiting",
+      text(".drumn") === "2", text(".drumn"));
+
+    await show({ pending: 1, drum_full: false });
+    check("but a lone hanger already means one load, so no number",
+      drumIs() === "mdi:hanger" && !q(".drumn"),
+      `${drumIs()} / ${text(".drumn")}`);
+
+    await show({ pending: 0, drum_full: false });
+    check("and nothing waiting is just the machine",
+      drumIs() === "mdi:washing-machine", drumIs());
+
+    await show({ pending: 2, drum_full: true });
     check("and stated as a chip",
       all(".pill").some((p) => p.textContent.includes("2 to hang")),
       all(".pill").map((p) => p.textContent.trim()).join(" | "));
