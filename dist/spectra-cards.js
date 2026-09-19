@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.84.0";
+const VERSION = "0.85.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4179,17 +4179,24 @@ function washerWord(cycle, leak, powered) {
 /* Accent by meaning, matching the rest of the house: 1 alerts, 2 warnings,
    3 positive, 4 the colour of something happening. */
 /* The drum's colour, or null to let the card's own accent through.
-   Every state that MEANS something keeps its own colour on every machine,
-   so running looks like running and a leak looks like a leak wherever it
-   happens. Idle means nothing is going on -- there is no state worth a
-   colour -- so the drum is free to say WHICH MACHINE instead, which on a
-   pair of near-identical cards is the more useful thing for the biggest
-   shape on them to be saying. */
-function washerAccent(cycle, leak, powered, waiting) {
+
+   Colour says WHICH MACHINE; the glyph says what is happening. It was the
+   other way round, and the cost was that a washer and a dryer side by side
+   were tellable apart only while both were idle -- the moment either did
+   anything it took that state's colour and the pair matched again.
+
+   The state was never the thing that needed a colour: it is written in
+   words beside the drum, in the largest text on the card. Identity was not
+   written anywhere.
+
+   Two exceptions, and only two. A leak and a dead plug are the states that
+   have to catch the eye BEFORE anybody reads a word, so they keep their
+   roles on every machine. Everything else -- running, full, waiting, idle
+   -- is legible at a glance from its glyph and does not need to spend the
+   colour. */
+function washerAccent(leak, powered) {
   if (leak) return 1;
   if (!powered) return 2;
-  if (cycle === "running") return 4;
-  if (waiting) return 2;
   return null;
 }
 
@@ -4212,7 +4219,7 @@ function washerDrum(b, cycle, leak, powered, waiting) {
   const r = 31;
   const c = size / 2;
   const circ = 2 * Math.PI * r;
-  const accent = washerAccent(cycle, leak, powered, waiting);
+  const accent = washerAccent(leak, powered);
   const frac = Math.max(0, Math.min(1, Number(b.progress)));
   const arc = cycle === "running" && isFinite(frac) && frac > 0
     ? `<circle class="drumarc" cx="${c}" cy="${c}" r="${r}"`
@@ -4234,6 +4241,11 @@ function washerDrum(b, cycle, leak, powered, waiting) {
     glyph = isBlank(b.machine_off)
       ? "mdi:washing-machine-off"
       : String(b.machine_off);
+  } else if (cycle === "running") {
+    /* Running before full: a second load started without the drum being
+       emptied is running, not waiting. The live state is the one worth
+       showing. */
+    glyph = "mdi:autorenew";
   } else if (b.drum_full) glyph = "mdi:basket-unfill";
   const inner = waiting
     ? `<span class="drumcount">${esc(String(waiting))}</span>`
