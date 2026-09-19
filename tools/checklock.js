@@ -75,14 +75,20 @@ const js = fs.readFileSync(file);
     const q = (sel) => el.shadowRoot.querySelector(sel);
     const txt = (sel) => (q(sel) ? q(sel).textContent.trim() : null);
 
-    const LOCKED = {
-      type: "lock", state: "Locked", glyph: "mdi:lock", accent: 3,
-      sub: "3h 12m ago \u00b7 11:40",
-      action: {
-        label: "Unlock", service: "lock.unlock",
-        target: { entity_id: "lock.front_door" },
+    const ACTS = {
+      lock: { service: "lock.lock", target: { entity_id: "lock.front_door" } },
+      unlock: {
+        service: "lock.unlock", target: { entity_id: "lock.front_door" },
         confirm: { title: "Unlock the front door?", ok: "Unlock", accent: 1 },
       },
+    };
+    const LOCKED = {
+      type: "lock", state: "Locked", accent: 3,
+      sub: "3h 12m ago \u00b7 11:40", action: ACTS,
+    };
+    const glyph = () => {
+      const i = q(".lockglyph ha-icon");
+      return i ? i.getAttribute("icon") : null;
     };
 
     // ---- locked
@@ -109,11 +115,18 @@ const js = fs.readFileSync(file);
 
     // ---- the button says the act, not the state
     check("the button names the act", txt(".lockbtn") === "Unlock", txt(".lockbtn"));
-    /* A red Unlock on a calm card would break the rule that amber and red
-       are reserved for a state the house is asking about. The weight of
-       unlocking lives in the confirmation. */
-    check("...and wears no urgency colour on a calm card",
-      q(".lockbtn").classList.contains("plain"), q(".lockbtn").className);
+    /* The button wears the CARD's state colour, so the one coloured thing
+       and the one pressable thing agree. Not the colour of the act: a
+       terracotta Unlock on a calm card spends the alert colour on
+       nothing, and a moss Lock on a red card argues with the card. */
+    const btnBorder = getComputedStyle(q(".lockbtn")).borderTopColor;
+    const discRing = getComputedStyle(q(".lockring")).stroke;
+    check("the button's border is the card's state colour",
+      btnBorder === discRing, `button ${btnBorder}, disc ring ${discRing}`);
+    check("...and its fill is weaker than that border",
+      getComputedStyle(q(".lockbtn")).backgroundColor !== btnBorder,
+      getComputedStyle(q(".lockbtn")).backgroundColor);
+    check("the glyph agrees with the word", glyph() === "mdi:lock", glyph());
     check("...which is not the hero word repeated",
       txt(".lockbtn") !== txt(".lockstate"),
       `both say "${txt(".lockbtn")}"`);
@@ -139,10 +152,8 @@ const js = fs.readFileSync(file);
     /* The question is only ever on the action. Locking a door you are
        standing at is not worth a dialog, and the body must not add one. */
     await show({
-      type: "lock", state: "Unlocked", glyph: "mdi:lock-open-variant", accent: 2,
-      sub: "3m ago \u00b7 14:51",
-      action: { label: "Lock", service: "lock.lock",
-        target: { entity_id: "lock.front_door" } },
+      type: "lock", state: "Unlocked", accent: 2,
+      sub: "3m ago \u00b7 14:51", action: ACTS,
     }, 2);
     calls.length = 0;
     q(".lockbtn").click();
@@ -158,11 +169,10 @@ const js = fs.readFileSync(file);
        reach one of them, and the honest reading is that the door is not
        locked -- so it says Unlocked, and the fault is a chip. */
     await show({
-      type: "lock", state: "Unlocked", glyph: "mdi:lock-alert", accent: 1,
+      type: "lock", state: "Unlocked", accent: 1,
       sub: "8m ago \u00b7 14:46",
       chips: [{ text: "Jammed", icon: "mdi:lock-alert", accent: 1 }],
-      action: { label: "Lock", service: "lock.lock",
-        target: { entity_id: "lock.front_door" } },
+      action: ACTS,
     }, 1);
     check("a jammed lock still says Unlocked in the hero",
       txt(".lockstate") === "Unlocked", txt(".lockstate"));
@@ -170,25 +180,78 @@ const js = fs.readFileSync(file);
       (txt(".chips") || "").includes("Jammed"), txt(".chips"));
     check("...and never as a fourth hero word",
       !/jam/i.test(txt(".lockstate") || ""), txt(".lockstate"));
+    /* The hero says Unlocked, so the picture must be an open padlock. A
+       padlock with a warning flash on it is a picture of a SHUT door,
+       and that is what a hand-configured glyph gave it. */
+    check("...and the glyph is an open padlock, not a warning padlock",
+      glyph() === "mdi:lock-open-variant", glyph());
 
     /* "I cannot tell" is a real answer to "is the door shut", and the
        Nuki gives it several times a day. The one thing it must never be
        rendered as is Locked: not proof of a problem, and not proof of
        safety either. */
     await show({
-      type: "lock", state: "Unknown", glyph: "mdi:lock-question", accent: 2,
-      sub: "1m ago \u00b7 14:53",
-      action: { label: "Lock", service: "lock.lock",
-        target: { entity_id: "lock.front_door" } },
+      type: "lock", state: "Unknown", accent: 2,
+      sub: "1m ago \u00b7 14:53", action: ACTS,
     }, 2);
     check("a lock that cannot be read says so",
       txt(".lockstate") === "Unknown", txt(".lockstate"));
+    check("...and offers to shut it rather than open it",
+      txt(".lockbtn") === "Lock", txt(".lockbtn"));
     check("...and is not quietly rendered as locked",
       txt(".lockstate") !== "Locked" && q(".card").classList.contains("outlined"),
       `${txt(".lockstate")}, card ${q(".card").className}`);
 
+    /* A button offering "Unlock" on an open door is a service call that
+       changes nothing and a control that feels broken. */
+    await show({ type: "lock", state: "Unlocked", accent: 2,
+      sub: "3m ago \u00b7 14:51", action: ACTS }, 2);
+    check("an open door is never offered Unlock",
+      txt(".lockbtn") === "Lock", txt(".lockbtn"));
+
+    // ---- optimistic: the press answers before the bolt does
+    /* A Nuki takes a second or two. A hero word that sits on the old
+       state for that long reads as a card that did not hear you. */
+    let release;
+    const slow = { states: {}, themes: { darkMode: true },
+      callService: () => new Promise((r) => { release = r; }) };
+    holder.innerHTML = "";
+    el = document.createElement("spectra-card");
+    el.setConfig({ type: "custom:spectra-card", accent: 3, title: "Front door",
+      body: { type: "lock", state: "Locked", accent: 3, sub: "3h ago \u00b7 11:40",
+        action: { lock: ACTS.lock, unlock: { service: "lock.unlock",
+          target: { entity_id: "lock.front_door" } } } } });
+    holder.appendChild(el);
+    el.hass = slow;
+    await new Promise((r) => requestAnimationFrame(r));
+    q(".lockbtn").click();
+    await settle();
+    /* Nothing re-renders for PRESS_HOLD_MS, on purpose: a render here
+       would replace the button before it could flash, and the flash is
+       what answers the press in the first 280ms. checkpress covers that
+       half; this covers what arrives after it. */
+    check("the press is answered by the flash before anything re-renders",
+      txt(".lockstate") === "Locked", `re-rendered inside the hold: ${txt(".lockstate")}`);
+    await new Promise((r) => setTimeout(r, 400));
+    check("the word answers the press, not the bolt",
+      txt(".lockstate") === "Unlocked", txt(".lockstate"));
+    check("...and the glyph goes with it",
+      glyph() === "mdi:lock-open-variant", glyph());
+    check("...and the button flips to the other act",
+      txt(".lockbtn") === "Lock", txt(".lockbtn"));
+    check("...and it spins while the house is thinking",
+      !!el.shadowRoot.querySelector(".spinner"), "no spinner");
+    /* The claim is on the word only. Whether the house is SECURE is a
+       judgement home_signals makes out of the grace, the other contacts
+       and the jam -- the card is not entitled to guess it. */
+    check("...but it does not invent a security colour",
+      getComputedStyle(q(".lockring")).stroke === discRing,
+      `${getComputedStyle(q(".lockring")).stroke} vs ${discRing}`);
+    if (release) release();
+    await settle();
+
     // ---- a door with no control
-    await show({ type: "lock", state: "Locked", glyph: "mdi:lock", accent: 3,
+    await show({ type: "lock", state: "Locked", accent: 3,
       sub: "1d ago \u00b7 Thu 09:02" });
     check("a lock with no action draws no button", !q(".lockbtn"),
       "a button appeared with nothing behind it");
