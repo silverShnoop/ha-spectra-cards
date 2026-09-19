@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.74.0";
+const VERSION = "0.75.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -333,14 +333,19 @@ ha-icon { display:inline-flex; line-height:0; }
 .bands i ha-icon { --mdc-icon-size:14px; width:14px; height:14px; opacity:.85; }
 /* The same three statements the schedule strip above makes, so the two read
    as one control split in half rather than two controls that happen to sit
-   together: the chosen one is ringed, the rest recede while a choice is
-   being expressed, and the whole thing dulls when the room is off. */
-.scenetrack.choosing .bands i { opacity:.3; }
-.scenetrack.choosing .bands i.on { opacity:1; }
-/* And under a finger, where the one that recedes is whichever the finger is
-   NOT on. Without this a drag dimmed nothing: the only thing moving was the
-   ring, against six bands all still at full strength. */
-.scenetrack.picking .bands i { opacity:.3; }
+   together: the chosen one is ringed, the rest recede, and the whole thing
+   dulls when the room is off.
+
+   Full strength means SELECTED, with no second condition. This was hung on
+   a "choosing" class the markup only set when one of these scenes was the
+   live one -- so on Auto, when none of them is, the class was absent and
+   every band sat at full strength, six scenes all claiming to be the one
+   the room is on. Nothing selected has to look like nothing selected. */
+.scenetrack .bands i { opacity:.3; }
+.scenetrack .bands i.on { opacity:1; }
+/* Under a finger the selection is wherever the finger is, so the band that
+   was chosen recedes with the rest until it is lifted. */
+.scenetrack.picking .bands i.on { opacity:.3; }
 .scenetrack.picking .bands i.at { opacity:1; }
 .bands i { transition:opacity 160ms linear; }
 
@@ -3614,7 +3619,7 @@ function moveFrom(element, property, from, to, ms) {
 function motionSnapshot(root) {
   const shot = {
     count: 0, strip: null, cells: [], thumb: null, knob: null, dial: null,
-    rows: new Map(),
+    bands: null, dimtrack: null, rows: new Map(),
   };
 
   /* Where each row sits right now. A row leaving a flowed list moves every
@@ -3626,6 +3631,16 @@ function motionSnapshot(root) {
     const box = keyed[i].getBoundingClientRect();
     shot.rows.set(keyed[i].getAttribute("data-key"), { x: box.left, y: box.top });
   }
+
+  /* The drawer's two bars dull when the room goes off. Their CSS says
+     260ms, but a re-render hands them over as brand new elements already
+     at the new opacity, with no frame at the old one to ease from -- so
+     they popped while the schedule strip above them faded. Same carry,
+     same reason. */
+  const bands = root.querySelector(".bands");
+  shot.bands = bands ? getComputedStyle(bands).opacity : null;
+  const dimtrack = root.querySelector(".dimtrack");
+  shot.dimtrack = dimtrack ? getComputedStyle(dimtrack).opacity : null;
 
   const strip = root.querySelector(".strip");
   if (strip) {
@@ -3676,6 +3691,13 @@ function motionFrom(root, shot) {
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
       moveFrom(keyed[i], "transform", `translate(${dx}px, ${dy}px)`, "none", SETTLE_MS);
     }
+  }
+
+  const bands = root.querySelector(".bands");
+  if (bands) moveFrom(bands, "opacity", shot.bands, getComputedStyle(bands).opacity);
+  const dimtrack = root.querySelector(".dimtrack");
+  if (dimtrack) {
+    moveFrom(dimtrack, "opacity", shot.dimtrack, getComputedStyle(dimtrack).opacity);
   }
 
   const strip = root.querySelector(".strip");
@@ -3843,14 +3865,12 @@ function sceneTrackMarkup(key, scenes, activeName, lit) {
   const at = scenes.findIndex((scene) => active !== null
     && String(firstOf(scene.name, "")).toLowerCase() === active);
   const width = 100 / Math.max(1, scenes.length);
-  /* The room being ON one of these IS the choice, so the rest recede for as
-     long as it lasts. Keying this off `picked` instead meant the dimming
-     lived exactly as long as the optimistic window -- a couple of seconds
-     after a press -- and then quietly went away while the room was still
-     sitting on the scene you had chosen. The strip above dims for the whole
-     time it is overridden, not for a moment after the press. */
+  /* The dimming is not conditional on anything here: the CSS lights the
+     band that is `on` and dims the rest, so a strip with no `on` band --
+     the room following its schedule -- dims all of them, which is what
+     "none of these is selected" looks like. */
   return `<div class="slide scenetrack${lit ? "" : " off"}`
-    + `${at >= 0 ? " choosing" : ""}" data-track="${esc(key)}" role="slider"`
+    + `" data-track="${esc(key)}" role="slider"`
     + ` tabindex="${lit ? "0" : "-1"}" aria-label="Scene" aria-valuemin="0"`
     + ` aria-valuemax="${Math.max(0, scenes.length - 1)}"`
     + `${lit ? "" : ` aria-disabled="true"`}`
