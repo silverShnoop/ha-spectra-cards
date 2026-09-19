@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.88.0";
+const VERSION = "0.89.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -394,10 +394,15 @@ ha-icon { display:inline-flex; line-height:0; }
   justify-content:center; color:var(--accent);
 }
 .drumglyph ha-icon { --mdc-icon-size:26px; }
-.drumcount {
-  position:absolute; inset:0; display:flex; align-items:center;
-  justify-content:center; font-family:var(--sp-mono); font-size:30px;
-  font-weight:600; color:var(--accent);
+/* A hanger with a number beside it. The glyph shrinks to make room rather
+   than the number overlapping it: 48px of face is not enough for both at
+   full size, and a badge sitting on the hanger would hide the hook, which
+   is the part that reads as a hanger. */
+.drumglyph.counted { gap:2px; }
+.drumglyph.counted ha-icon { --mdc-icon-size:22px; }
+.drumn {
+  font-family:var(--sp-mono); font-size:15px; font-weight:600;
+  line-height:1; color:var(--accent);
 }
 .washmain { flex:1 1 auto; min-width:0; }
 .washstate {
@@ -4242,10 +4247,28 @@ function washerDrum(b, cycle, leak, powered, waiting) {
        emptied is running, not waiting. The live state is the one worth
        showing. */
     glyph = "mdi:autorenew";
-  } else if (b.drum_full) glyph = "mdi:basket-unfill";
-  const inner = waiting
-    ? `<span class="drumcount">${esc(String(waiting))}</span>`
-    : `<span class="drumglyph"><ha-icon icon="${esc(glyph)}"></ha-icon></span>`;
+  } else if (b.drum_full) {
+    /* A full drum outranks a hanging queue. They are both true the moment
+       a cycle ends -- the integration sets `drum_full` and appends to
+       `pending` together -- but they are consecutive jobs, not rival ones:
+       the washing has to come OUT before it can be hung, and the door is
+       what clears the first. Showing the queue while the drum is still
+       full would name the job after next. */
+    glyph = "mdi:basket-unfill";
+  } else if (waiting) {
+    /* Drum empty, washing still not hung. This is the only state where the
+       machine has nothing left to do and a person does. */
+    glyph = "mdi:hanger";
+  }
+  /* The count used to REPLACE the glyph, so a waiting queue erased every
+     other thing the drum was saying -- including, while the drum was still
+     full, the fact that it was full. It is an adornment now, and only when
+     there is more than one: a lone hanger already means "one load". */
+  const many = !b.drum_full && waiting > 1;
+  const inner = `<span class="drumglyph${many ? " counted" : ""}">`
+    + `<ha-icon icon="${esc(glyph)}"></ha-icon>`
+    + (many ? `<span class="drumn">${esc(String(waiting))}</span>` : "")
+    + `</span>`;
   const tone = accent
     ? ` style="--accent:var(--sp-a${accent});`
       + `--accent-soft:var(--sp-a${accent}-soft);--accent-on:var(--sp-a${accent}-on)"`
