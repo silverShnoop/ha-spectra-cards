@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.89.0";
+const VERSION = "0.89.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6009,7 +6009,15 @@ class SpectraCard extends HTMLElement {
       const command = row && row.buttons && row.buttons[Number(el.dataset.position)];
       const run = (event) => {
         event.stopPropagation();
-        onPress(el, () => this._callAction(command && command.action));
+        /* The last control path that could not ask first. The all-off
+           button, the emergency stop and a list row all honour a
+           `confirm` on their action; a control row's buttons quietly did
+           not, so an `Unlock` that carried one fired anyway. Which way a
+           button is pointing is a fact about the house, not about the
+           card, so the rule is the same everywhere: the action carries
+           the question or it does not. */
+        this._guard(command && command.action && command.action.confirm,
+          () => onPress(el, () => this._callAction(command && command.action)));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
