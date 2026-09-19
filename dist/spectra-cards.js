@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.73.0";
+const VERSION = "0.74.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -347,7 +347,10 @@ ha-icon { display:inline-flex; line-height:0; }
 /* The ring is one element that MOVES rather than a border handed from band
    to band. Handing it over can only cross-fade; a thing that slides is the
    same thing in a new place, which is what choosing a scene is -- and it is
-   what the marker on the strip above already does. */
+   what the marker on the strip above already does.
+
+   It slides only when the ROOM moves it. Under a finger it does not: see
+   the .slide.picking rule below. */
 .bandmark {
   position:absolute; top:0; height:26px; border-radius:4px;
   box-shadow:inset 0 0 0 2px var(--sp-ink); pointer-events:none;
@@ -379,8 +382,16 @@ ha-icon { display:inline-flex; line-height:0; }
 /* Under a finger there is nothing to animate towards: the value IS where the
    finger is, and easing towards it would just lag the hand. Same for the
    first paint after a re-render, which has to land where the control already
-   was before it is allowed to move. */
+   was before it is allowed to move.
+
+   The ring on the scene bands needs this for a second reason. Easing it
+   made a drag read as a box chasing the thumb across the track, arriving
+   after the band it was meant to be marking had already been passed -- so
+   at no point did it say which scene a lift would choose. Snapped, it is a
+   border on the band being pressed, which is what the strip above does and
+   what the control is actually for. */
 .slide.picking .dimfill, .slide.picking .dimthumb,
+.slide.picking .bandmark,
 .dimfill.instant, .dimthumb.instant { transition:none; }
 .slide .dimtrack, .slide .bands { transition:opacity 260ms linear; }
 .slide.off .dimtrack, .slide.off .bands { opacity:.32; }

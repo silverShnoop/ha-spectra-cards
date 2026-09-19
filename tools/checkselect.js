@@ -132,11 +132,19 @@ const js = fs.readFileSync(file);
       button: 0, bubbles: true, pointerId: 1 });
     const track = q("[data-track]");
     track.dispatchEvent(new PointerEvent("pointerdown", opts(box.left + box.width * 0.85)));
-    /* Checked with the finger still down: this is when the ring travels, and
-       a transition is spent by the time anything else happens. */
-    check("the ring travels to the band under the finger",
-      q("[data-bandmark]").getAnimations().length > 0,
-      `no transition; left was ${before}, now ${q("[data-bandmark]").style.left}`);
+    /* Checked with the finger still down. This asserted a TRANSITION once,
+       on the reasoning that a ring which slides is the same ring in a new
+       place. Under a thumb it is not: the hand has already left the band
+       the ring is easing towards, so the one thing the control has to say
+       -- which scene a lift would choose -- is the one thing it does not.
+       So: moved, and arrived, on this frame. The easing is still asserted
+       further down, for the case it was written for, the room moving the
+       scene while nothing is being touched. */
+    check("the ring lands on the band under the finger, not eases towards it",
+      Math.abs(at("[data-bandmark]") - 200 / 3) < 0.01
+        && q("[data-bandmark]").getAnimations().length === 0,
+      `left was ${before}, now ${q("[data-bandmark]").style.left},`
+      + ` ${q("[data-bandmark]").getAnimations().length} animations`);
     track.dispatchEvent(new PointerEvent("pointerup", opts(box.left + box.width * 0.85)));
     check("choosing a scene turns it on",
       calls.length === 1 && calls[0].target.entity_id === "scene.rest",
@@ -244,7 +252,37 @@ const js = fs.readFileSync(file);
       Math.abs(boxOf(q("[data-bandmark]")).left - boxOf(under).left) < 1.5,
       `ring ${boxOf(q("[data-bandmark]")).left.toFixed(1)},`
       + ` band ${boxOf(under).left.toFixed(1)}`);
-    dtrack.dispatchEvent(new PointerEvent("pointerup", dopt(dbox.left + dbox.width * 0.1)));
+
+    /* ---- and it is ON the band, not on its way there.
+
+       Everything above settles for 400ms before it measures, which is long
+       enough for an eased ring to arrive -- so a ring that CHASED the
+       finger passed every one of those checks while reading, under a
+       thumb, as a box trailing behind the band it claimed to be marking.
+       These two measure the frame the move happens on: no transition
+       running, and already in place. Drag across several bands first, so
+       what is asserted is a ring that has kept up, not one that never had
+       to move. */
+    for (const frac of [0.45, 0.75, 0.3]) {
+      const x = dbox.left + dbox.width * frac;
+      dtrack.dispatchEvent(new PointerEvent("pointermove", dopt(x)));
+      const now = all("[data-cell]").find((c) => c.classList.contains("at"));
+      const ring = q("[data-bandmark]");
+      check(`no easing under the finger at ${frac}`,
+        ring.getAnimations().length === 0,
+        `${ring.getAnimations().length} animations running`);
+      check(`the ring is on the pressed band at ${frac}, that same frame`,
+        Math.abs(boxOf(ring).left - boxOf(now).left) < 1.5,
+        `ring ${boxOf(ring).left.toFixed(1)}, band ${boxOf(now).left.toFixed(1)}`);
+    }
+
+    /* Released, the room may still move it, and that move IS eased -- the
+       scene changing under you is the case the slide was written for. */
+    dtrack.dispatchEvent(new PointerEvent("pointerup", dopt(dbox.left + dbox.width * 0.3)));
+    await settle();
+    check("but off the finger the easing is back",
+      getComputedStyle(q("[data-bandmark]")).transitionDuration !== "0s",
+      getComputedStyle(q("[data-bandmark]")).transitionDuration);
     calls.length = 0;
     el._pick = { label: "Rest", at: Date.now() };
     el._config.body.active = "Shine";
