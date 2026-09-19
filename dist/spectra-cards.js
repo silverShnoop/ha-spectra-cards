@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.80.0";
+const VERSION = "0.81.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -986,20 +986,33 @@ img.avatar { object-fit:cover; display:block; }
 /* An accented tile carries its accent on the edge, where a row carried it as
    a wash. A wash inside a bordered tile reads as two boxes. */
 .flow .row.tile.wash { background:none; border-color:var(--accent); }
-/* A row that has just been dealt with. It does not vanish under the finger
-   that dealt with it: the button flashes, the row is left alone long enough
-   to see that it was the right one, and only then does it go -- shrinking
-   rather than blinking, so the eye follows it out instead of being startled
-   by a gap. Pointer events go first, so the half-second cannot be spent
-   pressing a button that has already fired. */
+/* Rows arrive and leave; they do not blink in and out.
+
+   This belongs to the LIST, not to whatever caused the change. A row that
+   goes because you pressed its button and a row that goes because the
+   house stopped needing it are the same event to the eye, and animating
+   only the first taught people that a row vanishing meant somebody had
+   done something -- which was false half the time.
+
+   Leaving shrinks, so the eye follows it out instead of being startled by
+   a gap, and pointer events go first so the last frames cannot be spent
+   pressing a button that has already fired. Arriving is quicker than
+   leaving: a departure has to be noticed, an arrival is already being
+   looked at. */
 .row.leaving { animation: sp-leave 420ms cubic-bezier(.4,0,.7,.3) forwards;
   pointer-events:none; }
 @keyframes sp-leave {
   from { opacity:1; transform:none; }
   to   { opacity:0; transform:scale(.93); }
 }
+.row.entering { animation: sp-enter 260ms cubic-bezier(.2,.7,.4,1) both; }
+@keyframes sp-enter {
+  from { opacity:0; transform:scale(.95); }
+  to   { opacity:1; transform:none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .row.leaving { animation:none; opacity:0; }
+  .row.entering { animation:none; }
 }
 
 /* festival — the card celebrates, the controls do not. The decoration lives
@@ -3783,7 +3796,6 @@ const SLIDE_LIVE_MS = 200;
 const DIM_SETTLE = 2;
 const DIM_GIVE_UP_MS = 12000;
 
-const LEAVE_DELAY_MS = 500;
 const LEAVE_MS = 420;
 const SETTLE_MS = 380;
 
@@ -4849,21 +4861,6 @@ class SpectraCard extends HTMLElement {
      got to so the things that are supposed to move can move. Everything else
      simply swaps: for a word being replaced by another word there is nothing
      to interpolate, and the title bar's fade covers it. */
-  /* Sends one row out, and holds the card still until it has gone.
-
-     Optimistic on purpose: it starts on the press rather than on the state
-     coming back, because the point is that the press feels answered. If the
-     row turns out to still be there -- an action that did not clear it -- the
-     re-render simply brings it back without the class. */
-  _leave(row) {
-    if (!row) return;
-    this._leaveUntil = Date.now() + LEAVE_DELAY_MS + LEAVE_MS;
-    if (this._leaveTimer) { clearTimeout(this._leaveTimer); this._leaveTimer = null; }
-    setTimeout(() => {
-      if (row.isConnected) row.classList.add("leaving");
-    }, LEAVE_DELAY_MS);
-  }
-
   disconnectedCallback() {
     /* A tab switch takes the card off the page with its drawer still open,
        which would leave the module holding a slot no one can close. */
@@ -4871,12 +4868,65 @@ class SpectraCard extends HTMLElement {
     if (super.disconnectedCallback) super.disconnectedCallback();
   }
 
+  /* Swap the markup, and let the rows that changed say so.
+
+     Whether a row is arriving or leaving is decided HERE, by comparing the
+     keys on the page with the keys in the markup about to replace them --
+     never by the thing that caused the change. A press, a snooze expiring
+     and a door being opened all reach this function the same way, so they
+     all look the same.
+
+     A departure has to run BEFORE the swap, because after it the row does
+     not exist to animate. So the swap waits: the doomed rows are marked,
+     the paint is deferred one animation, and the re-render finds them
+     genuinely gone. */
   _paint(html) {
-    const shot = this._holder.firstElementChild
-      ? motionSnapshot(this._holder)
-      : null;
-    this._holder.innerHTML = html;
-    motionFrom(this._holder, shot);
+    const holder = this._holder;
+    const had = !!holder.firstElementChild;
+
+    /* Read the keys off the markup rather than the model: every body
+       shapes its rows differently, and the markup is what actually
+       decides which of them reach the page. */
+    const next = new Set();
+    for (const m of html.matchAll(/data-key="([^"]*)"/g)) next.add(m[1]);
+
+    const onPage = Array.from(holder.querySelectorAll(".row[data-key]"));
+    const before = new Set(onPage.map((el) => el.getAttribute("data-key")));
+
+    if (had && !this._leavingNow) {
+      const going = onPage.filter((el) => !next.has(el.getAttribute("data-key")));
+      if (going.length) {
+        /* Latched, so the deferred re-render swaps instead of deferring
+           again on the same rows and never arriving. */
+        this._leavingNow = true;
+        for (const el of going) el.classList.add("leaving");
+        this._leaveUntil = Date.now() + LEAVE_MS;
+        if (this._leaveTimer) clearTimeout(this._leaveTimer);
+        /* The latch is NOT cleared here. The deferred paint has to see it
+           still set, or it finds the same doomed rows still on the page
+           and defers again, forever. `_paint` clears it once it has
+           actually swapped. */
+        this._leaveTimer = setTimeout(() => {
+          this._leaveTimer = null;
+          this._leaveUntil = 0;
+          this._signature = null;
+          this._update();
+        }, LEAVE_MS + 20);
+        return;
+      }
+    }
+    this._leavingNow = false;
+
+    const shot = had ? motionSnapshot(holder) : null;
+    holder.innerHTML = html;
+    motionFrom(holder, shot);
+
+    /* Nothing arrives on the first paint. A card that deals itself in one
+       row at a time on every page load is a card that looks broken. */
+    if (!had) return;
+    for (const el of holder.querySelectorAll(".row[data-key]")) {
+      if (!before.has(el.getAttribute("data-key"))) el.classList.add("entering");
+    }
   }
 
   /* Some bodies know their own state better than any config line can. Where
@@ -5792,9 +5842,12 @@ class SpectraCard extends HTMLElement {
       const row = rows[Number(el.dataset.row)];
       const run = (event) => {
         event.stopPropagation();
+        /* No exit is started here. The row leaves when it stops being in
+           the list, which is the same rule for a press, a snooze expiring
+           and a door being opened. The press already has its own answer:
+           the button flashes, and spins until the house agrees. */
         this._guard(row && row.action && row.action.confirm, () => {
           onPress(el, () => this._callAction(row && row.action));
-          this._leave(el.closest(".row[data-key]"));
         });
       };
       el.addEventListener("click", run);
