@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.77.0";
+const VERSION = "0.78.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -404,24 +404,22 @@ ha-icon { display:inline-flex; line-height:0; }
    how you turn the machine off", and it is not -- the knob on the machine
    is. A latched button behind a hazard lip says what it is, and the
    confirmation says the rest. */
-.estop { display:flex; flex-direction:column; flex:none; width:150px; }
+.estop {
+  display:flex; flex-direction:column; flex:none; width:46px;
+  background:none; border:0; padding:0; font:inherit; cursor:pointer;
+}
 .estoplip {
-  height:5px; border-radius:3px 3px 0 0;
+  height:4px; border-radius:3px 3px 0 0;
   background-image:repeating-linear-gradient(135deg,
-    var(--accent) 0 6px, var(--sp-paper) 6px 12px);
+    var(--accent) 0 5px, var(--sp-paper) 5px 10px);
 }
 .estopbtn {
   border:2px solid var(--accent); border-top:0; border-radius:0 0 4px 4px;
   background:var(--accent-soft); color:var(--accent-on);
-  padding:8px 8px 7px; display:flex; flex-direction:column; align-items:center;
-  gap:2px; cursor:pointer; font:inherit; min-height:48px; position:relative;
+  display:grid; place-items:center; height:42px; position:relative;
 }
-.estopbtn .estopname {
-  display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
-  letter-spacing:.06em; text-transform:uppercase;
-}
-.estopbtn ha-icon { --mdc-icon-size:14px; }
-.estopbtn .estopwhy { font-size:10px; color:var(--sp-ink-3); letter-spacing:.03em; }
+.estopbtn ha-icon { --mdc-icon-size:20px; }
+.estop:active .estopbtn { background:var(--accent); color:var(--sp-paper); }
 
 /* Water on the floor outranks everything else on the card, so it is the
    only thing here allowed to take the full width and a solid fill. */
@@ -2603,14 +2601,21 @@ const BODIES = {
        mid-fill, so that is the one behind a question. */
     const stop = powered ? action.cut : action.restore;
     if (stop) {
-      out += `<div class="estop">`
-        + `<span class="estoplip"></span>`
-        + `<button type="button" class="estopbtn" data-estop`
+      /* Icon only, 46px. An industrial E-stop is oversized so a palm can
+         find it without looking; a wall panel has the opposite problem,
+         which is a sleeve brushing past it. The hazard lip is what says
+         "emergency" -- the width never did -- so the lip stays and the
+         target shrinks by three quarters. The words move to aria-label,
+         which is now the only place the meaning lives: the two glyphs
+         have to carry it, so they are a plug being pulled and a plug
+         going back in, not one ambiguous power toggle. */
+      out += `<button type="button" class="estop" data-estop`
+        + ` title="${esc(powered ? "Cut power at the plug" : "Restore power at the plug")}"`
         + ` aria-label="${esc(powered ? "Cut power at the plug" : "Restore power at the plug")}">`
-        + `<span class="estopname"><ha-icon icon="mdi:power"></ha-icon>`
-        + `${esc(powered ? "Cut power" : "Restore power")}</span>`
-        + `<span class="estopwhy">${esc(powered ? "emergency only" : "back to normal")}</span>`
-        + `</button></div>`;
+        + `<span class="estoplip"></span>`
+        + `<span class="estopbtn"><ha-icon icon="${
+          powered ? "mdi:power-plug-off" : "mdi:power-plug"}"></ha-icon></span>`
+        + `</button>`;
     }
     out += `</div>`;
 
