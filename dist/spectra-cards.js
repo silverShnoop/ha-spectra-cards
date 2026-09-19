@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.89.0";
+const VERSION = "0.90.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -404,11 +404,43 @@ ha-icon { display:inline-flex; line-height:0; }
   font-family:var(--sp-mono); font-size:15px; font-weight:600;
   line-height:1; color:var(--accent);
 }
-.washmain { flex:1 1 auto; min-width:0; }
-.washstate {
+.washmain, .lockmain { flex:1 1 auto; min-width:0; }
+/* One hero size for both. The lock card and the washer card sit on
+   different pages but are the same shape, and a hero that changed size
+   between them would make them look like different kinds of thing. */
+.washstate, .lockstate {
   margin:0; font-size:23px; font-weight:500; letter-spacing:-.01em;
   line-height:1.1;
 }
+
+.lockrow { display:flex; align-items:center; gap:12px; }
+.lockdisc { position:relative; flex:none; width:78px; height:78px; }
+.lockdisc svg { display:block; }
+.lockring { fill:none; stroke:var(--accent-soft); stroke-width:5; }
+.lockface { fill:var(--sp-paper); }
+.lockdisc.filled .lockring { stroke:var(--accent); }
+.lockdisc.filled .lockface { fill:var(--accent-soft); }
+.lockglyph {
+  position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:center; color:var(--accent);
+}
+.lockglyph ha-icon { --mdc-icon-size:26px; }
+.lockdisc.filled .lockglyph { color:var(--accent-on); }
+/* 44px tall because everything touched on this panel is, and wide enough
+   that "Unlock" does not wrap -- a control whose label breaks over two
+   lines stops reading as one press. */
+.lockbtn {
+  flex:none; min-width:84px; height:44px; padding:0 14px;
+  border:2px solid var(--accent); border-radius:4px;
+  background:var(--accent-soft); color:var(--accent-on);
+  font:inherit; font-size:13px; font-weight:600; white-space:nowrap;
+  cursor:pointer;
+}
+.lockbtn:active { background:var(--accent); color:var(--sp-paper); }
+.lockbtn.plain {
+  border-color:var(--sp-edge); background:var(--sp-sink); color:var(--sp-ink);
+}
+.lockbtn.plain:active { background:var(--sp-edge); color:var(--sp-ink); }
 
 /* The emergency stop is deliberately not a switch. A switch says "this is
    how you turn the machine off", and it is not -- the knob on the machine
@@ -2670,6 +2702,75 @@ const BODIES = {
     return out;
   },
 
+  /* Is it shut, and what do I do about it?
+   *
+   * A lock is not the `control` body wearing a lock glyph. `control`
+   * answers "what can I set, and what is it set to", which is a question
+   * about a dial with a range. A door has two states and one worthwhile
+   * act, and the thing you want from across a hall is the state, in a
+   * word, large enough to read without stopping.
+   *
+   * Four decisions, all of them corrections to an earlier draft:
+   *
+   * The hero says what the door IS, and the answers to that are closed:
+   * Locked, Unlocked, Unknown. Everything else is a REASON, and reasons
+   * are chips.
+   *
+   * A jam is the clearest case. It is not a fourth state of the door --
+   * it is the mechanism failing to reach one of the first two, and the
+   * honest reading of a jammed lock is that the door is not locked. So
+   * the hero says Unlocked and the jam is a chip. A draft that put "Not
+   * secure" in the hero grew the vocabulary to carry a fault, and the
+   * next fault would have grown it again.
+   *
+   * Unknown earns its place where a jam does not, because "I cannot tell"
+   * is a real answer to "is it shut" and the Nuki gives it several times
+   * a day. It is never rendered as Locked: not proof of a problem, and
+   * not proof of safety either.
+   *
+   * Chips carry status the card does not otherwise state, and nothing
+   * else. There is no "bolt thrown" chip because the Nuki does not
+   * report one, and no duration chip because how long something has been
+   * true is already the sub line and was never a status.
+   *
+   * The button is named for the act, not the state. Repeating the hero
+   * word on the control makes the control look like a readout, and the
+   * one thing it must look like is a button.
+   *
+   * And whether pressing it asks first is config, not markup: the action
+   * carries a `confirm` or it does not. Unlocking a front door from a
+   * wall panel is the one direction worth a question; locking it is not.
+   */
+  lock(b) {
+    const action = b.action || {};
+    const chips = (Array.isArray(b.chips) ? b.chips : [])
+      .filter((chip) => chip && !isBlank(chip.text))
+      .map((chip) => chipOf(String(chip.text), firstOf(chip.icon, "mdi:alert"),
+        accentNumber(chip.accent)));
+
+    let out = `<div class="lockrow">` + lockDisc(b);
+    out += `<div class="lockmain">`
+      + `<p class="lockstate">${esc(firstOf(b.state, "Unknown"))}</p>`
+      + `<p class="sub">${esc(firstOf(b.sub, ""))}</p>`
+      + (chips.length ? `<div class="chips">${chips.join("")}</div>` : "")
+      + `</div>`;
+
+    if (action.service) {
+      const label = firstOf(action.label, "Set");
+      /* No accent means no colour. accentStyle defaults to teal, which
+         would have put a coloured button on a card whose whole point is
+         that a locked door is unremarkable -- and a red Unlock on a calm
+         card breaks the rule that yellow, amber and red are reserved for
+         a state the house is actually asking about. The weight of
+         unlocking lives in the confirmation, not in the paint. */
+      const tone = accentNumber(action.accent);
+      out += `<button type="button" class="lockbtn${tone ? "" : " plain"}"`
+        + ` data-lockact${tone ? ` style="${accentStyle(tone)}"` : ""}>`
+        + `${esc(label)}</button>`;
+    }
+    return out + `</div>`;
+  },
+
   summary(b) {
     const lit = b.on === undefined ? false : Boolean(b.on);
     let out = `<div class="row summaryrow" style="padding-left:0">`
@@ -4278,6 +4379,30 @@ function washerDrum(b, cycle, leak, powered, waiting) {
     + `<circle class="drumring${powered ? "" : " broken"}" cx="${c}" cy="${c}" r="${r}"></circle>`
     + `<circle class="drumface" cx="${c}" cy="${c}" r="24"></circle>${arc}</svg>`
     + inner + `</div>`;
+}
+
+/* The state, as a shape, at the size the washer's drum is -- because a
+   pair of cards whose heroes are different sizes read as different kinds
+   of card, and these are the same kind.
+
+   Filled rather than inverted. Inversion is step 7 of the emphasis ladder
+   and is rationed to one thing on screen at a time; a front door that is
+   simply locked has no claim on it. Fill is the rail's device: the soft
+   tint behind, the base colour as the ring, which is a much lower
+   strength than the border it sits in and does not shout the good news. */
+function lockDisc(b) {
+  const size = 78;
+  const r = 31;
+  const c = size / 2;
+  const filled = b.fill === undefined ? true : Boolean(b.fill);
+  return `<div class="lockdisc${filled ? " filled" : ""}"`
+    + ` style="${accentStyle(b.accent)}">`
+    + `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`
+    + `<circle class="lockring" cx="${c}" cy="${c}" r="${r}"></circle>`
+    + `<circle class="lockface" cx="${c}" cy="${c}" r="24"></circle></svg>`
+    + `<span class="lockglyph">`
+    + `<ha-icon icon="${esc(firstOf(b.glyph, "mdi:lock-question"))}"></ha-icon>`
+    + `</span></div>`;
 }
 
 function drawerMarkup(key, body) {
@@ -5930,6 +6055,28 @@ class SpectraCard extends HTMLElement {
         event.stopPropagation();
         this._guard(chosen.confirm,
           () => onPress(el, () => this._work(() => this._callAction(chosen))));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
+      });
+    });
+
+    /* The lock's one control. Guarded from the first line it was written,
+       because the whole point of the button is that unlocking a front
+       door from a wall panel is the press worth asking about -- and a
+       control that silently drops its `confirm` leaves config that still
+       reads as safe. */
+    this._holder.querySelectorAll("[data-lockact]").forEach((el) => {
+      const action = (model.body && model.body.action) || null;
+      if (!action || !action.service) return;
+      const run = (event) => {
+        event.stopPropagation();
+        this._guard(action.confirm,
+          () => onPress(el, () => this._work(() => this._callAction(action))));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
