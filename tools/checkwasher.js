@@ -106,6 +106,17 @@ const js = fs.readFileSync(file);
       const i = q(sel + " ha-icon");
       return i ? i.getAttribute("icon") : null;
     };
+    /* Resolve a design token to the colour it actually paints, rather than
+       hardcoding hex: the sheet has a light and a dark value for every
+       role and the harness runs in whichever the browser prefers. */
+    const tokenColour = (token) => {
+      const probe = document.createElement("span");
+      probe.style.color = `var(${token})`;
+      root().appendChild(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    };
     const show = async (over) => {
       el.setConfig(JSON.parse(JSON.stringify(conf(over))));
       el._signature = null;
@@ -182,6 +193,26 @@ const js = fs.readFileSync(file);
     check("and the two states do not wear the same glyph",
       glyph("[data-estop]") === "mdi:power-plug",
       glyph("[data-estop]"));
+
+    // ---- the stop wears the alert role, not the card's
+    await show({ powered: true, state: "running" });
+    /* The card under test is configured accent 6. The stop inheriting that
+       is exactly how this shipped: a plum emergency control sitting beside
+       a terracotta leak band. Accent 1 is the alert role and the stop IS
+       that role, so it is pinned rather than inherited. */
+    const alert = tokenColour("--sp-a1");
+    const card = tokenColour("--sp-a6");
+    const edge = () =>
+      getComputedStyle(q("[data-estop] .estopbtn")).borderBottomColor;
+    check("the stop is the alert colour",
+      edge() === alert, `${edge()} (a1 is ${alert})`);
+    check("and not the card's accent",
+      edge() !== card && card !== alert, `${edge()} (a6 is ${card})`);
+    await show({ powered: false });
+    /* Same colour latched out. A stop you have to re-find because it
+       changed colour is a worse stop. */
+    check("restore keeps the same colour, so the control stays findable",
+      edge() === alert, `${edge()} (a1 is ${alert})`);
 
     // ---- the shrunk target still says what it is
     await show({ powered: true, state: "running" });
