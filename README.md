@@ -603,7 +603,11 @@ action:
 ```
 
 It is a property of the **action**, not of the body, so nothing needs new
-code to gain one. The dialog is drawn inside the card rather than with the
+code to gain one. `tools/checkconfirm.js` holds every control surface to
+that sentence, because the one way this fails is silent: a control that
+calls straight through ignores a `confirm` without complaining, and the
+config still reads as safe. A control row's buttons did exactly that until
+0.89.1. The dialog is drawn inside the card rather than with the
 browser's `confirm()`: the panel has no keyboard and no window chrome, a
 native dialog cannot be styled or dismissed with a thumb, and it blocks the
 whole frontend while it is open.
