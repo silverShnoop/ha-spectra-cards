@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.86.0";
+const VERSION = "0.87.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -113,6 +113,11 @@ ha-icon { display:inline-flex; line-height:0; }
   background:var(--sp-surface); border:2px solid var(--sp-edge);
   border-radius:6px; padding:9px 10px; position:relative;
 }
+/* A card that wants attention takes the alert's colour on the edge it
+   already has, the same device a Needs-you row uses. The border was
+   always there, so nothing moves and nothing is pushed down the card --
+   which is the whole reason this beats a band across the top. */
+.card.outlined { border-color:var(--outline); }
 .titlebar { display:flex; align-items:center; gap:7px; margin-bottom:8px; }
 .tick { width:3px; height:12px; flex:none; background:var(--accent); }
 .titlebar ha-icon { --mdc-icon-size:16px; color:var(--accent); }
@@ -432,19 +437,6 @@ ha-icon { display:inline-flex; line-height:0; }
     animation:none; box-shadow:inset 0 0 0 999px var(--sp-press);
   }
 }
-
-/* Water on the floor outranks everything else on the card, so it is the
-   only thing here allowed to take the full width and a solid fill. */
-.leakband {
-  display:flex; align-items:center; gap:8px; margin:0 0 8px;
-  padding:7px 9px; border-radius:4px; background:var(--sp-a1);
-  color:var(--sp-paper);
-}
-.leakband ha-icon { --mdc-icon-size:17px; }
-.leakband .leakwhat {
-  font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-}
-.leakband .leakwhen { font-size:12px; opacity:.85; }
 
 .washfin { margin-top:10px; }
 .washfinhead { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
@@ -2585,16 +2577,13 @@ const BODIES = {
     const running = cycle === "running";
     const action = b.action || {};
 
-    let out = "";
-    if (leak) {
-      out += `<div class="leakband">`
-        + `<ha-icon icon="mdi:alert"></ha-icon>`
-        + `<span class="leakwhat">Water detected</span>`
-        + `<span class="leakwhen">${esc(firstOf(b.leak_note, "Check the floor"))}</span>`
-        + `</div>`;
-    }
-
-    out += `<div class="washrow">` + washerDrum(b, cycle, leak, powered, waiting);
+    /* No band. Water on the floor used to get a solid terracotta bar across
+       the top of the card, which said the same thing four more times over:
+       the hero word is "Leaking", the drum is terracotta with a droplet in
+       it, there is a "Sensor wet" chip, and the card itself is now outlined
+       in the alert colour. The bar was the loudest of the five and the only
+       one that pushed everything else down the card. */
+    let out = `<div class="washrow">` + washerDrum(b, cycle, leak, powered, waiting);
 
     /* Two lines and a row of chips, in the order somebody reads them:
        what it is doing, since when, and then the details that qualify it. */
@@ -4723,6 +4712,7 @@ class SpectraCard extends HTMLElement {
       icon: resolveValue(this._hass, config.icon, f),
       title: resolveValue(this._hass, config.title, f),
       meta: resolveValue(this._hass, config.meta, f),
+      outline: resolveValue(this._hass, config.outline, f),
       body: resolveValue(this._hass, config.body, f) || {},
     };
     this._fitDials(model.body);
@@ -4892,7 +4882,12 @@ class SpectraCard extends HTMLElement {
     const lit = Boolean(fb && Array.isArray(fb.decor)
       && fb.decor.indexOf("perimeter") >= 0);
 
+    /* The card's own accent says what this card IS; the outline says that
+       something on it wants a person. They are different questions, so the
+       outline is its own value rather than a mode of the accent. */
+    const outline = accentNumber(model.outline);
     const classes = "card"
+      + (outline ? " outlined" : "")
       + (config.invert ? " invert" : "")
       + (tappable ? " tappable" : "")
       + (festive ? " festive" : "")
@@ -4900,7 +4895,9 @@ class SpectraCard extends HTMLElement {
       + (swapped ? " swap" : "");
     const card = [
       `<div class="${classes}"`,
-      ` style="${accentStyle(model.accent)}${festive ? `;--fg:${esc(fb.wash)}` : ""}"`,
+      ` style="${accentStyle(model.accent)}`
+        + `${outline ? `;--outline:var(--sp-a${outline})` : ""}`
+        + `${festive ? `;--fg:${esc(fb.wash)}` : ""}"`,
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
       /* Behind the words and anchored to the card, so snow falls the full
