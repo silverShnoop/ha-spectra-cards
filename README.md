@@ -191,8 +191,12 @@ count.** Nineteen hall trips in twelve minutes is one thing happening, not
 nineteen; without this the rail becomes a single sensor's log. Set
 `collapse: false` to see every row.
 
-Rows older than an hour drop to `ink-3`. A lock event never greys out — it is
-the one kind that still matters hours later.
+Rows older than an hour drop to `ink-3`, every kind alike. A lock used to be
+exempt, on the argument that it still matters hours later; on the wall that
+read as broken, a rail of grey rows with three bright locks from the same two
+minutes looking like the only thing that had happened. Whether the door is
+locked is answered in the present tense by its own cell — the rail only says
+*when*, and an hour-old lock is as old as an hour-old anything.
 
 ### `strip` — where are we in a cycle?
 
