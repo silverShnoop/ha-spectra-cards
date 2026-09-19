@@ -575,9 +575,21 @@ Colour on this rail means **status**, and nothing else:
 | `fill` | accent as the background | this domain's state is the reason the button exists |
 | *selected* | no colour at all | which set of cards is on screen |
 
-`fill` is the loud one. Spend it on one or two domains — security, an alarm —
-and it reads from the doorway; spend it on every button and the rail is a
-fruit salad that means nothing.
+`fill` is the loud one, and it is **earned where the reassuring state is
+itself information**. Security filled green is not decoration: "everything
+is locked" is a thing you positively want told from the doorway, and its
+green is as much the point as its red.
+
+That is the test, not a budget. Cleaning's green means *no jobs waiting* —
+the absence of something — and an absence does not need announcing, so that
+button stays plain until there is amber or red to resolve. Both rules come
+out of the same question: **is this state news?** For a lock it is. For an
+empty laundry queue it is not.
+
+The budget follows from the test rather than the other way round. Only one
+or two domains in a house pass it — security, an alarm — which is also
+roughly as many as can be loud before the rail is a fruit salad that means
+nothing.
 
 **Selection is said without colour on purpose**: a hue spent on "you are
 here" is a hue that can no longer mean "the door is open". It uses three
