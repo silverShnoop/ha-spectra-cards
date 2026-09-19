@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.76.0";
+const VERSION = "0.77.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -366,6 +366,121 @@ ha-icon { display:inline-flex; line-height:0; }
    appear where it already was, not slide in from wherever the markup put
    it. */
 .bandmark.instant { transition:none; }
+
+/* washer -- one appliance, read from the doorway.
+
+   The porthole is the one round thing on the card and it carries the state
+   colour, so "is it on" is answered before a word is read. It doubles as
+   the count when there is washing waiting, because a number in the drum is
+   the one place nobody will mistake it for a control. */
+.washrow { display:flex; align-items:center; gap:14px; }
+.drum { position:relative; flex:none; width:78px; height:78px; }
+.drum svg { display:block; }
+.drumring { fill:none; stroke:var(--accent-soft); stroke-width:5; }
+.drumring.broken { stroke-dasharray:5 5; }
+.drumarc {
+  fill:none; stroke:var(--accent); stroke-width:5; stroke-linecap:round;
+  transform:rotate(-90deg); transform-origin:50% 50%;
+  transition:stroke-dasharray 400ms cubic-bezier(.25,.1,.25,1);
+}
+.drumface { fill:var(--sp-paper); }
+.drumglyph {
+  position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:center; color:var(--accent);
+}
+.drumglyph ha-icon { --mdc-icon-size:26px; }
+.drumcount {
+  position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:center; font-family:var(--sp-mono); font-size:30px;
+  font-weight:600; color:var(--accent);
+}
+.washmain { flex:1 1 auto; min-width:0; }
+.washstate {
+  margin:0; font-size:23px; font-weight:500; letter-spacing:-.01em;
+  line-height:1.1;
+}
+
+/* The emergency stop is deliberately not a switch. A switch says "this is
+   how you turn the machine off", and it is not -- the knob on the machine
+   is. A latched button behind a hazard lip says what it is, and the
+   confirmation says the rest. */
+.estop { display:flex; flex-direction:column; flex:none; width:150px; }
+.estoplip {
+  height:5px; border-radius:3px 3px 0 0;
+  background-image:repeating-linear-gradient(135deg,
+    var(--accent) 0 6px, var(--sp-paper) 6px 12px);
+}
+.estopbtn {
+  border:2px solid var(--accent); border-top:0; border-radius:0 0 4px 4px;
+  background:var(--accent-soft); color:var(--accent-on);
+  padding:8px 8px 7px; display:flex; flex-direction:column; align-items:center;
+  gap:2px; cursor:pointer; font:inherit; min-height:48px; position:relative;
+}
+.estopbtn .estopname {
+  display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase;
+}
+.estopbtn ha-icon { --mdc-icon-size:14px; }
+.estopbtn .estopwhy { font-size:10px; color:var(--sp-ink-3); letter-spacing:.03em; }
+
+/* Water on the floor outranks everything else on the card, so it is the
+   only thing here allowed to take the full width and a solid fill. */
+.leakband {
+  display:flex; align-items:center; gap:8px; margin:0 0 8px;
+  padding:7px 9px; border-radius:4px; background:var(--sp-a1);
+  color:var(--sp-paper);
+}
+.leakband ha-icon { --mdc-icon-size:17px; }
+.leakband .leakwhat {
+  font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+}
+.leakband .leakwhen { font-size:12px; opacity:.85; }
+
+.washfin { margin-top:10px; }
+.washfinhead { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.washfinhead span:first-child {
+  font-size:10px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--sp-ink-3);
+}
+.washfinrule { flex:1 1 auto; height:1px; background:var(--sp-edge); }
+.washfinrow {
+  display:flex; align-items:center; gap:10px; padding:5px 6px;
+  border-radius:3px; background:var(--sp-zebra);
+}
+.washfinrow .at { font-family:var(--sp-mono); font-size:12px; width:46px; }
+.washfinrow .ran { font-size:12px; color:var(--sp-ink-2); flex:1 1 auto; }
+.washfinrow .used { font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); }
+
+/* A confirmation is a modal over the card it belongs to, not a browser
+   dialog: the panel has no keyboard and no window chrome, and a native
+   confirm() cannot be styled, cannot be dismissed with a thumb, and stops
+   the whole frontend while it is open. */
+.confirmwrap {
+  position:absolute; inset:0; z-index:5; border-radius:4px;
+  background:rgba(0,0,0,.62); display:flex; align-items:center;
+  justify-content:center; padding:10px;
+}
+.confirmbox {
+  max-width:430px; width:100%; background:var(--sp-surface);
+  border:2px solid var(--accent); border-radius:6px; padding:14px 16px 12px;
+}
+.confirmhead {
+  display:flex; align-items:center; gap:8px; margin-bottom:8px;
+  font-size:14px; font-weight:600; color:var(--accent-on);
+}
+.confirmhead ha-icon { --mdc-icon-size:18px; color:var(--accent); }
+.confirmtext { margin:0 0 6px; font-size:12px; color:var(--sp-ink-2); line-height:1.5; }
+.confirmtext.quiet { color:var(--sp-ink-3); }
+.confirmbtns { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+.confirmbtns button {
+  font:inherit; font-size:13px; border-radius:4px; padding:9px 16px;
+  min-height:44px; cursor:pointer;
+}
+.confirmno { border:1px solid var(--sp-edge); background:none; color:var(--sp-ink); }
+.confirmyes {
+  border:2px solid var(--accent); background:var(--accent);
+  color:var(--sp-surface); font-weight:600;
+}
 
 .dimtrack {
   height:26px; border-radius:4px; overflow:hidden; background:var(--sp-sink);
@@ -2429,6 +2544,92 @@ const BODIES = {
      With the floor already dark it goes inert rather than disappearing --
      a control that vanishes when it has nothing to do is a control you have
      to hunt for when it does. */
+  /* One appliance, stated rather than operated.
+
+     Nothing on this card asks you to do anything. A load of washing waiting
+     to be hung is a job, and jobs live in Needs you -- putting it here as
+     well would be the same sentence in two places, and the one on the card
+     could not be finished from a phone. So the count appears in the drum as
+     a FACT and the only control is the one that has nothing to do with
+     laundry: cutting the power in an emergency.
+
+     `leak` and `powered` are read separately and neither is inferred from
+     the other. A leak pad stays damp long after the floor has been dealt
+     with, and the cycle still has to be finished, so "wet" says nothing
+     about whether the machine has power -- and the card must not pretend
+     otherwise while somebody is standing in front of it. */
+  washer(b) {
+    const cycle = String(firstOf(b.state, "idle")).toLowerCase();
+    const leak = Boolean(b.leak);
+    const powered = b.powered === undefined ? true : Boolean(b.powered);
+    const waiting = Math.max(0, Number(firstOf(b.pending, 0)) || 0);
+    const running = cycle === "running";
+    const action = b.action || {};
+
+    let out = "";
+    if (leak) {
+      out += `<div class="leakband">`
+        + `<ha-icon icon="mdi:alert"></ha-icon>`
+        + `<span class="leakwhat">Water detected</span>`
+        + `<span class="leakwhen">${esc(firstOf(b.leak_note, "Check the floor"))}</span>`
+        + `</div>`;
+    }
+
+    out += `<div class="washrow">` + washerDrum(b, cycle, leak, powered, waiting);
+
+    /* Two lines and a row of chips, in the order somebody reads them:
+       what it is doing, since when, and then the details that qualify it. */
+    const chips = [];
+    chips.push(b.door_open
+      ? chipOf("Door open", "mdi:door-open", 2)
+      : chipOf("Door closed", "mdi:door-closed", 0));
+    if (leak) chips.push(chipOf("Sensor wet", "mdi:water", 1));
+    if (!powered) chips.push(chipOf("Plug off", "mdi:power-plug-off", 2));
+    else if (running) chips.push(chipOf(`${Math.round(Number(b.power) || 0)} W`, "mdi:flash", 4));
+    if (b.drum_full) chips.push(chipOf("Full", "mdi:basket-unfill", 2));
+    if (waiting) {
+      chips.push(chipOf(`${waiting} to hang`, "mdi:hanger", 2));
+    }
+
+    out += `<div class="washmain">`
+      + `<p class="washstate">${esc(washerWord(cycle, leak, powered))}</p>`
+      + `<p class="sub">${esc(firstOf(b.info, ""))}</p>`
+      + `<div class="chips">${chips.join("")}</div>`
+      + `</div>`;
+
+    /* The control is whichever one the machine is not already in. With the
+       power off the emergency has passed, so restoring is an ordinary act
+       and asks nothing; cutting it is the one that interrupts a cycle
+       mid-fill, so that is the one behind a question. */
+    const stop = powered ? action.cut : action.restore;
+    if (stop) {
+      out += `<div class="estop">`
+        + `<span class="estoplip"></span>`
+        + `<button type="button" class="estopbtn" data-estop`
+        + ` aria-label="${esc(powered ? "Cut power at the plug" : "Restore power at the plug")}">`
+        + `<span class="estopname"><ha-icon icon="mdi:power"></ha-icon>`
+        + `${esc(powered ? "Cut power" : "Restore power")}</span>`
+        + `<span class="estopwhy">${esc(powered ? "emergency only" : "back to normal")}</span>`
+        + `</button></div>`;
+    }
+    out += `</div>`;
+
+    const finished = Array.isArray(b.finished) ? b.finished : [];
+    if (finished.length) {
+      const rows = finished.map((run) => `<div class="washfinrow">`
+        + `<span class="at">${esc(firstOf(run.at, ""))}</span>`
+        + `<span class="ran">${esc(firstOf(run.ran, ""))}</span>`
+        + `<span class="used">${esc(firstOf(run.used, ""))}</span>`
+        + `</div>`).join("");
+      out += `<div class="washfin">`
+        + `<div class="washfinhead"><span>${esc(firstOf(b.finished_label, "Finished today"))}</span>`
+        + `<span class="washfinrule"></span></div>`
+        + `<div class="chips" style="flex-direction:column;gap:3px;margin-top:0">${rows}</div>`
+        + `</div>`;
+    }
+    return out;
+  },
+
   summary(b) {
     const lit = b.on === undefined ? false : Boolean(b.on);
     let out = `<div class="row summaryrow" style="padding-left:0">`
@@ -3913,6 +4114,67 @@ function dimmerMarkup(key, light, raw, lit) {
 /* Everything a light cell keeps behind its chevron. Either half may be
    absent: a room with no unscheduled scenes gets only the brightness, and a
    light with no dimming gets only the scenes. */
+/* The state word, which is the largest thing on the card and therefore the
+   one that must never be a guess. Leaking outranks everything -- it is the
+   only state where what the machine is doing matters less than what is on
+   the floor. */
+function washerWord(cycle, leak, powered) {
+  if (leak) return "Leaking";
+  if (!powered) return "No power";
+  if (cycle === "running") return "Running";
+  return "Idle";
+}
+
+/* Accent by meaning, matching the rest of the house: 1 alerts, 2 warnings,
+   3 positive, 4 the colour of something happening. */
+function washerAccent(cycle, leak, powered, waiting) {
+  if (leak) return 1;
+  if (!powered) return 2;
+  if (cycle === "running") return 4;
+  if (waiting) return 2;
+  return 6;
+}
+
+function chipOf(text, icon, accent) {
+  const tone = accent
+    ? ` style="background:var(--sp-a${accent}-soft);color:var(--sp-a${accent}-on)"`
+    : ` style="background:var(--sp-sink);color:var(--sp-ink-2)"`;
+  return `<span class="pill"${tone}>`
+    + `<ha-icon class="pillicon" icon="${esc(icon)}"></ha-icon>${esc(text)}</span>`;
+}
+
+/* The porthole. An arc when there is progress to show, a number when there
+   is washing waiting, and a glyph the rest of the time.
+
+   Deliberately never a power symbol: a circle with a power glyph in it on a
+   card that also has a power button reads as a second button, and the first
+   thing anybody tried to do with it was press it. */
+function washerDrum(b, cycle, leak, powered, waiting) {
+  const size = 78;
+  const r = 31;
+  const c = size / 2;
+  const circ = 2 * Math.PI * r;
+  const accent = washerAccent(cycle, leak, powered, waiting);
+  const frac = Math.max(0, Math.min(1, Number(b.progress)));
+  const arc = cycle === "running" && isFinite(frac) && frac > 0
+    ? `<circle class="drumarc" cx="${c}" cy="${c}" r="${r}"`
+      + ` stroke-dasharray="${(circ * frac).toFixed(1)} ${(circ * (1 - frac)).toFixed(1)}"></circle>`
+    : "";
+  let glyph = "mdi:washing-machine";
+  if (leak) glyph = "mdi:water";
+  else if (!powered) glyph = "mdi:washing-machine-off";
+  else if (b.drum_full) glyph = "mdi:basket-unfill";
+  const inner = waiting
+    ? `<span class="drumcount">${esc(String(waiting))}</span>`
+    : `<span class="drumglyph"><ha-icon icon="${esc(glyph)}"></ha-icon></span>`;
+  return `<div class="drum" style="--accent:var(--sp-a${accent});`
+    + `--accent-soft:var(--sp-a${accent}-soft);--accent-on:var(--sp-a${accent}-on)">`
+    + `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`
+    + `<circle class="drumring${powered ? "" : " broken"}" cx="${c}" cy="${c}" r="${r}"></circle>`
+    + `<circle class="drumface" cx="${c}" cy="${c}" r="24"></circle>${arc}</svg>`
+    + inner + `</div>`;
+}
+
 function drawerMarkup(key, body) {
   /* Only the scenes the schedule does not already drive.
 
@@ -5470,7 +5732,32 @@ class SpectraCard extends HTMLElement {
       if (!action || el.classList.contains("inert")) return;
       const run = (event) => {
         event.stopPropagation();
-        onPress(el, () => this._work(() => this._callAction(action)));
+        this._guard(action.confirm,
+          () => onPress(el, () => this._work(() => this._callAction(action))));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
+      });
+    });
+
+    /* The emergency stop. Whichever direction it is pointing, the action
+       carries its own `confirm` or does not -- the card does not decide
+       that here, because "which of these needs asking about" is a fact
+       about the house rather than about the button. */
+    this._holder.querySelectorAll("[data-estop]").forEach((el) => {
+      const body = model.body || {};
+      const action = body.action || {};
+      const powered = body.powered === undefined ? true : Boolean(body.powered);
+      const chosen = powered ? action.cut : action.restore;
+      if (!chosen) return;
+      const run = (event) => {
+        event.stopPropagation();
+        this._guard(chosen.confirm,
+          () => onPress(el, () => this._work(() => this._callAction(chosen))));
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
@@ -5486,8 +5773,10 @@ class SpectraCard extends HTMLElement {
       const row = rows[Number(el.dataset.row)];
       const run = (event) => {
         event.stopPropagation();
-        onPress(el, () => this._callAction(row && row.action));
-        this._leave(el.closest(".row[data-key]"));
+        this._guard(row && row.action && row.action.confirm, () => {
+          onPress(el, () => this._callAction(row && row.action));
+          this._leave(el.closest(".row[data-key]"));
+        });
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
@@ -5867,6 +6156,75 @@ class SpectraCard extends HTMLElement {
       this._hass.callService(domain, service, action.data || {},
         action.target || undefined, !quiet),
     ).catch((error) => LOGGER_WARN(`spectra-card: ${name} failed`, error));
+  }
+
+  /* Ask before an action that cannot be taken back.
+
+     A promise rather than a callback so a press site reads the same with
+     and without a confirmation, and so the press feedback can wait for the
+     answer -- a button spinning behind its own dialog looks broken.
+
+     Resolves false on anything that is not an explicit yes: Escape, the
+     backdrop, Cancel. The default has to be "no" for the one control this
+     exists to protect. */
+  /* Run `go`, asking first only if there is something to ask.
+
+     Synchronous when there is not. Routing every press through a promise
+     instead cost nothing visible but made every existing button fire a
+     microtask late, which the floor-summary checks caught immediately --
+     they press and assert in the same tick, as a finger does. */
+  _guard(spec, go) {
+    if (!spec) {
+      go();
+      return;
+    }
+    this._confirm(spec).then((yes) => {
+      if (yes) go();
+    });
+  }
+
+  _confirm(spec) {
+    if (!spec) return Promise.resolve(true);
+    const accent = Number(spec.accent) || 1;
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    wrap.style.setProperty("--accent", `var(--sp-a${accent})`);
+    wrap.style.setProperty("--accent-soft", `var(--sp-a${accent}-soft)`);
+    wrap.style.setProperty("--accent-on", `var(--sp-a${accent}-on)`);
+    wrap.innerHTML = `<div class="confirmbox" role="alertdialog" aria-modal="true">`
+      + `<div class="confirmhead"><ha-icon icon="${esc(firstOf(spec.icon, "mdi:alert"))}"></ha-icon>`
+      + `<span>${esc(firstOf(spec.title, "Are you sure?"))}</span></div>`
+      + (isBlank(spec.text) ? "" : `<p class="confirmtext">${esc(spec.text)}</p>`)
+      + (isBlank(spec.note) ? "" : `<p class="confirmtext quiet">${esc(spec.note)}</p>`)
+      + `<div class="confirmbtns">`
+      + `<button type="button" class="confirmno" data-no>${esc(firstOf(spec.cancel, "Cancel"))}</button>`
+      + `<button type="button" class="confirmyes" data-yes>${esc(firstOf(spec.ok, "Confirm"))}</button>`
+      + `</div></div>`;
+
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (answer) => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("keydown", onKey, true);
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        resolve(answer);
+      };
+      const onKey = (event) => {
+        if (event.key === "Escape") { event.preventDefault(); finish(false); }
+      };
+      wrap.querySelector("[data-no]").addEventListener("click", () => finish(false));
+      wrap.querySelector("[data-yes]").addEventListener("click", () => finish(true));
+      /* Only the backdrop, never the box -- a mis-tap inside the dialog
+         must not count as either answer. */
+      wrap.addEventListener("click", (event) => {
+        if (event.target === wrap) finish(false);
+      });
+      document.addEventListener("keydown", onKey, true);
+      this._holder.appendChild(wrap);
+      const no = wrap.querySelector("[data-no]");
+      if (no && no.focus) no.focus();
+    });
   }
 
   getCardSize() {
