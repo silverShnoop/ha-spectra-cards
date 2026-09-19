@@ -521,6 +521,11 @@ nowhere.
 
 **Two exceptions, and only two.** A leak and a dead plug have to catch the
 eye *before* anybody reads a word, so they keep their roles everywhere.
+The chips agree: `Sensor wet` is terracotta and `Plug off` is ochre, and
+the wattage is neutral, because a wattage is a *measurement* and not a
+status. It used to be teal, from when teal meant running — a leftover that
+had a card saying which machine it was and what it was doing in two
+different colours, one of them meaningless.
 Everything else is legible at a glance from its glyph and spends the
 colour on saying which machine it is. Running beats a full drum: a second
 load started without emptying the drum is running, not waiting.
