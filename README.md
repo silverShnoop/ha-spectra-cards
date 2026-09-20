@@ -594,6 +594,12 @@ body:
     each: {name: {field: name}, state: {field: state}, since: {field: since}}
 ```
 
+**Home is the moss role, not the card's accent.** Three states means
+three *meanings* — in, out, no idea — and a meaning wears a role colour
+here, the way the security light does. On the card's accent, "home" said
+"good" in whatever colour the card happened to be set to, and
+re-accenting the card would have silently restated it.
+
 **Three states, not two.** "Out" is a reading — the phone is somewhere
 that is not this house. "Unknown" is the *absence* of a reading: the
 trackers have gone quiet and nobody knows anything at all. Drawn alike,
@@ -703,7 +709,36 @@ and it shipped as an empty second line under all thirty-one rows. What
 belongs there instead depends on the list, which is what `detail` picks:
 Bring puts a short *specification* in `description` — 2 bottles,
 Tenderstem — which rides on the name's line; Home Tasks puts a page of
-notes there, which goes underneath, clipped to its first line.
+notes there, which goes underneath.
+
+**A `below` note opens.** It used to be clipped to its first line, which
+threw away the part worth having: on Home Tasks the note is the *reason*
+the task exists. Now all of it is there, two lines showing, and pressing
+the text opens the rest.
+
+Three things about that:
+
+- **Only rows that actually overflow are pressable.** Whether a note runs
+  past two lines depends on the width the card ended up at, which depends
+  on the viewport and how many section columns the view chose — so it
+  cannot be known from the markup. It is measured once per paint. A note
+  that fits does nothing on press, *including no flash*: a flash
+  promising something that does not follow reads as a control that
+  failed.
+- **One at a time.** Two open notes on a list push everything below them
+  down twice over and the card stops being something you can scan, so
+  opening one shuts the other.
+- **It animates, and the press flashes** like every other control here.
+  The clamp is a `max-height` rather than `-webkit-line-clamp`, because
+  line-clamp cannot be transitioned — it would snap open and snap shut.
+  The pixel height is set at press time from the measured content, since
+  a transition to `none` or to a guessed maximum runs at the wrong speed
+  or not at all.
+
+The open note is a **claim carried on the model**, like `ticked` and
+`undo`, so it survives the re-render the press provokes. Without that it
+would shut itself the moment anything else on the card moved, which on a
+wall panel is constantly.
 
 ### `washer` — is the appliance running, and has it left you anything?
 
