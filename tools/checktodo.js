@@ -68,9 +68,18 @@ const js = fs.readFileSync(file);
       { uid: "u4", summary: "Crumpets", status: "needs_action", description: "" },
       { uid: "u5", summary: "Bagels", status: "needs_action", description: "" },
     ];
+    /* A real Home Tasks note. The point of `detail: below` is that the
+       note is the REASON the task exists, and these run to paragraphs
+       -- so a fixture of two short lines would fit in the clamp and
+       prove nothing about opening it. */
     const TASKS = [
       { uid: "t1", summary: "Car: check connected services", status: "needs_action",
-        description: "Why: HA finds the car but Stellantis returns 404.\nSecond line." },
+        description: "Why: HA finds the car but Stellantis returns 404 / 40400"
+          + " \"We didn't find the status for this vehicle\", so no sensors are"
+          + " created. The app's 87 miles is likely from your phone rather than"
+          + " the car itself.\nSecond line: check whether the subscription"
+          + " lapsed, and whether re-pairing in the app brings the endpoint"
+          + " back before spending any more time on the integration." },
     ];
 
     const conf = (over) => ({
@@ -162,8 +171,96 @@ const js = fs.readFileSync(file);
     await show({ items: TASKS, columns: 1, detail: "below" });
     check("a long note goes underneath instead",
       (text(".tdsub") || "").startsWith("Why: HA finds the car"), text(".tdsub"));
-    check("and only its first line",
-      !(text(".tdsub") || "").includes("Second line"), text(".tdsub"));
+    /* It used to be clipped to the first line. Home Tasks puts the
+       REASON the task exists in there, which is the part worth
+       reading, so now all of it is in the DOM and two lines of it are
+       shown. */
+    check("and all of it, not just the first line",
+      (text(".tdsub") || "").includes("Second line"), text(".tdsub"));
+
+    const sub = () => q(".tdsub");
+    const item = () => q(".tditem");
+    check("clamped to about two lines rather than run out in full",
+      sub().clientHeight < sub().scrollHeight
+        && sub().clientHeight < 60,
+      `${sub().clientHeight} shown of ${sub().scrollHeight}`);
+    check("and the row is marked as having more, which is measured not guessed",
+      item().classList.contains("more"), item().className);
+    check("so a screen reader is told it opens",
+      q(".tdtext").getAttribute("role") === "button"
+        && q(".tdtext").getAttribute("aria-expanded") === "false",
+      `${q(".tdtext").getAttribute("role")} / ${q(".tdtext").getAttribute("aria-expanded")}`);
+
+    /* A note that already fits is not a control. A press target that
+       does nothing is worse than no press target. */
+    await show({ items: [{ uid: "s1", summary: "Short", status: "needs_action",
+      description: "Brief." }], columns: 1, detail: "below" });
+    check("a note that already fits is not pressable at all",
+      !q(".tditem").classList.contains("more")
+        && !q(".tdtext").getAttribute("role"),
+      q(".tditem").className);
+    /* And nothing HAPPENS on press, which is the part that matters:
+       a flash promising something that does not follow reads as a
+       control that failed, not as a row that had nothing to show. */
+    q(".tdtext").click();
+    await settle();
+    check("and pressing it neither opens nor flashes",
+      !q(".tditem").classList.contains("open")
+        && !q(".tdtext").classList.contains("pressed"),
+      `${q(".tditem").className} | ${q(".tdtext").className}`);
+
+    await show({ items: TASKS, columns: 1, detail: "below" });
+    const shut = sub().clientHeight;
+    q(".tdtext").click();
+    await settle();
+    check("pressing the text opens the whole note",
+      sub().clientHeight > shut, `${shut} -> ${sub().clientHeight}`);
+    check("and says so to a screen reader",
+      q(".tdtext").getAttribute("aria-expanded") === "true",
+      q(".tdtext").getAttribute("aria-expanded"));
+    check("it animates rather than snapping",
+      getComputedStyle(sub()).transitionDuration !== "0s",
+      getComputedStyle(sub()).transitionDuration);
+    /* The flash is the press contract: every control on this panel
+       acknowledges a touch, and a note that opens silently reads as a
+       press that missed. */
+    check("and the press is acknowledged like every other press",
+      q(".tdtext").classList.contains("pressed"), q(".tdtext").className);
+
+    q(".tdtext").click();
+    await settle();
+    check("pressing it again shuts it",
+      !q(".tditem").classList.contains("open"), q(".tditem").className);
+
+    /* Two open notes on a two-column list push everything below them
+       down twice over, and the card stops being a list you can scan. */
+    const TWO = [
+      { uid: "a1", summary: "First", status: "needs_action",
+        description: TASKS[0].description },
+      { uid: "a2", summary: "Second", status: "needs_action",
+        description: TASKS[0].description },
+    ];
+    await show({ items: TWO, columns: 1, detail: "below" });
+    all(".tdtext")[0].click();
+    await settle();
+    all(".tdtext")[1].click();
+    await settle();
+    check("only one note is open at a time",
+      all(".tditem.open").length === 1, all(".tditem.open").length);
+    check("and it is the one just pressed",
+      all(".tditem")[1].classList.contains("open"),
+      all(".tditem")[0].className + " | " + all(".tditem")[1].className);
+
+    /* The claim has to outlive the re-render the press provokes, or
+       the note shuts itself the moment anything else on the card
+       moves -- which on a wall panel is constantly. */
+    el._signature = null;
+    el.hass = hass;
+    await painted();
+    check("an open note survives a re-render",
+      all(".tditem.open").length === 1, all(".tditem.open").length);
+
+    await show({});
 
     // ---- the press goes to the real list
     await show({});

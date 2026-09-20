@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.97.0";
+const VERSION = "0.98.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -525,9 +525,34 @@ ha-icon { display:inline-flex; line-height:0; }
    for. It rides on the same line because grocery names are short and a
    second line each would double a thirty-item list. */
 .tdspec { color:var(--sp-ink-2); }
+/* Two lines, and the rest a press away.
+   Clamped by max-height rather than -webkit-line-clamp, because
+   line-clamp cannot be transitioned -- it would snap open and snap
+   shut, and this card animates everything else it does. The height is
+   in em so it follows the font rather than a pixel guess.
+   The fade is a mask over the TEXT, not a gradient over the
+   background, so it works on the zebra row, the accent-soft row and
+   whatever a theme does to either. */
 .tdsub {
   display:block; font-size:12px; color:var(--sp-ink-2);
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  overflow:hidden; white-space:pre-line;
+  max-height:2.9em; transition:max-height 260ms cubic-bezier(.2,.7,.4,1);
+}
+.tditem.more .tdsub {
+  -webkit-mask-image:linear-gradient(to bottom, #000 55%, transparent);
+  mask-image:linear-gradient(to bottom, #000 55%, transparent);
+}
+.tditem.more .tdtext { cursor:pointer; }
+.tditem.open .tdsub { -webkit-mask-image:none; mask-image:none; }
+/* A press target that is not a button needs to say so, and needs to
+   show it was pressed -- the same flash every control on this panel
+   gives, because a press that produces no acknowledgement reads as a
+   press that missed. */
+.tditem.more .tdtext:focus-visible {
+  outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tdsub { transition:none; }
 }
 .tdwho {
   font-size:11px; margin-left:6px; padding:1px 7px; border-radius:8px;
@@ -920,7 +945,16 @@ ha-icon { display:inline-flex; line-height:0; }
 /* people */
 .people { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .person { padding:8px; border-radius:4px; background:var(--sp-zebra); }
-.person.here { background:var(--accent-soft); }
+/* Home is the moss role, not the card's accent.
+   Three states, three MEANINGS -- in, out, no idea -- and meanings
+   wear role colours here, the same way the security light does. On
+   the card's accent, home was teal because the card happens to be
+   teal, so the one tile that says "good" said it in whatever colour
+   the card was set to, and changing the card's accent would have
+   silently restated it. */
+.person.here { background:var(--sp-a3-soft); }
+.person.here .avatar { background:var(--sp-a3); color:var(--sp-surface); }
+.person.here .sub { color:var(--sp-a3-on); }
 .avatar {
   width:38px; height:38px; border-radius:50%; margin-bottom:6px;
   display:flex; align-items:center; justify-content:center;
@@ -2983,24 +3017,34 @@ const BODIES = {
          everything it is given is blank, String(null) is the four
          characters "null", and every Bring item without a specification
          rendered as "Milk \u00b7 null". Thirty-one of them. */
-      const note = isBlank(item.description)
-        ? ""
-        : String(item.description).split("\n")[0].trim();
+      const full = isBlank(item.description) ? "" : String(item.description).trim();
+      /* `inline` is Bring's specification -- 2 bottles, Tenderstem --
+         which is one short phrase and rides on the name's line. Only
+         the first line of it, because a Bring item with a paragraph in
+         it would push the name off the row.
+
+         `below` is Home Tasks, where the note is the reason the task
+         exists and is worth reading. It gets all of it, clamped to two
+         lines and openable. */
+      const note = full ? full.split("\n")[0].trim() : "";
       let extra = "";
       if (note && detail === "inline") {
         extra = `<span class="tdspec"> \u00b7 ${esc(note)}</span>`;
       }
-      const sub = note && detail === "below"
-        ? `<span class="tdsub">${esc(note)}</span>` : "";
+      const open = Boolean(full) && detail === "below" && b.open_note === uid;
+      const sub = full && detail === "below"
+        ? `<span class="tdsub">${esc(full)}</span>` : "";
       const who = isBlank(item.who) ? "" : `<span class="tdwho">${esc(item.who)}</span>`;
-      return `<div class="tditem${done ? " ticked" : ""}" data-key="${esc(keyPrefix + uid)}">`
+      return `<div class="tditem${done ? " ticked" : ""}${open ? " open" : ""}"`
+        + ` data-key="${esc(keyPrefix + uid)}">`
         + `<button type="button" class="tdbox${done ? " ticked" : ""}"`
         + ` data-todo="${esc(uid)}" data-todo-done="${done ? "1" : ""}"`
         + ` aria-pressed="${done ? "true" : "false"}"`
         + ` aria-label="${esc((done ? "Put back on the list: " : "Tick off: ") + name)}">`
         + `<span class="tdmark"><ha-icon icon="mdi:check-bold"></ha-icon></span>`
         + `</button>`
-        + `<span class="tdtext"><span class="tdname">${esc(name)}${extra}${who}</span>${sub}</span>`
+        + `<span class="tdtext"${sub ? ` data-note="${esc(uid)}"` : ""}>`
+        + `<span class="tdname">${esc(name)}${extra}${who}</span>${sub}</span>`
         + `</div>`;
     };
 
@@ -5129,6 +5173,9 @@ class SpectraCard extends HTMLElement {
     this._calendars = {};
     this._failed = {};
     this._optimistic = {};
+    /* Which note is open, at most one. Per card rather than per row,
+       because "only one at a time" is a fact about the card. */
+    this._openNote = null;
     this._dragging = false;
     this._pick = null;
     /* One spinner for the card, not one per button. idle -> busy -> done,
@@ -5558,6 +5605,14 @@ class SpectraCard extends HTMLElement {
          on its own twelve seconds later. */
       model.body.foot = `${this._undo.name} ticked off`;
     }
+    /* Which note is open, carried on the model rather than read off
+       the card, because a body is called as a method of BODIES and has
+       no idea the card exists. Same route as `ticked` and `undo`, and
+       the same reason: it has to survive the re-render the press
+       provokes, or the note shuts itself the moment the list moves. */
+    if (model.body && model.body.type === "todo" && this._openNote) {
+      model.body.open_note = this._openNote;
+    }
 
     const mode = this._mode;
     if (mode && model.body) {
@@ -5823,11 +5878,86 @@ class SpectraCard extends HTMLElement {
 
     /* Nothing arrives on the first paint. A card that deals itself in one
        row at a time on every page load is a card that looks broken. */
+    this._fitNotes();
     if (!had) return true;
     for (const el of holder.querySelectorAll("[data-key]")) {
       if (!before.has(el.getAttribute("data-key"))) el.classList.add("entering");
     }
     return true;
+  }
+
+  /* Which notes are long enough to be worth opening.
+
+     Not decidable from the markup: whether a note runs past two lines
+     depends on the width the card ended up at, which depends on the
+     viewport and on how many section columns the view chose. So it is
+     measured, once per paint, and the rows that overflow are marked.
+
+     Reading scrollHeight forces layout, so this is one pass over the
+     rows rather than a read-write-read per row. */
+  _fitNotes() {
+    if (!this._holder) return;
+    const subs = Array.from(this._holder.querySelectorAll(".tdsub"));
+    if (!subs.length) return;
+    const overflowing = subs.map((sub) => {
+      const row = sub.closest(".tditem");
+      /* An open row is already at its full height, so it never looks
+         like it overflows. It got here by being openable, so it is. */
+      if (row && row.classList.contains("open")) return true;
+      return sub.scrollHeight > sub.clientHeight + 1;
+    });
+    subs.forEach((sub, i) => {
+      const row = sub.closest(".tditem");
+      if (!row) return;
+      row.classList.toggle("more", overflowing[i]);
+      const text = sub.parentElement;
+      if (!text) return;
+      if (overflowing[i]) {
+        text.setAttribute("role", "button");
+        text.setAttribute("tabindex", "0");
+        text.setAttribute("aria-expanded",
+          row.classList.contains("open") ? "true" : "false");
+      } else {
+        text.removeAttribute("role");
+        text.removeAttribute("tabindex");
+        text.removeAttribute("aria-expanded");
+      }
+      if (row.classList.contains("open")) {
+        sub.style.maxHeight = `${sub.scrollHeight}px`;
+      }
+    });
+  }
+
+  /* Open or shut one note, on the live element.
+
+     Animated from the height it has to the height it wants, which is
+     why the pixel value is set here rather than in the stylesheet: a
+     transition to `none` or to a guessed maximum runs at the wrong
+     speed or not at all. Clearing it afterwards hands the row back to
+     the stylesheet, so a note that grows later is not pinned to the
+     height it had when it was opened. */
+  _openRow(row, open) {
+    const sub = row.querySelector(".tdsub");
+    const text = row.querySelector(".tdtext");
+    if (!sub) return;
+    row.classList.toggle("open", open);
+    if (text) text.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) {
+      sub.style.maxHeight = `${sub.scrollHeight}px`;
+      return;
+    }
+    /* Shutting needs a real starting height to travel from: the
+       element is sitting at `auto`-ish and a transition out of that
+       does nothing. Pin it, force the layout, then let it go. */
+    sub.style.maxHeight = `${sub.scrollHeight}px`;
+    void sub.offsetHeight;
+    sub.style.maxHeight = "";
+  }
+
+  _closeNotes() {
+    if (!this._holder) return;
+    this._holder.querySelectorAll(".tditem.open")
+      .forEach((row) => this._openRow(row, false));
   }
 
   /* Some bodies know their own state better than any config line can. Where
@@ -6819,6 +6949,40 @@ class SpectraCard extends HTMLElement {
           target: { entity_id: entity },
           data: { item: uid, status: done ? "needs_action" : "completed" },
         })));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
+      });
+    });
+
+    /* Opening a note. The box ticks, the TEXT opens -- two targets on
+       one row, which is why the box stops propagation.
+
+       Only rows whose note is actually longer than the two lines shown
+       are pressable, and that cannot be known from the markup: it
+       depends on the width the card ended up at. So `_fitNotes` marks
+       them after the paint and this checks the mark. A row whose note
+       fits does nothing at all on press -- no flash either, because a
+       flash promising something that does not happen is worse than an
+       inert row. */
+    this._holder.querySelectorAll("[data-note]").forEach((el) => {
+      const uid = el.getAttribute("data-note");
+      const row = el.parentElement;
+      const run = (event) => {
+        if (!row || !row.classList.contains("more")) return;
+        event.stopPropagation();
+        const wasOpen = row.classList.contains("open");
+        /* One at a time. Two open notes on a two-column list push
+           every row below them down twice over, and the card stops
+           being a list you can scan. */
+        if (!wasOpen) this._closeNotes();
+        this._openNote = wasOpen ? null : uid;
+        this._openRow(row, !wasOpen);
+        flashPress(el);
       };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
