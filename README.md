@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -550,6 +550,63 @@ later. The spinner is what covers that gap.
 
 Urgency rides the card's `outline`, not the title accent: plain when
 locked, then amber and red as the Needs-you row escalates.
+
+### `todo` — a list you can actually finish
+
+```yaml
+body:
+  type: todo
+  list: todo.phoenix                 # NOT `entity` — see below
+  items: {todo: todo.phoenix, status: needs_action}
+  columns: 2                         # 1 or 2; two read DOWN, not across
+  detail: inline                     # inline | below | none
+  limit: 40                          # optional; the rest become "+ N more"
+  empty: "Nothing on the list"
+```
+
+**This is the one card control that finishes something, and it is allowed
+for a reason.** The house rule is that jobs live in `Needs you`, because a
+job with a copy on a card drifts from the copy that counts. A to-do tick
+has no copy: it calls `todo.update_item` on the same list the phone and
+Bring write to, so the card is operating the one store rather than keeping
+a second opinion about it. What was banned was a second place to record a
+job, not a control over the only place.
+
+**`list` is not `entity`, and that is not cosmetic.** `entity` is a
+reserved key in a value spec — the resolver sees a string there and reads
+the whole object as an entity read, so a body carrying `entity:` resolves
+to that entity's state and every other key on it silently disappears. The
+card then renders an empty list and says so, with no error anywhere.
+
+**Two columns read down.** A list is scanned, and scanning is vertical;
+reading across means the eye crosses a gutter between every pair of
+neighbours. `grid-auto-flow: column` does it, but only with an explicit
+row count — without one the grid makes a column per item and the order
+quietly becomes across again.
+
+**The box is the target, not the row.** A list you brush past should not
+tick itself, and a thumb at arm's length needs 30px. The tick answers on
+the live element rather than by re-rendering: a re-render would replace
+the button the flash was started on, and `_work` skips a re-render while
+the card is already busy — so on a shopping list, where four things get
+tapped in a row, every tick after the first would sit unticked for the
+second and a bit the spinner takes to settle.
+
+**A tick is claimed until the list agrees**, by uid rather than by index,
+because the refetch reorders and shortens the list. The claim is dropped
+as soon as the item stops coming back as outstanding, and abandoned after
+twelve seconds either way, so a call that never lands leaves a box telling
+the truth rather than one stuck pretending.
+
+**Undo, not a confirmation.** A mis-tap on a wall panel is likely, and
+asking before every tick makes the common case pay for the rare one.
+
+**`due` is deliberately not drawn.** Neither list in this house sets one,
+and it shipped as an empty second line under all thirty-one rows. What
+belongs there instead depends on the list, which is what `detail` picks:
+Bring puts a short *specification* in `description` — 2 bottles,
+Tenderstem — which rides on the name's line; Home Tasks puts a page of
+notes there, which goes underneath, clipped to its first line.
 
 ### `washer` — is the appliance running, and has it left you anything?
 
