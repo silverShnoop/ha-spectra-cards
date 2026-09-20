@@ -720,11 +720,26 @@ The state was never the thing that needed a colour. It is written in words
 beside the drum, in the largest text on the card. Identity was written
 nowhere.
 
+**Except where the state asks something of you.** A leak, a dead plug, a
+drum to empty and washing to hang all take the accent's *role* rather than
+the card's hue — and those are exactly the states that also outline the
+card. A card trimmed amber with a plum porthole in the middle of it was the
+one element not joining in.
+
+The cost is real and was accepted knowingly: a washer and a dryer that are
+both full show the same ring and the same basket, and are then tellable
+apart only by the title and the accent tick beside it. That trade is worth
+making on this card, because two machines both asking for the same thing is
+the case where *which* of them matters least. Running and idle are not in
+the list — they ask nothing, and spending the colour on them is what cost
+identity the first time.
+
 | state | glyph | colour |
 | --- | --- | --- |
 | idle | `machine` | the card's accent |
 | running | `mdi:autorenew` | the card's accent |
-| washing waiting | the count | the card's accent |
+| drum to empty | `mdi:basket-unfill` | **warning** |
+| washing waiting | the count | **warning** |
 | full drum | `mdi:basket-unfill` | the card's accent |
 | **no power** | `machine_off` | **2 ochre, on every machine** |
 | **leak** | `mdi:water` | **1 terracotta, on every machine** |
