@@ -660,6 +660,14 @@ neighbours. `grid-auto-flow: column` does it, but only with an explicit
 row count — without one the grid makes a column per item and the order
 quietly becomes across again.
 
+The row that **ends** a column is marked and loses its rule.
+`:last-child` only exempts the last row in document order, which in two
+columns is the bottom of the *second* one — so the first column kept its
+line and drew a stray rule under a column with nothing beneath it. The
+break is counted over the rows that will actually be **drawn**, not the
+items handed in: a skipped item otherwise moved it and left the columns
+uneven.
+
 **The box is the target, not the row.** A list you brush past should not
 tick itself, and a thumb at arm's length needs 30px. The tick answers on
 the live element rather than by re-rendering: a re-render would replace
@@ -667,6 +675,20 @@ the button the flash was started on, and `_work` skips a re-render while
 the card is already busy — so on a shopping list, where four things get
 tapped in a row, every tick after the first would sit unticked for the
 second and a bit the spinner takes to settle.
+
+**The list is not emptied while it refetches.** A to-do entity's state is
+its outstanding count, so a tick moves it, and that invalidates the
+cached items — but the refetch is a websocket round trip away. The items
+used to be *deleted* rather than marked stale, so for that whole trip the
+body had nothing to draw. And a list with no rows has no keys, so the row
+machinery read it as every row leaving at once: the card animated the lot
+out over 420ms, brought them back, and only then showed the one that had
+actually gone. Ticking one thing off looked like the list being rebuilt.
+
+Keeping the old items until the new ones land means the machinery sees
+what it is for — one row gone, the rest sliding up. A refetch that fails
+leaves the last known list up with its error beside it, which is also
+better than a blank.
 
 **A tick is claimed until the list agrees**, by uid rather than by index,
 because the refetch reorders and shortens the list. The claim is dropped
