@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.102.0";
+const VERSION = "0.103.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -118,6 +118,21 @@ ha-icon { display:inline-flex; line-height:0; }
    always there, so nothing moves and nothing is pushed down the card --
    which is the whole reason this beats a band across the top. */
 .card.outlined { border-color:var(--outline); }
+/* A card that heads a group rather than being one of it.
+   Same shell, same title bar, same accent tick -- it simply stops
+   drawing the box, so the cells beneath it read as its contents
+   rather than as its neighbours. NOT a container: it holds nothing
+   and knows nothing about what follows it. The section it sits in
+   does the bounding, which is HA's job and already works.
+   The type grows one step. A header that is the same size as the
+   rows under it is not a header, it is the first row. */
+.card.asheader {
+  background:none; border-color:transparent; padding:2px 2px 0;
+}
+.card.asheader .titlebar { margin-bottom:2px; }
+.card.asheader .titlebar h3 { font-size:13px; letter-spacing:.12em; }
+.card.asheader .titlebar ha-icon { --mdc-icon-size:18px; }
+.card.asheader .tick { height:15px; width:4px; }
 .titlebar { display:flex; align-items:center; gap:7px; margin-bottom:8px; }
 .tick { width:3px; height:12px; flex:none; background:var(--accent); }
 .titlebar ha-icon { --mdc-icon-size:16px; color:var(--accent); }
@@ -5811,6 +5826,7 @@ class SpectraCard extends HTMLElement {
        outline is its own value rather than a mode of the accent. */
     const outline = accentNumber(model.outline);
     const classes = "card"
+      + (config.header ? " asheader" : "")
       + (outline ? " outlined" : "")
       + (config.invert ? " invert" : "")
       + (tappable ? " tappable" : "")

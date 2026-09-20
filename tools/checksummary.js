@@ -159,6 +159,66 @@ const js = fs.readFileSync(file);
         && calls[0].service === "light.turn_off",
       `${text(".pickinfo")}, ${JSON.stringify(calls)}`);
 
+    /* ---- A card can head a group instead of being one ------------
+       A floor summary at the top of a bounded section is a header,
+       not a cell. `header: true` stops the shell drawing its box so
+       the rooms beneath read as its contents.
+
+       It is NOT a container: it holds nothing and knows nothing
+       about what follows. The section does the bounding. */
+    const boxed = (sel) => {
+      const c = q(sel);
+      if (!c) return null;
+      const st = getComputedStyle(c);
+      return `${st.borderTopWidth}|${st.borderTopColor}|${st.backgroundColor}`;
+    };
+
+    const plain = boxed(".card");
+    check("an ordinary card draws its box",
+      /^2px/.test(plain) && !/rgba\(0, 0, 0, 0\)/.test(plain.split("|")[2]),
+      plain);
+
+    const c = conf();
+    c.header = true;
+    el.setConfig(JSON.parse(JSON.stringify(c)));
+    await repaint();
+
+    check("a header card stops drawing one",
+      /rgba\(0, 0, 0, 0\)/.test(boxed(".card").split("|")[2]),
+      boxed(".card"));
+    check("and its border goes with it, rather than just the fill",
+      /rgba\(0, 0, 0, 0\)/.test(boxed(".card").split("|")[1]),
+      boxed(".card"));
+
+    /* The point of the whole thing: it still IS a spectra card. Same
+       title bar, same accent tick, same icon -- a header in another
+       typeface is the problem this exists to avoid. */
+    check("it keeps the eyebrow, the tick and the icon",
+      !!q(".titlebar h3") && !!q(".tick") && !!q(".titlebar ha-icon"),
+      `${!!q(".titlebar h3")} ${!!q(".tick")} ${!!q(".titlebar ha-icon")}`);
+    check("and still says what it is",
+      (text(".titlebar h3") || "").toLowerCase() === "downstairs",
+      text(".titlebar h3"));
+
+    /* A header the same size as the rows under it is not a header,
+       it is the first row. */
+    const headSize = parseFloat(getComputedStyle(q(".titlebar h3")).fontSize);
+    el.setConfig(JSON.parse(JSON.stringify(conf())));
+    await repaint();
+    const cellSize = parseFloat(getComputedStyle(q(".titlebar h3")).fontSize);
+    check("a header is set larger than an ordinary card's title",
+      headSize > cellSize, `${headSize} vs ${cellSize}`);
+
+    /* And the body still works -- a header that lost its control
+       would be a heading, which HA already has. */
+    const c2 = conf();
+    c2.header = true;
+    el.setConfig(JSON.parse(JSON.stringify(c2)));
+    await repaint();
+    check("the summary underneath still draws, control and all",
+      !!q("[data-alloff]") && !!q(".pickinfo"),
+      `${!!q("[data-alloff]")} / ${text(".pickinfo")}`);
+
     return problems;
   });
 
