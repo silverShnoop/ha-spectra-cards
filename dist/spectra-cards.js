@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.99.0";
+const VERSION = "0.100.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -497,7 +497,15 @@ ha-icon { display:inline-flex; line-height:0; }
   display:flex; align-items:flex-start; gap:10px; padding:6px 0;
   border-bottom:1px solid var(--sp-edge); min-width:0;
 }
-.tditem:last-child { border-bottom:none; }
+/* :last-child is the bottom of the SECOND column in a two-column
+   list, because the columns are one document order flowed sideways.
+   The bottom of the first column kept its rule and drew a stray line
+   under a column with nothing beneath it, so the row that ends a
+   column is marked and exempted too.
+   (No backticks in here. This stylesheet lives inside a template
+   literal and one would end it -- which is how the bundle broke the
+   first two times, and nearly a third writing this very comment.) */
+.tditem:last-child, .tditem.colend { border-bottom:none; }
 /* 30px, not the 22px it was drawn at. A checkbox on a wall panel is
    hit with a thumb at arm's length, and the box is the whole target:
    the row is deliberately NOT clickable, because a list you brush
@@ -3002,13 +3010,19 @@ const BODIES = {
        the same rows, ticked -- same box, same press, same un-tick --
        so they are built by the same code rather than by a second copy
        of it that would drift the first time either changed. */
-    const row = (item, keyPrefix) => {
-      if (!item || typeof item !== "object") return "";
-      /* isBlank rather than String(firstOf(...)): firstOf returns null
-         when everything it was given is blank, and String(null) is the
-         four characters "null" -- which is truthy, so a nameless item
-         drew a row called null instead of being skipped. */
-      if (isBlank(item.uid) || isBlank(item.summary)) return "";
+    /* isBlank rather than String(firstOf(...)): firstOf returns null
+       when everything it was given is blank, and String(null) is the
+       four characters "null" -- which is truthy, so a nameless item
+       drew a row called null instead of being skipped.
+
+       Its own test, rather than a return inside the builder, because
+       the column break has to be counted in rows that will actually
+       be DRAWN. Counted over the items handed in, a skipped one put
+       the break in the wrong place and left the columns uneven. */
+    const drawable = (item) => Boolean(item) && typeof item === "object"
+      && !isBlank(item.uid) && !isBlank(item.summary);
+
+    const row = (item, keyPrefix, endsColumn) => {
       const uid = String(item.uid);
       const name = String(item.summary);
       const done = item.status === "completed" || claimed.has(uid);
@@ -3035,7 +3049,8 @@ const BODIES = {
       const sub = full && detail === "below"
         ? `<span class="tdsub">${esc(full)}</span>` : "";
       const who = isBlank(item.who) ? "" : `<span class="tdwho">${esc(item.who)}</span>`;
-      return `<div class="tditem${done ? " ticked" : ""}${open ? " open" : ""}"`
+      return `<div class="tditem${done ? " ticked" : ""}${open ? " open" : ""}`
+        + `${endsColumn ? " colend" : ""}"`
         + ` data-key="${esc(keyPrefix + uid)}">`
         + `<button type="button" class="tdbox${done ? " ticked" : ""}"`
         + ` data-todo="${esc(uid)}" data-todo-done="${done ? "1" : ""}"`
@@ -3048,28 +3063,38 @@ const BODIES = {
         + `</div>`;
     };
 
-    const cells = shown.map((item) => row(item, "")).join("");
-    const doneItems = Array.isArray(b.done) ? b.done : [];
-    const doneCells = doneItems.map((item) => row(item, "done:")).join("");
+    /* Column-major, so the eye runs down one column and then the
+       other rather than hopping the gutter on every row.
+       `grid-auto-flow: column` needs to be told how tall a column is;
+       without an explicit row count it makes one column per item.
 
-    if (!cells && !doneCells) {
-      return `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
-    }
-
-    /* Column-major, so the eye runs down one column and then the other
-       rather than hopping the gutter on every row. `grid-auto-flow:
-       column` needs to be told how tall a column is; without an explicit
-       row count it makes one column per item. */
-    const grid = (markup, count) => {
-      const height = two ? Math.ceil(count / 2) : 0;
+       The row that ENDS the first column is marked, because
+       `:last-child` only exempts the last row in document order --
+       which in two columns is the bottom of the SECOND one. The
+       bottom of the first kept its rule, leaving a stray line under
+       the column with nothing beneath it. */
+    const section = (list, keyPrefix) => {
+      const rows = list.filter(drawable);
+      const height = two ? Math.ceil(rows.length / 2) : 0;
+      const markup = rows
+        .map((item, i) => row(item, keyPrefix, two && i === height - 1))
+        .join("");
+      if (!markup) return "";
       const style = two
         ? ` style="grid-template-rows:repeat(${height}, auto)"` : "";
       return `<div class="todolist${two ? " two" : ""}"${style}>${markup}</div>`;
     };
 
+    const cells = section(shown, "");
+    const doneItems = Array.isArray(b.done) ? b.done : [];
+    const doneCells = section(doneItems, "done:");
+
+    if (!cells && !doneCells) {
+      return `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
+    }
+
     let out = cells
-      ? grid(cells, shown.length)
-      : `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
+      || `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
     if (all.length > shown.length) {
       out += `<div class="tdmore">+ ${all.length - shown.length} more</div>`;
     }
@@ -3079,8 +3104,8 @@ const BODIES = {
     if (doneCells) {
       out += `<div class="tddone">`
         + `<p class="tddonehead">${esc(firstOf(b.done_label, "Done today"))}`
-        + `<span class="tddonecount">${doneItems.length}</span></p>`
-        + grid(doneCells, doneItems.length)
+        + `<span class="tddonecount">${doneItems.filter(drawable).length}</span></p>`
+        + doneCells
         + `</div>`;
     }
     const undo = b.undo
@@ -5409,8 +5434,20 @@ class SpectraCard extends HTMLElement {
       const seen = this._todoCounts && this._todoCounts[key];
       const now = state ? state.state : null;
       if (seen !== undefined && seen !== now) {
+        /* Stale, not gone. Dropping the items here emptied the list
+           for the whole round trip of the refetch -- and an empty list
+           has no keys, so the row machinery read it as every row
+           leaving at once: the card animated the lot out over 420ms,
+           brought them back, and only then showed the one that had
+           actually gone. Ticking one thing off looked like the list
+           being rebuilt.
+
+           Keeping them means the old list stays on screen until the
+           new one replaces it, and the machinery then sees what it is
+           for -- one row gone, the rest sliding up. A failed refetch
+           leaves the last known list up with `_failed` beside it,
+           which is also better than a blank. */
         this._fetched.delete(key);
-        delete this._todos[key];
       }
       this._todoCounts = this._todoCounts || {};
       this._todoCounts[key] = now;

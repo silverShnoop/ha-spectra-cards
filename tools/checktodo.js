@@ -138,6 +138,49 @@ const js = fs.readFileSync(file);
       /repeat|px/.test(grid.getAttribute("style") || ""),
       grid.getAttribute("style"));
 
+    /* A stray rule under the bottom of the first column, with nothing
+       beneath it. `:last-child` only exempts the last row in document
+       order, which in two columns is the bottom of the SECOND one --
+       so the first column kept its line. */
+    const ruled = (el2) =>
+      getComputedStyle(el2).borderBottomWidth !== "0px";
+    await show({ items: SHOP, columns: 2 });
+    const five = all(".tditem");
+    check("no rule under the bottom of the first column",
+      !ruled(five[2]), getComputedStyle(five[2]).borderBottomWidth);
+    check("nor under the bottom of the second",
+      !ruled(five[4]), getComputedStyle(five[4]).borderBottomWidth);
+    check("but the rows inside a column keep theirs",
+      ruled(five[0]) && ruled(five[1]) && ruled(five[3]),
+      [0, 1, 3].map((i) => getComputedStyle(five[i]).borderBottomWidth).join(","));
+
+    /* The break is counted in rows that will be DRAWN. Counting the
+       items handed in instead put it in the wrong place the moment
+       one of them was skipped -- and left the columns uneven. */
+    await show({
+      items: [
+        { uid: "z0", status: "needs_action" },
+        ...SHOP,
+        { uid: "z1", status: "needs_action" },
+      ],
+      columns: 2,
+    });
+    check("a skipped item does not move the column break",
+      all(".todolist").length === 1
+        && /repeat\(3, auto\)/.test(q(".todolist").getAttribute("style") || ""),
+      q(".todolist").getAttribute("style"));
+    const kept = all(".tditem");
+    check("and the break still lands on the last drawn row of column one",
+      kept.length === 5 && !ruled(kept[2]) && ruled(kept[1]),
+      `${kept.length} rows`);
+
+    await show({ items: SHOP, columns: 1 });
+    const one = all(".tditem");
+    check("in one column only the very last row loses its rule",
+      ruled(one[2]) && !ruled(one[4]),
+      `${getComputedStyle(one[2]).borderBottomWidth} / ${getComputedStyle(one[4]).borderBottomWidth}`);
+    await show({});
+
     // ---- what rides beside a name
     check("a Bring specification rides on the name's line",
       (text(".tditem:nth-child(2) .tdname") || "").includes("Tenderstem"),
@@ -511,6 +554,81 @@ const js = fs.readFileSync(file);
     check("an empty list still shows what got done",
       all(".tddone .tditem").length === 2 && !!q(".sub"),
       all(".tddone .tditem").length);
+
+    /* ---- The list must not blank while it refetches -------------
+
+       Everything above hands the body a literal `items` array, which
+       skips the fetch entirely -- and the fetch is exactly where this
+       went wrong, so not one of those assertions could see it.
+
+       What happened in the house: ticking an item moves the to-do
+       entity's outstanding count, the count moving invalidates the
+       cached items, and the refetch is a websocket round trip away.
+       The items were DELETED rather than marked stale, so for that
+       whole round trip the body had nothing to draw -- and a list
+       with no rows has no keys, so the row machinery read it as
+       every row leaving at once. The card animated the lot out over
+       420ms, brought them back, and only then showed the one that
+       had actually gone. Ticking one thing off looked like the list
+       being rebuilt. */
+    let pending = null;
+    const fetched = {
+      states: { "todo.phoenix": { state: "5" } },
+      callService: (d, s2, data, target) => {
+        calls.push({ service: `${d}.${s2}`, data, target });
+        return Promise.resolve();
+      },
+      callWS: () => new Promise((resolve) => { pending = resolve; }),
+    };
+    const deliver = (items) => {
+      const go = pending;
+      pending = null;
+      go({ response: { "todo.phoenix": { items } } });
+      return new Promise((r) => setTimeout(r, 0));
+    };
+
+    el.setConfig({
+      type: "custom:spectra-card", accent: 5, title: "Phoenix",
+      body: {
+        type: "todo", list: "todo.phoenix", columns: 1,
+        items: { todo: "todo.phoenix", status: "needs_action" },
+      },
+    });
+    el._signature = null;
+    el.hass = fetched;
+    await new Promise((r) => requestAnimationFrame(r));
+    await deliver(SHOP);
+    await painted();
+    check("a list fetched rather than handed over still draws",
+      all(".tditem").length === 5, all(".tditem").length);
+
+    /* The tick lands at the entity: the count drops, and the cached
+       items are now stale. The refetch has NOT answered yet. */
+    fetched.states["todo.phoenix"] = { state: "4" };
+    el._signature = null;
+    el.hass = fetched;
+    await new Promise((r) => requestAnimationFrame(r));
+
+    check("the list stays on screen while the refetch is in flight",
+      all(".tditem").length === 5, all(".tditem").length);
+    check("and nothing is marked as leaving, because nothing has left",
+      all(".leaving").length === 0, all(".leaving").length);
+    check("nor does it claim the list is empty",
+      !q(".sub"), text(".sub"));
+
+    /* Now it answers, one item shorter. ONE row should be going. */
+    await deliver(SHOP.slice(1));
+    await new Promise((r) => requestAnimationFrame(r));
+    check("when the answer lands, only the row that went is leaving",
+      all(".leaving").length === 1, all(".leaving").length);
+    await painted();
+    check("and the list settles at the new length",
+      all(".tditem").length === 4, all(".tditem").length);
+
+    el.setConfig(JSON.parse(JSON.stringify(conf({}))));
+    el._signature = null;
+    el.hass = hass;
+    await painted();
 
     // ---- it degrades honestly
     await show({ items: [] });
