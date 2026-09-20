@@ -112,6 +112,39 @@ only when its marshalled data changes — a wall panel sees a great deal of
 state it does not care about. A card showing a relative time also ticks every
 30 seconds, because that value goes stale with no state change to prompt it.
 
+### Counting and adding up
+
+Two value shapes read several entities and answer with one number. They exist
+for the same reason: the alternative is a helper entity per tile whose only
+job is to be counted, and that helper is a second place for the membership to
+drift.
+
+`count` answers *how many of these are on*. Given a group id it counts that
+group's members; given a list it counts the list, because a floor is not an
+entity and nothing in Home Assistant groups one for you.
+
+```yaml
+meta: {count: light.downstairs, suffix: " lights on", singular: " light on",
+       none: All off}
+meta: {count: [light.kitchen, light.study_2], state: "on", suffix: " rooms"}
+```
+
+`sum` adds the states together. No operators and no expressions — a tab tile
+that counts two to-do lists needs addition and nothing else.
+
+```yaml
+meta: {sum: [todo.phoenix, todo.home_tasks], suffix: " to do"}
+```
+
+Both take `singular` and `none`, which **replace the whole phrase** rather
+than its tail — `map` would substitute the number and leave the suffix
+appended, giving "All off rooms on".
+
+A state that is not a number is skipped rather than counted as zero, and if
+none of the entities can be read the answer is nothing rather than `0`. An
+unavailable list has no size; saying it has none would be a lie the tile
+could sit on all evening.
+
 ### Saying when something happened
 
 Anything the panel reports as having *already happened* uses `format: since`,
@@ -929,6 +962,13 @@ Identifying a row across a re-render needs a key, so a row carrying an `id`
 renders it as `data-key`. `home_signals`' Needs-you and System-health items
 already carry one. Without an id a row is not tracked: it will not arrive or
 leave, and it cannot slide, since nothing can tell which row moved where.
+
+**A `data-key` is the whole subscription.** The machinery once looked for
+`.row[data-key]`, which meant only the `list` body could have any of this —
+a to-do row ticked off snapped away while a Needs-you row dismissed beside
+it slid. The class was never the point; the key is. Any element a body
+renders with one now arrives, leaves and slides, and a body joins in by
+keying its rows and nothing else.
 
 A flowed list is a CSS grid, and a grid cannot transition its own reflow —
 items simply appear in their new cells. So positions are measured before the
