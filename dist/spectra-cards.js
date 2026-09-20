@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.95.1";
+const VERSION = "0.96.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1181,20 +1181,24 @@ img.avatar { object-fit:cover; display:block; }
    pressing a button that has already fired. Arriving is quicker than
    leaving: a departure has to be noticed, an arrival is already being
    looked at. */
-.row.leaving { animation: sp-leave 420ms cubic-bezier(.4,0,.7,.3) forwards;
+/* Keyed on data-key rather than on .row, so any body that gives its rows
+   keys gets the departure, the arrival and the close-up for free. The
+   to-do list was the second one to want it and had none of it: a ticked
+   item simply vanished and everything below it jumped up a line. */
+.leaving { animation: sp-leave 420ms cubic-bezier(.4,0,.7,.3) forwards;
   pointer-events:none; }
 @keyframes sp-leave {
   from { opacity:1; transform:none; }
   to   { opacity:0; transform:scale(.93); }
 }
-.row.entering { animation: sp-enter 260ms cubic-bezier(.2,.7,.4,1) both; }
+.entering { animation: sp-enter 260ms cubic-bezier(.2,.7,.4,1) both; }
 @keyframes sp-enter {
   from { opacity:0; transform:scale(.95); }
   to   { opacity:1; transform:none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .row.leaving { animation:none; opacity:0; }
-  .row.entering { animation:none; }
+  .leaving { animation:none; opacity:0; }
+  .entering { animation:none; }
 }
 
 /* festival — the card celebrates, the controls do not. The decoration lives
@@ -1998,6 +2002,9 @@ function resolveValue(hass, spec, forecasts) {
   if (typeof spec.count === "string" || Array.isArray(spec.count)) {
     return readCount(hass, spec);
   }
+  if (typeof spec.sum === "string" || Array.isArray(spec.sum)) {
+    return readSum(hass, spec);
+  }
   const out = {};
   for (const [key, value] of Object.entries(spec)) {
     out[key] = RAW_KEYS.has(key) ? value : resolveValue(hass, value, forecasts);
@@ -2075,6 +2082,44 @@ function readCount(hass, spec) {
      giving "All off rooms on". */
   if (n === 0 && !isBlank(spec.none)) return spec.none;
   return applyFormat(n, shape);
+}
+
+/* Several numbers, added up.
+
+   `count` answers "how many of these are on", which is a different
+   question from "how many are there altogether". The tab tile wanted the
+   second: two to-do lists, one number, and neither list knows about the
+   other.
+
+   Arithmetic in a dashboard config is a slope worth naming, so this is
+   the whole of it -- a sum of entity states, no operators, no
+   expressions -- for the same reason `count` exists: the alternative is
+   a helper entity per tile whose only job is to add two numbers, and
+   that is a second place for the membership to drift.
+
+   A state that is not a number is skipped rather than counted as zero,
+   and if none of them are readable the answer is null rather than "0".
+   An unavailable list has no size; saying it has none would be a lie
+   the tile could sit on all evening. */
+function readSum(hass, spec) {
+  const ids = (Array.isArray(spec.sum) ? spec.sum : [spec.sum])
+    .filter((id) => typeof id === "string" && id);
+  let total = 0;
+  let read = false;
+  for (const id of ids) {
+    const entity = hass && hass.states ? hass.states[id] : null;
+    if (!entity) continue;
+    const value = Number(entity.state);
+    if (!isFinite(value)) continue;
+    total += value;
+    read = true;
+  }
+  if (!read) return null;
+  const shape = total === 1 && !isBlank(spec.singular)
+    ? Object.assign({}, spec, { suffix: spec.singular })
+    : spec;
+  if (total === 0 && !isBlank(spec.none)) return spec.none;
+  return applyFormat(total, shape);
 }
 
 /* A person's state is a fixed vocabulary: "home", "not_home", or the name of
@@ -2261,6 +2306,12 @@ function collectSources(spec, found) {
   if (Array.isArray(spec.count)) {
     /* No group to stand in for them, so every one is watched directly. */
     for (const id of spec.count) {
+      if (typeof id === "string" && id) found.entities.add(id);
+    }
+    return found;
+  }
+  if (typeof spec.sum === "string" || Array.isArray(spec.sum)) {
+    for (const id of (Array.isArray(spec.sum) ? spec.sum : [spec.sum])) {
       if (typeof id === "string" && id) found.entities.add(id);
     }
     return found;
@@ -2889,7 +2940,7 @@ const BODIES = {
       const sub = note && detail === "below"
         ? `<span class="tdsub">${esc(note)}</span>` : "";
       const who = isBlank(item.who) ? "" : `<span class="tdwho">${esc(item.who)}</span>`;
-      return `<div class="tditem${done ? " ticked" : ""}">`
+      return `<div class="tditem${done ? " ticked" : ""}" data-key="${esc(uid)}">`
         + `<button type="button" class="tdbox${done ? " ticked" : ""}"`
         + ` data-todo="${esc(uid)}" data-todo-done="${done ? "1" : ""}"`
         + ` aria-pressed="${done ? "true" : "false"}"`
@@ -4311,7 +4362,7 @@ function motionSnapshot(root) {
      row after it, and a grid cannot transition that by itself -- the items
      simply appear in their new cells. So the positions are measured before
      the swap and the survivors are animated back from them afterwards. */
-  const keyed = root.querySelectorAll(".row[data-key]");
+  const keyed = root.querySelectorAll("[data-key]");
   for (let i = 0; i < keyed.length; i += 1) {
     const box = keyed[i].getBoundingClientRect();
     shot.rows.set(keyed[i].getAttribute("data-key"), { x: box.left, y: box.top });
@@ -4364,7 +4415,7 @@ function motionFrom(root, shot) {
   if (!shot || !stillWanted()) return;
 
   if (shot.rows && shot.rows.size) {
-    const keyed = root.querySelectorAll(".row[data-key]");
+    const keyed = root.querySelectorAll("[data-key]");
     for (let i = 0; i < keyed.length; i += 1) {
       const was = shot.rows.get(keyed[i].getAttribute("data-key"));
       if (!was) continue;
@@ -5421,8 +5472,11 @@ class SpectraCard extends HTMLElement {
     }
     if (model.body && model.body.type === "todo" && this._undo) {
       model.body.undo = true;
-      model.body.foot = model.body.foot
-        || `${this._undo.name} ticked off`;
+      /* Outranks whatever the card was configured to say down there.
+         The configured line is ambient -- who last touched the list --
+         and this one is about the press that just happened and expires
+         on its own twelve seconds later. */
+      model.body.foot = `${this._undo.name} ticked off`;
     }
 
     const mode = this._mode;
@@ -5571,8 +5625,12 @@ class SpectraCard extends HTMLElement {
       `</div>`,
     ].join("");
 
-    this._paint(card);
-    this._bind(model);
+    /* Only bind when the paint actually swapped. A deferred paint leaves
+       the OLD nodes on the page, still carrying the listeners they were
+       given last time -- binding again would add a second one to each
+       and every press would fire twice. Invisible until a keyed body
+       also had per-row controls, which is what the to-do list is. */
+    if (this._paint(card)) this._bind(model);
   }
 
   /* Replaces what is on screen, then tells the new bar where the old one had
@@ -5608,7 +5666,7 @@ class SpectraCard extends HTMLElement {
     const next = new Set();
     for (const m of html.matchAll(/data-key="([^"]*)"/g)) next.add(m[1]);
 
-    const onPage = Array.from(holder.querySelectorAll(".row[data-key]"));
+    const onPage = Array.from(holder.querySelectorAll("[data-key]"));
     const before = new Set(onPage.map((el) => el.getAttribute("data-key")));
 
     if (had && !this._leavingNow) {
@@ -5630,7 +5688,7 @@ class SpectraCard extends HTMLElement {
           this._signature = null;
           this._update();
         }, LEAVE_MS + 20);
-        return;
+        return false;
       }
     }
     this._leavingNow = false;
@@ -5649,9 +5707,32 @@ class SpectraCard extends HTMLElement {
     const wasLit = pressables().findIndex((el) => el.classList.contains("pressed"));
     if (wasLit >= 0 && !this._flashUntil) this._flashUntil = Date.now() + PRESS_MS;
 
+    /* Where the focus was, so the swap does not drop it on the floor.
+
+       Tapping a checkbox focuses it; the re-render then destroys that
+       node and the document falls back to <body>. On a long list inside
+       a scrolling panel that is how a tick loses your place -- there is
+       nothing focused left to anchor to.
+
+       Restored BY POSITION, not by key, and deliberately: the row that
+       was ticked is the row that has gone, so there is nothing of its
+       own to go back to. The next row has taken its place, which is
+       both where the finger already is and the right place for a
+       keyboard to carry on from. `preventScroll` because focus() will
+       otherwise scroll the thing it focuses into view, which is the
+       very jump this is trying to avoid. */
+    const active = this.shadowRoot ? this.shadowRoot.activeElement : null;
+    const wasFocused = active ? pressables().indexOf(active) : -1;
+
     const shot = had ? motionSnapshot(holder) : null;
     holder.innerHTML = html;
     motionFrom(holder, shot);
+
+    if (wasFocused >= 0) {
+      const now = pressables();
+      const again = now[Math.min(wasFocused, now.length - 1)];
+      if (again) again.focus({ preventScroll: true });
+    }
 
     if (wasLit >= 0 && Date.now() < this._flashUntil) {
       const again = pressables()[wasLit];
@@ -5662,10 +5743,11 @@ class SpectraCard extends HTMLElement {
 
     /* Nothing arrives on the first paint. A card that deals itself in one
        row at a time on every page load is a card that looks broken. */
-    if (!had) return;
-    for (const el of holder.querySelectorAll(".row[data-key]")) {
+    if (!had) return true;
+    for (const el of holder.querySelectorAll("[data-key]")) {
       if (!before.has(el.getAttribute("data-key"))) el.classList.add("entering");
     }
+    return true;
   }
 
   /* Some bodies know their own state better than any config line can. Where
