@@ -603,6 +603,14 @@ ends nothing is live, because a lit cell on a stopped machine is the card
 claiming it is still going. Every cell carries the full sentence — `Heated
 for 3m 50s`, `Spinning, 4m so far` — as its accessible name.
 
+**The live cell moves the way the machine does.** A drop falls through the
+fill; heat breathes, like every other live thing on the panel; tumble
+sweeps one way, pauses, and sweeps back; spin goes round, one direction
+and faster. Nothing that has already happened moves — one moving glyph on
+a card, not eight — and `prefers-reduced-motion` stops all of it. The
+motion also does the work the glyphs cannot: at 17px, reversing against
+going round separates tumble from spin far better than their shapes do.
+
 Tumble and spin are both the drum going round, so they differ in form
 rather than direction: `mdi:sync` (two arrows opposed — the drum reverses)
 against `mdi:rotate-right` (one arrow, flat out). Mirror images were the
