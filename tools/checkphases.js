@@ -212,6 +212,56 @@ const js = fs.readFileSync(file);
       all(".phcell").map(anim).every((a) => a === "none"),
       all(".phcell").map(anim).join(" "));
 
+    /* ---- The hero shows the phase, not just that it is running ----
+       `mdi:autorenew` said "running", which the word beside it already
+       said. The drum now shows the phase happening now, at the size
+       you can read from the doorway, and moves the way that phase
+       moves. The strip keeps every phase of the run; this is one. */
+    const drum = () => root().querySelector(".drumglyph");
+    const drumIcon = () => {
+      const i = root().querySelector(".drumglyph ha-icon");
+      return i ? i.getAttribute("icon") : null;
+    };
+
+    await show({ state: "running", phases: CYCLE });
+    check("the hero shows the phase happening now",
+      drumIcon() === "mdi:rotate-right", drumIcon());
+    check("and moves the way that phase moves",
+      anim(drum()) === "sp-spin", anim(drum()));
+
+    await show({ state: "running", phases: CYCLE.slice(0, 7) });
+    check("it follows the phase, rather than picking one",
+      drumIcon() === "mdi:sync" && anim(drum()) === "sp-phase-tumble",
+      `${drumIcon()} / ${anim(drum())}`);
+
+    /* The failure that would matter: a hero rotating beside a strip
+       that reverses is the card disagreeing with itself about what
+       the machine is doing. One marker drives both. */
+    check("and never disagrees with the strip beside it",
+      anim(drum()) === anim(cellOf("tumble")),
+      `${anim(drum())} vs ${anim(cellOf("tumble"))}`);
+
+    await show({ state: "running", phases: CYCLE.slice(0, 1) });
+    check("a fill in the hero falls, same as in the strip",
+      drumIcon() === "mdi:water" && anim(drum()) === "sp-phase-fill",
+      `${drumIcon()} / ${anim(drum())}`);
+
+    /* A machine that reports no phases at all still has to draw
+       something, and "running" is the honest fallback. */
+    await show({ state: "running", phases: [] });
+    check("a machine reporting no phases falls back rather than blanking",
+      drumIcon() === "mdi:autorenew", drumIcon());
+    check("and stands still, because nothing is known to be happening",
+      anim(drum()) === "none", anim(drum()));
+
+    /* Stopped is stopped. A drum still turning on a finished wash is
+       the single most misleading thing this card could do. */
+    await show({ state: "idle", drum_full: true, phases: CYCLE });
+    check("a finished wash has a still hero",
+      anim(drum()) === "none", anim(drum()));
+    check("and shows the job, not the last phase",
+      drumIcon() === "mdi:basket-unfill", drumIcon());
+
     // ---- every cell says what it is, in words, to anything reading it
     await show({ state: "running", phases: CYCLE });
     check("every cell carries a sentence, not just a glyph",
