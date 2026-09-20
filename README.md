@@ -637,7 +637,8 @@ body:
   limit: 40                          # optional; the rest become "+ N more"
   empty: "Nothing on the list"
   done: {entity: sensor.phoenix_done_today, attribute: items}
-  done_label: "Done today"           # optional
+  done_label: "Bought"               # optional; default "Done today"
+  tick_icon: mdi:shopping            # optional; default mdi:check-bold
 ```
 
 **This is the one card control that finishes something, and it is allowed
@@ -698,6 +699,17 @@ the truth rather than one stuck pretending.
 
 **Undo, not a confirmation.** A mis-tap on a wall panel is likely, and
 asking before every tick makes the common case pay for the rare one.
+
+**A list chooses its own word and its own glyph.** A check mark is right
+for a list of jobs and wrong for a shopping list, where the act is not
+"correct" but *in the bag* — so `tick_icon` sets what the box fills with,
+and `done_label` names the completed section. Phoenix ticks with a
+shopping bag under a heading that says **Bought**; Home Tasks keeps the
+check mark and **Done today**.
+
+Both sections use the same glyph, because they are the same rows: a
+completed row showing a check while the outstanding ones show a bag would
+be two answers to one question.
 
 **`done` is a second list, not a filter over the first.** It draws under
 the outstanding items as its own section, and it is fed from somewhere

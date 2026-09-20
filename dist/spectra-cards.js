@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.100.0";
+const VERSION = "0.101.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3005,6 +3005,11 @@ const BODIES = {
        would land in the model and never change the signature, so the
        tick would not be drawn until something else moved. */
     const claimed = new Set(Array.isArray(b.ticked) ? b.ticked : []);
+    /* What ticking one off looks like. A check mark is right for a
+       list of jobs and wrong for a shopping list, where the act is
+       not "correct" but "in the bag" -- so the glyph is the list's to
+       choose, the way its heading already is. */
+    const tick = isBlank(b.tick_icon) ? "mdi:check-bold" : String(b.tick_icon);
 
     /* One row builder for both sections. The completed rows below are
        the same rows, ticked -- same box, same press, same un-tick --
@@ -3056,7 +3061,7 @@ const BODIES = {
         + ` data-todo="${esc(uid)}" data-todo-done="${done ? "1" : ""}"`
         + ` aria-pressed="${done ? "true" : "false"}"`
         + ` aria-label="${esc((done ? "Put back on the list: " : "Tick off: ") + name)}">`
-        + `<span class="tdmark"><ha-icon icon="mdi:check-bold"></ha-icon></span>`
+        + `<span class="tdmark"><ha-icon icon="${esc(tick)}"></ha-icon></span>`
         + `</button>`
         + `<span class="tdtext"${sub ? ` data-note="${esc(uid)}"` : ""}>`
         + `<span class="tdname">${esc(name)}${extra}${who}</span>${sub}</span>`
