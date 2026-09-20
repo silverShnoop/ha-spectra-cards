@@ -127,6 +127,27 @@ const js = fs.readFileSync(file);
     check("nothing draws an empty second line",
       all(".tdsub").length === 0, all(".tdsub").length);
 
+    /* Shipped broken: an item with no specification rendered as
+       "Milk \u00b7 null", thirty-one times on the panel. Most Bring items
+       have no specification, so the empty case is the COMMON one --
+       which is why the fixture below has more blanks than not. */
+    const names = () => all(".tdname").map((n) => n.textContent);
+    check("an item with no specification shows only its name",
+      names().every((n) => !/null|undefined/.test(n)), names().join(" | "));
+    check("and no orphan separator either",
+      !names().some((n) => n.trim().endsWith("\u00b7")), names().join(" | "));
+    check("while one that has a specification still shows it",
+      names().some((n) => n.includes("\u00b7 Tenderstem")), names().join(" | "));
+
+    await show({ items: TASKS, columns: 1, detail: "below" });
+    check("the same holds for the line underneath",
+      !/null|undefined/.test(text(".tdsub") || ""), text(".tdsub"));
+    await show({ items: [{ uid: "n1", summary: "No note at all",
+      status: "needs_action" }], columns: 1, detail: "below" });
+    check("and a missing note draws no line at all",
+      all(".tdsub").length === 0, all(".tdsub").length);
+    await show({});
+
     await show({ items: TASKS, columns: 1, detail: "below" });
     check("a long note goes underneath instead",
       (text(".tdsub") || "").startsWith("Why: HA finds the car"), text(".tdsub"));
