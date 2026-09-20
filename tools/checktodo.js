@@ -89,11 +89,22 @@ const js = fs.readFileSync(file);
     const root = () => el.shadowRoot || el;
     const q = (sel) => root().querySelector(sel);
     const all = (sel) => Array.from(root().querySelectorAll(sel));
+    /* A row that disappears is animated out before the swap, so a config
+       change that removes one does not reach the page for LEAVE_MS.
+       Waiting only when something is actually leaving keeps the common
+       case a single frame. */
+    const painted = async () => {
+      await new Promise((r) => requestAnimationFrame(r));
+      if (root().querySelector(".leaving")) {
+        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+    };
     const show = async (over) => {
       el.setConfig(JSON.parse(JSON.stringify(conf(over))));
       el._signature = null;
       el.hass = hass;
-      await new Promise((r) => requestAnimationFrame(r));
+      await painted();
     };
     const settle = () => new Promise((r) => setTimeout(r, 40));
     /* Long enough for the spinner floor and the done-flash to clear, so
@@ -231,6 +242,44 @@ const js = fs.readFileSync(file);
       all(".tdbox.ticked").length === 3,
       all(".tdbox.ticked").length);
 
+    /* One tap, one call. A deferred paint leaves the old nodes in place,
+       and binding again on top of them gave every control a second
+       listener -- so a tick fired todo.update_item twice. */
+    await rest();
+    await show({});
+    calls.length = 0;
+    q('[data-todo="u2"]').click();
+    await settle();
+    check("one tap sends exactly one update, not two",
+      calls.length === 1, JSON.stringify(calls));
+
+    /* The row leaves the way a Needs-you row leaves, and the rest close
+       up behind it, rather than the list snapping shorter. */
+    await rest();
+    await show({});
+    q('[data-todo="u2"]').click();
+    await new Promise((r) => setTimeout(r, 30));
+    await show({ items: SHOP.filter((i) => i.uid !== "u2") });
+    check("the ticked row is animated out, not snapped away",
+      !q('[data-todo="u2"]'), "it is still on the page");
+    check("and the rows are keyed, which is what earns the animation",
+      all(".tditem[data-key]").length === all(".tditem").length,
+      `${all(".tditem[data-key]").length} of ${all(".tditem").length}`);
+
+    /* Tapping focuses the box; the re-render destroys it. Without
+       carrying the focus across, the page has nothing to anchor to and
+       a long list loses your place. */
+    await rest();
+    await show({});
+    const target = q('[data-todo="u3"]');
+    target.focus();
+    target.click();
+    await settle();
+    const nowFocused = root().activeElement;
+    check("focus survives the swap instead of falling to the body",
+      !!nowFocused && nowFocused.classList.contains("tdbox"),
+      nowFocused ? nowFocused.className : "(nothing focused)");
+
     // ---- the row is not the target
     /* A list you brush past should not tick itself. */
     await show({});
@@ -262,6 +311,44 @@ const js = fs.readFileSync(file);
       calls.length === 1 && calls[0].data.status === "needs_action"
         && calls[0].data.item === "d1",
       JSON.stringify(calls));
+
+    /* `sum` -- two lists, one number, because the tab tile counts both
+       and neither list knows about the other. An unreadable list has no
+       size, so the answer is nothing rather than a confident zero. */
+    await rest();
+    hass.states["todo.phoenix"] = { state: "51" };
+    hass.states["todo.home_tasks"] = { state: "3" };
+    el.setConfig({
+      type: "custom:spectra-card", accent: 5, icon: "mdi:cart-outline",
+      title: "Lists",
+      meta: { sum: ["todo.phoenix", "todo.home_tasks"], suffix: " to do" },
+      body: { type: "todo", list: "todo.phoenix", items: SHOP },
+    });
+    el._signature = null;
+    el.hass = hass;
+    await painted();
+    check("sum adds both lists together",
+      (text(".meta") || "").trim() === "54 to do", text(".meta"));
+
+    delete hass.states["todo.home_tasks"];
+    el._signature = null;
+    el.hass = hass;
+    await painted();
+    check("and counts only what it can read, rather than treating a missing list as zero",
+      (text(".meta") || "").trim() === "51 to do", text(".meta"));
+
+    delete hass.states["todo.phoenix"];
+    el._signature = null;
+    el.hass = hass;
+    await painted();
+    check("with nothing readable it says nothing, not zero",
+      !/0/.test(text(".meta") || ""), text(".meta"));
+
+    hass.states["todo.phoenix"] = { state: "51" };
+    el.setConfig(JSON.parse(JSON.stringify(conf({}))));
+    el._signature = null;
+    el.hass = hass;
+    await painted();
 
     // ---- it degrades honestly
     await show({ items: [] });
