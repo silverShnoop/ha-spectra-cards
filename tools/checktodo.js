@@ -630,6 +630,34 @@ const js = fs.readFileSync(file);
     el.hass = hass;
     await painted();
 
+    /* ---- A list chooses its own words and its own glyph ---------
+       A check mark is right for a list of jobs and wrong for a
+       shopping list, where the act is not "correct" but "in the bag".
+       Same for the heading: things are not "done", they are bought. */
+    await show({ items: SHOP, tick_icon: "mdi:shopping", done: [
+      { uid: "d1", summary: "Eggs", status: "completed", description: "" },
+    ], done_label: "Bought" });
+    const glyph = (sel) => {
+      const i = q(sel);
+      return i ? i.getAttribute("icon") : null;
+    };
+    check("a list can choose the glyph it ticks with",
+      glyph(".tdbox ha-icon") === "mdi:shopping", glyph(".tdbox ha-icon"));
+    check("and the completed rows use the same one, not a stray check",
+      glyph(".tddone .tdbox ha-icon") === "mdi:shopping",
+      glyph(".tddone .tdbox ha-icon"));
+    check("and it can name its completed section",
+      /bought/i.test(text(".tddonehead") || ""), text(".tddonehead"));
+
+    await show({ items: SHOP, done: [
+      { uid: "d1", summary: "Eggs", status: "completed", description: "" },
+    ] });
+    check("a list that chooses neither still gets a check mark",
+      glyph(".tdbox ha-icon") === "mdi:check-bold", glyph(".tdbox ha-icon"));
+    check("and still says Done today",
+      /done today/i.test(text(".tddonehead") || ""), text(".tddonehead"));
+    await show({});
+
     // ---- it degrades honestly
     await show({ items: [] });
     check("an empty list says so rather than drawing nothing",
