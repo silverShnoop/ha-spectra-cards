@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.96.0";
+const VERSION = "0.97.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -534,6 +534,29 @@ ha-icon { display:inline-flex; line-height:0; }
   white-space:nowrap; background:var(--accent-soft); color:var(--accent-on);
 }
 .tdmore { font-size:12px; color:var(--sp-ink-2); padding:8px 0 0; }
+/* Done today. Separated by a rule rather than a gap, because on a long
+   list the two sections have to be told apart from across the room and
+   a gap reads as the end of the card. Recessive throughout: what is
+   left is the thing you act on, and what is finished is the thing you
+   are pleased to see -- the second must not compete with the first. */
+.tddone { margin-top:12px; padding-top:10px; border-top:1px solid var(--sp-edge); }
+.tddonehead {
+  display:flex; align-items:center; gap:6px; margin:0 0 4px;
+  font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--sp-ink-3);
+}
+.tddonecount {
+  font-size:10px; letter-spacing:0; padding:1px 6px; border-radius:8px;
+  background:var(--sp-sink); color:var(--sp-ink-2);
+}
+/* No strike-through down here. Up in the list it means "just ticked,
+   on its way out"; in a section where every row is ticked it is thirty
+   identical lines through thirty words, and the point of this section
+   is to READ what you got done. The filled box still says done, and is
+   still the way to put one back. */
+.tddone .tditem.ticked .tdname {
+  color:var(--sp-ink-2); text-decoration:none;
+}
 .tdfoot {
   display:flex; align-items:center; gap:8px; margin-top:10px;
   padding-top:9px; border-top:1px solid var(--sp-edge);
@@ -912,6 +935,21 @@ img.avatar { object-fit:cover; display:block; }
    not. The label still says Home or Out; the colour only agrees with it. */
 .person:not(.here) .avatar { background:var(--sp-sink); color:var(--sp-ink-3); }
 .person:not(.here) img.avatar { opacity:.55; }
+/* Out is grey because it is a reading, and a reading that is simply not
+   this house. Unknown is ochre because it is the absence of one: the
+   phone has stopped reporting and somebody may want to know why. Drawn
+   grey alongside Out, it read as "they went out", which is a thing the
+   card did not know. The ring is dashed for the same reason the colour
+   is warmer -- a gap in the line says missing in a way no solid shape
+   does, and it survives being looked at by somebody who cannot tell the
+   ochre from the grey. */
+.person.adrift { background:var(--sp-a2-soft); }
+.person.adrift .avatar {
+  background:transparent; color:var(--sp-a2-on);
+  border:2px dashed var(--sp-a2); box-sizing:border-box;
+}
+.person.adrift img.avatar { opacity:.45; }
+.person.adrift .sub { color:var(--sp-a2-on); }
 
 /* agenda */
 .dayhead {
@@ -2125,17 +2163,28 @@ function readSum(hass, spec) {
 /* A person's state is a fixed vocabulary: "home", "not_home", or the name of
    whichever zone they are in. Every dashboard spelling that map out per
    person is the same boilerplate three times over, so the body reads it. */
+/* Nobody knows where this person is.
+
+   A person whose trackers have all gone quiet reads as unknown, and the
+   resolver turns "unknown" into nothing at all on the way here — so the
+   blank case is not "say nothing", it is the same case. Saying nothing
+   left a tile with a duration and no word beside it, which is the one
+   reading that means neither in nor out.
+
+   Its own function because the word and the colour both depend on it,
+   and the one way this can go wrong is a tile that says Unknown while
+   wearing the colour for Out. */
+function presenceUnknown(state) {
+  if (isBlank(state)) return true;
+  const v = String(state);
+  return v === "unknown" || v === "unavailable";
+}
+
 function presenceLabel(state) {
-  /* A person whose trackers have all gone quiet reads as unknown, and the
-     resolver turns "unknown" into nothing at all on the way here — so the
-     blank case is not "say nothing", it is the same case. Saying nothing
-     left a tile with a duration and no word beside it, which is the one
-     reading that means neither in nor out. */
-  if (isBlank(state)) return "Unknown";
+  if (presenceUnknown(state)) return "Unknown";
   const v = String(state);
   if (v === "home") return "Home";
   if (v === "not_home") return "Out";
-  if (v === "unknown" || v === "unavailable") return "Unknown";
   return v.charAt(0).toUpperCase() + v.slice(1);
 }
 
@@ -2915,7 +2964,11 @@ const BODIES = {
        tick would not be drawn until something else moved. */
     const claimed = new Set(Array.isArray(b.ticked) ? b.ticked : []);
 
-    const cells = shown.map((item, i) => {
+    /* One row builder for both sections. The completed rows below are
+       the same rows, ticked -- same box, same press, same un-tick --
+       so they are built by the same code rather than by a second copy
+       of it that would drift the first time either changed. */
+    const row = (item, keyPrefix) => {
       if (!item || typeof item !== "object") return "";
       /* isBlank rather than String(firstOf(...)): firstOf returns null
          when everything it was given is blank, and String(null) is the
@@ -2940,7 +2993,7 @@ const BODIES = {
       const sub = note && detail === "below"
         ? `<span class="tdsub">${esc(note)}</span>` : "";
       const who = isBlank(item.who) ? "" : `<span class="tdwho">${esc(item.who)}</span>`;
-      return `<div class="tditem${done ? " ticked" : ""}" data-key="${esc(uid)}">`
+      return `<div class="tditem${done ? " ticked" : ""}" data-key="${esc(keyPrefix + uid)}">`
         + `<button type="button" class="tdbox${done ? " ticked" : ""}"`
         + ` data-todo="${esc(uid)}" data-todo-done="${done ? "1" : ""}"`
         + ` aria-pressed="${done ? "true" : "false"}"`
@@ -2949,9 +3002,13 @@ const BODIES = {
         + `</button>`
         + `<span class="tdtext"><span class="tdname">${esc(name)}${extra}${who}</span>${sub}</span>`
         + `</div>`;
-    }).join("");
+    };
 
-    if (!cells) {
+    const cells = shown.map((item) => row(item, "")).join("");
+    const doneItems = Array.isArray(b.done) ? b.done : [];
+    const doneCells = doneItems.map((item) => row(item, "done:")).join("");
+
+    if (!cells && !doneCells) {
       return `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
     }
 
@@ -2959,12 +3016,28 @@ const BODIES = {
        rather than hopping the gutter on every row. `grid-auto-flow:
        column` needs to be told how tall a column is; without an explicit
        row count it makes one column per item. */
-    const rows = two ? Math.ceil(shown.length / 2) : 0;
-    const style = two
-      ? ` style="grid-template-rows:repeat(${rows}, auto)"` : "";
-    let out = `<div class="todolist${two ? " two" : ""}"${style}>${cells}</div>`;
+    const grid = (markup, count) => {
+      const height = two ? Math.ceil(count / 2) : 0;
+      const style = two
+        ? ` style="grid-template-rows:repeat(${height}, auto)"` : "";
+      return `<div class="todolist${two ? " two" : ""}"${style}>${markup}</div>`;
+    };
+
+    let out = cells
+      ? grid(cells, shown.length)
+      : `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
     if (all.length > shown.length) {
       out += `<div class="tdmore">+ ${all.length - shown.length} more</div>`;
+    }
+    /* What got done today, under the list rather than mixed into it.
+       An empty completed section draws nothing at all: "0 done" on a
+       quiet morning is a reproach, not a fact anybody asked for. */
+    if (doneCells) {
+      out += `<div class="tddone">`
+        + `<p class="tddonehead">${esc(firstOf(b.done_label, "Done today"))}`
+        + `<span class="tddonecount">${doneItems.length}</span></p>`
+        + grid(doneCells, doneItems.length)
+        + `</div>`;
     }
     const undo = b.undo
       ? `<button type="button" class="tdundo" data-todo-undo>Undo</button>` : "";
@@ -3840,6 +3913,13 @@ const BODIES = {
 
     return `<div class="people">` + rows.map((r) => {
       const here = String(firstOf(r.state, "")) === "home";
+      /* Out and Unknown are not the same fact and must not look alike.
+         "Out" is a reading: the phone is somewhere else. "Unknown" is
+         the ABSENCE of a reading, and the thing to do about it is not
+         to expect them home — it is to go and look at why the tracker
+         stopped reporting. Drawn from the state rather than the label
+         so an overriding `status` cannot leave the two disagreeing. */
+      const adrift = !here && presenceUnknown(r.state);
       const name = firstOf(r.name, "");
       const label = firstOf(r.status, presenceLabel(r.state));
       /* "Home since 3h ago" is noise when the wash already says home; the
@@ -3850,7 +3930,7 @@ const BODIES = {
         ? `<img class="avatar" src="${esc(picture)}" alt="">`
         : `<span class="avatar">${esc(initialsOf(name))}</span>`;
 
-      return `<div class="person${here ? " here" : ""}">`
+      return `<div class="person${here ? " here" : ""}${adrift ? " adrift" : ""}">`
         + face
         + (isBlank(name) ? "" : `<p class="name">${esc(name)}</p>`)
         + (parts.length ? `<p class="sub">${esc(parts.join(" \u00b7 "))}</p>` : "")

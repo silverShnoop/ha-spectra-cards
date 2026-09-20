@@ -350,6 +350,71 @@ const js = fs.readFileSync(file);
     el.hass = hass;
     await painted();
 
+    /* `done` -- what got ticked off today, under the list.
+
+       The section is fed by a sensor rather than by the list, because
+       a to-do entity mostly does not record WHEN something was
+       completed. Here that only matters in that the rows arrive from
+       somewhere else and must still behave like rows. */
+    const DONE = [
+      { uid: "d9", summary: "Eggs", status: "completed", description: "" },
+      { uid: "d8", summary: "Butter", status: "completed", description: "Salted" },
+    ];
+    await show({ items: SHOP, done: DONE });
+
+    check("the completed section draws under the list, not mixed into it",
+      !!q(".tddone") && all(".tddone .tditem").length === 2,
+      all(".tddone .tditem").length);
+    check("and the outstanding rows are still the ones above it",
+      all(".todolist:not(.tddone .todolist) .tditem").length >= 5,
+      all(".tditem").length);
+    check("it says how many, because that is the point of looking",
+      (text(".tddonecount") || "").trim() === "2", text(".tddonecount"));
+    check("and names itself",
+      /done today/i.test(text(".tddonehead") || ""), text(".tddonehead"));
+
+    /* A key collision would make one section's row animate the other's
+       out. They cannot collide on uid alone, since an item is in one
+       section or the other -- but it IS in both for the second or two
+       an optimistic tick is still showing, which is exactly when the
+       row machinery is running. */
+    const keys = all("[data-key]").map((el2) => el2.getAttribute("data-key"));
+    check("the two sections cannot collide on a key",
+      new Set(keys).size === keys.length
+        && keys.some((k) => k.startsWith("done:")),
+      keys.join(","));
+
+    /* Every row in there is ticked, so striking them all through is
+       thirty lines through thirty words. The section exists to be READ. */
+    const doneName = q(".tddone .tditem .tdname");
+    check("a completed row is legible, not struck through",
+      !!doneName && getComputedStyle(doneName).textDecorationLine === "none",
+      doneName && getComputedStyle(doneName).textDecorationLine);
+
+    calls.length = 0;
+    const doneTick = q(".tddone .tdbox");
+    if (doneTick) doneTick.click();
+    await settle();
+    check("pressing one puts it back on the list rather than re-completing it",
+      calls.length === 1 && calls[0].data.status === "needs_action"
+        && calls[0].data.item === "d9",
+      JSON.stringify(calls));
+    await rest();
+
+    /* Nothing done yet is not worth a heading. "0 done" on a quiet
+       morning is a reproach, not a fact anybody asked for. */
+    await show({ items: SHOP, done: [] });
+    check("an empty completed section draws nothing at all",
+      !q(".tddone"), "a heading with no rows under it");
+
+    /* The list can be finished and the day still worth showing -- in
+       fact that is the best case, and it used to render as "Nothing on
+       the list" with today's work thrown away below it. */
+    await show({ items: [], done: DONE });
+    check("an empty list still shows what got done",
+      all(".tddone .tditem").length === 2 && !!q(".sub"),
+      all(".tddone .tditem").length);
+
     // ---- it degrades honestly
     await show({ items: [] });
     check("an empty list says so rather than drawing nothing",
