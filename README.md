@@ -584,6 +584,41 @@ later. The spinner is what covers that gap.
 Urgency rides the card's `outline`, not the title accent: plain when
 locked, then amber and red as the Needs-you row escalates.
 
+### `people` — who is in, who is out, and who nobody can say
+
+```yaml
+body:
+  type: people
+  rows:
+    from: {entity: sensor.household, attribute: people}
+    each: {name: {field: name}, state: {field: state}, since: {field: since}}
+```
+
+**Three states, not two.** "Out" is a reading — the phone is somewhere
+that is not this house. "Unknown" is the *absence* of a reading: the
+trackers have gone quiet and nobody knows anything at all. Drawn alike,
+the second reads as the first, and the card ends up telling you somebody
+went out when it does not know that and cannot know it. So out is grey
+and unknown is ochre, the warning role, because the thing to do about it
+is not to expect them home — it is to find out why the tracker stopped
+reporting.
+
+The unknown circle is also drawn as a **dashed ring rather than a fill**.
+A gap in the line says *missing* in a way no solid shape does, and it
+still says it to somebody who cannot tell the ochre from the grey.
+
+**The colour follows the state, never the label.** `status` can override
+the words on a tile, and the one way this rots is a tile reading
+"Unknown" while wearing the colour for "Out" — so both come from one
+function and the checker asserts them as a pair.
+
+A person whose trackers have all gone quiet arrives here as an **empty
+string**, not the word `unknown`: the resolver turns `unknown` and
+`unavailable` into nothing on the way in. So the blank case is not "say
+nothing", it is the same case, and saying nothing left a tile with a
+duration and no word beside it — the one reading that means neither in
+nor out.
+
 ### `todo` — a list you can actually finish
 
 ```yaml
@@ -595,6 +630,8 @@ body:
   detail: inline                     # inline | below | none
   limit: 40                          # optional; the rest become "+ N more"
   empty: "Nothing on the list"
+  done: {entity: sensor.phoenix_done_today, attribute: items}
+  done_label: "Done today"           # optional
 ```
 
 **This is the one card control that finishes something, and it is allowed
@@ -633,6 +670,33 @@ the truth rather than one stuck pretending.
 
 **Undo, not a confirmation.** A mis-tap on a wall panel is likely, and
 asking before every tick makes the common case pay for the rare one.
+
+**`done` is a second list, not a filter over the first.** It draws under
+the outstanding items as its own section, and it is fed from somewhere
+else on purpose: a to-do entity remembers *what* was completed and mostly
+not *when*. `local_todo` stamps each item because iCalendar has a field
+for it; Bring has none, so its eighteen completed items were bought at
+some unknown point over some unknown number of days. Filtering the list
+to "today" is therefore not possible for half the lists in this house, and
+[`home_signals`](https://github.com/silverShnoop/ha-home-signals) watches
+the ticks as they happen instead and publishes
+`sensor.<list>_done_today`. The card renders what it is handed and decides
+nothing about dates — as usual.
+
+The rows are the **same rows**, built by the same code: same box, same
+press, and pressing one puts the item back on the list. Two differences,
+both deliberate. They are keyed `done:<uid>` rather than `<uid>`, because
+for the second or two an optimistic tick is still showing the same item is
+in both sections and two equal keys would make one row animate the other
+out. And they are **not struck through** — up in the list a strike means
+"just ticked, on its way out", but in a section where every row is ticked
+it is thirty lines through thirty words, and this section exists to be
+read.
+
+An empty `done` draws nothing at all, heading included: "0 done" on a
+quiet morning is a reproach, not a fact anybody asked for. An empty *list*
+with a non-empty `done` still shows the day — that is the best case, not a
+reason to show nothing.
 
 **`due` is deliberately not drawn.** Neither list in this house sets one,
 and it shipped as an empty second line under all thirty-one rows. What
