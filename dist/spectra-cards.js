@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.92.0";
+const VERSION = "0.93.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -423,17 +423,59 @@ ha-icon { display:inline-flex; line-height:0; }
   display:inline-flex; align-items:center; gap:5px;
   color:var(--sp-ink-2); line-height:1;
 }
+/* A fixed box, so the strip's spacing does not shift with the glyph --
+   and so the fill drop has something to fall through and out of. */
+.phglyph {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:17px; height:17px; overflow:hidden; flex:none;
+}
 .phcell ha-icon { --mdc-icon-size:17px; }
 .phcell.now { color:var(--accent); }
 .phword {
   font-size:12px; font-weight:500; letter-spacing:.01em;
   color:var(--accent);
 }
-/* The live cell breathes, at the same rate as every other live thing on
-   the panel. It is the one part of the strip making a claim about RIGHT
-   NOW, and a still strip beside a running machine looked like a
-   screenshot of one. */
-.phcell.now ha-icon { animation:sp-breathe 3s ease-in-out infinite; }
+
+/* The live cell moves the way the machine does.
+
+   One cell is ever live, and only while the machine is running, so this
+   is one moving thing on the card rather than a strip of them. It
+   earns its place twice over: a still strip beside a running machine
+   read as a screenshot of one, and at 17px the motion tells tumble from
+   spin far better than the glyphs do -- reversing against going round
+   is not a difference you have to squint at.
+
+   Each phase moves as itself:
+
+     fill    a drop falls through the cell, top to bottom, and repeats
+     heat    the breathe every other live thing on the panel uses
+     tumble  a sweep one way, a pause, the same sweep back -- which is
+             the drum, and the pauses are the part that reads
+     spin     round and round, one direction, and faster
+
+   Spin is 1.6s rather than the 0.7s the button spinner uses: a spinner
+   says "waiting, briefly" and is gone, while this one is in the corner
+   of the room for forty minutes. */
+.phcell.now.ph-fill ha-icon { animation:sp-phase-fill 2.6s linear infinite; }
+.phcell.now.ph-heat ha-icon { animation:sp-breathe 3s ease-in-out infinite; }
+.phcell.now.ph-tumble ha-icon { animation:sp-phase-tumble 3s ease-in-out infinite; }
+.phcell.now.ph-spin ha-icon { animation:sp-spin 1.6s linear infinite; }
+@keyframes sp-phase-fill {
+  0%   { transform:translateY(-135%); opacity:0; }
+  22%  { opacity:1; }
+  78%  { opacity:1; }
+  100% { transform:translateY(135%); opacity:0; }
+}
+/* Forward, hold, back, hold. The holds are deliberate: a drum that
+   reversed smoothly would read as wobbling rather than changing its
+   mind, and the pause is what says a direction ended. */
+@keyframes sp-phase-tumble {
+  0%   { transform:rotate(0deg); }
+  38%  { transform:rotate(168deg); }
+  50%  { transform:rotate(168deg); }
+  88%  { transform:rotate(0deg); }
+  100% { transform:rotate(0deg); }
+}
 
 .washmain, .lockmain { flex:1 1 auto; min-width:0; }
 /* One hero size for both. The lock card and the washer card sit on
@@ -1166,8 +1208,14 @@ img.avatar { object-fit:cover; display:block; }
 /* A panel is looked at all evening. Anyone who has asked their system to
    stop animating things means it here too. */
 @media (prefers-reduced-motion: reduce) {
-  .pb, .strand .bulb, .fk, .burst, .diya.lit .fl,
-  .phcell.now ha-icon { animation:none; }
+  .pb, .strand .bulb, .fk, .burst, .diya.lit .fl { animation:none; }
+  /* Spelled out per kind rather than as .phcell.now ha-icon, which
+     those rules outrank -- a one-class difference is the whole reason
+     a reduced-motion override silently fails. */
+  .phcell.now.ph-fill ha-icon, .phcell.now.ph-heat ha-icon,
+  .phcell.now.ph-tumble ha-icon, .phcell.now.ph-spin ha-icon {
+    animation:none; opacity:1; transform:none;
+  }
   .fk { opacity:0; }
 }
 /* The box is a fixed 20px whatever the flame inside it is doing, so a room
@@ -4559,9 +4607,9 @@ function washerPhases(b, running) {
     const said = now
       ? `${PHASE_DOING[kind]}, ${ran} so far`
       : `${PHASE_DID[kind]} for ${ran}`;
-    cells.push(`<span class="phcell${now ? " now" : ""}" role="listitem"`
+    cells.push(`<span class="phcell ph-${kind}${now ? " now" : ""}" role="listitem"`
       + ` title="${esc(said)}" aria-label="${esc(said)}">`
-      + `<ha-icon icon="${glyph}"></ha-icon>`
+      + `<span class="phglyph"><ha-icon icon="${glyph}"></ha-icon></span>`
       + (now ? `<span class="phword">${esc(PHASE_DOING[kind])}</span>` : "")
       + `</span>`);
   });

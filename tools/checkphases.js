@@ -168,6 +168,50 @@ const js = fs.readFileSync(file);
       all(".phcell.now").length === 0 && !q(".phword"),
       `${all(".phcell.now").length} live`);
 
+    // ---- the live cell moves the way the machine does
+    const anim = (el) => {
+      const i = el && el.querySelector("ha-icon");
+      return i ? getComputedStyle(i).animationName : "(no cell)";
+    };
+    const cellOf = (kind) => root().querySelector(`.phcell.now.ph-${kind}`);
+
+    await show({ state: "running", phases: CYCLE });
+    check("a live spin goes round, in one direction",
+      anim(cellOf("spin")) === "sp-spin", anim(cellOf("spin")));
+
+    await show({ state: "running", phases: CYCLE.slice(0, 7) });
+    check("a live tumble reverses instead",
+      anim(cellOf("tumble")) === "sp-phase-tumble", anim(cellOf("tumble")));
+    /* The pair the glyphs struggle with at 17px. Motion is what
+       actually separates them, so it must not be the same motion. */
+    check("and the two are not the same movement",
+      anim(cellOf("tumble")) !== "sp-spin", anim(cellOf("tumble")));
+
+    await show({ state: "running", phases: CYCLE.slice(0, 4) });
+    check("a live heat breathes, as every other live thing does",
+      anim(cellOf("heat")) === "sp-breathe", anim(cellOf("heat")));
+
+    await show({ state: "running", phases: CYCLE.slice(0, 1) });
+    check("a live fill falls, like the water going in",
+      anim(cellOf("fill")) === "sp-phase-fill", anim(cellOf("fill")));
+    /* The drop travels its own height and further. Without a box to
+       fall out of it would land on the cell beside it. */
+    const glyph = root().querySelector(".phcell.now .phglyph");
+    check("and it falls inside a box that clips it",
+      !!glyph && getComputedStyle(glyph).overflow === "hidden",
+      glyph ? getComputedStyle(glyph).overflow : "(no box)");
+
+    /* Eight moving glyphs would be a fairground. Only the live one. */
+    await show({ state: "running", phases: CYCLE });
+    const still = all(".phcell:not(.now)").map(anim);
+    check("nothing that has already happened moves",
+      still.every((a) => a === "none"), still.join(" "));
+
+    await show({ state: "idle", drum_full: true, phases: CYCLE });
+    check("and nothing moves at all once the wash has ended",
+      all(".phcell").map(anim).every((a) => a === "none"),
+      all(".phcell").map(anim).join(" "));
+
     // ---- every cell says what it is, in words, to anything reading it
     await show({ state: "running", phases: CYCLE });
     check("every cell carries a sentence, not just a glyph",
@@ -204,13 +248,42 @@ const js = fs.readFileSync(file);
         && all(".phcell.now")[0] === all(".phcell")[1],
       `${all(".phcell.now").length} live`);
 
+    // Left running, with something moving, for the reduced-motion pass.
+    await show({ state: "running", phases: CYCLE });
     return problems;
   });
 
-  console.log(fails.length
-    ? `FAILED (${fails.length})`
+  /* Asked for stillness, get stillness.
+     Its own pass because the media state is a property of the page, not
+     of anything reachable from inside one evaluate. Worth the second
+     pass: the per-kind rules carry one class more than a
+     `.phcell.now ha-icon` override would, so the obvious way to write
+     this exemption loses on specificity and fails in total silence --
+     the page simply keeps moving for the one person who asked it not
+     to. */
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const stillFails = await page.evaluate(async () => {
+    const problems = [];
+    const check = (name, ok, got) => {
+      console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : "  -> " + got}`);
+      if (!ok) problems.push(`${name}: ${got}`);
+    };
+    const el = document.querySelector("spectra-card");
+    const root = el.shadowRoot || el;
+    await new Promise((r) => requestAnimationFrame(r));
+    const moving = Array.from(root.querySelectorAll(".phcell ha-icon"))
+      .map((i) => getComputedStyle(i).animationName)
+      .filter((a) => a !== "none");
+    check("reduced motion stops every one of them",
+      moving.length === 0, moving.join(" "));
+    return problems;
+  });
+
+  const total = fails.length + stillFails.length;
+  console.log(total
+    ? `FAILED (${total})`
     : "OK (phases: a record of the wash, not a progress bar)");
   await browser.close();
   server.close();
-  process.exit(fails.length ? 1 : 0);
+  process.exit(total ? 1 : 0);
 })();
