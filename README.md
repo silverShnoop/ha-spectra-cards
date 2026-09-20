@@ -1296,6 +1296,44 @@ body:
   sub: {entity: lock.front_door, attribute: last_changed, format: relative, prefix: "Unsecured for "}
 ```
 
+## A card can head a group, and that is not a container
+
+`header: true` on the shell stops it drawing its box. Same title bar,
+same accent tick, same icon — it simply loses the border, the fill and
+most of the padding, and its title goes up a size. The cells beneath it
+then read as its contents rather than as its neighbours.
+
+```yaml
+type: custom:spectra-card
+header: true
+accent: 2
+icon: mdi:home-floor-g
+title: Downstairs
+body: {type: summary, …}
+```
+
+**It holds nothing.** It has no `cards`, it does not know what follows
+it, and nothing is nested. The *section* does the bounding — that is
+Home Assistant's job, it already works, and a `background` on the
+section draws the container.
+
+That split is deliberate, and the alternative was considered and
+rejected. A card that rendered child cards would:
+
+- draw **boxes inside a box**, because each child still draws its own
+  shell — the thing the container was supposed to fix;
+- lose the **section grid**, so every card inside it would be
+  full-width forever unless the container reimplemented responsive
+  columns itself;
+- be invisible to HA's **sections editor**, which can otherwise drag
+  cards between sections and resize them;
+- depend on `loadCardHelpers()` / `createCardElement`, frontend
+  internals with no stability promise; and
+- be the first card in the set that contains another, after which the
+  second one will want to contain differently.
+
+A header is a card wearing less. A container is a new kind of thing.
+
 ## Yellow is a promise
 
 A card states facts, and at most offers one optional control. That much
