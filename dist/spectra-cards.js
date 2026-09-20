@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.95.0";
+const VERSION = "0.95.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2874,7 +2874,14 @@ const BODIES = {
       const uid = String(item.uid);
       const name = String(item.summary);
       const done = item.status === "completed" || claimed.has(uid);
-      const note = String(firstOf(item.description, "")).split("\n")[0].trim();
+      /* isBlank, NOT String(firstOf(...)) -- the same trap as the name
+         three lines up, and it shipped anyway: firstOf returns null when
+         everything it is given is blank, String(null) is the four
+         characters "null", and every Bring item without a specification
+         rendered as "Milk \u00b7 null". Thirty-one of them. */
+      const note = isBlank(item.description)
+        ? ""
+        : String(item.description).split("\n")[0].trim();
       let extra = "";
       if (note && detail === "inline") {
         extra = `<span class="tdspec"> \u00b7 ${esc(note)}</span>`;
