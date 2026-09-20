@@ -1251,6 +1251,30 @@ body:
   sub: {entity: lock.front_door, attribute: last_changed, format: relative, prefix: "Unsecured for "}
 ```
 
+## Yellow is a promise
+
+A card states facts, and at most offers one optional control. That much
+is already the rule. This is the corollary: **ochre — the warning role —
+promises that something wants doing**, and the thing that wants doing
+lives in a `sensor.needs_you` row and nowhere else.
+
+So a body may only paint something ochre where a Needs-you row exists
+for the same fact. Otherwise the colour is a job that exists only on the
+panel: nobody can clear it from a phone, and doing the thing will not
+make it go away.
+
+On the washer, three chips earn it — `Full`, `N to hang` and `Plug off`
+each have a row behind them. `Door open` does not, and used to be drawn
+in ochre anyway. That was worse than decorative: the full-drum row reads
+*"clears when the door is opened"*, so an open door is the **resolution**
+and warning about it said the opposite of what was true. On the dryer it
+simply sat there yellow between loads, which is the state a dryer spends
+most of its life in.
+
+`checkwasher` asserts it in both directions — the door chips are not
+ochre, and the three that are stay that way, so the rule cannot be
+satisfied by draining the colour out of everything.
+
 ## Theming
 
 Everything is a CSS custom property on `:host`, so a dashboard can override
