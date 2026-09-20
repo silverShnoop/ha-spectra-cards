@@ -834,6 +834,16 @@ a card, not eight — and `prefers-reduced-motion` stops all of it. The
 motion also does the work the glyphs cannot: at 17px, reversing against
 going round separates tumble from spin far better than their shapes do.
 
+**The hero shows the phase too.** While the machine runs, the drum wears
+the live phase's glyph at 26px and moves the way that phase moves —
+`mdi:autorenew` only said *running*, which the word beside it already
+said. The strip below keeps every phase of the run; the drum is the one
+happening now, at the size you can read from the doorway. Both are driven
+by a single `.phlive` marker, because a hero rotating beside a strip that
+reverses is the card disagreeing with itself about what the machine is
+doing. A machine that reports no phases falls back to `mdi:autorenew`
+rather than to nothing.
+
 Tumble and spin are both the drum going round, so they differ in form
 rather than direction: `mdi:sync` (two arrows opposed — the drum reverses)
 against `mdi:rotate-right` (one arrow, flat out). Mirror images were the
@@ -903,7 +913,8 @@ identity the first time.
 | state | glyph | colour |
 | --- | --- | --- |
 | idle | `machine` | the card's accent |
-| running | `mdi:autorenew` | the card's accent |
+| running | the live phase's glyph, moving | the card's accent |
+| running, no phase known | `mdi:autorenew` | the card's accent |
 | drum to empty | `mdi:basket-unfill` | **warning** |
 | washing waiting | the count | **warning** |
 | full drum | `mdi:basket-unfill` | the card's accent |

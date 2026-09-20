@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.101.0";
+const VERSION = "0.102.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -456,10 +456,14 @@ ha-icon { display:inline-flex; line-height:0; }
    Spin is 1.6s rather than the 0.7s the button spinner uses: a spinner
    says "waiting, briefly" and is gone, while this one is in the corner
    of the room for forty minutes. */
-.phcell.now.ph-fill ha-icon { animation:sp-phase-fill 2.6s linear infinite; }
-.phcell.now.ph-heat ha-icon { animation:sp-breathe 3s ease-in-out infinite; }
-.phcell.now.ph-tumble ha-icon { animation:sp-phase-tumble 3s ease-in-out infinite; }
-.phcell.now.ph-spin ha-icon { animation:sp-spin 1.6s linear infinite; }
+/* Keyed on .phlive rather than on the strip, because the drum wears
+   the same phase at 26px while the strip wears it at 17. One rule for
+   both: a hero rotating while the strip beside it reverses would be
+   the card disagreeing with itself about what the machine is doing. */
+.phlive.ph-fill ha-icon { animation:sp-phase-fill 2.6s linear infinite; }
+.phlive.ph-heat ha-icon { animation:sp-breathe 3s ease-in-out infinite; }
+.phlive.ph-tumble ha-icon { animation:sp-phase-tumble 3s ease-in-out infinite; }
+.phlive.ph-spin ha-icon { animation:sp-spin 1.6s linear infinite; }
 @keyframes sp-phase-fill {
   0%   { transform:translateY(-135%); opacity:0; }
   22%  { opacity:1; }
@@ -4898,6 +4902,7 @@ function washerDrum(b, cycle, leak, powered, waiting) {
      house; letting a card choose those would be letting it choose what
      they mean. */
   let glyph = isBlank(b.machine) ? "mdi:washing-machine" : String(b.machine);
+  let live = "";
   if (leak) glyph = "mdi:water";
   else if (!powered) {
     glyph = isBlank(b.machine_off)
@@ -4906,8 +4911,17 @@ function washerDrum(b, cycle, leak, powered, waiting) {
   } else if (cycle === "running") {
     /* Running before full: a second load started without the drum being
        emptied is running, not waiting. The live state is the one worth
-       showing. */
-    glyph = "mdi:autorenew";
+       showing.
+
+       And the live state is a PHASE where one is known. `mdi:autorenew`
+       said "running", which the word under it already said; the phase
+       glyph says filling, heating, tumbling or spinning, and moves the
+       way that phase moves. The strip below keeps every phase of the
+       run -- this is only the one happening now, at the size you can
+       read from the doorway. A machine that reports no phases falls
+       back to the old glyph rather than to nothing. */
+    live = livePhaseKind(b);
+    glyph = live ? PHASE_GLYPH[live] : "mdi:autorenew";
   } else if (b.drum_full) {
     /* A full drum outranks a hanging queue. They are both true the moment
        a cycle ends -- the integration sets `drum_full` and appends to
@@ -4926,7 +4940,8 @@ function washerDrum(b, cycle, leak, powered, waiting) {
      full, the fact that it was full. It is an adornment now, and only when
      there is more than one: a lone hanger already means "one load". */
   const many = !b.drum_full && waiting > 1;
-  const inner = `<span class="drumglyph${many ? " counted" : ""}">`
+  const inner = `<span class="drumglyph${many ? " counted" : ""}`
+    + `${live ? ` ph-${live} phlive` : ""}">`
     + `<ha-icon icon="${esc(glyph)}"></ha-icon>`
     + (many ? `<span class="drumn">${esc(String(waiting))}</span>` : "")
     + `</span>`;
@@ -4988,6 +5003,20 @@ const PHASE_DID = {
   fill: "Filled", heat: "Heated", tumble: "Tumbled", spin: "Spun",
 };
 
+/* The phase happening right now, or "" if the machine is not running
+   or reports none.
+
+   Read off the END of `phases` rather than from a separate attribute,
+   because that is where the strip reads it: two sources for one fact
+   is how the hero ends up spinning while the strip says tumble. */
+function livePhaseKind(b) {
+  const phases = Array.isArray(b.phases) ? b.phases : [];
+  const last = phases[phases.length - 1];
+  if (!last || typeof last !== "object") return "";
+  const kind = String(last.kind || "").toLowerCase();
+  return PHASE_GLYPH[kind] ? kind : "";
+}
+
 function washerPhases(b, running) {
   const phases = Array.isArray(b.phases) ? b.phases : [];
   const cells = [];
@@ -5010,7 +5039,7 @@ function washerPhases(b, running) {
     const said = now
       ? `${PHASE_DOING[kind]}, ${ran} so far`
       : `${PHASE_DID[kind]} for ${ran}`;
-    cells.push(`<span class="phcell ph-${kind}${now ? " now" : ""}" role="listitem"`
+    cells.push(`<span class="phcell ph-${kind}${now ? " now phlive" : ""}" role="listitem"`
       + ` title="${esc(said)}" aria-label="${esc(said)}">`
       + `<span class="phglyph"><ha-icon icon="${glyph}"></ha-icon></span>`
       + (now ? `<span class="phword">${esc(PHASE_DOING[kind])}</span>` : "")
