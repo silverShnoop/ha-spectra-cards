@@ -514,6 +514,45 @@ const js = fs.readFileSync(file);
         && (text(".washfinrow .used") || "").includes("1.12"),
       `${text(".washfinrow .at")} / ${text(".washfinrow .used")}`);
 
+    /* ---- Yellow is a promise that something wants doing ----------
+       And the job it promises lives in `Needs you`, never on the card.
+       So a chip may only be ochre where a Needs-you row exists for the
+       same fact. Three do: Full (drum_<slug>), N to hang (the load id)
+       and Plug off (unpowered_<slug>). An open door has no row and
+       never should -- it is a state a machine spends half its life in
+       -- so it must not be ochre.
+
+       On the washer it was worse than decorative: the full-drum row
+       reads "clears when the door is opened", so an open door is the
+       RESOLUTION, and warning about it said the opposite of true. */
+    const warn = tokenColour("--sp-a2-on");
+    const pillInk = (word) => {
+      const found = all(".pill").find(
+        (el2) => (el2.textContent || "").includes(word));
+      return found ? getComputedStyle(found).color : null;
+    };
+
+    await show({ door_open: true });
+    check("an open door is not a warning, because nothing wants doing",
+      pillInk("Door open") !== warn, pillInk("Door open"));
+    await show({ door_open: false });
+    check("nor is a closed one",
+      pillInk("Door closed") !== warn, pillInk("Door closed"));
+
+    /* The other side of the same rule: the three that DO have a row
+       stay ochre. Without this the fix above could be applied by
+       draining the colour out of everything, which would lose the
+       signal rather than make it honest. */
+    await show({ drum_full: true, pending: 2, powered: false, door_open: true });
+    check("a full drum still warns, because Needs you carries it",
+      pillInk("Full") === warn, pillInk("Full"));
+    check("so does washing waiting to be hung",
+      pillInk("to hang") === warn, pillInk("to hang"));
+    check("and so does a machine with its plug off",
+      pillInk("Plug off") === warn, pillInk("Plug off"));
+    check("while the open door beside them stays quiet",
+      pillInk("Door open") !== warn, pillInk("Door open"));
+
     return problems;
   });
 

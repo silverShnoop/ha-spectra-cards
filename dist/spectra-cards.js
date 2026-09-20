@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.98.0";
+const VERSION = "0.99.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3111,8 +3111,16 @@ const BODIES = {
     /* Two lines and a row of chips, in the order somebody reads them:
        what it is doing, since when, and then the details that qualify it. */
     const chips = [];
+    /* Both door chips are neutral, and the open one used to be ochre.
+       Yellow on this panel is a promise that something wants doing,
+       and the job it promises lives in `Needs you` -- an open door
+       promises nothing. On the washer it is worse than nothing: the
+       full-drum row says "clears when the door is opened", so an open
+       door is the RESOLUTION, and warning about it said the opposite
+       of what was true. On the dryer it just sat there yellow between
+       loads, which is the state a dryer spends most of its life in. */
     chips.push(b.door_open
-      ? chipOf("Door open", "mdi:door-open", 2)
+      ? chipOf("Door open", "mdi:door-open", 0)
       : chipOf("Door closed", "mdi:door-closed", 0));
     if (leak) chips.push(chipOf("Sensor wet", "mdi:water", 1));
     if (!powered) chips.push(chipOf("Plug off", "mdi:power-plug-off", 2));
