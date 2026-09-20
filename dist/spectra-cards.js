@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.93.0";
+const VERSION = "0.94.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -475,6 +475,78 @@ ha-icon { display:inline-flex; line-height:0; }
   50%  { transform:rotate(168deg); }
   88%  { transform:rotate(0deg); }
   100% { transform:rotate(0deg); }
+}
+
+/* todo -- a list you can actually finish.
+
+   The one place a spectra card carries a control that completes
+   something, and it is allowed for a reason worth writing down. The
+   house rule is that jobs live in Needs you, because a job with a
+   copy on a card drifts from the copy that counts. A to-do tick has
+   no copy: it calls todo.update_item on the same list the phone
+   and Bring write to, so the card is operating the one store rather
+   than keeping a second opinion about it. What was banned was a
+   second place to record a job, not a control over the only place.
+
+   Two columns read DOWN, not across. A shopping list is scanned, and
+   scanning is vertical; reading across means the eye crosses a gutter
+   between every pair of neighbours. */
+.todolist { display:grid; gap:0 18px; }
+.todolist.two { grid-template-columns:1fr 1fr; grid-auto-flow:column; }
+.tditem {
+  display:flex; align-items:flex-start; gap:10px; padding:6px 0;
+  border-bottom:1px solid var(--sp-edge); min-width:0;
+}
+.tditem:last-child { border-bottom:none; }
+/* 30px, not the 22px it was drawn at. A checkbox on a wall panel is
+   hit with a thumb at arm's length, and the box is the whole target:
+   the row is deliberately NOT clickable, because a list you brush
+   past should not tick itself. */
+.tdbox {
+  position:relative; flex:none; width:30px; height:30px; margin:-3px 0 0 -3px;
+  padding:0; border:none; background:none; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+}
+.tdmark {
+  width:21px; height:21px; border-radius:6px;
+  border:2px solid var(--sp-ink-3); box-sizing:border-box;
+  display:inline-flex; align-items:center; justify-content:center;
+  color:var(--sp-surface); transition:background 140ms, border-color 140ms;
+}
+.tdbox ha-icon { --mdc-icon-size:15px; opacity:0; transition:opacity 140ms; }
+.tdbox.ticked .tdmark { background:var(--accent); border-color:var(--accent); }
+.tdbox.ticked ha-icon { opacity:1; }
+.tdbox .spinner { position:absolute; inset:auto; }
+.tdtext { flex:1 1 auto; min-width:0; line-height:1.3; padding-top:1px; }
+.tdname { font-size:14px; color:var(--sp-ink); }
+.tditem.ticked .tdname { color:var(--sp-ink-3); text-decoration:line-through; }
+/* The Bring "specification" -- 2 bottles, Tenderstem, the child it is
+   for. It rides on the same line because grocery names are short and a
+   second line each would double a thirty-item list. */
+.tdspec { color:var(--sp-ink-2); }
+.tdsub {
+  display:block; font-size:12px; color:var(--sp-ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.tdwho {
+  font-size:11px; margin-left:6px; padding:1px 7px; border-radius:8px;
+  white-space:nowrap; background:var(--accent-soft); color:var(--accent-on);
+}
+.tdmore { font-size:12px; color:var(--sp-ink-2); padding:8px 0 0; }
+.tdfoot {
+  display:flex; align-items:center; gap:8px; margin-top:10px;
+  padding-top:9px; border-top:1px solid var(--sp-edge);
+  font-size:12px; color:var(--sp-ink-2);
+}
+/* Undo, not a confirmation. A mis-tap on a wall panel is likely, and
+   asking "are you sure" before every tick would make the common case
+   pay for the rare one. Reversing is one press and the row comes
+   back. */
+.tdundo {
+  margin-left:auto; font:inherit; font-weight:500; color:var(--accent);
+  background:none; border:none; padding:3px 6px; cursor:pointer;
+  border-radius:6px;
 }
 
 .washmain, .lockmain { flex:1 1 auto; min-width:0; }
@@ -2304,6 +2376,13 @@ const BODY_STATUS = {
     return null;
   },
 
+  /* Also here only for the spinner slot. A count belongs in the card's
+     own `meta`, where it can be configured, rather than being invented
+     by the body. */
+  todo() {
+    return null;
+  },
+
   picker(b) {
     if (!b || typeof b !== "object") return null;
     if (b.on !== undefined && !b.on) return { text: "Off" };
@@ -2750,6 +2829,94 @@ const BODIES = {
      with, and the cycle still has to be finished, so "wet" says nothing
      about whether the machine has power -- and the card must not pretend
      otherwise while somebody is standing in front of it. */
+  /* A list, and the one control that finishes a row on it.
+
+     `items` resolves straight from a `{todo: ...}` source, so the body
+     gets the real items -- uid included, which is what `todo.update_item`
+     needs. The list has to be named separately as well, because
+     resolving the items throws the entity away and the tick must say
+     what it is ticking on.
+
+     That field is `list`, NOT `entity`, and the difference is not
+     cosmetic. `entity` is a reserved key in a value spec: the resolver
+     sees a string there and reads the whole object as an entity read,
+     so a body carrying `entity: todo.phoenix` resolves to that
+     entity's state and every other key on it disappears. The card then
+     renders an empty list and says so, with no error anywhere. It cost
+     an hour the first time.
+
+     What is shown beside a name depends on the list. Bring puts a
+     "specification" in `description` -- 2 bottles, Tenderstem -- which
+     is short and belongs on the same line. Home Tasks puts a page of
+     notes there, which does not, so it goes underneath, clipped to one
+     line. `due` is deliberately NOT drawn: neither list in this house
+     sets one, and it shipped as an empty second line under all
+     thirty-one rows. */
+  todo(b) {
+    const all = Array.isArray(b.items) ? b.items : [];
+    const limit = Number(b.limit) > 0 ? Number(b.limit) : all.length;
+    const shown = all.slice(0, limit);
+    const two = Number(b.columns) === 2;
+    const detail = isBlank(b.detail) ? "inline" : String(b.detail);
+    /* An array rather than a Set, because the card's render signature
+       is JSON.stringify(model) and a Set serialises to {} -- a claim
+       would land in the model and never change the signature, so the
+       tick would not be drawn until something else moved. */
+    const claimed = new Set(Array.isArray(b.ticked) ? b.ticked : []);
+
+    const cells = shown.map((item, i) => {
+      if (!item || typeof item !== "object") return "";
+      /* isBlank rather than String(firstOf(...)): firstOf returns null
+         when everything it was given is blank, and String(null) is the
+         four characters "null" -- which is truthy, so a nameless item
+         drew a row called null instead of being skipped. */
+      if (isBlank(item.uid) || isBlank(item.summary)) return "";
+      const uid = String(item.uid);
+      const name = String(item.summary);
+      const done = item.status === "completed" || claimed.has(uid);
+      const note = String(firstOf(item.description, "")).split("\n")[0].trim();
+      let extra = "";
+      if (note && detail === "inline") {
+        extra = `<span class="tdspec"> \u00b7 ${esc(note)}</span>`;
+      }
+      const sub = note && detail === "below"
+        ? `<span class="tdsub">${esc(note)}</span>` : "";
+      const who = isBlank(item.who) ? "" : `<span class="tdwho">${esc(item.who)}</span>`;
+      return `<div class="tditem${done ? " ticked" : ""}">`
+        + `<button type="button" class="tdbox${done ? " ticked" : ""}"`
+        + ` data-todo="${esc(uid)}" data-todo-done="${done ? "1" : ""}"`
+        + ` aria-pressed="${done ? "true" : "false"}"`
+        + ` aria-label="${esc((done ? "Put back on the list: " : "Tick off: ") + name)}">`
+        + `<span class="tdmark"><ha-icon icon="mdi:check-bold"></ha-icon></span>`
+        + `</button>`
+        + `<span class="tdtext"><span class="tdname">${esc(name)}${extra}${who}</span>${sub}</span>`
+        + `</div>`;
+    }).join("");
+
+    if (!cells) {
+      return `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
+    }
+
+    /* Column-major, so the eye runs down one column and then the other
+       rather than hopping the gutter on every row. `grid-auto-flow:
+       column` needs to be told how tall a column is; without an explicit
+       row count it makes one column per item. */
+    const rows = two ? Math.ceil(shown.length / 2) : 0;
+    const style = two
+      ? ` style="grid-template-rows:repeat(${rows}, auto)"` : "";
+    let out = `<div class="todolist${two ? " two" : ""}"${style}>${cells}</div>`;
+    if (all.length > shown.length) {
+      out += `<div class="tdmore">+ ${all.length - shown.length} more</div>`;
+    }
+    const undo = b.undo
+      ? `<button type="button" class="tdundo" data-todo-undo>Undo</button>` : "";
+    const foot = isBlank(b.foot) ? "" : esc(b.foot);
+    if (foot || undo) {
+      out += `<div class="tdfoot"><span>${foot}</span>${undo}</div>`;
+    }
+    return out;
+  },
+
   washer(b) {
     const cycle = String(firstOf(b.state, "idle")).toLowerCase();
     const leak = Boolean(b.leak);
@@ -5207,6 +5374,34 @@ class SpectraCard extends HTMLElement {
       }
     }
 
+    /* A ticked row keeps its tick until the list stops offering it.
+
+       The claim is dropped per uid rather than all at once: two quick
+       taps are two independent claims, and the first landing must not
+       un-tick the second. When every claim has been honoured the undo
+       goes too, because by then the list itself says what happened. */
+    if (this._ticked && this._ticked.size && model.body
+        && model.body.type === "todo") {
+      const outstanding = new Set(
+        (Array.isArray(model.body.items) ? model.body.items : [])
+          .filter((row) => row && row.status !== "completed")
+          .map((row) => String(row.uid)),
+      );
+      for (const uid of [...this._ticked]) {
+        if (!outstanding.has(uid)) this._forgetTick(uid);
+      }
+      if (!this._ticked.size && this._tickGiveUp) {
+        clearTimeout(this._tickGiveUp);
+        this._tickGiveUp = null;
+      }
+      model.body.ticked = [...this._ticked];
+    }
+    if (model.body && model.body.type === "todo" && this._undo) {
+      model.body.undo = true;
+      model.body.foot = model.body.foot
+        || `${this._undo.name} ticked off`;
+    }
+
     const mode = this._mode;
     if (mode && model.body) {
       if (Boolean(model.body.manual) === mode.manual) {
@@ -5862,6 +6057,42 @@ class SpectraCard extends HTMLElement {
     }, 12000);
   }
 
+  /* A ticked row stays ticked until the list agrees.
+
+     `todo.update_item` returns before Bring has been told, and the card
+     does not refetch until the entity's count moves -- which is a
+     round trip away. Without the claim the box un-ticks itself under
+     the finger and the tap looks lost, so it is pressed again.
+
+     Held by uid rather than by index, because the refetch reorders and
+     shortens the list: the row that was third is not the row that was
+     third. The claim is dropped the moment the item stops coming back
+     as outstanding, and abandoned after twelve seconds either way, so
+     a call that never lands leaves a box that tells the truth rather
+     than one stuck pretending.
+
+     `_undo` is the same press remembered the other way round. A wall
+     panel gets brushed past, and an undo is a far better answer to
+     that than a confirmation on every tick -- which would make the
+     common case pay for the rare one. */
+  _wantTicked(uid, name) {
+    if (!this._ticked) this._ticked = new Set();
+    this._ticked.add(uid);
+    this._undo = { uid, name };
+    if (this._tickGiveUp) clearTimeout(this._tickGiveUp);
+    this._tickGiveUp = setTimeout(() => {
+      this._ticked = new Set();
+      this._undo = null;
+      this._signature = null;
+      this._update();
+    }, 12000);
+  }
+
+  _forgetTick(uid) {
+    if (this._ticked) this._ticked.delete(uid);
+    if (this._undo && this._undo.uid === uid) this._undo = null;
+  }
+
   /* Auto and Manual answer on the press and are corrected by the bridge, not
      waited on: a mode button that does nothing for a second is a mode button
      you press twice. */
@@ -6361,6 +6592,74 @@ class SpectraCard extends HTMLElement {
        carries its own `confirm` or does not -- the card does not decide
        that here, because "which of these needs asking about" is a fact
        about the house rather than about the button. */
+    /* Ticking a row off, and putting it back.
+
+       Ordering matters and is the same as the lock's: claim first, then
+       flash, then call. Re-rendering before the flash replaces the very
+       element the animation was started on, so the press goes
+       unacknowledged -- which checkpress caught on the lock and would
+       catch here. */
+    this._holder.querySelectorAll("[data-todo]").forEach((el) => {
+      const body = model.body || {};
+      const entity = body.list;
+      const uid = el.getAttribute("data-todo");
+      const done = el.getAttribute("data-todo-done") === "1";
+      if (!entity || !uid) return;
+      const run = (event) => {
+        event.stopPropagation();
+        const item = (Array.isArray(body.items) ? body.items : [])
+          .find((row) => row && String(row.uid) === uid);
+        const name = item ? String(item.summary || "") : "";
+        if (done) this._forgetTick(uid); else this._wantTicked(uid, name);
+        /* Answered on the live element, not by re-rendering.
+
+           Two reasons, and the second is the one that bites. A
+           re-render would replace the very button the flash was just
+           started on, so the press would go unacknowledged. And
+           `_work` only re-renders when the card is not ALREADY busy --
+           so on a shopping list, where four things get tapped in a
+           row, every tick after the first would sit unticked for the
+           second and a bit it takes the spinner to settle. Ticking
+           four things quickly is not an edge case on a wall panel, it
+           is what a shopping list is for.
+
+           The claim above is what makes it survive the re-render when
+           it does come. This is only what makes it immediate. */
+        el.classList.toggle("ticked", !done);
+        el.setAttribute("aria-pressed", done ? "false" : "true");
+        const row = el.parentElement;
+        if (row) row.classList.toggle("ticked", !done);
+        onPress(el, () => this._work(() => this._callAction({
+          service: "todo.update_item",
+          target: { entity_id: entity },
+          data: { item: uid, status: done ? "needs_action" : "completed" },
+        })));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
+      });
+    });
+
+    this._holder.querySelectorAll("[data-todo-undo]").forEach((el) => {
+      const body = model.body || {};
+      const entity = body.list;
+      const undo = this._undo;
+      if (!entity || !undo) return;
+      el.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this._forgetTick(undo.uid);
+        onPress(el, () => this._work(() => this._callAction({
+          service: "todo.update_item",
+          target: { entity_id: entity },
+          data: { item: undo.uid, status: "needs_action" },
+        })));
+      });
+    });
+
     this._holder.querySelectorAll("[data-estop]").forEach((el) => {
       const body = model.body || {};
       const action = body.action || {};
