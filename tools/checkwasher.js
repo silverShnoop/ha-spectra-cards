@@ -264,10 +264,17 @@ const js = fs.readFileSync(file);
        matched again. The state is written in words beside the drum in the
        largest text on the card; identity was written nowhere.
 
-       Two exceptions, and the tests below pin the count at two. A leak and
-       a dead plug have to catch the eye before anybody reads a word, so
-       they keep their roles on every machine. Everything else spends the
-       colour on saying which machine it is. */
+       The exceptions are the states that ASK something: a leak, a dead
+       plug, a drum to empty, washing to hang. Those take the accent's
+       role rather than the card's hue, because they are the same states
+       that outline the card and the drum is the biggest thing on it.
+
+       Full and waiting were added deliberately and at a known cost,
+       which the tests below now pin rather than forbid: two machines
+       that are both full show the same ring and the same basket. What
+       still has to hold is that the states asking NOTHING -- idle and
+       running -- keep identity, and that the title bar keeps it even
+       when the drum has spent it. */
     const DRYER = { machine: "mdi:tumble-dryer", machine_off: "mdi:tumble-dryer-off" };
     const ringOf = () => {
       const r = q(".drumring");
@@ -288,11 +295,37 @@ const js = fs.readFileSync(file);
     check("idle: the two machines differ", await differs({ state: "idle" }), "same");
     check("running: they still differ",
       await differs({ state: "running", power: 600 }), "running overrode identity");
-    check("a full drum: they still differ",
-      await differs({ state: "idle", drum_full: true }), "full overrode identity");
-    check("washing waiting: they still differ",
-      await differs({ state: "idle", pending: 2, drum_full: true }),
-      "the waiting count overrode identity");
+    /* Reversed from what these asserted before, on purpose. The drum now
+       says "this wants you" rather than "this is the washer", and the
+       title bar is what tells the two apart. */
+    check("a full drum takes the warning role on both machines",
+      !(await differs({ state: "idle", drum_full: true })),
+      "full still spent the colour on identity");
+    check("washing waiting takes it too, for the same reason",
+      !(await differs({ state: "idle", pending: 2, drum_full: true })),
+      "waiting still spent the colour on identity");
+
+    const tickOf = () => {
+      const t = q(".tick");
+      return t ? getComputedStyle(t).backgroundColor : "(no tick)";
+    };
+    /* The point of the change, and the one thing the pair-comparison
+       above cannot see: WHICH colour it takes. Two cards both going the
+       card's own accent would satisfy "they no longer differ" just as
+       well, and that is the opposite of what was asked for -- the drum
+       is meant to match the trim the card is already wearing. */
+    await show({ state: "idle", drum_full: true }, 6);
+    check("and the colour it takes is the trim's, not the card's",
+      getComputedStyle(q(".drumglyph")).color === token(2),
+      `${getComputedStyle(q(".drumglyph")).color} (warning is ${token(2)})`);
+    check("the ring goes with it, not just the glyph",
+      getComputedStyle(q(".drumring")).stroke === tokenColour("--sp-a2-soft"),
+      getComputedStyle(q(".drumring")).stroke);
+
+    const washerTick = tickOf();
+    await show(Object.assign({ state: "idle", drum_full: true }, DRYER), 5);
+    check("and the title bar is what still tells the two apart",
+      washerTick !== tickOf(), `${washerTick} on both`);
 
     check("a leak is the same alarm on both, whatever machine it is",
       !(await differs({ leak: true })), "a leak took the card's colour");

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.94.0";
+const VERSION = "0.95.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4615,14 +4615,28 @@ function washerWord(cycle, leak, powered) {
    words beside the drum, in the largest text on the card. Identity was not
    written anywhere.
 
-   Two exceptions, and only two. A leak and a dead plug are the states that
-   have to catch the eye BEFORE anybody reads a word, so they keep their
-   roles on every machine. Everything else -- running, full, waiting, idle
-   -- is legible at a glance from its glyph and does not need to spend the
-   colour. */
-function washerAccent(leak, powered) {
+   The exceptions are the states that ask something of a person, and they
+   take the accent's ROLE rather than the card's hue: alert for a leak,
+   warning for a dead plug, a drum to empty or washing to hang. Those are
+   the same states that outline the card, and the drum is the biggest
+   thing on it -- a card trimmed amber with a plum porthole in the middle
+   of it was the one element not joining in, which is what this is
+   correcting.
+
+   Running and idle are not in the list. They ask nothing, they are
+   written in words beside the drum in the largest text on the card, and
+   spending the colour on them is what cost identity last time.
+
+   The cost here is real and was accepted knowingly: a washer and a dryer
+   that are both full show the same amber ring and the same basket, and
+   are then tellable apart only by the title and the accent tick beside
+   it. That is the trade this makes -- the needs-you signal is worth more
+   on this card than the at-a-glance difference between two machines that
+   are both, in fact, asking for the same thing. */
+function washerAccent(leak, powered, wants) {
   if (leak) return 1;
   if (!powered) return 2;
+  if (wants) return 2;
   return null;
 }
 
@@ -4645,7 +4659,9 @@ function washerDrum(b, cycle, leak, powered, waiting) {
   const r = 31;
   const c = size / 2;
   const circ = 2 * Math.PI * r;
-  const accent = washerAccent(leak, powered);
+  /* A drum to empty, or washing waiting to be hung. Both are jobs, both
+     outline the card, and both now colour the drum to match it. */
+  const accent = washerAccent(leak, powered, b.drum_full || waiting > 0);
   const frac = Math.max(0, Math.min(1, Number(b.progress)));
   const arc = cycle === "running" && isFinite(frac) && frac > 0
     ? `<circle class="drumarc" cx="${c}" cy="${c}" r="${r}"`
