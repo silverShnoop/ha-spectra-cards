@@ -204,6 +204,47 @@ const js = fs.readFileSync(file);
       q(plain, "[data-dim]") && q(plain, "[data-dim]").getAttribute("aria-valuenow") === "50",
       q(plain, "[data-dim]") && q(plain, "[data-dim]").getAttribute("aria-valuenow"));
 
+    /* ---- the switch stays in the corner, lit or not.
+
+       It lives in the title bar, and what right-aligns that bar's run is an
+       auto margin on whichever piece comes first. A room reporting a scene
+       gets it from the status group; a room reporting nothing has to get it
+       from the switch itself. Both were true until the bar's run was wrapped
+       for the climate grid, at which point the selector -- a child combinator,
+       which reads the DOM and not the layout -- stopped matching and every lit
+       room's switch walked back to sit against its name. Nothing in here
+       measured that, so nothing caught it. This does. */
+    /* The case that actually broke, and the reason the first version of this
+       check passed while the panel was wrong: BOTH rooms above report a
+       scene, so the status group is drawn and IT takes the auto margin. A
+       lit room with no scene to report draws no status, and then the margin
+       has to come from the switch itself -- the one path the wrapper broke.
+       So the fixture here is a room that is simply on and says nothing. */
+    const bare = mk("a", {
+      type: "custom:spectra-card", accent: 4, icon: "mdi:lightbulb", title: "Bedroom",
+      body: { type: "picker", light: "light.room", on: true, info: "5 lights on" },
+    });
+    await new Promise((r) => requestAnimationFrame(r));
+    check("a lit room with no scene reports no status",
+      !q(bare, ".metagroup"), "it drew one, so this is not the failing case");
+
+    for (const [label, el] of [["scheduled", scheduled], ["plain", plain],
+      ["bare", bare]]) {
+      const sw = q(el, "[data-pickpower]");
+      const card = q(el, ".card");
+      const cs = getComputedStyle(card);
+      const edge = card.getBoundingClientRect().right
+        - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
+      const gap = edge - sw.getBoundingClientRect().right;
+      /* The edge, and only the edge. A "is it past the title" assertion was
+         here too and it passed while the panel was visibly wrong -- the
+         titles in these fixtures are short enough that a switch sitting
+         against one is still twenty pixels clear of it. A check that agrees
+         with a bug is worse than no check. */
+      check(`${label}: the switch sits on the card's right edge`,
+        Math.abs(gap) < 1, `${gap.toFixed(1)}px short of it`);
+    }
+
     calls.length = 0;
     q(plain, "[data-pickpower]").click();
     check("and its power switch reaches the light",
