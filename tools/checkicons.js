@@ -148,7 +148,18 @@ const CARDS = {
            than the cap band it contains, so measuring those against the cap
            band would report a fault where the design is doing exactly what it
            says. Only an icon placed on a baseline is a cap-band question. */
-        const pcs = getComputedStyle(icon.parentElement);
+        /* The box that actually lays this icon out. A wrapper with
+           display:contents is not a box -- its children are laid out by ITS
+           parent -- so asking it how it aligns its children is asking an
+           element that is not doing any aligning. The title bar wraps its
+           two runs that way, so without this walk the card's own icon was
+           measured against a cap band when the flex row is still centring
+           it on a box, and reported 20px out while nothing had moved. */
+        let host = icon.parentElement;
+        while (host && getComputedStyle(host).display === "contents") {
+          host = host.parentElement;
+        }
+        const pcs = getComputedStyle(host || icon.parentElement);
         const flexCentred = /flex/.test(pcs.display)
           && pcs.alignItems === "center";
         const twoLine = flexCentred
