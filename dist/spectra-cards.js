@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.104.0";
+const VERSION = "0.106.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -125,9 +125,27 @@ ${TOKENS_DARK}
    why tuning the offsets against a stand-in <ha-icon> got them wrong -- a
    stand-in with no shadow DOM has no inner line box to go wrong.
 
-   inline-flex gives it no line box and no strut, so its box is the icon and
-   the offsets below mean what they say. line-height:0 is belt and braces for
-   anywhere a rule puts it back to a block. */
+   inline-flex gives it no line box and no strut, so its box is the icon.
+   line-height:0 is belt and braces for anywhere a rule puts it back to a
+   block.
+
+   That box still cannot be placed by its baseline. An inline-flex with no
+   text in it has no baseline of its own, so the browser synthesises one out
+   of font metrics, and a vertical-align length hangs the box off exactly
+   that -- it moves with whichever font is in front of it. The lengths this
+   replaced read as exact only because the check was measuring them against a
+   baseline five pixels below the one the text is painted on. Measured
+   honestly they were 2 to 5px low in every font, which is what the bin icons
+   were doing beside their names.
+
+   So the three icons that lead text are placed by vertical-align:middle
+   instead -- the midpoint of the BOX against the baseline plus half the
+   parent's x-height, no synthetic baseline anywhere in it -- and then lifted
+   the rest of the way onto the cap band, which is where an icon beside
+   writing wants to sit. That lift is (cap - x-height) / 2, and it is nearly
+   the same fraction in every font: 0.085em holds every icon within 0.7px of
+   the cap band across five unrelated font stacks. tools/checkicons.js is the
+   measurement. */
 ha-icon { display:inline-flex; line-height:0; }
 
 /* shell */
@@ -355,7 +373,7 @@ ha-icon { display:inline-flex; line-height:0; }
    width, and inline that difference would move the chip's text. */
 .pillicon {
   --mdc-icon-size:12px; width:12px; height:12px;
-  margin-right:5px; vertical-align:-0.41em;
+  margin-right:5px; vertical-align:middle; position:relative; top:-0.085em;
 }
 .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
 /* An icon leads the name it belongs to, so a name and its icon must not be
@@ -365,13 +383,16 @@ ha-icon { display:inline-flex; line-height:0; }
    text that is deliberately large. 0.78em is the number that makes them
    read as part of the writing: the hero's cap height measures 0.72em, and
    an mdi glyph carries its own padding inside its box, so a box a little
-   over the cap height draws ink at about it. -0.19em then centres that box
-   on the cap band to within 0.1px. Both measured in the browser against the
-   rendered font and a faithful <ha-icon>, not assumed -- tools/checkicons.js. */
+   over the cap height draws ink at about it. Measured in the browser against
+   the rendered font and a faithful <ha-icon>, not assumed.
+
+   middle + a 0.085em lift puts it on the cap band; see ha-icon above for why
+   it is not a length. The hero is the largest text on the card and so the
+   worst place for one: these were the icons drawing 5px low. */
 .heropart { white-space:nowrap; }
 .heroicon {
   --mdc-icon-size:0.78em; width:0.78em; height:0.78em;
-  margin-right:0.2em; vertical-align:-0.19em;
+  margin-right:0.2em; vertical-align:middle; position:relative; top:-0.085em;
 }
 /* pre, because the separator's spaces are the gap either side of it. */
 .herojoin { white-space:pre; }
@@ -947,16 +968,14 @@ ha-icon { display:inline-flex; line-height:0; }
    trash can, and inline that difference moves the name after it. A fixed
    square means every name in the list starts at the same x.
 
-   The baseline offset is in em rather than px so it tracks the text instead
-   of drifting against it, which is what a fixed -3px did.
-
-   It looks too large for what it does, and it is: an icon box taller than
-   the line it sits on grows the line, and the text baseline moves down with
-   it, so the first part of the nudge only cancels itself. Solved by
-   measurement, not arithmetic -- tools/checkicons.js. */
+   Placed on the cap band of the name by middle + a 0.085em lift, in em so it
+   tracks the text instead of drifting against it -- which is what a fixed
+   -3px did, and then what a vertical-align length did again, four pixels
+   low. See ha-icon above. */
 .eventbody .evicon {
   --mdc-icon-size:15px; width:15px; height:15px;
-  flex:none; margin-right:7px; vertical-align:-0.57em;
+  flex:none; margin-right:7px; vertical-align:middle; position:relative;
+  top:-0.085em;
 }
 .railcol { width:22px; flex:none; display:flex; flex-direction:column;
   align-items:center; align-self:stretch; }
@@ -2340,11 +2359,29 @@ function readCount(hass, spec) {
     members = group.attributes && group.attributes.entity_id;
   }
   if (!Array.isArray(members)) return null;
-  const want = isBlank(spec.state) ? "on" : String(spec.state);
+  /* What "on" means is not the same word everywhere. A radiator valve is
+     heating; an air conditioner cooling; a lamp on. So `state` takes a list
+     as readily as a word, and a member counts if it reads as any of them --
+     which is the only way one number can cover a floor of valves and the one
+     aircon among them without a second tile to add up.
+
+     And `attribute`, the same key an entity read uses, because the fact is
+     not always the state. A valve left in `auto` all winter reads `auto`
+     whether it is burning or idle; `hvac_action` is the one that says which,
+     and "how many rooms are heating right now" is a question about that. */
+  const wanted = (Array.isArray(spec.state) ? spec.state : [spec.state])
+    .filter((v) => !isBlank(v))
+    .map((v) => String(v));
+  if (!wanted.length) wanted.push("on");
   let n = 0;
   for (const id of members) {
     const member = hass.states[id];
-    if (member && member.state === want) n += 1;
+    if (!member) continue;
+    const value = isBlank(spec.attribute)
+      ? member.state
+      : (member.attributes || {})[spec.attribute];
+    if (value === null || value === undefined) continue;
+    if (wanted.includes(String(value))) n += 1;
   }
   /* "1 lights on" is the kind of thing that makes a panel look unfinished,
      and the fix is one optional string rather than a pluralisation engine. */
