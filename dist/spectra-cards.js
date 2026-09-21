@@ -4228,12 +4228,22 @@ const BODIES = {
       const coords = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
       out += `<polyline points="${coords.join(" ")}" fill="none"`
         + ` stroke="var(--accent)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
-      /* Only the current point is filled — it is the one the eye needs. */
-      out += `<circle cx="${x(0).toFixed(1)}" cy="${y(points[0]).toFixed(1)}" r="4" fill="var(--accent)"/>`;
+      /* The end labels say what the numbers ARE. This was a degree sign,
+         hardcoded, because the first thing plotted here was a temperature —
+         so the first history chart to use the body drew a day costing £3.99
+         as "4°". A chart cannot infer its own unit, so it is told, and an
+         untold chart says nothing rather than guessing wrong. */
+      const unit = typeof b.unit === "string" ? b.unit : "";
+      /* Which end is NOW. A forecast runs into the future and its live point
+         is the first; a history runs up to the present and its live point is
+         the last. Same body, opposite ends, and the filled dot is the whole
+         reason the eye knows which way to read the line. */
+      const live = b.mark === "last" ? points.length - 1 : 0;
+      out += `<circle cx="${x(live).toFixed(1)}" cy="${y(points[live]).toFixed(1)}" r="4" fill="var(--accent)"/>`;
       out += `<text x="${x(0).toFixed(1)}" y="${(TOP - 1).toFixed(1)}" font-size="10"`
-        + ` fill="var(--sp-ink-3)">${esc(Math.round(points[0]))}°</text>`;
+        + ` fill="var(--sp-ink-3)">${esc(Math.round(points[0]))}${esc(unit)}</text>`;
       out += `<text x="${W - 13}" y="${(TOP - 1).toFixed(1)}" font-size="10" text-anchor="end"`
-        + ` fill="var(--sp-ink-3)">${esc(Math.round(points[points.length - 1]))}°</text>`;
+        + ` fill="var(--sp-ink-3)">${esc(Math.round(points[points.length - 1]))}${esc(unit)}</text>`;
     }
 
     const labels = labelList;

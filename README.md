@@ -335,17 +335,28 @@ caps — round caps make the segment joins overlap.
 ```yaml
 body:
   type: chart
+  unit:   "°"
   line:   {forecast: weather.home, type: hourly, field: temperature, limit: 12}
   bars:   {forecast: weather.home, type: hourly, field: precipitation_probability, limit: 12}
   labels: {forecast: weather.home, type: hourly, field: datetime, format: time, limit: 12}
 ```
 
 A 3px line over its own scale, with bars beneath on theirs — a probability and
-a temperature share no axis. Only the current point is filled. Labels are
-thinned to about four so they never crowd. Never a gradient.
+a temperature share no axis. Labels are thinned to about four so they never
+crowd. Never a gradient.
 
 `line`, `bars` and `labels` are plain arrays; the forecast source above is
 just one way to fill them.
+
+`unit` is written after the two end labels, and there is no default. It was
+a hardcoded degree sign until a history chart used the body and drew a day
+costing £3.99 as `4°` — a chart cannot infer its own unit, so it is told,
+and an untold one says nothing rather than saying something wrong.
+
+`mark` says which end is *now*: `first` (the default) for a forecast running
+into the future, `last` for a history running up to the present. That is the
+end whose point is filled, and the filled point is how the eye knows which
+way to read the line.
 
 ### `forecast` — what will it be like later?
 
