@@ -553,6 +553,40 @@ const js = fs.readFileSync(file);
     check("while the open door beside them stays quiet",
       pillInk("Door open") !== warn, pillInk("Door open"));
 
+    /* ---- What the run cost ----------------------------------------
+       The one figure on this card that is money, and the rule it has to
+       clear is the same one that took the wattage chip off: a card does
+       not state a figure twice. The draw is in `meta`; the cost is
+       nowhere else, so it earns a chip.
+
+       It must be neutral. A cost asks nothing of anybody and there is no
+       Needs-you row behind it, so ochre would be exactly the lie the
+       block above exists to prevent -- and it must not be the alert
+       colour either, because a wash costing money is not a wash going
+       wrong. Both are asserted: draining the colour out is not the same
+       as choosing neutral, and only checking one of them would let the
+       other through. */
+    const alertInk = tokenColour("--sp-a1-on");
+    await show({ cost: "33p", door_open: false });
+    check("a finished wash says what it cost",
+      (pillInk("33p") || "") !== "", pillInk("33p"));
+    check("and the cost is not a warning, because nothing wants doing",
+      pillInk("33p") !== warn, pillInk("33p"));
+    check("nor an alert, because spending money is not going wrong",
+      pillInk("33p") !== alertInk, pillInk("33p"));
+
+    /* A wash that could not be priced leaves a hole. `home_signals`
+       drops the cost for any cycle it could not price all the way
+       through -- no tariff sensor, one unavailable mid-wash, a plug
+       whose own total reset -- so the value arrives blank, and a blank
+       must render nothing rather than `0p`. A chip reading zero is
+       indistinguishable from a wash that was genuinely free. */
+    await show({ cost: "", door_open: false });
+    check("a wash that could not be priced shows no cost at all",
+      all(".pill").every((el2) => !(el2.textContent || "").includes("p")
+        || !/\d/.test(el2.textContent || "")),
+      all(".pill").map((el2) => el2.textContent).join(" | "));
+
     return problems;
   });
 
