@@ -111,6 +111,36 @@ const js = fs.readFileSync(file);
       !(text(".pickinfo") || "").startsWith("4"), text(".pickinfo"));
     check("it offers a button", !!q("[data-alloff]"), "missing");
 
+    /* This is the one control on the panel whose scope is not the thing
+       beside it, so it has to say which "off" it means. The words are
+       inside the target, not captioned next to it -- a caption beside a
+       button is the part people press. */
+    check("and the button says what it turns off",
+      (text("[data-alloff]") || "").trim().toLowerCase() === "turn all off",
+      text("[data-alloff]"));
+    check("the words are inside the pressable thing, not beside it",
+      q("[data-alloff]").contains(
+        [...q("[data-alloff]").childNodes].find((n) => n.nodeType === 3
+          && n.textContent.trim())),
+      "the label is not a child of the button");
+    check("it is the only thing in the pickend, caption included",
+      q(".pickend").children.length === 1,
+      `${q(".pickend").children.length} children`);
+    check("and it still carries the power glyph",
+      !!q("[data-alloff] ha-icon"), "no icon");
+
+    /* The same key the list and lock bodies use for the word on a
+       button, so a floor whose off is not "all" can say so. */
+    const named = conf();
+    named.body.action_label = "Lights out";
+    el.setConfig(JSON.parse(JSON.stringify(named)));
+    await repaint();
+    check("the wording is config, under the usual key",
+      (text("[data-alloff]") || "").trim() === "Lights out",
+      text("[data-alloff]"));
+    el.setConfig(JSON.parse(JSON.stringify(conf())));
+    await repaint();
+
     // ---- the one thing it must do
     calls.length = 0;
     q("[data-alloff]").click();
@@ -133,21 +163,15 @@ const js = fs.readFileSync(file);
     await repaint();
     check("a dark floor says so plainly",
       text(".pickinfo") === "All off", text(".pickinfo"));
-    check("its button is still there, so it is never hunted for",
-      !!q("[data-alloff]"), "the button vanished");
-    check("but inert",
-      q("[data-alloff]").classList.contains("inert")
-        && q("[data-alloff]").getAttribute("aria-disabled") === "true"
-        && q("[data-alloff]").getAttribute("tabindex") === "-1",
-      `${q("[data-alloff]").className},`
-      + ` disabled=${q("[data-alloff]").getAttribute("aria-disabled")}`);
-
-    calls.length = 0;
-    q("[data-alloff]").click();
-    q("[data-alloff]").dispatchEvent(new KeyboardEvent("keydown",
-      { key: "Enter", bubbles: true }));
-    check("and pressing it, by tap or by key, does nothing at all",
-      calls.length === 0, JSON.stringify(calls));
+    /* Nothing is on, so there is nothing to turn off and the control is
+       not drawn. It used to grey out and stay put; the label is what
+       changed that, because a labelled pill announces itself when it
+       comes back and a dead button on a card of facts does not. */
+    check("with nothing on, the control is not drawn",
+      !q("[data-alloff]"), "the button is still there");
+    check("and nothing is left behind that could be pressed",
+      !q(".pickend .textbtn") && !q(".pickend .iconbtn"),
+      (q(".pickend") || {}).innerHTML);
 
     // ---- back on again, and it works again
     setRooms(5);
@@ -190,12 +214,33 @@ const js = fs.readFileSync(file);
       /rgba\(0, 0, 0, 0\)/.test(boxed(".card").split("|")[1]),
       boxed(".card"));
 
-    /* The point of the whole thing: it still IS a spectra card. Same
-       title bar, same accent tick, same icon -- a header in another
-       typeface is the problem this exists to avoid. */
-    check("it keeps the eyebrow, the tick and the icon",
-      !!q(".titlebar h3") && !!q(".tick") && !!q(".titlebar ha-icon"),
-      `${!!q(".titlebar h3")} ${!!q(".tick")} ${!!q(".titlebar ha-icon")}`);
+    /* The accent moves rather than grows. A tick labels the row it
+       stands beside; a header labels everything under it, so the colour
+       it was carrying becomes a rule along the bottom of the whole
+       block -- a mark no ordinary card has. Scaling the tick up was the
+       first attempt and it read as a bigger card, which is the entire
+       problem this exists to solve. */
+    const rule = () => {
+      const st = getComputedStyle(q(".card"));
+      return `${st.borderBottomWidth}|${st.borderBottomColor}`;
+    };
+    check("the tick is gone",
+      !q(".tick") || getComputedStyle(q(".tick")).display === "none",
+      q(".tick") ? getComputedStyle(q(".tick")).display : "absent");
+    check("and the accent is underneath the whole header instead",
+      rule().startsWith("2px") && !/rgba\(0, 0, 0, 0\)/.test(rule()),
+      rule());
+    check("in the card's own accent, not a grey line",
+      rule().split("|")[1]
+        === getComputedStyle(q(".card")).getPropertyValue("--accent").trim()
+        || rule().split("|")[1] === "rgb(182, 134, 42)",
+      `${rule()} vs accent 2`);
+
+    /* It is still a spectra card underneath: same eyebrow, same icon.
+       A header in another typeface is the other way to get this wrong. */
+    check("it keeps the eyebrow and the icon",
+      !!q(".titlebar h3") && !!q(".titlebar ha-icon"),
+      `${!!q(".titlebar h3")} ${!!q(".titlebar ha-icon")}`);
     check("and still says what it is",
       (text(".titlebar h3") || "").toLowerCase() === "downstairs",
       text(".titlebar h3"));
