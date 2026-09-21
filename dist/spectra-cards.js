@@ -4307,7 +4307,14 @@ const BODIES = {
        it for the whole card. This row is the supporting line and the
        controls, so it never changes width as scenes change, and "what is
        this room doing" is in the same place on every card. */
-    out += `<div class="row pickrow" style="padding-left:0">`
+    /* No side padding at all, not just none on the left. `.row` carries 6px
+       for the sake of the zebra stripe it usually wears, and this row wears
+       none -- so that 6px was doing nothing but holding the chevron a
+       chevron's-worth in from the edge the bar above it and the switch in
+       the title bar both reach. Three things on the card's right margin, one
+       of them not quite on it, and the eye finds that before it finds the
+       control. */
+    out += `<div class="row pickrow" style="padding:6px 0">`
       /* The symbol sits against the word that explains it. A caption two
          inches away from its control is a caption for nothing.
 
