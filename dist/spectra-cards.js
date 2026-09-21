@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.106.0";
+const VERSION = "0.107.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -31,17 +31,47 @@ const LOGGER_WARN = (...args) => console.warn(...args);
  * config went on claiming a colour it never got. Custom properties
  * inherit downwards and only downwards, so a token set on a card can
  * never be read by the section containing it -- the card is the child.
+ *
+ * ---- two sets, and the split between them is the whole rule ----
+ *
+ * a1..a6 are DECORATIVE. They say which tab a card belongs to and they
+ * mean nothing else. attention/waiting/critical are LEVELS. They say the
+ * house is asking a person for something, and they are the only colours
+ * that do.
+ *
+ * Yellow, orange and red belong to the levels and may not appear in the
+ * decorative set, which is why a1 and a2 are a brown and a bone rather
+ * than the terracotta and ochre they used to be. Those two hues did not
+ * change value -- they moved, intact, from a1/a2 to waiting/attention.
+ * Climate kept a1 and Lights kept a2, so neither dashboard had to be
+ * rewritten to be repainted.
+ *
+ * The levels are ORDERED and the decorative six are not, which is why
+ * the levels are named and the accents are numbered. A slot number is an
+ * arbitrary label; a level name carries a timeline:
+ *
+ *   attention   needs doing today or tomorrow
+ *   waiting     something is paused or degrading until a person acts
+ *   critical    damage or risk is accruing now
+ *
+ * Yellow and orange measure dE 13.3 apart to normal vision, under the 15
+ * floor, so hue alone does not carry the step: waiting adds a 1px inset
+ * ring and critical adds the soft fill. The colour is the label, the
+ * weight is what survives a kitchen and colour-blindness.
  * ------------------------------------------------------------------ */
 const TOKENS_LIGHT = `
   --sp-paper:#F3F0E7; --sp-surface:#FAF8F2; --sp-sink:#EAE6D9;
   --sp-zebra:#F0EDE3; --sp-ink:#2B2724; --sp-ink-2:#6B655B;
   --sp-ink-3:#938C80; --sp-edge:#D6D0C0;
-  --sp-a1:#B0512C; --sp-a1-soft:#F0DED4; --sp-a1-on:#8C3E20;
-  --sp-a2:#B6862A; --sp-a2-soft:#F2E6C9; --sp-a2-on:#8A6310;
+  --sp-a1:#553F2C; --sp-a1-soft:#E6DFD4; --sp-a1-on:#43301F;
+  --sp-a2:#A9A190; --sp-a2-soft:#EEEBE2; --sp-a2-on:#7A7364;
   --sp-a3:#5F7F39; --sp-a3-soft:#E1EAD2; --sp-a3-on:#44601F;
   --sp-a4:#2F7576; --sp-a4-soft:#D6E7E5; --sp-a4-on:#1E5657;
   --sp-a5:#4C5D8A; --sp-a5-soft:#DCE1ED; --sp-a5-on:#3A496E;
   --sp-a6:#7A4C6B; --sp-a6-soft:#EDDEE8; --sp-a6-on:#5E3452;
+  --sp-attention:#B6862A; --sp-attention-soft:#F2E6C9; --sp-attention-on:#8A6310;
+  --sp-waiting:#B0512C;   --sp-waiting-soft:#F0DED4;   --sp-waiting-on:#8C3E20;
+  --sp-critical:#8E0C14;  --sp-critical-soft:#F2D7D8;  --sp-critical-on:#7A0B12;
   --sp-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --sp-press: rgba(43,39,36,.20);
   /* A flash on plain paper only has to beat paper. A flash landing on top of
@@ -58,8 +88,16 @@ const TOKENS_LIGHT = `
    The six roles keep their meanings and their relationships. Each base is
    lifted and slightly desaturated so it carries on a dark ground; each soft
    becomes a deep tint of the same hue instead of a pale one, and each on
-   becomes light. Nothing is remapped to a different hue, so a terracotta row
-   means in the dark exactly what it means in the light.
+   becomes light. Nothing is remapped to a different hue, so a level means in
+   the dark exactly what it means in the light.
+
+   The one exception is a1. Brown IS a dark orange -- darkness is the whole of
+   what makes it brown -- and a dark ground takes that away. Lifted honestly
+   it becomes a tan, which measures deutan dE 1.0 from the waiting level: the
+   same colour. So a1 goes to a taupe instead, trading hue for chroma. That
+   leaves it dE 6.5 from --sp-ink-3, which is close, and accepted: ink is a
+   different position on the card -- body text, never a tick -- whereas
+   waiting would be a different meaning in the same glance.
 
    Raw entity colours — a bulb's temperature, a Hue scene's hex — are
    deliberately untouched. They are the colour the light actually is. */
@@ -68,12 +106,15 @@ const TOKENS_DARK = `
   --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
   --sp-ink-3:#837C6F; --sp-edge:#3C372E; --sp-press: rgba(240,235,224,.22);
   --sp-press-firm: rgba(240,235,224,.36);
-  --sp-a1:#E08054; --sp-a1-soft:#3A241A; --sp-a1-on:#F0B393;
-  --sp-a2:#D9A63F; --sp-a2-soft:#382C14; --sp-a2-on:#EBC97E;
+  --sp-a1:#A08B75; --sp-a1-soft:#2A2621; --sp-a1-on:#C4B3A0;
+  --sp-a2:#D8CDB4; --sp-a2-soft:#2C2A24; --sp-a2-on:#E6E0D2;
   --sp-a3:#93B45F; --sp-a3-soft:#24301A; --sp-a3-on:#BBD495;
   --sp-a4:#4FA9AA; --sp-a4-soft:#14302F; --sp-a4-on:#8CCBCB;
   --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
   --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
+  --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
+  --sp-waiting:#E08054;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
+  --sp-critical:#E2333F;  --sp-critical-soft:#3A1618;  --sp-critical-on:#F0949B;
 `;
 
 /* ------------------------------------------------------------------ *
@@ -153,11 +194,31 @@ ha-icon { display:inline-flex; line-height:0; }
   background:var(--sp-surface); border:2px solid var(--sp-edge);
   border-radius:6px; padding:9px 10px; position:relative;
 }
-/* A card that wants attention takes the alert's colour on the edge it
+/* A card that wants attention takes the level's colour on the edge it
    already has, the same device a Needs-you row uses. The border was
    always there, so nothing moves and nothing is pushed down the card --
-   which is the whole reason this beats a band across the top. */
+   which is the whole reason this beats a band across the top.
+
+   The three levels then escalate by weight as well as hue, because hue
+   alone does not carry them: yellow and orange measure dE 13.3 apart to
+   normal vision, under the 15 floor, and across a kitchen at an angle
+   that is not a difference. Weight survives the distance, the angle and
+   colour-blindness, all of which the hue step does not.
+
+   The second pixel is an inset ring rather than a 3px border, and that
+   is not a flourish. Every box in this sheet is sized by its outside
+   edge, so a 3px border would eat a pixel of the padding and shift every
+   line in the card inward the moment a level arrived -- breaking the one
+   promise the rule above makes. The ring paints inside the same 2px box.
+   Identical to look at; nothing moves. */
 .card.outlined { border-color:var(--outline); }
+.card.lvl-waiting, .card.lvl-critical { box-shadow: inset 0 0 0 1px var(--outline); }
+/* Critical is the one level that takes the card's ground as well. An
+   earlier pass inverted the title bar instead, and that was wrong: a
+   solid bar has to invert the tick and the icon with it, which throws
+   away the card's identity on precisely the card where you most want to
+   know what is shouting. */
+.card.lvl-critical { background:var(--outline-soft); }
 
 /* Three columns, and the middle one is a single merged cell.
 
@@ -1772,15 +1833,75 @@ img.avatar { object-fit:cover; display:block; }
 
 const ACCENTS = [1, 2, 3, 4, 5, 6];
 
+/* The levels, loudest last. Named rather than numbered because they are
+   ordered and the accents are not: a slot number is an arbitrary label,
+   whereas "waiting" carries a timeline a reviewer can check a row against.
+   Numbering them alongside the accents is exactly how decoration and
+   alerting came to share a palette in the first place. */
+const LEVELS = ["attention", "waiting", "critical"];
+
 function accentNumber(n) {
   const a = Number(n);
   return ACCENTS.includes(a) ? a : null;
+}
+
+/* An outline takes a level name and nothing else. An accent number here
+   used to work and deliberately no longer does: it is the config that let
+   a card claim a level by asking for a hue, which is the drift this whole
+   split exists to stop. Anything unrecognised is no level, so the card
+   keeps its neutral edge rather than inventing a quieter alarm. */
+function levelName(v) {
+  const k = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return LEVELS.includes(k) ? k : null;
 }
 
 /** The three custom properties a body is allowed to read. */
 function accentStyle(n) {
   const a = accentNumber(n) || 4;
   return `--accent:var(--sp-a${a});--accent-soft:var(--sp-a${a}-soft);--accent-on:var(--sp-a${a}-on)`;
+}
+
+/** A tone is "whatever colour this element should be", and unlike the card
+    itself it may legitimately be either kind: a rail button is its tab's
+    identity until that tab has something at a level, and then it is the
+    level. So this takes a level name OR a decorative slot and resolves both
+    onto the same three properties -- config says which by writing a name or
+    a number.
+
+    The wall is at the CARD, where the audit found the problem: `accent` on a
+    card is decorative and `outline` is a level, and neither will take the
+    other's value. Inside a body an element's tone is not identity, so there
+    is nothing there to protect. */
+function toneStyle(v) {
+  const level = levelName(v);
+  if (level) {
+    return `--accent:var(--sp-${level})`
+      + `;--accent-soft:var(--sp-${level}-soft)`
+      + `;--accent-on:var(--sp-${level}-on)`;
+  }
+  return accentStyle(v);
+}
+
+/** Whether a tone resolves to anything at all, without caring which kind. */
+function toneSet(v) {
+  return levelName(v) !== null || accentNumber(v) !== null;
+}
+
+/** A tone's base colour, for an icon or a dot. Null when unset. */
+function toneBase(v) {
+  const level = levelName(v);
+  if (level) return `var(--sp-${level})`;
+  return accentBase(v);
+}
+
+/** The three custom properties a level sets on the card it is dressing.
+    Same shape as accentStyle, deliberately: a body that already knows how
+    to wear --accent-soft can wear --outline-soft without learning a second
+    pattern. Leading semicolon because this appends to accentStyle. */
+function levelStyle(name) {
+  return `;--outline:var(--sp-${name})`
+    + `;--outline-soft:var(--sp-${name}-soft)`
+    + `;--outline-on:var(--sp-${name}-on)`;
 }
 
 /** The accent's base colour, for an icon or a dot. Null when unset. */
@@ -3478,10 +3599,10 @@ const BODIES = {
        of what was true. On the dryer it just sat there yellow between
        loads, which is the state a dryer spends most of its life in. */
     chips.push(b.door_open
-      ? chipOf("Door open", "mdi:door-open", 0)
-      : chipOf("Door closed", "mdi:door-closed", 0));
-    if (leak) chips.push(chipOf("Sensor wet", "mdi:water", 1));
-    if (!powered) chips.push(chipOf("Plug off", "mdi:power-plug-off", 2));
+      ? chipOf("Door open", "mdi:door-open", null)
+      : chipOf("Door closed", "mdi:door-closed", null));
+    if (leak) chips.push(chipOf("Sensor wet", "mdi:water", "critical"));
+    if (!powered) chips.push(chipOf("Plug off", "mdi:power-plug-off", "waiting"));
     /* No wattage chip. The draw is already in the card's `meta`, top right,
        where every other measurement on this panel lives -- so the chip was
        the same number twice, a few centimetres apart.
@@ -3506,11 +3627,11 @@ const BODIES = {
        and the last load's once it stops. Blank renders nothing, which is
        how a wash that could not be priced leaves a hole instead of `0p`. */
     if (!isBlank(b.cost)) {
-      chips.push(chipOf(String(b.cost), "mdi:currency-gbp", 0));
+      chips.push(chipOf(String(b.cost), "mdi:currency-gbp", null));
     }
-    if (b.drum_full) chips.push(chipOf("Full", "mdi:basket-unfill", 2));
+    if (b.drum_full) chips.push(chipOf("Full", "mdi:basket-unfill", "attention"));
     if (waiting) {
-      chips.push(chipOf(`${waiting} to hang`, "mdi:hanger", 2));
+      chips.push(chipOf(`${waiting} to hang`, "mdi:hanger", "attention"));
     }
 
     out += `<div class="washmain">`
@@ -3629,7 +3750,7 @@ const BODIES = {
     const chips = (Array.isArray(b.chips) ? b.chips : [])
       .filter((chip) => chip && !isBlank(chip.text))
       .map((chip) => chipOf(String(chip.text), firstOf(chip.icon, "mdi:alert"),
-        accentNumber(chip.accent)));
+        levelName(chip.level)));
 
     let out = `<div class="lockrow">` + lockDisc(b, word);
     out += `<div class="lockmain">`
@@ -3649,7 +3770,7 @@ const BODIES = {
          otherwise calm card spends the alert colour on nothing, and a
          moss Lock on a red one argues with the card it is sitting in. */
       out += `<button type="button" class="lockbtn" data-lockact`
-        + ` style="${accentStyle(b.accent)}">${esc(action.label)}</button>`;
+        + ` style="${toneStyle(b.accent)}">${esc(action.label)}</button>`;
     }
     return out + `</div>`;
   },
@@ -4647,19 +4768,25 @@ const BODIES = {
       const label = firstOf(r.action_label, r.button);
       const hasAction = Boolean(r.action) && !isBlank(label);
 
-      /* A row with an accent takes that accent's soft fill as its wash, which
-         overrides zebra. Never both — see the emphasis ladder. */
-      const washed = accentNumber(r.accent) !== null;
+      /* A row with a tone takes its soft fill as a wash, which overrides
+         zebra. Never both — see the emphasis ladder.
+
+         A Needs-you row is a job, so its tone is a LEVEL and it arrives
+         under `level`. `accent` still works, because this body also draws
+         lists that are not jobs -- what finished today, a bin schedule --
+         and those are decorated, not levelled. */
+      const tone = firstOf(r.level, r.accent);
+      const washed = toneSet(tone);
       const classes = ["row"];
       if (flow) classes.push("tile");
       if (prose) classes.push("prose");
       if (washed) classes.push("wash");
       else if (zebra && index % 2 === 0) classes.push("zebra");
       if (hasAction) classes.push("hasact");
-      const rowStyle = washed ? ` style="${accentStyle(r.accent)}"` : "";
+      const rowStyle = washed ? ` style="${toneStyle(tone)}"` : "";
 
       let lead = "";
-      const iconColour = accentBase(r.accent);
+      const iconColour = toneBase(tone);
       if (!isBlank(r.icon)) {
         lead = String(r.icon).startsWith("spectra:")
           ? iconMarkup(r.icon, "rowicon")
@@ -5188,12 +5315,18 @@ function washerWord(cycle, leak, powered) {
    written anywhere.
 
    The exceptions are the states that ask something of a person, and they
-   take the accent's ROLE rather than the card's hue: alert for a leak,
-   warning for a dead plug, a drum to empty or washing to hang. Those are
-   the same states that outline the card, and the drum is the biggest
-   thing on it -- a card trimmed amber with a plum porthole in the middle
-   of it was the one element not joining in, which is what this is
+   take the LEVEL rather than the card's hue: critical for a leak, waiting
+   for a dead plug, attention for a drum to empty or washing to hang.
+   Those are the same states that outline the card, and the drum is the
+   biggest thing on it -- a card trimmed amber with a plum porthole in the
+   middle of it was the one element not joining in, which is what this is
    correcting.
+
+   These three used to be written here as accent numbers 1 and 2, which
+   is level meaning hidden in a decorative slot: the card was picking an
+   alarm by asking for a hue, and repainting a1 would silently have
+   repainted the leak. They are level names now, so the two cannot drift
+   apart again.
 
    Running and idle are not in the list. They ask nothing, they are
    written in words beside the drum in the largest text on the card, and
@@ -5205,16 +5338,22 @@ function washerWord(cycle, leak, powered) {
    it. That is the trade this makes -- the needs-you signal is worth more
    on this card than the at-a-glance difference between two machines that
    are both, in fact, asking for the same thing. */
-function washerAccent(leak, powered, wants) {
-  if (leak) return 1;
-  if (!powered) return 2;
-  if (wants) return 2;
+function washerLevel(leak, powered, wants) {
+  if (leak) return "critical";
+  /* A machine without power mid-cycle is wet washing and a running clock:
+     activity paused until a person acts, which is waiting, not attention. */
+  if (!powered) return "waiting";
+  /* A full drum and a hanging queue both need doing, neither is urgent. */
+  if (wants) return "attention";
   return null;
 }
 
-function chipOf(text, icon, accent) {
-  const tone = accent
-    ? ` style="background:var(--sp-a${accent}-soft);color:var(--sp-a${accent}-on)"`
+/* A chip states a fact, and the coloured ones state a fact a person has to
+   act on -- so they wear a level, never a decorative accent. A chip with no
+   level is ink on sink: still a fact, just not one asking for anything. */
+function chipOf(text, icon, level) {
+  const tone = level
+    ? ` style="background:var(--sp-${level}-soft);color:var(--sp-${level}-on)"`
     : ` style="background:var(--sp-sink);color:var(--sp-ink-2)"`;
   return `<span class="pill"${tone}>`
     + `<ha-icon class="pillicon" icon="${esc(icon)}"></ha-icon>${esc(text)}</span>`;
@@ -5233,7 +5372,7 @@ function washerDrum(b, cycle, leak, powered, waiting) {
   const circ = 2 * Math.PI * r;
   /* A drum to empty, or washing waiting to be hung. Both are jobs, both
      outline the card, and both now colour the drum to match it. */
-  const accent = washerAccent(leak, powered, b.drum_full || waiting > 0);
+  const level = washerLevel(leak, powered, b.drum_full || waiting > 0);
   const frac = Math.max(0, Math.min(1, Number(b.progress)));
   const arc = cycle === "running" && isFinite(frac) && frac > 0
     ? `<circle class="drumarc" cx="${c}" cy="${c}" r="${r}"`
@@ -5293,9 +5432,11 @@ function washerDrum(b, cycle, leak, powered, waiting) {
     + `<ha-icon icon="${esc(glyph)}"></ha-icon>`
     + (many ? `<span class="drumn">${esc(String(waiting))}</span>` : "")
     + `</span>`;
-  const tone = accent
-    ? ` style="--accent:var(--sp-a${accent});`
-      + `--accent-soft:var(--sp-a${accent}-soft);--accent-on:var(--sp-a${accent}-on)"`
+  /* Written onto --accent rather than --outline so the .drum rules below
+     do not have to learn a second token name for the same job. */
+  const tone = level
+    ? ` style="--accent:var(--sp-${level});`
+      + `--accent-soft:var(--sp-${level}-soft);--accent-on:var(--sp-${level}-on)"`
     : "";
   return `<div class="drum"${tone}>`
     + `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`
@@ -5455,7 +5596,7 @@ function lockDisc(b, word) {
   const filled = b.fill === undefined ? true : Boolean(b.fill);
   const glyph = lockGlyph(word);
   return `<div class="lockdisc${filled ? " filled" : ""}"`
-    + ` style="${accentStyle(b.accent)}">`
+    + ` style="${toneStyle(b.accent)}">`
     + `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`
     + `<circle class="lockring" cx="${c}" cy="${c}" r="${r}"></circle>`
     + `<circle class="lockface" cx="${c}" cy="${c}" r="24"></circle></svg>`
@@ -6158,10 +6299,10 @@ class SpectraCard extends HTMLElement {
     /* The card's own accent says what this card IS; the outline says that
        something on it wants a person. They are different questions, so the
        outline is its own value rather than a mode of the accent. */
-    const outline = accentNumber(model.outline);
+    const outline = levelName(model.outline);
     const classes = "card"
       + (config.header ? " asheader" : "")
-      + (outline ? " outlined" : "")
+      + (outline ? ` outlined lvl-${outline}` : "")
       + (config.invert ? " invert" : "")
       + (tappable ? " tappable" : "")
       + (festive ? " festive" : "")
@@ -6174,7 +6315,7 @@ class SpectraCard extends HTMLElement {
     const card = [
       `<div class="${classes}${aside ? " split" : ""}"`,
       ` style="${accentStyle(model.accent)}`
-        + `${outline ? `;--outline:var(--sp-a${outline})` : ""}`
+        + `${outline ? levelStyle(outline) : ""}`
         + `${festive ? `;--fg:${esc(fb.wash)}` : ""}"`,
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
@@ -8124,7 +8265,7 @@ class SpectraDock extends HTMLElement {
       const on = here !== null && String(b.label) === here;
       return `<div class="dockbtn${b.live ? " live" : ""}${b.fill ? " fill" : ""}${on ? " selected" : ""}"`
         + ` role="button" tabindex="0" aria-current="${on ? "page" : "false"}"`
-        + ` data-button="${index}" style="${accentStyle(b.accent)}">`
+        + ` data-button="${index}" style="${toneStyle(b.accent)}">`
         + `<div class="dockhead">`
         + (isBlank(b.icon) ? "" : `<ha-icon icon="${esc(b.icon)}"></ha-icon>`)
         + `<h4>${esc(b.label)}</h4>`
