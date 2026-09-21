@@ -1488,6 +1488,26 @@ turned every card on the dashboard into "Custom element doesn't exist".
 
 The card ships as `type="module"`. So it has to be checked as one.
 
+```
+node tools/checkicons.js
+```
+
+Renders the cards whose icons lead text and reports each glyph against the
+cap band of the name beside it. Positive is low; it fails over 0.75px.
+
+Two traps it has fallen into, both of which it passed while the panel showed
+icons sitting low beside their names. It measured the baseline with a probe
+that carried a letter, and in a line tighter than the font wants — the hero's
+`line-height:1` — Chromium aligns such a probe by the baseline *inside* it,
+five pixels below the one the text is painted on. And it measured in one
+font, while an icon hung off a `vertical-align` length hangs off a baseline
+the browser synthesises out of font metrics, so an offset solved here was not
+the offset the panel's Roboto needed.
+
+So the probe is now empty and zero-height, and every card is measured through
+five unrelated font stacks. An offset that only lines up in one of them is
+not lined up.
+
 ## Licence
 
 MIT
