@@ -761,6 +761,14 @@ body:
   done: {entity: sensor.phoenix_done_today, attribute: items}
   done_label: "Bought"               # optional; default "Done today"
   tick_icon: mdi:shopping            # optional; default mdi:check-bold
+  voice:                             # optional; the mic. See below
+    script: script.list_speech_to_items
+    about: "a shopping list"         # optional; wording passed to the script
+    pipeline: 01j4f21kr8213bjys7tpfhnkaw   # optional; the default one otherwise
+    label: "Say what to add"         # optional
+    icon: mdi:microphone             # optional
+    agent: ai_task.google_gemini_2_5_flash_lite   # optional; the script decides otherwise
+    max_seconds: 15                  # optional; the cap on one take
 ```
 
 **This is the one card control that finishes something, and it is allowed
@@ -895,6 +903,106 @@ The open note is a **claim carried on the model**, like `ticked` and
 `undo`, so it survives the re-render the press provokes. Without that it
 would shut itself the moment anything else on the card moved, which on a
 wall panel is constantly.
+
+#### `voice` — saying what to add
+
+A microphone under the list. Press it, say *two pints of milk, some
+tenderstem and crumpets for Anaya*, and a sheet comes back with three
+rows on it; press **Add 3** and they go on the list the phone and Bring
+read. Nothing is written before that press.
+
+**The mic proposes. The tick does.** That difference is the whole design,
+and it is about who is guessing. A tick is a person saying something
+about a row in front of them, and it reverses with one press. This is a
+model's reading of a microphone's reading of a sentence, landing on a
+list that is on three phones a second later — two guesses deep is where
+a card stops acting on its own. So the sheet is never skipped, not even
+for a single item, and no setting turns it off.
+
+A row can be **dropped** on the sheet rather than the whole take being
+cancelled, because the usual failure is four right and one wrong. If
+that cost the other four, the mic would not be worth pressing. A dropped
+row stays where it is, struck through: a list that shortened under the
+finger would slide the next row into the place just pressed, which is
+how the wrong thing gets dropped twice.
+
+**The speech goes through Home Assistant, not the browser.** The browser
+has a speech API and it is the wrong one here: it does not exist in the
+companion app's webview on iOS, it sends the audio to whichever cloud
+the browser vendor prefers, and it knows nothing about this house. The
+pipeline already exists, already has an engine configured, and is the
+one everything else in the house speaks to. The browser is asked for a
+microphone and for nothing else.
+
+Three things about that route are easy to get wrong and silent when you
+do:
+
+- **`end_stage: "stt"`.** Without it the transcript runs straight on to
+  the conversation agent, which *answers* it — so "milk and bread" is
+  replied to, out loud, in the kitchen, instead of written down. This is
+  dictation, not a conversation.
+- **The first byte of every audio frame is the handler id** that
+  `run-start` named. Home Assistant routes binary frames by that byte
+  and nothing else, so a frame sent before the id arrives — or with the
+  wrong one — is dropped in silence. No error, no transcript, no clue.
+  The card discards the first fraction of a second rather than
+  misrouting it.
+- **16 kHz, whatever the microphone gives.** `new AudioContext({sampleRate:
+  16000})` is honoured on the panel and *ignored* on some builds, which
+  is not an error anywhere: the context runs at 48 kHz, every frame goes
+  out three times too fast, and the transcript comes back empty. So the
+  card resamples on the way out rather than trusting the rate it asked
+  for.
+
+**The panel has no microphone over plain http.** `getUserMedia` does not
+exist outside a secure context, and its absence is not an error — the
+property is simply undefined. A dashboard opened at `http://<ip>:8123`
+therefore cannot listen at all, so the card says so in the line under
+the list: the fix is the address, not the button.
+
+**The press means three things.** Idle, it starts a take. Live, it ends
+one — which is the honest reading of pressing a running microphone, and
+the way out when the room is too noisy for the pipeline's own silence
+detection to fire. Thinking, it does nothing: a second press there is a
+second recording, a second model call and a second bill for a sentence
+already being read.
+
+**What was heard is shown while the parse runs.** A mishearing is
+obvious in the words and invisible by the time they are items — reading
+"Tenderstem" back as *ten der stem* is caught at the panel rather than
+in the shop.
+
+**The parse lives in a script, not in this bundle.** A card that decided
+what "a couple of bags of that fusilli" meant would be a card holding an
+opinion, and everything else here is a fact it was handed. The script
+names the model, carries the wording, and can be rewritten without
+touching a file the panel has cached — which matters, because a prompt
+that works is found by trying prompts.
+
+The contract between them is small. The card calls the script with
+`transcript`, plus `about` and `agent` if they are configured, and asks
+for the response. The script returns:
+
+```yaml
+items:
+  - name: Milk              # required; a blank or missing one is dropped
+    specification: 2 pints  # optional; becomes the item's description
+```
+
+`about` is in there because the same script serves more than one list: a
+shopping list and a list of household jobs want different things out of
+the same sentence, and the wording is the only part that differs.
+
+**Items are added one at a time, in the order they were said.**
+`todo.add_item` returns before Bring has been told, and four sent at once
+arrive at Bring in whatever order its API pleases — which leaves the list
+in an order nobody spoke. A failure stops the chain rather than carrying
+on past it: three added and the fourth quietly missing is the worst
+outcome available, because the list looks finished.
+
+**An empty list still draws the mic.** It used to return early and draw
+nothing but its empty line, which is exactly the moment somebody is
+standing at the panel wanting to put something on it.
 
 ### `washer` — is the appliance running, and has it left you anything?
 
@@ -1640,6 +1748,23 @@ one passed every check, shipped, registered no custom elements at all, and
 turned every card on the dashboard into "Custom element doesn't exist".
 
 The card ships as `type="module"`. So it has to be checked as one.
+
+```
+node tools/checkvoice.js
+```
+
+The mic, with the browser's half stubbed at the two seams the card
+actually touches — `getUserMedia` and `AudioContext`. A real microphone
+in a headless browser would make this a test of Chromium's audio stack
+instead of a test of the card, while the frame building, the handler-id
+byte and the resampling stay real code. Its stub context runs at 48 kHz
+on purpose: one that honoured the 16000 asked for would never exercise
+the resampler, and 48 is the case that ships chipmunk audio and gets an
+empty transcript back.
+
+Most of what it asserts is what has **not** happened yet: no audio before
+the pipeline named a handler, no script call before something was heard,
+and nothing on the list before a person pressed Add.
 
 ```
 node tools/checkicons.js
