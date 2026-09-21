@@ -45,6 +45,10 @@ const js = fs.readFileSync(file);
     ? { executablePath: process.env.CHROME_PATH } : {});
   const page = await browser.newPage({ viewport: { width: 560, height: 900 } });
   page.on("pageerror", (e) => console.log("PAGEERROR:", e.message));
+  page.on("console", (m) => {
+    const t = m.text();
+    if (!t.includes("SPECTRA-CARDS")) console.log("  " + t);
+  });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.waitForFunction(() => !!customElements.get("spectra-card"));
 
@@ -114,6 +118,60 @@ const js = fs.readFileSync(file);
     check("a unit that is not text is ignored rather than printed",
       odd.texts.includes("280") && !odd.texts.some((t) => t.includes("7 ")),
       odd.texts.join("|"));
+
+    /* ---- the size it draws at
+       The reason this file exists twice over. An inline svg with a viewBox
+       and no CSS fills its container and scales its type with it, so on a
+       full-width card the end labels came out at 37px and the card stood
+       285px tall. Measured rather than eyeballed, because the failure was
+       invisible in the markup -- every number in it was correct. */
+    const wide = document.getElementById("a");
+    wide.style.width = "1200px";
+    const big = await draw({ unit: " W", mark: "last" });
+    const svg = (big.el.shadowRoot || big.el).querySelector("svg.chart");
+    const box = svg.getBoundingClientRect();
+    check("a chart in a very wide card stops growing rather than filling it",
+      box.width <= 481, `${Math.round(box.width)}px wide`);
+    check("...so it stays a band rather than a panel",
+      box.height <= 120, `${Math.round(box.height)}px tall`);
+    /* 10 user units at the capped scale. The point of the cap: the labels
+       have to sit in the same type range as the rows above them. */
+    const label = svg.querySelector("text");
+    const drawn = Number(getComputedStyle(label).fontSize.replace("px", ""))
+      * (box.width / 320);
+    check("and its labels land in the card's own type range, not headline size",
+      drawn >= 11 && drawn <= 17, `${drawn.toFixed(1)}px`);
+
+    wide.style.width = "";
+
+    /* ---- one point is not a shape
+       A fortnight chart on the house's first day. A length of one counted
+       as data, so the card drew a single dot in an empty box instead of
+       standing aside. */
+    const lonely = document.createElement("spectra-card");
+    lonely.setConfig({
+      type: "custom:spectra-card", accent: 4, title: "Last 14 days",
+      body: { type: "chart", line: [286], labels: ["S"] },
+    });
+    document.getElementById("a").appendChild(lonely);
+    lonely.hass = { states: {} };
+    await frame();
+    check("a one-point chart hides the card rather than drawing a lone dot",
+      lonely.hidden || getComputedStyle(lonely).display === "none"
+        || !(lonely.shadowRoot || lonely).querySelector("svg"),
+      "still rendered");
+
+    const pair = document.createElement("spectra-card");
+    pair.setConfig({
+      type: "custom:spectra-card", accent: 4, title: "Last 14 days",
+      body: { type: "chart", line: [286, 291], labels: ["S", "S"] },
+    });
+    document.getElementById("a").appendChild(pair);
+    pair.hass = { states: {} };
+    await frame();
+    check("two points are a shape, and do draw",
+      !!(pair.shadowRoot || pair).querySelector("svg.chart"),
+      "nothing drawn");
 
     return problems;
   });
