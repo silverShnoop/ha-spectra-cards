@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.107.2";
+const VERSION = "0.107.3";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -69,7 +69,7 @@ const TOKENS_LIGHT = `
   --sp-a4:#2F7576; --sp-a4-soft:#D6E7E5; --sp-a4-on:#1E5657;
   --sp-a5:#4C5D8A; --sp-a5-soft:#DCE1ED; --sp-a5-on:#3A496E;
   --sp-a6:#7A4C6B; --sp-a6-soft:#EDDEE8; --sp-a6-on:#5E3452;
-  --sp-sun:#C9962B;
+  --sp-sun:#B6862A;
   --sp-attention:#B6862A; --sp-attention-soft:#F2E6C9; --sp-attention-on:#8A6310;
   --sp-waiting:#B0512C;   --sp-waiting-soft:#F0DED4;   --sp-waiting-on:#8C3E20;
   --sp-critical:#8E0C14;  --sp-critical-soft:#F2D7D8;  --sp-critical-on:#7A0B12;
@@ -113,7 +113,7 @@ const TOKENS_DARK = `
   --sp-a4:#4FA9AA; --sp-a4-soft:#14302F; --sp-a4-on:#8CCBCB;
   --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
   --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
-  --sp-sun:#E8B85A;
+  --sp-sun:#D9A63F;
   --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
   --sp-waiting:#E08054;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
   --sp-critical:#E2333F;  --sp-critical-soft:#3A1618;  --sp-critical-on:#F0949B;
@@ -417,10 +417,18 @@ ha-icon { display:inline-flex; line-height:0; }
    something the palette gets a vote on. It was a2 and turned bone the
    moment a2 did, which is a grey sun.
 
-   Deliberately not --sp-attention, even though a yellow sun and a yellow
-   level are near neighbours: a glyph inside a weather icon is a picture,
-   the level is a claim about the card it is drawn on, and letting the two
-   share a token is how one of them ends up dragging the other. */
+   It holds the exact value a2 had -- #B6862A and #D9A63F -- because the
+   weather icons were right before any of this and nothing about them
+   changed. What changed is only which token they get it from.
+
+   So --sp-sun and --sp-attention are, today, the same two hex values, and
+   that is on purpose rather than an oversight waiting to be tidied. They
+   are the same COLOUR and different FACTS: a glyph inside a weather icon
+   is a picture of the sun, a level is a claim about the card it is drawn
+   on. One token would mean re-levelling the panel could never again
+   happen without the sun going with it -- which is exactly what just
+   happened when they shared a2 and the sun turned grey. Two tokens that
+   happen to agree can be told apart later; one token cannot. */
 .wicon .ws { fill:var(--sp-sun); }
 .titlebar .wicon { width:16px; height:16px; }
 .bigicon.wicon { width:44px; height:44px; }
