@@ -185,6 +185,23 @@ ha-icon { display:inline-flex; line-height:0; }
 .metagroup { margin-left:auto; }
 .scenename .dot, .metagroup .dot { width:8px; height:8px; }
 .titlebar .metaicon { --mdc-icon-size:14px; color:var(--sp-ink-2); }
+/* The bar's right-hand furniture -- the status, the spinner slot, and the
+   one control a body may put up here -- is one right-aligned run, and it
+   right-aligns off whichever of the three comes first. A body that reports
+   no status still has to put its switch at the far end, not against the
+   title. Only the first takes the auto margin; the rest ride the gap. */
+.titlebar > .spinslot, .titlebar > .switch { margin-left:auto; }
+.titlebar > .metagroup ~ .spinslot, .titlebar > .metagroup ~ .switch,
+.titlebar > .spinslot ~ .switch { margin-left:0; }
+/* A 26px control in a bar of 11px capitals would set the height of every
+   title bar on the panel by itself. It is the same switch, drawn to the
+   line it is now sitting on: 34x22 outside, 2px border, so 30x18 inside; a
+   16px knob is then inset exactly 1px on every side and travels 1 -> 13 to
+   land inset 1px at the far end. The same arithmetic as the full-size one,
+   which is why it reads as the same control rather than a smaller one. */
+.titlebar > .switch { width:34px; height:22px; }
+.titlebar > .switch > i { width:16px; height:16px; }
+.titlebar > .switch.on > i { left:13px; }
 
 /* clock — the one cell that is read from the doorway. Everything about it is
    sized for that: the time is the largest thing on the whole dashboard, and
@@ -1540,7 +1557,11 @@ img.avatar { object-fit:cover; display:block; }
   position:absolute; top:1px; left:1px; width:20px; height:20px; border-radius:2px;
   background:var(--sp-ink-3); transition:left 140ms ease-out;
 }
-.switch.on { background:var(--sp-a4); border-color:var(--sp-a4); }
+/* On wears the card's accent, the same way the lock's button does. It was a
+   fixed teal, so a plum card carried a teal switch, and a room already
+   spending six colours on its scenes spent a seventh on simply being on. The
+   side the knob sits on still says which state this is without the colour. */
+.switch.on { background:var(--accent); border-color:var(--accent); }
 .switch.on > i { left:15px; background:var(--sp-surface); }
 .switch::after {
   content:""; position:absolute; left:50%; top:50%;
@@ -2618,6 +2639,28 @@ function pickerScene(b, label) {
   }
   return null;
 }
+
+/* The one control a body puts in the title bar.
+
+   A room's power switch belongs beside the room's name and the scene it is
+   running, not down in the body an inch from the chevron: those two are
+   reached by the same thumb and they do very different things. Up here it is
+   the last thing on the line the card is titled with, which is where a hand
+   goes for it without reading.
+
+   It is still an optional control rather than a job — the card states what
+   the room is doing, and offers the one switch you might use — so nothing
+   about the rule that jobs live in `Needs you` changes. */
+const BODY_TOOL = {
+  picker(b) {
+    if (!b || typeof b !== "object" || isBlank(b.light)) return "";
+    const state = pickerState(b);
+    const lit = state ? state.lit : (b.on === undefined || Boolean(b.on));
+    return `<span class="switch${lit ? " on" : ""}" role="switch"`
+      + ` aria-checked="${lit ? "true" : "false"}" aria-label="Lights"`
+      + ` tabindex="0" data-pickpower><i></i></span>`;
+  },
+};
 
 /* What a body would say about itself in the title bar, where config cannot
    know it. Wherever this card names a scene it names it the same way — the
@@ -3899,7 +3942,7 @@ const BODIES = {
         + ` aria-pressed="${auto ? "true" : "false"}"`
         + ` aria-label="Follow the schedule"`
         + ` title="${auto ? "Following the schedule" : "Follow the schedule"}"`
-        + ` data-climauto style="${accentStyle(3)}">`
+        + ` data-climauto>`
         + `<ha-icon icon="${esc(firstOf(b.auto_icon, "mdi:sun-clock"))}"></ha-icon></span>`;
     }
 
@@ -4264,7 +4307,14 @@ const BODIES = {
        it for the whole card. This row is the supporting line and the
        controls, so it never changes width as scenes change, and "what is
        this room doing" is in the same place on every card. */
-    out += `<div class="row pickrow" style="padding-left:0">`
+    /* No side padding at all, not just none on the left. `.row` carries 6px
+       for the sake of the zebra stripe it usually wears, and this row wears
+       none -- so that 6px was doing nothing but holding the chevron a
+       chevron's-worth in from the edge the bar above it and the switch in
+       the title bar both reach. Three things on the card's right margin, one
+       of them not quite on it, and the eye finds that before it finds the
+       control. */
+    out += `<div class="row pickrow" style="padding:6px 0">`
       /* The symbol sits against the word that explains it. A caption two
          inches away from its control is a caption for nothing.
 
@@ -4282,8 +4332,7 @@ const BODIES = {
           + ` title="${auto ? "Following the schedule" : "Follow the schedule"}"`
           + `${lit ? "" : ` aria-disabled="true"`}`
           + ` data-pickmode="${auto ? "manual" : "auto"}"`
-          + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}"`
-          + ` style="${accentStyle(3)}">`
+          + ` data-pickscene="${esc(scene && scene.entity ? scene.entity : "")}">`
           + `<ha-icon icon="${esc(autoIcon)}"></ha-icon></span>`
         : "")
       + `<p class="pickinfo">`
@@ -4310,27 +4359,16 @@ const BODIES = {
         : "")
       + `</p>`;
 
-    /* Status and controls share one right-hand group so the buttons sit in
-       the same place in every state. A control that moves depending on what
-       the room is doing is a control you have to find before you can use
-       it, and this panel is read at arm's length while carrying something. */
+    /* The right-hand group is the chevron's alone now. The power switch used
+       to sit in it, a finger's width from the chevron, so the control that
+       turns the room off and the control that opens a drawer were neighbours
+       — two very different consequences reachable by the same misaimed
+       thumb. It has gone to the title bar, beside the scene it switches. */
     out += `<span class="pickend">`;
 
-    /* Mode, then power. Two questions, not three peer states — and the mode
-       only has an answer once the room is on. Power sits rightmost because
-       it is the one you reach for without reading. */
-
-    if (!isBlank(b.light)) {
-      out += `<span class="switch${lit ? " on" : ""}" role="switch"`
-        + ` aria-checked="${lit ? "true" : "false"}" aria-label="Lights"`
-        + ` tabindex="0" data-pickpower><i></i></span>`;
-    }
-
-    /* Rightmost, after the power switch, because it is the least urgent
-       thing on the row: everything else here answers a question, this one
-       asks for more. The markup always says closed -- whether this card is
-       the one holding the drawer open is the element's business, re-applied
-       after the render rather than baked into it. */
+    /* The markup always says closed -- whether this card is the one holding
+       the drawer open is the element's business, re-applied after the render
+       rather than baked into it. */
     const drawer = drawerMarkup("picker", b);
     if (drawer) out += chevronMarkup("picker", false);
 
@@ -6177,7 +6215,10 @@ class SpectraCard extends HTMLElement {
         phase === "busy" ? `<span class="spinner"></span>`
           : (phase === "done" ? `<span class="ok"></span>` : "")}</span>`
       : "";
-    if (isBlank(title) && isBlank(icon) && !status && !slot) return "";
+    /* After the spinner, so the spinner stays against the word it is waiting
+       on and the control stays at the end of the line. */
+    const tool = BODY_TOOL[type] ? BODY_TOOL[type](model.body) : "";
+    if (isBlank(title) && isBlank(icon) && !status && !slot && !tool) return "";
     return `<div class="titlebar">`
       + `<span class="tick"></span>`
       + iconMarkup(icon)
@@ -6190,6 +6231,7 @@ class SpectraCard extends HTMLElement {
           + `</span>`
         : "")
       + slot
+      + tool
       + `</div>`;
   }
 
