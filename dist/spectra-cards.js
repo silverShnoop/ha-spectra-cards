@@ -1306,6 +1306,21 @@ img.avatar { object-fit:cover; display:block; }
 .iconrow span { flex:1 1 0; text-align:center; }
 .iconrow ha-icon { --mdc-icon-size:17px; color:var(--sp-ink-3); }
 
+/* chart — the one body with an intrinsic size, and it has to be told so.
+   An inline svg carrying a viewBox and no CSS fills its container and
+   scales EVERYTHING inside it to match: on a full-width card at 1280px
+   the 320-wide box became 1200 wide, which drew the end labels at 37px
+   and the line at 11px and stood the card 285px tall. Nothing in the body
+   is wrong at that size -- it is the right drawing, enlarged until it
+   reads as a mistake.
+
+   A viewBox cannot be resolution-independent AND keep its type at a fixed
+   size, so the box is capped instead. 480 puts the labels at 15px and the
+   band at 114px, which is the same type scale as the rows above it; past
+   that the chart stops growing and the card's own padding takes the
+   slack. Below it the chart still shrinks to fit a phone. */
+.chart { display:block; width:100%; max-width:480px; height:auto; }
+
 /* control — the one body you touch rather than read. Same row metrics as
    list, so a panel of controls and a panel of readings sit at the same
    rhythm; the difference is the cluster on the right. */
@@ -4200,7 +4215,8 @@ const BODIES = {
     const step = count > 1 ? (W - 26) / (count - 1) : 0;
     const x = (i) => 13 + i * step;
 
-    let out = head + `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(b.label || "Forecast")}">`;
+    let out = head + `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img"`
+      + ` aria-label="${esc(b.label || "Forecast")}">`;
 
     /* Rain sits under the temperature line as its own scale — a probability
        and a temperature share no axis. */
@@ -4718,9 +4734,14 @@ function bodyIsEmpty(type, b) {
       return !Array.isArray(b.slots) || b.slots.length === 0;
     case "agenda":
       return !Array.isArray(b.events) || b.events.length === 0;
+    /* One point is not a shape. A fortnight chart drawn on the house's
+       first day put a single dot in an empty box, because a length of one
+       counted as data -- so the threshold is two, which is the fewest that
+       can go up or down. An icon row is exempt: one icon over one hour is
+       still a forecast saying something. */
     case "chart":
-      return !(Array.isArray(b.line) && b.line.length)
-        && !(Array.isArray(b.bars) && b.bars.length)
+      return !(Array.isArray(b.line) && b.line.length > 1)
+        && !(Array.isArray(b.bars) && b.bars.length > 1)
         && !(Array.isArray(b.icons) && b.icons.length);
     case "strip":
     case "arc":
