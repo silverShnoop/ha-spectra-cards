@@ -232,21 +232,38 @@ const js = fs.readFileSync(file);
       probe.remove();
       return c;
     };
+    /* Same probe for a level. Levels are named, not numbered, precisely so
+       that a test like this cannot ask for one by hue. */
+    const lvl = (name) => {
+      const probe = document.createElement("span");
+      probe.style.color = `var(--sp-${name})`;
+      root().appendChild(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    };
 
     await showCard({ state: "idle" }, 6, null);
     const plain = border();
-    await showCard({ state: "idle" }, 6, 1);
-    check("an outlined card takes the alert colour on its edge",
-      border() === token(1), `${border()} (alert is ${token(1)})`);
+    await showCard({ state: "idle" }, 6, "critical");
+    check("an outlined card takes the critical colour on its edge",
+      border() === lvl("critical"), `${border()} (critical is ${lvl("critical")})`);
     check("and an un-outlined one does not",
-      plain !== token(1), plain);
+      plain !== lvl("critical"), plain);
 
+    await showCard({ state: "idle" }, 6, "waiting");
+    check("waiting outlines waiting", border() === lvl("waiting"), border());
+
+    /* The breaking half of the change, and worth a test of its own: an
+       accent number is no longer a level. It used to outline the card,
+       which is how a config could claim an alarm by naming a hue. */
     await showCard({ state: "idle" }, 6, 2);
-    check("amber outlines amber", border() === token(2), border());
+    check("an accent number no longer buys an outline",
+      border() === plain, `${border()} (plain is ${plain})`);
 
     /* The bug this guards: reusing the accent for the outline would make
        an alert card forget which machine it is. */
-    await showCard({ state: "idle" }, 5, 1);
+    await showCard({ state: "idle" }, 5, "critical");
     check("outlining does not repaint the drum, so identity survives it",
       getComputedStyle(q(".drumring")).stroke
         !== getComputedStyle(q(".card")).borderColor,
@@ -316,10 +333,10 @@ const js = fs.readFileSync(file);
        is meant to match the trim the card is already wearing. */
     await show({ state: "idle", drum_full: true }, 6);
     check("and the colour it takes is the trim's, not the card's",
-      getComputedStyle(q(".drumglyph")).color === token(2),
-      `${getComputedStyle(q(".drumglyph")).color} (warning is ${token(2)})`);
+      getComputedStyle(q(".drumglyph")).color === lvl("attention"),
+      `${getComputedStyle(q(".drumglyph")).color} (attention is ${lvl("attention")})`);
     check("the ring goes with it, not just the glyph",
-      getComputedStyle(q(".drumring")).stroke === tokenColour("--sp-a2-soft"),
+      getComputedStyle(q(".drumring")).stroke === tokenColour("--sp-attention-soft"),
       getComputedStyle(q(".drumring")).stroke);
 
     const washerTick = tickOf();
@@ -525,7 +542,10 @@ const js = fs.readFileSync(file);
        On the washer it was worse than decorative: the full-drum row
        reads "clears when the door is opened", so an open door is the
        RESOLUTION, and warning about it said the opposite of true. */
-    const warn = tokenColour("--sp-a2-on");
+    const warn = tokenColour("--sp-attention-on");
+    /* The plug is its own level: a machine without power mid-cycle is
+       activity paused on a person, not an errand for tomorrow. */
+    const waitInk = tokenColour("--sp-waiting-on");
     const pillInk = (word) => {
       const found = all(".pill").find(
         (el2) => (el2.textContent || "").includes(word));
@@ -548,8 +568,8 @@ const js = fs.readFileSync(file);
       pillInk("Full") === warn, pillInk("Full"));
     check("so does washing waiting to be hung",
       pillInk("to hang") === warn, pillInk("to hang"));
-    check("and so does a machine with its plug off",
-      pillInk("Plug off") === warn, pillInk("Plug off"));
+    check("and a machine with its plug off is waiting, not attention",
+      pillInk("Plug off") === waitInk, pillInk("Plug off"));
     check("while the open door beside them stays quiet",
       pillInk("Door open") !== warn, pillInk("Door open"));
 
@@ -561,12 +581,12 @@ const js = fs.readFileSync(file);
 
        It must be neutral. A cost asks nothing of anybody and there is no
        Needs-you row behind it, so ochre would be exactly the lie the
-       block above exists to prevent -- and it must not be the alert
+       block above exists to prevent -- and it must not be the critical
        colour either, because a wash costing money is not a wash going
        wrong. Both are asserted: draining the colour out is not the same
        as choosing neutral, and only checking one of them would let the
        other through. */
-    const alertInk = tokenColour("--sp-a1-on");
+    const alertInk = tokenColour("--sp-critical-on");
     await show({ cost: "33p", door_open: false });
     check("a finished wash says what it cost",
       (pillInk("33p") || "") !== "", pillInk("33p"));
