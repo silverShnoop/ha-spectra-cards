@@ -129,6 +129,22 @@ meta: {count: light.downstairs, suffix: " lights on", singular: " light on",
 meta: {count: [light.kitchen, light.study_2], state: "on", suffix: " rooms"}
 ```
 
+`state` takes a list as readily as a word, and `attribute` — the same key an
+entity read uses — says which fact to count. Both exist because heating is
+not a lamp. A radiator valve left on its schedule reads `auto` whether it is
+burning or idle, so the state cannot say which; the air conditioner in the
+same house reads `cool` when it is working, so one word cannot cover both.
+The rail's Climate button asks one question over the lot of them.
+
+```yaml
+summary: {count: [climate.kitchen, climate.bedroom_master_aircon],
+          attribute: hvac_action, state: [heating, cooling],
+          suffix: " rooms on", singular: " room on", none: Nothing on}
+```
+
+A room that cannot be read, or that has no such attribute, counts as nothing
+rather than as something — an offline valve carries no `hvac_action` at all.
+
 `sum` adds the states together. No operators and no expressions — a tab tile
 that counts two to-do lists needs addition and nothing else.
 
@@ -1487,6 +1503,26 @@ one passed every check, shipped, registered no custom elements at all, and
 turned every card on the dashboard into "Custom element doesn't exist".
 
 The card ships as `type="module"`. So it has to be checked as one.
+
+```
+node tools/checkicons.js
+```
+
+Renders the cards whose icons lead text and reports each glyph against the
+cap band of the name beside it. Positive is low; it fails over 0.75px.
+
+Two traps it has fallen into, both of which it passed while the panel showed
+icons sitting low beside their names. It measured the baseline with a probe
+that carried a letter, and in a line tighter than the font wants — the hero's
+`line-height:1` — Chromium aligns such a probe by the baseline *inside* it,
+five pixels below the one the text is painted on. And it measured in one
+font, while an icon hung off a `vertical-align` length hangs off a baseline
+the browser synthesises out of font metrics, so an offset solved here was not
+the offset the panel's Roboto needed.
+
+So the probe is now empty and zero-height, and every card is measured through
+five unrelated font stacks. An offset that only lines up in one of them is
+not lined up.
 
 ## Licence
 
