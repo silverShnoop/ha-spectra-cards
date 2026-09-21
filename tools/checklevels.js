@@ -30,6 +30,46 @@ const file = process.argv[2]
   || path.join(__dirname, "..", "dist", "spectra-cards.js");
 const js = fs.readFileSync(file);
 
+/* ---- a source check, before any of the rendered ones ----------------
+   a1 and a2 are the two slots that used to be terracotta and ochre, and
+   terracotta and ochre used to mean alert and warning. Four rules in the
+   stylesheet were still reaching for them by name for that meaning --
+   the inverted strip, the unlocatable person, the plug and the open
+   window -- and every one of them silently repainted itself the moment
+   those slots became a brown and a bone. None of the rendered checks
+   caught it, because each rule was right about its own token.
+
+   So: no rule may name a1 or a2 directly. A card asks for its accent by
+   number in config and reads var(--accent); anything in the sheet that
+   wants one of these two specifically is either a level wearing a
+   disguise or a depiction that needs its own token. a3..a6 are exempt --
+   they never carried a level, so hardcoding one is only a style choice. */
+{
+  const src = js.toString("utf8");
+  const sheetStart = src.indexOf("const SHEET");
+  const body = sheetStart === -1 ? src : src.slice(sheetStart);
+  /* Comments are stripped rather than skipped line by line: the note
+     explaining why a rule stopped naming a1 quotes a1, and a line-based
+     filter cannot tell that from the rule itself. Newlines are kept so
+     the reported line number still points at the real place. */
+  const code = body.replace(/\/\*[\s\S]*?\*\//g,
+    (c) => c.replace(/[^\n]/g, " "));
+  const offenders = [];
+  const re = /var\(--sp-a[12](?:-soft|-on)?\)/g;
+  let m;
+  while ((m = re.exec(code)) !== null) {
+    const line = code.slice(0, m.index).split("\n").length;
+    offenders.push(`${m[0]} at sheet line ${line}: ${code.split("\n")[line - 1].trim()}`);
+  }
+  if (offenders.length) {
+    console.log("FAIL no rule hardcodes a1 or a2");
+    offenders.forEach((o) => console.log("       " + o));
+    console.log(`\nFAILED (${offenders.length})`);
+    process.exit(1);
+  }
+  console.log("ok   no rule hardcodes a1 or a2, the two ex-level slots");
+}
+
 (async () => {
   console.log(`levels: ${path.relative(process.cwd(), file)}`);
   const server = http.createServer((req, res) => {
