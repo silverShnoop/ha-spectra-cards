@@ -233,7 +233,7 @@ const js = fs.readFileSync(file);
     check("in the card's own accent, not a grey line",
       rule().split("|")[1]
         === getComputedStyle(q(".card")).getPropertyValue("--accent").trim()
-        || rule().split("|")[1] === "rgb(182, 134, 42)",
+        || rule().split("|")[1] === "rgb(169, 161, 144)",
       `${rule()} vs accent 2`);
 
     /* It is still a spectra card underneath: same eyebrow, same icon.

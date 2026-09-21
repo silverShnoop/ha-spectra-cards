@@ -154,7 +154,7 @@ const js = fs.readFileSync(file);
     await show({
       type: "lock", state: "Unlocked", accent: 2,
       sub: "3m ago \u00b7 14:51", action: ACTS,
-    }, 2);
+    }, "waiting");
     calls.length = 0;
     q(".lockbtn").click();
     await settle();
@@ -173,7 +173,7 @@ const js = fs.readFileSync(file);
       sub: "8m ago \u00b7 14:46",
       chips: [{ text: "Jammed", icon: "mdi:lock-alert", accent: 1 }],
       action: ACTS,
-    }, 1);
+    }, "critical");
     check("a jammed lock still says Unlocked in the hero",
       txt(".lockstate") === "Unlocked", txt(".lockstate"));
     check("and carries the jam as a chip",
@@ -193,7 +193,7 @@ const js = fs.readFileSync(file);
     await show({
       type: "lock", state: "Unknown", accent: 2,
       sub: "1m ago \u00b7 14:53", action: ACTS,
-    }, 2);
+    }, "waiting");
     check("a lock that cannot be read says so",
       txt(".lockstate") === "Unknown", txt(".lockstate"));
     check("...and offers to shut it rather than open it",
@@ -205,7 +205,7 @@ const js = fs.readFileSync(file);
     /* A button offering "Unlock" on an open door is a service call that
        changes nothing and a control that feels broken. */
     await show({ type: "lock", state: "Unlocked", accent: 2,
-      sub: "3m ago \u00b7 14:51", action: ACTS }, 2);
+      sub: "3m ago \u00b7 14:51", action: ACTS }, "waiting");
     check("an open door is never offered Unlock",
       txt(".lockbtn") === "Lock", txt(".lockbtn"));
 

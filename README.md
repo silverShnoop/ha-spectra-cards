@@ -42,20 +42,65 @@ tap_action:                # optional
 
 | Key | Meaning |
 | --- | --- |
-| `accent` | 1 terracotta (alerts) · 2 ochre (warnings, override) · 3 moss (positive) · 4 teal (primary, live) · 5 slate (secondary series) · 6 plum (third category). Default 4. |
+| `accent` | 1 brown (Climate) · 2 bone (Lights) · 3 moss (positive) · 4 teal (primary, live) · 5 slate (secondary series) · 6 plum (third category). Default 4. Decorative only — see below. |
 | `icon`, `title`, `meta` | All optional. Omit all three and the title bar is not drawn. |
 | `body` | Required, with a `type`. |
-| `outline` | An accent number, or falsy. Colours the card's border, the way a Needs-you row is outlined. |
+| `outline` | `attention`, `waiting`, `critical`, or falsy. Colours the card's border, the way a Needs-you row is outlined. **Not** an accent number. |
 | `tap_action` | `more-info`, `navigate`, `url`, `perform-action`, `none`. |
 | `hide_when_empty` | Default `true`. See below. |
 | `invert` | Accent fill, paper text. Step 7 of the emphasis ladder and the only one in the system — see below. |
 
-`outline` is deliberately **not** a mode of `accent`. The accent says what
-this card *is*; the outline says something on it wants a person. A card is
-often both at once — a plum washing machine outlined terracotta because the
-floor is wet — and collapsing them into one value would make an alert card
-forget which machine it was. It uses the border the card already has, so
-nothing moves and nothing is pushed down the card.
+## Two palettes, and the wall between them
+
+`accent` is **decorative**. It says which tab this card belongs to and it
+means nothing else. `outline` is a **level**. It says the house is asking a
+person for something, and it is the only thing on a card that says so.
+
+They used to be the same six numbers, and that is how a card came to claim an
+alarm by naming a hue — and how repainting a decorative slot would silently
+have repainted an alert. They are now different value spaces, and an accent
+number in `outline` buys nothing at all.
+
+| Level | Timeline | Treatment | Light | Dark |
+| --- | --- | --- | --- | --- |
+| `attention` | today or tomorrow | 2px border | `#B6862A` | `#D9A63F` |
+| `waiting` | the next 30 minutes | border + 1px inset ring | `#B0512C` | `#E08054` |
+| `critical` | now | ring + soft ground | `#8E0C14` | `#E2333F` |
+
+The levels are ordered and the accents are not, which is why the levels are
+named and the accents numbered: a slot number is an arbitrary label, whereas
+`waiting` carries a timeline a reviewer can check a row against.
+
+**Yellow, orange and red are reserved.** No decorative slot may be one of
+them, which is why `a1` and `a2` are a brown and a bone rather than the
+terracotta and ochre they used to be. Those two hues did not change value —
+they moved, intact, from `a1`/`a2` to `waiting`/`attention`, so Climate kept
+`accent: 1` and Lights kept `accent: 2` and neither dashboard had to be
+rewritten to be repainted.
+
+**The weight is not decoration.** Yellow and orange measure ΔE 13.3 apart to
+normal vision, under the 15 floor, and across a kitchen at an angle that is
+not a difference. The ring and the fill survive the distance, the angle and
+colour-blindness; the hue step alone does not. The second pixel is an inset
+ring rather than a 3px border because every box in the sheet is sized by its
+outside edge — a thicker border would eat a pixel of padding and shift every
+line in the card the moment a level arrived.
+
+A card is often decorated and levelled at once — a plum washing machine
+outlined red because the floor is wet. Collapsing the two into one value
+would make an alerting card forget which machine it was.
+
+**Inside a body, an element's colour may be either.** The wall is at the
+card, where identity lives. A rail button is its tab's hue until that tab
+has something at a level, and then it is the level — so the `accent` on a
+dock button, a lock disc or a lock action button takes a level name as
+happily as a slot number, and the config says which by writing one or the
+other:
+
+```yaml
+accent: {entity: sensor.security_status,
+         map: {green: 3, amber: waiting, red: critical}, default: 3}
+```
 
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
@@ -554,11 +599,11 @@ paper.
 body:
   type: lock
   state: {entity: lock.front_door, map: {locked: Locked}, default: Unlocked}
-  accent: {entity: sensor.security_status, map: {green: 3, amber: 2, red: 1}, default: 3}
+  accent: {entity: sensor.security_status, map: {green: 3, amber: waiting, red: critical}, default: 3}
   fill: true                       # the disc is tinted; default true
   sub: {entity: lock.front_door, attribute: last_changed, format: since}
   chips:                           # omit entirely when there is nothing extra
-    - {text: Jammed, icon: mdi:lock-alert, accent: 1}
+    - {text: Jammed, icon: mdi:lock-alert, level: critical}
   action:
     lock:   {service: lock.lock,   target: {entity_id: lock.front_door}}
     unlock:
@@ -971,10 +1016,14 @@ beside the drum, in the largest text on the card. Identity was written
 nowhere.
 
 **Except where the state asks something of you.** A leak, a dead plug, a
-drum to empty and washing to hang all take the accent's *role* rather than
-the card's hue — and those are exactly the states that also outline the
-card. A card trimmed amber with a plum porthole in the middle of it was the
-one element not joining in.
+drum to empty and washing to hang all take the *level* rather than the
+card's hue — and those are exactly the states that also outline the card. A
+card trimmed amber with a plum porthole in the middle of it was the one
+element not joining in.
+
+These three used to be written as accent numbers 1 and 2, which was level
+meaning hidden in a decorative slot: the card picked an alarm by asking for
+a hue, and repainting `a1` would silently have repainted the leak.
 
 The cost is real and was accepted knowingly: a washer and a dryer that are
 both full show the same ring and the same basket, and are then tellable
@@ -989,11 +1038,11 @@ identity the first time.
 | idle | `machine` | the card's accent |
 | running | the live phase's glyph, moving | the card's accent |
 | running, no phase known | `mdi:autorenew` | the card's accent |
-| drum to empty | `mdi:basket-unfill` | **warning** |
-| washing waiting | the count | **warning** |
-| full drum | `mdi:basket-unfill` | the card's accent |
-| **no power** | `machine_off` | **2 ochre, on every machine** |
-| **leak** | `mdi:water` | **1 terracotta, on every machine** |
+| drum to empty | `mdi:basket-unfill` | **attention** |
+| washing waiting | the count | **attention** |
+| full drum | `mdi:basket-unfill` | **attention** |
+| **no power** | `machine_off` | **waiting, on every machine** |
+| **leak** | `mdi:water` | **critical, on every machine** |
 
 **Two exceptions, and only two.** A leak and a dead plug have to catch the
 eye *before* anybody reads a word, so they keep their roles everywhere.
@@ -1091,7 +1140,7 @@ buttons:
       data: {title: Lights, content: {...}}
   - icon: mdi:shield-home
     label: Security
-    accent: {entity: sensor.security_status, map: {green: 3, amber: 2, red: 1}}
+    accent: {entity: sensor.security_status, map: {green: 3, amber: waiting, red: critical}}
     fill: true
     summary: {entity: sensor.security_status, attribute: detail}
 ```

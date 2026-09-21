@@ -126,6 +126,28 @@ const js = fs.readFileSync(file);
     check("and the card goes with it",
       insideDark.toUpperCase() === "#312D26", `card says ${insideDark}`);
 
+    /* The levels have to reach the page for the same reason the rest of
+       the palette does, and more urgently: the rail buttons are HA's own
+       chrome, outside every card, and colouring one is half of what a
+       level means. A level that only existed inside the shadow root
+       could paint the card and never the button. */
+    a.hass = hass(false);
+    await frame();
+    const lvl = (name) => {
+      probe.style.background = `var(--sp-${name})`;
+      const c = getComputedStyle(probe).backgroundColor;
+      probe.style.background = "var(--sp-sink)";
+      return c;
+    };
+    ["attention", "waiting", "critical"].forEach((name) => {
+      check(`the page can read var(--sp-${name})`,
+        !/rgba\(0, 0, 0, 0\)/.test(lvl(name)), lvl(name));
+      check(`...and var(--sp-${name}-soft) with it`,
+        !/rgba\(0, 0, 0, 0\)/.test(lvl(`${name}-soft`)), lvl(`${name}-soft`));
+    });
+    a.hass = hass(true);
+    await frame();
+
     /* HA owns <html>. data-theme on a card is ours to set because we made
        the element; on the document it is a name every other plugin and
        every theme may also be using. */
