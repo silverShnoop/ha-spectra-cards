@@ -140,6 +140,44 @@ ha-icon { display:inline-flex; line-height:0; }
    always there, so nothing moves and nothing is pushed down the card --
    which is the whole reason this beats a band across the top. */
 .card.outlined { border-color:var(--outline); }
+
+/* Three columns, and the middle one is a single merged cell.
+
+   The outer two keep their rows: the room's name over what the room is
+   doing on the left, what it is reporting over nothing on the right. The
+   middle holds the one tall control, spanning both rows, so its 44px is
+   absorbed by the two lines beside it instead of stacking a third band
+   under them. That is the whole saving -- 108px to 76px -- and no element
+   has moved relative to any other.
+
+   minmax(0,1fr) on both outer columns rather than auto: equal tracks are
+   what put the middle column on the card's midline, and the zero minimum is
+   what lets a long sentence ellipsis rather than shove the dial sideways. */
+.card.split {
+  display:grid; align-items:center;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  grid-template-rows:auto auto;
+  column-gap:10px; row-gap:4px;
+}
+/* The bar stops being a box so its two runs can be placed separately; the
+   runs become boxes for the same reason. Everywhere else this pair is the
+   other way round and the layout is exactly what it always was. */
+.card.split > .titlebar { display:contents; }
+.card.split .tbmain, .card.split .tbend {
+  display:flex; align-items:center; gap:7px; min-width:0;
+}
+.card.split .tbmain { grid-column:1; grid-row:1; }
+.card.split .tbend { grid-column:3; grid-row:1; justify-self:end; }
+.card.split > .row { grid-column:1; grid-row:2; min-width:0; }
+/* An explicit span, and the rows declared above rather than left implicit.
+   With implicit rows, 1 / -1 resolves against the rows that exist at the
+   time -- which is one -- so the dial landed in row 1 alone and forced that
+   row to its own 44px, putting the card back to 96px. The span is the whole
+   point of this layout, so it says two and the grid says two. */
+.card.split > .aside {
+  grid-column:2; grid-row:1 / span 2;
+  display:flex; align-items:center; justify-content:center;
+}
 /* A card that heads a group rather than being one of it.
    NOT a container: it holds nothing and knows nothing about what
    follows it. The section it sits in does the bounding, which is HA's
@@ -172,6 +210,12 @@ ha-icon { display:inline-flex; line-height:0; }
 .card.asheader .titlebar ha-icon { --mdc-icon-size:18px; }
 .card.asheader .tick { display:none; }
 .titlebar { display:flex; align-items:center; gap:7px; margin-bottom:8px; }
+/* The bar's two runs are inert by default -- not boxes at all, so every
+   ordinary title bar lays out exactly as it did: the tick, the icon, the
+   title, the status and the control are still the flex items themselves.
+   They become real boxes only inside the split grid, where the two runs have
+   to travel to opposite columns as single pieces. */
+.tbmain, .tbend { display:contents; }
 .tick { width:3px; height:12px; flex:none; background:var(--accent); }
 .titlebar ha-icon { --mdc-icon-size:16px; color:var(--accent); }
 .titlebar h3 {
@@ -1306,13 +1350,7 @@ img.avatar { object-fit:cover; display:block; }
 .dial.adrift .barrel { opacity:.3; }
 /* climate — one room. Same row as the light card's, so the two card types
    sit at the same rhythm and the controls land in the same place on both. */
-.climrow { min-height:44px; padding:6px 0; }
-/* The two outer slots of the climate row. Equal flex basis of zero, so they
-   split the leftover width evenly however long the sentence is -- which is
-   what puts the control between them on the card's midline rather than
-   somewhere that merely looks central on one room's wording. */
-.climside { display:flex; align-items:center; gap:8px; flex:1 1 0; min-width:0; }
-.climend { justify-content:flex-end; }
+.climrow { min-height:26px; padding:0; }
 
 /* Something is stopping the room heating that the room did not choose — an
    open window. Ochre, because it is a warning rather than a fault. */
@@ -2653,6 +2691,33 @@ function pickerScene(b, label) {
   return null;
 }
 
+/* The one thing a body puts in the card's middle column.
+
+   A climate card was three bands deep for one reason: the dial is 44px and
+   everything else on it is half that, so the dial's band set the height and
+   the two text lines sat above it. Given a column of its own that spans
+   every row, the same 44px is absorbed by the two lines beside it instead of
+   stacking under them -- one merged cell between two columns that each keep
+   their rows. 108px becomes 76px, and nothing has moved except the dial.
+
+   It is the card's middle in the real sense: the outer columns share the
+   leftover width equally, so the control sits on the midline whatever the
+   sentence beside it says. */
+const BODY_ASIDE = {
+  climate(b) {
+    if (!b || typeof b !== "object") return "";
+    const power = Number(b.flame);
+    const firing = isFinite(power) && power > 0;
+    /* A shallow copy rather than a flag on the body: the dial is shared with
+       `control`, and it should know that a row is running hot without knowing
+       that radiators exist. */
+    if (b.adjust) return dialMarkup(firing ? Object.assign({}, b, { hot: true }) : b, 0);
+    /* A room with no dial puts its word in the same column, so the middle
+       does not empty out and shift when a room goes off. */
+    return isBlank(b.value) ? "" : `<span class="ctlvalue">${esc(b.value)}</span>`;
+  },
+};
+
 /* The one control a body puts in the title bar.
 
    A room's power switch belongs beside the room's name and the scene it is
@@ -3968,12 +4033,6 @@ const BODIES = {
        one a modifier may yet want to reach. */
     let out = `<div class="row pickrow climrow">`;
 
-    /* Three slots, and the outer two share the slack equally so the middle
-       one lands on the card's midline. That is the whole reason they are
-       wrapped: with the sentence simply taking the slack, the dial was
-       pushed to the far end and sat directly under the switch. */
-    out += `<span class="climside">`;
-
     /* Live in every state, unlike the lights' twin: see above. */
     if (!isBlank(b.zone)) {
       out += `<span class="iconbtn${auto ? " on" : ""}" role="button" tabindex="0"`
@@ -4013,32 +4072,13 @@ const BODIES = {
 
     /* Reserved whether or not it has anything to say, so nothing below it
        moves when the room changes what it is doing. */
-    out += `<p class="pickinfo${b.warn ? " warn" : ""}">${esc(firstOf(b.info, ""))}</p>`
-      + `</span>`;
+    out += `<p class="pickinfo${b.warn ? " warn" : ""}">${esc(firstOf(b.info, ""))}</p>`;
 
-    /* The middle slot: the temperature you are setting, on the card's
-       midline. It is the one thing here you reach for and hold, and at the
-       far right it was a thumb's width under the switch -- the same
-       neighbouring-consequences problem that moved the switch up in the
-       first place, just the other way round. A room with no dial puts its
-       word in the same place, so the column does not jump. */
+    /* The dial is not here any more -- it is the card's middle column, and
+       it spans this row and the title bar's. See BODY_ASIDE. */
     if (b.adjust) {
-      /* A shallow copy rather than a flag on the body: the dial is shared
-         with `control`, and it should know that a row is running hot without
-         knowing that radiators exist. */
-      out += dialMarkup(firing ? Object.assign({}, b, { hot: true }) : b, 0);
-    } else if (!isBlank(b.value)) {
-      out += `<span class="ctlvalue">${esc(b.value)}</span>`;
+      out += `<span class="spinslot">${b.pending ? `<span class="spinner"></span>` : ""}</span>`;
     }
-
-    /* The right slot. It carries the spinner and, mostly, nothing else --
-       but it is drawn whatever it holds, because it is the counterweight
-       that keeps the middle in the middle. */
-    out += `<span class="climside climend">`
-      + (b.adjust
-        ? `<span class="spinslot">${b.pending ? `<span class="spinner"></span>` : ""}</span>`
-        : "")
-      + `</span>`;
     return out + `</div>`;
   },
 
@@ -6025,8 +6065,12 @@ class SpectraCard extends HTMLElement {
       + (festive ? " festive" : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "");
+    /* Drawn as a sibling of the title bar and the body rather than inside
+       either, because it belongs to neither: it is the column between them,
+       and only a direct child of the card can span the card's rows. */
+    const aside = BODY_ASIDE[type] && !waiting ? BODY_ASIDE[type](model.body) : "";
     const card = [
-      `<div class="${classes}"`,
+      `<div class="${classes}${aside ? " split" : ""}"`,
       ` style="${accentStyle(model.accent)}`
         + `${outline ? `;--outline:var(--sp-a${outline})` : ""}`
         + `${festive ? `;--fg:${esc(fb.wash)}` : ""}"`,
@@ -6042,6 +6086,7 @@ class SpectraCard extends HTMLElement {
       waiting
         ? `<p class="sub">${esc(waiting)}</p>`
         : BODIES[type](model.body),
+      aside ? `<span class="aside">${aside}</span>` : "",
       /* Last, so the glow sits over everything including the wash. */
       lit ? festPerimeter(Array.isArray(fb.palette) ? fb.palette : []) : "",
       `</div>`,
@@ -6266,19 +6311,27 @@ class SpectraCard extends HTMLElement {
        on and the control stays at the end of the line. */
     const tool = BODY_TOOL[type] ? BODY_TOOL[type](model.body) : "";
     if (isBlank(title) && isBlank(icon) && !status && !slot && !tool) return "";
+    /* The bar's two runs are wrapped, and the wrappers are `display:contents`
+       everywhere except the split card -- so on every ordinary card the flex
+       items are exactly what they were, and on a split card the two runs can
+       be sent to opposite columns as single pieces. */
     return `<div class="titlebar">`
-      + `<span class="tick"></span>`
-      + iconMarkup(icon)
-      + (isBlank(title) ? "" : `<h3>${esc(title)}</h3>`)
-      + (status
-        ? `<span class="metagroup">`
-          + (isBlank(status.icon) ? "" : `<ha-icon class="metaicon" icon="${esc(status.icon)}"></ha-icon>`)
-          + `<span class="meta">${esc(status.text)}</span>`
-          + (isBlank(status.color) ? "" : `<span class="dot" style="background:${status.color}"></span>`)
-          + `</span>`
-        : "")
-      + slot
-      + tool
+      + `<span class="tbmain">`
+        + `<span class="tick"></span>`
+        + iconMarkup(icon)
+        + (isBlank(title) ? "" : `<h3>${esc(title)}</h3>`)
+      + `</span>`
+      + `<span class="tbend">`
+        + (status
+          ? `<span class="metagroup">`
+            + (isBlank(status.icon) ? "" : `<ha-icon class="metaicon" icon="${esc(status.icon)}"></ha-icon>`)
+            + `<span class="meta">${esc(status.text)}</span>`
+            + (isBlank(status.color) ? "" : `<span class="dot" style="background:${status.color}"></span>`)
+            + `</span>`
+          : "")
+        + slot
+        + tool
+      + `</span>`
       + `</div>`;
   }
 
