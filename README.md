@@ -807,6 +807,12 @@ body:
   pending: {entity: sensor.washing_machine, attribute: pending_count}
   phases: {entity: sensor.washing_machine, attribute: phases}
   info: "Started 47m ago"
+  cost:                              # one value; the dashboard picks which
+    cases:
+      - when: {entity: sensor.washing_machine, map: {running: true},
+               default: false}
+        then: {entity: sensor.washing_machine, attribute: cost_so_far_text}
+    else: {entity: sensor.washing_machine, attribute: last_cost_text}
   finished:
     from: {entity: sensor.washing_machine, attribute: finished_today}
     each:
@@ -864,6 +870,27 @@ Tumble and spin are both the drum going round, so they differ in form
 rather than direction: `mdi:sync` (two arrows opposed — the drum reverses)
 against `mdi:rotate-right` (one arrow, flat out). Mirror images were the
 obvious pair and the worst one; at 17px, handedness is not a difference.
+
+**`cost` is the one figure that earned a chip back.** There is no wattage
+chip, because the draw is already in the card's `meta` and a card does not
+state a figure twice. The cost is stated nowhere else, so it is a figure
+rather than a second copy of one — and it is the fact people actually want
+from a washing machine, which is not *what does it cost* but *was it worth
+putting a half load on*. Two chips a week apart answer that.
+
+It is **neutral**, like the door chips. A cost asks nothing of anybody and
+has no `Needs you` row behind it, so ochre would be the lie the yellow rule
+exists to prevent; and a wash costing money is not a wash going wrong, so
+it is not terracotta either. Teal was tried on the wattage chip and came off
+for the reason it would be wrong here too — a wash that has finished is not
+live.
+
+It takes **one value**, so the config decides which cost it is: the running
+total while a cycle is in flight, the last load's once it stops. A blank
+renders nothing, which is how a wash that could not be priced leaves a hole
+rather than a confident `0p` — `home_signals` drops the cost for any cycle
+it could not price all the way through, and a chip reading zero is
+indistinguishable from a wash that was genuinely free.
 
 **The card carries no jobs.** A load waiting to be hung is a job, and jobs
 live in `Needs you`. Putting it here as well would be the same sentence in

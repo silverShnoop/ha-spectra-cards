@@ -3475,6 +3475,24 @@ const BODIES = {
        running) and then neutral before the simpler answer: a card that
        already states a figure does not need to state it again. `power` on
        the body went with it, since nothing else read it. */
+    /* What the run cost. This is not the wattage chip coming back: that one
+       was the same number as the card's `meta` a few centimetres away, and
+       the rule it fell to was "a card that already states a figure does not
+       need to state it again". The cost is stated nowhere else on the card,
+       so it is a figure rather than a second copy of one.
+
+       Neutral, like the door chips. A cost asks nothing of anybody, and
+       ochre here is a promise that something wants doing -- the one colour
+       it must not be. Teal came off the wattage chip for the reason it
+       would be wrong here too: a wash that has finished is not live.
+
+       One value, not a pair, so the dashboard decides WHICH cost it is --
+       `cases` already picks the running total while a cycle is in flight
+       and the last load's once it stops. Blank renders nothing, which is
+       how a wash that could not be priced leaves a hole instead of `0p`. */
+    if (!isBlank(b.cost)) {
+      chips.push(chipOf(String(b.cost), "mdi:currency-gbp", 0));
+    }
     if (b.drum_full) chips.push(chipOf("Full", "mdi:basket-unfill", 2));
     if (waiting) {
       chips.push(chipOf(`${waiting} to hang`, "mdi:hanger", 2));
