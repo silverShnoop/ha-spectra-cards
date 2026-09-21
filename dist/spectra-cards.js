@@ -239,10 +239,17 @@ ha-icon { display:inline-flex; line-height:0; }
    one control a body may put up here -- is one right-aligned run, and it
    right-aligns off whichever of the three comes first. A body that reports
    no status still has to put its switch at the far end, not against the
-   title. Only the first takes the auto margin; the rest ride the gap. */
-.titlebar > .spinslot, .titlebar > .switch { margin-left:auto; }
-.titlebar > .metagroup ~ .spinslot, .titlebar > .metagroup ~ .switch,
-.titlebar > .spinslot ~ .switch { margin-left:0; }
+   title. Only the first takes the auto margin; the rest ride the gap.
+
+   Matched inside .tbend, not as children of the bar. The run is wrapped now,
+   and a child combinator reads the DOM, not the layout -- so while
+   display:contents keeps these the bar's flex items (which is why an auto
+   margin here still eats the bar's slack), a child-of-titlebar selector
+   stopped matching the moment the wrapper went in. A lit room reports no status, so
+   with nothing taking the margin its switch walked back to the title. */
+.tbend > .spinslot, .tbend > .switch { margin-left:auto; }
+.tbend > .metagroup ~ .spinslot, .tbend > .metagroup ~ .switch,
+.tbend > .spinslot ~ .switch { margin-left:0; }
 /* A 26px control in a bar of 11px capitals would set the height of every
    title bar on the panel by itself. It is the same switch, drawn to the
    line it is now sitting on: 34x22 outside, 2px border, so 30x18 inside; a
@@ -2775,6 +2782,15 @@ const BODY_STATUS = {
     return null;
   },
 
+  /* And again: registered for the slot, not for a status line. What the
+     room is reporting is configured `meta` -- the temperature and the
+     humidity -- and the body has nothing truer to say than that. Being in
+     here is what puts this card's spinner in the same place as every other
+     card's, which is the top right corner and nowhere else. */
+  climate() {
+    return null;
+  },
+
   picker(b) {
     if (!b || typeof b !== "object") return null;
     if (b.on !== undefined && !b.on) return { text: "Off" };
@@ -4074,11 +4090,11 @@ const BODIES = {
        moves when the room changes what it is doing. */
     out += `<p class="pickinfo${b.warn ? " warn" : ""}">${esc(firstOf(b.info, ""))}</p>`;
 
-    /* The dial is not here any more -- it is the card's middle column, and
-       it spans this row and the title bar's. See BODY_ASIDE. */
-    if (b.adjust) {
-      out += `<span class="spinslot">${b.pending ? `<span class="spinner"></span>` : ""}</span>`;
-    }
+    /* No spinner here. The card has exactly one, in the title bar, and it
+       is the shell's -- driven by whether this card has a call in flight
+       rather than by a `pending` figure in the config, and able to become a
+       tick when the call lands. A second one in the row could only ever
+       disagree with it. */
     return out + `</div>`;
   },
 
@@ -7518,7 +7534,13 @@ class SpectraCard extends HTMLElement {
       if (auto) {
         const run = (event) => {
           event.stopPropagation();
-          onPress(auto, () => setMode("auto"));
+          /* flashPress and _work, not onPress: onPress hangs a spinner
+             inside the button it was given, which is a second place for
+             this card to report from. The press is shown by the flash; the
+             call is shown by the one spinner in the title bar. Exactly what
+             the room's schedule button does. */
+          flashPress(auto);
+          this._work(() => setMode("auto"));
         };
         auto.addEventListener("click", run);
         auto.addEventListener("keydown", (event) => {
@@ -7533,7 +7555,8 @@ class SpectraCard extends HTMLElement {
           /* The knob travels on the press, before the thermostat answers,
              for the same reason every other control here does. */
           power.classList.toggle("on", !on);
-          onPress(power, () => setMode(on ? "off" : "auto"));
+          flashPress(power);
+          this._work(() => setMode(on ? "off" : "auto"));
         };
         power.addEventListener("click", run);
         power.addEventListener("keydown", (event) => {
@@ -7743,11 +7766,14 @@ class SpectraCard extends HTMLElement {
       /* One call for a flurry of taps: a thermostat asked three times in a
          second is three round trips for one decision. */
       send: setTimeout(() => {
-        this._callAction({
+        /* Through _work, so the dial reports where every other control on
+           the card reports. Without this the one control people actually
+           use on a climate card was the one that said nothing. */
+        this._work(() => this._callAction({
           service: adjust.service,
           target: { entity_id: adjust.entity },
           data: Object.assign({}, adjust.data, { [field]: Number(next.toFixed(2)) }),
-        });
+        }));
       }, 450),
       /* If the house never agrees, stop claiming it did. */
       giveUp: setTimeout(() => this._settle(adjust.entity), 12000),
