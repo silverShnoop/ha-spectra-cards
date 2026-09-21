@@ -102,6 +102,22 @@ accent: {entity: sensor.security_status,
          map: {green: 3, amber: waiting, red: critical}, default: 3}
 ```
 
+**The stylesheet may not name `a1` or `a2`.** Those are the two slots that
+used to be terracotta and ochre, back when terracotta and ochre meant alert
+and warning — so a rule reaching for one of them by name is usually a level
+wearing a disguise. Four were: the inverted strip, the unlocatable person,
+the plug and the open-window note, and all four silently repainted
+themselves the moment those slots became a brown and a bone. `a3`–`a6` are
+exempt; they never carried a level. `checklevels` asserts it against the
+source before it renders anything.
+
+**A depiction is neither.** `--sp-sun` is yellow because the sun is, the way
+a bulb's colour temperature is the colour the light actually is. It is not a
+role anybody chose and the palette gets no vote on it — which is also why it
+is its own token rather than the attention level, near neighbours though
+they are: a glyph inside a weather icon is a picture, and a level is a claim
+about the card it is drawn on.
+
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
 is never a seventh: if a new meaning appears, map it onto one of the six.
