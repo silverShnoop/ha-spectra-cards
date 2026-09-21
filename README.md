@@ -358,6 +358,26 @@ into the future, `last` for a history running up to the present. That is the
 end whose point is filled, and the filled point is how the eye knows which
 way to read the line.
 
+**This is the one body with an intrinsic size.** An inline `svg` carrying a
+`viewBox` and no CSS fills its container and scales everything inside it to
+match, type included — on a full-width card at 1280px the 320-wide box
+became 1200 wide, drawing the end labels at 37px and the line at 11px and
+standing the card 285px tall. Every number in the drawing was correct; it
+was the right chart, enlarged until it read as a mistake.
+
+A `viewBox` cannot be resolution-independent *and* hold its type at a fixed
+size, so the box is capped at 480px: labels at 15px and a band 114px tall,
+which is the type scale of the rows above it. Past that the chart stops
+growing and the card's padding takes the slack; below it the chart still
+shrinks to fit a phone. `tools/checkchart.js` measures it rather than
+eyeballing it, because that failure is invisible in the markup.
+
+**Two points is the minimum.** One is not a shape, so a single-value chart
+reports itself empty and `hide_when_empty` stands the card down rather than
+drawing a lone dot in an empty box — which is what a fourteen-day chart did
+on its first day. An `icons` row is exempt: one icon over one hour is still
+a forecast saying something.
+
 ### `forecast` — what will it be like later?
 
 ```yaml
