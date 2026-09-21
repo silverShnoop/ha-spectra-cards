@@ -1298,10 +1298,17 @@ body:
 
 ## A card can head a group, and that is not a container
 
-`header: true` on the shell stops it drawing its box. Same title bar,
-same accent tick, same icon — it simply loses the border, the fill and
-most of the padding, and its title goes up a size. The cells beneath it
-then read as its contents rather than as its neighbours.
+`header: true` on the shell stops it drawing its box, and moves its
+accent. The tick goes — a tick labels the row it stands beside, and a
+header is labelling everything under it — and the colour it carried
+becomes a 2px rule along the bottom of the whole header. The title goes
+up a size. The cells beneath then read as its contents rather than as
+its neighbours.
+
+The first version of this only scaled the ordinary title bar up, tick
+and all, and it read as a larger card rather than as a different kind
+of thing. The rule is the part that fixes that: it is a mark no
+ordinary card has, and it is as wide as the group it heads.
 
 ```yaml
 type: custom:spectra-card
@@ -1311,6 +1318,22 @@ icon: mdi:home-floor-g
 title: Downstairs
 body: {type: summary, …}
 ```
+
+### The one control on it says what it turns off
+
+A `summary` body's button is the only control on the panel whose scope
+is not the thing beside it: a room's switch sits next to the room's
+name, and this one sits next to a count of rooms. So it carries words
+as well as the power glyph, and the words are **inside** the target —
+a caption next to a button is the part people press. `action_label`
+(or `button`) overrides the wording; the default is `Turn all off`.
+
+With nothing on, it is not drawn at all. That reverses an earlier
+decision — it used to grey out and stay put, on the argument that a
+control which vanishes is one you have to hunt for. The label is what
+changed the balance: a labelled pill announces itself the moment it
+comes back, and a dead button on a card whose job is stating facts was
+the worse of the two.
 
 **It holds nothing.** It has no `cards`, it does not know what follows
 it, and nothing is nested. The *section* does the bounding — that is
@@ -1333,6 +1356,22 @@ rejected. A card that rendered child cards would:
   second one will want to contain differently.
 
 A header is a card wearing less. A container is a new kind of thing.
+
+### Tokens outside the cards
+
+The `background` a section wears can name a Spectra colour —
+`{color: "var(--sp-sink)", opacity: 60}` — because the palette is
+published to `:root`, not only to each card's shadow root. It did not
+used to be, and the failure was silent: custom properties inherit
+downwards, so a section *containing* the cards could never read a token
+one of them declared. The declaration was invalid, Home Assistant fell
+back to its own default fill, and the config went on naming a colour it
+never got.
+
+Only `--sp-*` names are published, and no rule selects anything, so
+loading the file repaints nothing. The page's mode is stamped as
+`data-spectra-theme` on `<html>` rather than `data-theme`, which belongs
+to Home Assistant and to every other plugin on the panel.
 
 ## Yellow is a promise
 

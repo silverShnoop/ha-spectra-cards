@@ -9,21 +9,30 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.103.0";
+const VERSION = "0.104.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
 /* ------------------------------------------------------------------ *
- * Stylesheet
+ * The palette
  *
- * Ported verbatim from the Reference view. The measurements are deliberate
- * and are not to be adjusted body by body — that is how a design system
- * turns into a pile of cards that nearly match. The block at the end is
- * additive: mechanics the reference markup could not express (hiding,
- * focus rings, touch targets), each noted with why.
+ * Declared once here and worn in two places: the shadow sheet below, and
+ * a stylesheet stamped on the document so that Home Assistant's own
+ * chrome -- a section background, a heading -- can be given a Spectra
+ * tone by name.
+ *
+ * The second place is not a nicety. A dashboard writing
+ *
+ *   background: {color: "var(--sp-sink)"}
+ *
+ * on an HA section was, while these tokens lived only in a shadow root,
+ * naming a custom property that did not exist out there: the declaration
+ * was invalid, HA quietly fell back to its own default fill, and the
+ * config went on claiming a colour it never got. Custom properties
+ * inherit downwards and only downwards, so a token set on a card can
+ * never be read by the section containing it -- the card is the child.
  * ------------------------------------------------------------------ */
-const SHEET = `
-:host {
+const TOKENS_LIGHT = `
   --sp-paper:#F3F0E7; --sp-surface:#FAF8F2; --sp-sink:#EAE6D9;
   --sp-zebra:#F0EDE3; --sp-ink:#2B2724; --sp-ink-2:#6B655B;
   --sp-ink-3:#938C80; --sp-edge:#D6D0C0;
@@ -38,8 +47,7 @@ const SHEET = `
   /* A flash on plain paper only has to beat paper. A flash landing on top of
      a selection wash has to beat the wash, so it presses harder. */
   --sp-press-firm: rgba(43,39,36,.34);
-  display:block; color:var(--sp-ink);
-}
+`;
 
 /* ---- dark ----
    Paper and ink swap materials rather than inverting arithmetically. The
@@ -55,25 +63,7 @@ const SHEET = `
 
    Raw entity colours — a bulb's temperature, a Hue scene's hex — are
    deliberately untouched. They are the colour the light actually is. */
-@media (prefers-color-scheme: dark) {
-  :host(:not([data-theme="light"])) {
-    --sp-paper:#16140F; --sp-surface:#211E19; --sp-sink:#312D26;
-    --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
-    --sp-ink-3:#837C6F; --sp-edge:#3C372E; --sp-press: rgba(240,235,224,.22);
-    --sp-press-firm: rgba(240,235,224,.36);
-    --sp-a1:#E08054; --sp-a1-soft:#3A241A; --sp-a1-on:#F0B393;
-    --sp-a2:#D9A63F; --sp-a2-soft:#382C14; --sp-a2-on:#EBC97E;
-    --sp-a3:#93B45F; --sp-a3-soft:#24301A; --sp-a3-on:#BBD495;
-    --sp-a4:#4FA9AA; --sp-a4-soft:#14302F; --sp-a4-on:#8CCBCB;
-    --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
-    --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
-  }
-}
-
-/* Home Assistant's own setting wins over the OS, because a panel forced to
-   one mode in HA should stay there. The card stamps data-theme from
-   hass.themes.darkMode, which already resolves "auto" against the system. */
-:host([data-theme="dark"]) {
+const TOKENS_DARK = `
   --sp-paper:#16140F; --sp-surface:#211E19; --sp-sink:#312D26;
   --sp-zebra:#292520; --sp-ink:#F0EBE0; --sp-ink-2:#B0A897;
   --sp-ink-3:#837C6F; --sp-edge:#3C372E; --sp-press: rgba(240,235,224,.22);
@@ -84,6 +74,38 @@ const SHEET = `
   --sp-a4:#4FA9AA; --sp-a4-soft:#14302F; --sp-a4-on:#8CCBCB;
   --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
   --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
+`;
+
+/* ------------------------------------------------------------------ *
+ * Stylesheet
+ *
+ * Ported verbatim from the Reference view. The measurements are deliberate
+ * and are not to be adjusted body by body — that is how a design system
+ * turns into a pile of cards that nearly match. The block at the end is
+ * additive: mechanics the reference markup could not express (hiding,
+ * focus rings, touch targets), each noted with why.
+ *
+ * Nothing in here may open a backtick, not even inside a comment: the whole
+ * sheet is one JS template literal, and a stray one ends it mid-rule. That
+ * has been done three times.
+ * ------------------------------------------------------------------ */
+const SHEET = `
+:host {
+${TOKENS_LIGHT}
+  display:block; color:var(--sp-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :host(:not([data-theme="light"])) {
+${TOKENS_DARK}
+  }
+}
+
+/* Home Assistant's own setting wins over the OS, because a panel forced to
+   one mode in HA should stay there. The card stamps data-theme from
+   hass.themes.darkMode, which already resolves "auto" against the system. */
+:host([data-theme="dark"]) {
+${TOKENS_DARK}
 }
 
 /* Every box in this sheet is sized by its outside edge. Declared twice by
@@ -119,20 +141,30 @@ ha-icon { display:inline-flex; line-height:0; }
    which is the whole reason this beats a band across the top. */
 .card.outlined { border-color:var(--outline); }
 /* A card that heads a group rather than being one of it.
-   Same shell, same title bar, same accent tick -- it simply stops
-   drawing the box, so the cells beneath it read as its contents
-   rather than as its neighbours. NOT a container: it holds nothing
-   and knows nothing about what follows it. The section it sits in
-   does the bounding, which is HA's job and already works.
-   The type grows one step. A header that is the same size as the
+   NOT a container: it holds nothing and knows nothing about what
+   follows it. The section it sits in does the bounding, which is HA's
+   job and already works.
+
+   The first pass at this dropped the box and scaled everything up by a
+   step, and that was the whole mistake: same tick, same icon, same
+   small-caps eyebrow, only larger. You had to measure it against the
+   card below to tell which was which.
+
+   So the accent moves instead of growing. The tick goes -- a tick
+   labels the row it stands beside, and this is labelling everything
+   under it -- and the colour it was carrying becomes a 2px rule along
+   the bottom of the whole header. That is the one line wide enough to
+   say "and all of this", and it is a mark no ordinary card has.
+   The type still grows one step, because a header the same size as the
    rows under it is not a header, it is the first row. */
 .card.asheader {
-  background:none; border-color:transparent; padding:2px 2px 0;
+  background:none; border-color:transparent;
+  border-bottom-color:var(--accent); padding:2px 2px 9px;
 }
 .card.asheader .titlebar { margin-bottom:2px; }
 .card.asheader .titlebar h3 { font-size:13px; letter-spacing:.12em; }
 .card.asheader .titlebar ha-icon { --mdc-icon-size:18px; }
-.card.asheader .tick { height:15px; width:4px; }
+.card.asheader .tick { display:none; }
 .titlebar { display:flex; align-items:center; gap:7px; margin-bottom:8px; }
 .tick { width:3px; height:12px; flex:none; background:var(--accent); }
 .titlebar ha-icon { --mdc-icon-size:16px; color:var(--accent); }
@@ -1464,6 +1496,26 @@ img.avatar { object-fit:cover; display:block; }
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
 }
 
+/* The same slab with a word in it. An icon button can go wordless when
+   the thing it acts on is named an inch to its left -- a room's switch
+   is beside the room's name. This one is not: it acts on every card
+   below it, and "off" with no scope on a wall panel is a question, not
+   a control. So it says which off it means, and the words are INSIDE
+   the target rather than beside it, because a caption next to a button
+   is the part people press. */
+.textbtn {
+  position:relative; display:inline-flex; align-items:center; gap:6px;
+  height:26px; padding:0 9px 0 7px; border-radius:3px; cursor:pointer;
+  flex:none; border:2px solid var(--sp-sink); background:var(--sp-sink);
+  color:var(--sp-ink-3); font-size:10px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase; white-space:nowrap;
+}
+.textbtn ha-icon { --mdc-icon-size:15px; }
+.textbtn::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
+}
+
 /* The one control in this system with no word on it. It can afford that
    because the thing it switches is named two inches to its left, and the
    side the knob sits on is a non-colour signal in its own right — so the
@@ -1869,6 +1921,51 @@ function applyTheme(element, hass) {
   const mode = themes.darkMode ? "dark" : "light";
   if (element.dataset.theme !== mode) element.dataset.theme = mode;
 }
+
+/* ------------------------------------------------------------------ *
+ * The palette, published to the page
+ *
+ * A card can only paint inside itself. Anything Home Assistant draws
+ * around the cards -- a section background, a heading, a badge -- is in
+ * the light DOM, above them, and cannot see a custom property declared
+ * on a shadow host. Publishing the same tokens on :root lets a dashboard
+ * name a Spectra colour where HA's own config asks for one, and costs a
+ * single <style> element for the whole page.
+ *
+ * It is published, not imposed: only --sp-* names are set, and no rule
+ * in here selects anything. A page with no spectra card on it never
+ * loads this file, so nothing is stamped.
+ *
+ * The attribute is data-spectra-theme rather than data-theme. On a card
+ * we own the element and data-theme is ours to set; <html> belongs to
+ * Home Assistant and to every other plugin on the panel.
+ * ------------------------------------------------------------------ */
+const DOC_STYLE_ID = "spectra-tokens";
+
+const DOC_SHEET = `
+:root {${TOKENS_LIGHT}}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-spectra-theme="light"]) {${TOKENS_DARK}}
+}
+
+:root[data-spectra-theme="dark"] {${TOKENS_DARK}}
+`;
+
+function publishTokens(hass) {
+  const root = document.documentElement;
+  if (!document.getElementById(DOC_STYLE_ID)) {
+    const style = document.createElement("style");
+    style.id = DOC_STYLE_ID;
+    style.textContent = DOC_SHEET;
+    document.head.appendChild(style);
+  }
+  const themes = hass && hass.themes;
+  if (!themes || typeof themes.darkMode !== "boolean") return;
+  const mode = themes.darkMode ? "dark" : "light";
+  if (root.dataset.spectraTheme !== mode) root.dataset.spectraTheme = mode;
+}
+
 
 /* ------------------------------------------------------------------ *
  * Marshalling
@@ -2973,9 +3070,19 @@ const BODIES = {
      every light downstairs" is not a thing anyone wants a thumb's width
      from the edge of a wall panel. Nothing here can turn a light on.
 
-     With the floor already dark it goes inert rather than disappearing --
-     a control that vanishes when it has nothing to do is a control you have
-     to hunt for when it does. */
+     It carries its words rather than just the power glyph, because it is
+     the one control on the panel whose scope is not the thing beside it:
+     a room card's switch is next to the room's name, and this is next to
+     a count of rooms. `action_label` overrides the wording, the same
+     key the list and lock bodies use for the word on a button.
+
+     With the floor already dark it is not drawn at all. This reverses an
+     earlier decision here -- the button used to grey out and stay put, on
+     the argument that a control which vanishes is one you have to hunt
+     for. The label is what changed that: a labelled pill announces itself
+     the moment it comes back, so there is nothing left to relearn, and a
+     dead button on a card whose whole job is stating facts was the worse
+     of the two. */
   /* One appliance, stated rather than operated.
 
      Nothing on this card asks you to do anything. A load of washing waiting
@@ -3329,16 +3436,15 @@ const BODIES = {
 
   summary(b) {
     const lit = b.on === undefined ? false : Boolean(b.on);
+    const label = String(firstOf(b.action_label, b.button, "Turn all off"));
     let out = `<div class="row summaryrow" style="padding-left:0">`
       + `<p class="pickinfo">${esc(firstOf(b.info, ""))}</p>`
       + `<span class="pickend">`;
-    if (b.action) {
-      out += `<span class="iconbtn alloff${lit ? "" : " inert"}"`
-        + ` role="button" tabindex="${lit ? "0" : "-1"}"`
-        + `${lit ? "" : ` aria-disabled="true"`}`
-        + ` aria-label="Turn these lights off"`
-        + ` title="${lit ? "Turn these lights off" : "Already off"}"`
-        + ` data-alloff><ha-icon icon="mdi:power"></ha-icon></span>`;
+    if (b.action && lit) {
+      out += `<span class="textbtn alloff" role="button" tabindex="0"`
+        + ` aria-label="${esc(label)}" title="${esc(label)}"`
+        + ` data-alloff><ha-icon icon="mdi:power"></ha-icon>`
+        + `${esc(label)}</span>`;
     }
     return out + `</span></div>`;
   },
@@ -5306,6 +5412,7 @@ class SpectraCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     applyTheme(this, hass);
+    publishTokens(hass);
     if (!this._config) return;
     this._reconcile();
     this._subscribeForecasts();
@@ -6977,13 +7084,13 @@ class SpectraCard extends HTMLElement {
   _bind(model) {
     this._bindDrawer();
 
-    /* The one-way switch. Bound only when the body says something is on, so
-       a dark floor cannot be "turned off" again -- which would be a service
-       call that does nothing, a spinner for nothing, and a button that
-       feels broken because it responds without changing anything. */
+    /* The one-way switch. A dark floor does not draw one at all, so there
+       is normally nothing here to bind -- but the guard stays, because a
+       bound control that answers a press with a spinner and no change is
+       exactly what it exists to prevent. */
     this._holder.querySelectorAll("[data-alloff]").forEach((el) => {
       const action = model.body && model.body.action;
-      if (!action || el.classList.contains("inert")) return;
+      if (!action) return;
       const run = (event) => {
         event.stopPropagation();
         this._guard(action.confirm,
@@ -7712,6 +7819,7 @@ class SpectraDock extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     applyTheme(this, hass);
+    publishTokens(hass);
     if (!this._config) return;
     let changed = this._signature === null;
     for (const id of this._sources) {
