@@ -2652,6 +2652,19 @@ function pickerScene(b, label) {
    the room is doing, and offers the one switch you might use — so nothing
    about the rule that jobs live in `Needs you` changes. */
 const BODY_TOOL = {
+  /* The radiator's twin of the room's switch, and it goes to the same place
+     for the same reason: beside the room's name and the temperature it is
+     reporting, rather than down in the row against the dial. A thermostat's
+     off is a bigger consequence than a half-degree nudge, and the two were
+     touching. */
+  climate(b) {
+    if (!b || typeof b !== "object" || isBlank(b.zone)) return "";
+    const on = b.on === undefined ? true : Boolean(b.on);
+    return `<span class="switch${on ? " on" : ""}" role="switch"`
+      + ` aria-checked="${on ? "true" : "false"}" aria-label="Heating"`
+      + ` tabindex="0" data-climpower><i></i></span>`;
+  },
+
   picker(b) {
     if (!b || typeof b !== "object" || isBlank(b.light)) return "";
     const state = pickerState(b);
@@ -3931,10 +3944,15 @@ const BODIES = {
    */
   climate(b) {
     if (!b || typeof b !== "object") return "";
-    const on = b.on === undefined ? true : Boolean(b.on);
+    /* `on` is not read here any more -- the switch that wanted it went to
+       the title bar, and BODY_TOOL.climate reads it there. */
     const auto = Boolean(b.auto);
 
-    let out = `<div class="row pickrow climrow" style="padding-left:0">`;
+    /* Both sides, not just the left -- `.row`'s 6px is there for the zebra
+       stripe this row does not wear, and on the right it was holding the
+       dial in from the edge the title bar's switch reaches. Same fix as the
+       picker's. */
+    let out = `<div class="row pickrow climrow" style="padding:6px 0">`;
 
     /* Live in every state, unlike the lights' twin: see above. */
     if (!isBlank(b.zone)) {
@@ -3986,11 +4004,6 @@ const BODIES = {
         + `<span class="spinslot">${b.pending ? `<span class="spinner"></span>` : ""}</span>`;
     } else if (!isBlank(b.value)) {
       out += `<span class="ctlvalue">${esc(b.value)}</span>`;
-    }
-    if (!isBlank(b.zone)) {
-      out += `<span class="switch${on ? " on" : ""}" role="switch"`
-        + ` aria-checked="${on ? "true" : "false"}" aria-label="Heating"`
-        + ` tabindex="0" data-climpower><i></i></span>`;
     }
     return out + `</span></div>`;
   },
