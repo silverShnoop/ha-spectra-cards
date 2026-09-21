@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.107.0";
+const VERSION = "0.107.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -69,6 +69,7 @@ const TOKENS_LIGHT = `
   --sp-a4:#2F7576; --sp-a4-soft:#D6E7E5; --sp-a4-on:#1E5657;
   --sp-a5:#4C5D8A; --sp-a5-soft:#DCE1ED; --sp-a5-on:#3A496E;
   --sp-a6:#7A4C6B; --sp-a6-soft:#EDDEE8; --sp-a6-on:#5E3452;
+  --sp-sun:#C9962B;
   --sp-attention:#B6862A; --sp-attention-soft:#F2E6C9; --sp-attention-on:#8A6310;
   --sp-waiting:#B0512C;   --sp-waiting-soft:#F0DED4;   --sp-waiting-on:#8C3E20;
   --sp-critical:#8E0C14;  --sp-critical-soft:#F2D7D8;  --sp-critical-on:#7A0B12;
@@ -112,6 +113,7 @@ const TOKENS_DARK = `
   --sp-a4:#4FA9AA; --sp-a4-soft:#14302F; --sp-a4-on:#8CCBCB;
   --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
   --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
+  --sp-sun:#E8B85A;
   --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
   --sp-waiting:#E08054;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
   --sp-critical:#E2333F;  --sp-critical-soft:#3A1618;  --sp-critical-on:#F0949B;
@@ -407,8 +409,19 @@ ha-icon { display:inline-flex; line-height:0; }
    also what lets sleet show a blue drop beside a pale flake — the one
    distinction that icon exists to make. */
 .wicon .wl { fill:var(--sp-ink-3); }
-/* Sun, stars, and the bolt, which is the same warmth doing a louder job. */
-.wicon .ws { fill:var(--sp-a2); }
+/* Sun, stars, and the bolt, which is the same warmth doing a louder job.
+
+   Its own token, and the third category after decoration and levels: a
+   DEPICTION. The sun is yellow the way a bulb's colour temperature is the
+   colour the light actually is -- not a role anybody chose, and not
+   something the palette gets a vote on. It was a2 and turned bone the
+   moment a2 did, which is a grey sun.
+
+   Deliberately not --sp-attention, even though a yellow sun and a yellow
+   level are near neighbours: a glyph inside a weather icon is a picture,
+   the level is a claim about the card it is drawn on, and letting the two
+   share a token is how one of them ends up dragging the other. */
+.wicon .ws { fill:var(--sp-sun); }
 .titlebar .wicon { width:16px; height:16px; }
 .bigicon.wicon { width:44px; height:44px; }
 .slot .wicon { width:28px; height:28px; margin:3px auto 1px; }
@@ -1183,20 +1196,21 @@ img.avatar { object-fit:cover; display:block; }
 .person:not(.here) .avatar { background:var(--sp-sink); color:var(--sp-ink-3); }
 .person:not(.here) img.avatar { opacity:.55; }
 /* Out is grey because it is a reading, and a reading that is simply not
-   this house. Unknown is ochre because it is the absence of one: the
+   this house. Unknown is the ATTENTION level because it is the absence of
+   one, and because there is a dark_<entity> row behind it: the
    phone has stopped reporting and somebody may want to know why. Drawn
    grey alongside Out, it read as "they went out", which is a thing the
    card did not know. The ring is dashed for the same reason the colour
    is warmer -- a gap in the line says missing in a way no solid shape
    does, and it survives being looked at by somebody who cannot tell the
    ochre from the grey. */
-.person.adrift { background:var(--sp-a2-soft); }
+.person.adrift { background:var(--sp-attention-soft); }
 .person.adrift .avatar {
-  background:transparent; color:var(--sp-a2-on);
-  border:2px dashed var(--sp-a2); box-sizing:border-box;
+  background:transparent; color:var(--sp-attention-on);
+  border:2px dashed var(--sp-attention); box-sizing:border-box;
 }
 .person.adrift img.avatar { opacity:.45; }
-.person.adrift .sub { color:var(--sp-a2-on); }
+.person.adrift .sub { color:var(--sp-attention-on); }
 
 /* agenda */
 .dayhead {
@@ -1206,8 +1220,15 @@ img.avatar { object-fit:cover; display:block; }
 .node { width:9px; height:9px; border-radius:50%; margin-top:3px; flex:none;
   background:var(--accent); }
 
-/* inverted — unsecured strip ONLY */
-.invert { background:var(--sp-a1); color:var(--sp-surface); border-color:var(--sp-a1); }
+/* inverted — unsecured strip ONLY.
+
+   Filled with the critical level, not with an accent. It was var(--sp-a1)
+   back when a1 was terracotta and terracotta meant alert -- the exact
+   thing the split exists to stop, and it survived the split because it is
+   written in CSS rather than in a config: repainting a1 to a brown turned
+   the panel's one alarm cell into a brown block, and nothing caught it.
+   Step 7 of the emphasis ladder is by definition a level. */
+.invert { background:var(--sp-critical); color:var(--sp-surface); border-color:var(--sp-critical); }
 .invert .sub { color:var(--sp-surface); opacity:.85; }
 
 /* ---- additions to the reference sheet ---- */
@@ -1353,7 +1374,11 @@ img.avatar { object-fit:cover; display:block; }
   border:2px solid var(--sp-edge); background:var(--sp-surface);
   display:flex; align-items:center; justify-content:center; position:relative;
 }
-.power.on { border-color:var(--sp-a2); color:var(--sp-a2); }
+/* The plug is on. That is a state of this machine, not a job anybody has
+   to do -- no timeline, no row -- so it takes the card's own accent rather
+   than a level, and a washer and a dryer each wear their own. It was a
+   hardcoded a2, which is how it came to be bone. */
+.power.on { border-color:var(--accent); color:var(--accent); }
 .power ha-icon { --mdc-icon-size:18px; }
 .power::after {
   content:""; position:absolute; left:50%; top:50%;
@@ -1455,8 +1480,14 @@ img.avatar { object-fit:cover; display:block; }
 .climrow { min-height:26px; padding:0; }
 
 /* Something is stopping the room heating that the room did not choose — an
-   open window. Ochre, because it is a warning rather than a fault. */
-.pickinfo.warn { color:var(--sp-a2-on); }
+   open window. WAITING: the heating is running against an open window and
+   will go on doing so until somebody shuts it, which is degrading now
+   rather than an errand for tomorrow.
+
+   It has no Needs-you row yet, which the three-way rule says it should.
+   That is finding 20's shape and is tracked separately; what is fixed here
+   is only that it was a hardcoded a2 and had silently become bone. */
+.pickinfo.warn { color:var(--sp-waiting-on); }
 
 /* A list that flows. auto-fit with a minimum does the deciding, so the card
    never has to be told how wide it is or how many rows it has: one column on
