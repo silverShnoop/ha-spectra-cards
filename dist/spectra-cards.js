@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.107.1";
+const VERSION = "0.107.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1837,6 +1837,14 @@ img.avatar { object-fit:cover; display:block; }
   color:var(--accent-on); font-size:12px; padding:7px 14px; border-radius:4px;
   cursor:pointer; white-space:nowrap;
 }
+/* The one card this body is drawn on is inverted, and an inverted card is
+   filled with the critical level -- so the button standing on that fill
+   has to be lettered in the same level, not in the card's accent. It read
+   --accent-on, which matched while a1 was terracotta and the fill was a1.
+   Now the fill is critical and the accent is a brown, and the pairing is
+   a brown word on a red card. Scoped to .invert because an alert body
+   drawn plain would still want the card's own accent. */
+.invert .alertbtn { color:var(--sp-critical-on); }
 .alertbtn::after {
   content:""; position:absolute; left:50%; top:50%;
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
