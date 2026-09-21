@@ -68,6 +68,33 @@ const js = fs.readFileSync(file);
     process.exit(1);
   }
   console.log("ok   no rule hardcodes a1 or a2, the two ex-level slots");
+
+  /* The weather icons were right before any of this and nothing about
+     them changed -- only which token they read. The sun in particular
+     shares its two values with the attention level, which is the sort of
+     coincidence somebody later "tidies" into one token. Pinning the hexes
+     is the point: they are what the icons have always painted, and the
+     next person to move a level must leave them where they are. */
+  const SUN = { light: "#B6862A", dark: "#D9A63F" };
+  const blocks = {
+    light: /const TOKENS_LIGHT = `([\s\S]*?)`;/.exec(src),
+    dark: /const TOKENS_DARK = `([\s\S]*?)`;/.exec(src),
+  };
+  let sunOk = /\.wicon \.ws \{ fill:var\(--sp-sun\); \}/.test(src);
+  const sunGot = {};
+  for (const mode of ["light", "dark"]) {
+    const found = blocks[mode]
+      && /--sp-sun:\s*(#[0-9A-Fa-f]{6})/.exec(blocks[mode][1]);
+    sunGot[mode] = found ? found[1].toUpperCase() : "(absent)";
+    if (sunGot[mode] !== SUN[mode]) sunOk = false;
+  }
+  if (!sunOk) {
+    console.log("FAIL the sun keeps the exact values the weather icons had"
+      + `  -> ${JSON.stringify(sunGot)} vs ${JSON.stringify(SUN)}`);
+    console.log("\nFAILED (1)");
+    process.exit(1);
+  }
+  console.log("ok   the sun keeps the exact values the weather icons had");
 }
 
 (async () => {

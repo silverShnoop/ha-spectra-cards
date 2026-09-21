@@ -113,10 +113,19 @@ source before it renders anything.
 
 **A depiction is neither.** `--sp-sun` is yellow because the sun is, the way
 a bulb's colour temperature is the colour the light actually is. It is not a
-role anybody chose and the palette gets no vote on it — which is also why it
-is its own token rather than the attention level, near neighbours though
-they are: a glyph inside a weather icon is a picture, and a level is a claim
-about the card it is drawn on.
+role anybody chose and the palette gets no vote on it.
+
+It holds the exact values `a2` had — `#B6862A` and `#D9A63F` — because the
+weather icons were right before any of this and nothing about them changed;
+what changed is only which token they read. So `--sp-sun` and
+`--sp-attention` are, today, the same two hexes, and that is deliberate
+rather than an oversight waiting to be tidied. They are the same **colour**
+and different **facts**: a glyph inside a weather icon is a picture of the
+sun, a level is a claim about the card it is drawn on. One token would mean
+re-levelling the panel could never again happen without the sun going with
+it — which is exactly what happened when they shared `a2` and the sun turned
+grey. Two tokens that happen to agree can be told apart later; one cannot.
+`checklevels` pins both values.
 
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
