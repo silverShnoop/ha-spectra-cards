@@ -169,16 +169,11 @@ ha-icon { display:inline-flex; line-height:0; }
 }
 .card.asheader .titlebar { margin-bottom:2px; }
 .card.asheader .titlebar h3 { font-size:13px; letter-spacing:.12em; }
-.card.asheader .titlebar > ha-icon { --mdc-icon-size:18px; }
+.card.asheader .titlebar ha-icon { --mdc-icon-size:18px; }
 .card.asheader .tick { display:none; }
 .titlebar { display:flex; align-items:center; gap:7px; margin-bottom:8px; }
 .tick { width:3px; height:12px; flex:none; background:var(--accent); }
-/* The card's OWN icon, not every icon that happens to be in the bar. It was
-   a descendant selector, which was harmless while the bar held nothing but
-   the title -- and wrong the moment a one-line body moved in under it: the
-   schedule button's glyph is painted on the accent when the button is lit,
-   and this rule repainted it the accent too, so a lit button went blank. */
-.titlebar > ha-icon { --mdc-icon-size:16px; color:var(--accent); }
+.titlebar ha-icon { --mdc-icon-size:16px; color:var(--accent); }
 .titlebar h3 {
   font-size:11px; letter-spacing:.1em; text-transform:uppercase;
   font-weight:500; margin:0;
@@ -1312,29 +1307,13 @@ img.avatar { object-fit:cover; display:block; }
 /* climate — one room. Same row as the light card's, so the two card types
    sit at the same rhythm and the controls land in the same place on both. */
 .climrow { min-height:44px; padding:6px 0; }
+/* The two outer slots of the climate row. Equal flex basis of zero, so they
+   split the leftover width evenly however long the sentence is -- which is
+   what puts the control between them on the card's midline rather than
+   somewhere that merely looks central on one room's wording. */
+.climside { display:flex; align-items:center; gap:8px; flex:1 1 0; min-width:0; }
+.climend { justify-content:flex-end; }
 
-/* A body that finishes the title bar's line instead of starting a second one.
-   
-   The dial is 44px and nothing else in a climate card is, so the dial alone
-   decided how tall the card was -- and it was doing that in a band of its
-   own, directly under the switch. Sliding it along that band would have
-   moved it without saving a pixel: the band is 44px tall either way. The
-   height only comes back when the band goes, so the row joins the title bar
-   and the card is one line: room, what it is doing, the temperature you set,
-   the temperature it is, and the switch. 108px becomes 66px.
-   
-   Only a body short enough to finish a line may do this. The picker may not:
-   its scene bar is a full-width ruler and has to have the width to itself. */
-.titlebar.oneline { margin-bottom:0; }
-/* The title stops stretching, so the row beside it gets the slack. */
-.titlebar.oneline > h3 { flex:none; white-space:nowrap; }
-.titlebar.oneline > .row {
-  flex:1 1 auto; min-width:0; padding:0; margin:0;
-}
-/* Kept, so a room with no dial is the same height as a room with one. A
-   column of climate cards that jumped between 66 and 48 would read as two
-   kinds of card. */
-.titlebar.oneline > .climrow { min-height:44px; }
 /* Something is stopping the room heating that the room did not choose — an
    open window. Ochre, because it is a warning rather than a fault. */
 .pickinfo.warn { color:var(--sp-a2-on); }
@@ -2674,11 +2653,6 @@ function pickerScene(b, label) {
   return null;
 }
 
-/* Bodies that finish the title bar's line rather than starting a band under
-   it. See `.titlebar.oneline` in the sheet for why this exists and what
-   disqualifies a body from it. */
-const BODY_INLINE = { climate: true };
-
 /* The one control a body puts in the title bar.
 
    A room's power switch belongs beside the room's name and the scene it is
@@ -3989,10 +3963,16 @@ const BODIES = {
 
     /* No side padding -- `.row`'s 6px is there for the zebra stripe this row
        does not wear, and on the right it was holding the dial in from the
-       edge the title bar's switch reaches. It lives in the sheet rather than
-       inline because `.titlebar.oneline` has to be able to beat it, and an
-       inline style beats every selector there is. */
+       edge the title bar's switch reaches. In the sheet rather than inline,
+       because an inline style beats every selector there is and this row is
+       one a modifier may yet want to reach. */
     let out = `<div class="row pickrow climrow">`;
+
+    /* Three slots, and the outer two share the slack equally so the middle
+       one lands on the card's midline. That is the whole reason they are
+       wrapped: with the sentence simply taking the slack, the dial was
+       pushed to the far end and sat directly under the switch. */
+    out += `<span class="climside">`;
 
     /* Live in every state, unlike the lights' twin: see above. */
     if (!isBlank(b.zone)) {
@@ -4033,19 +4013,33 @@ const BODIES = {
 
     /* Reserved whether or not it has anything to say, so nothing below it
        moves when the room changes what it is doing. */
-    out += `<p class="pickinfo${b.warn ? " warn" : ""}">${esc(firstOf(b.info, ""))}</p>`;
+    out += `<p class="pickinfo${b.warn ? " warn" : ""}">${esc(firstOf(b.info, ""))}</p>`
+      + `</span>`;
 
-    out += `<span class="pickend">`;
+    /* The middle slot: the temperature you are setting, on the card's
+       midline. It is the one thing here you reach for and hold, and at the
+       far right it was a thumb's width under the switch -- the same
+       neighbouring-consequences problem that moved the switch up in the
+       first place, just the other way round. A room with no dial puts its
+       word in the same place, so the column does not jump. */
     if (b.adjust) {
       /* A shallow copy rather than a flag on the body: the dial is shared
          with `control`, and it should know that a row is running hot without
          knowing that radiators exist. */
-      out += dialMarkup(firing ? Object.assign({}, b, { hot: true }) : b, 0)
-        + `<span class="spinslot">${b.pending ? `<span class="spinner"></span>` : ""}</span>`;
+      out += dialMarkup(firing ? Object.assign({}, b, { hot: true }) : b, 0);
     } else if (!isBlank(b.value)) {
       out += `<span class="ctlvalue">${esc(b.value)}</span>`;
     }
-    return out + `</span></div>`;
+
+    /* The right slot. It carries the spinner and, mostly, nothing else --
+       but it is drawn whatever it holds, because it is the counterweight
+       that keeps the middle in the middle. */
+    out += `<span class="climside climend">`
+      + (b.adjust
+        ? `<span class="spinslot">${b.pending ? `<span class="spinner"></span>` : ""}</span>`
+        : "")
+      + `</span>`;
+    return out + `</div>`;
   },
 
   /* What is wrong right now that you must fix?
@@ -6031,8 +6025,6 @@ class SpectraCard extends HTMLElement {
       + (festive ? " festive" : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "");
-    const inlineBody = BODY_INLINE[type] && !waiting
-      ? BODIES[type](model.body) : "";
     const card = [
       `<div class="${classes}"`,
       ` style="${accentStyle(model.accent)}`
@@ -6046,13 +6038,10 @@ class SpectraCard extends HTMLElement {
         ? festSnow() : "",
       festive && Array.isArray(fb.decor) && fb.decor.indexOf("bursts") >= 0
         ? festBursts(Array.isArray(fb.palette) ? fb.palette : []) : "",
-      /* A one-line body finishes the title bar's line instead of starting a
-         band under it, so the shell hands it over rather than drawing it.
-         Never while waiting: that is a sentence, not a row. */
-      this._titlebar(model, this._phase, inlineBody),
-      inlineBody ? "" : (waiting
+      this._titlebar(model, this._phase),
+      waiting
         ? `<p class="sub">${esc(waiting)}</p>`
-        : BODIES[type](model.body)),
+        : BODIES[type](model.body),
       /* Last, so the glow sits over everything including the wash. */
       lit ? festPerimeter(Array.isArray(fb.palette) ? fb.palette : []) : "",
       `</div>`,
@@ -6261,7 +6250,7 @@ class SpectraCard extends HTMLElement {
   /* Some bodies know their own state better than any config line can. Where
      one does, it says so here and the shell still draws the title bar — the
      body never reaches outside itself. */
-  _titlebar(model, phase, inline) {
+  _titlebar(model, phase) {
     const { title, icon } = model;
     const type = this._config.body.type;
     const own = BODY_STATUS[type] ? BODY_STATUS[type](model.body) : null;
@@ -6276,16 +6265,11 @@ class SpectraCard extends HTMLElement {
     /* After the spinner, so the spinner stays against the word it is waiting
        on and the control stays at the end of the line. */
     const tool = BODY_TOOL[type] ? BODY_TOOL[type](model.body) : "";
-    const row = isBlank(inline) ? "" : inline;
-    if (isBlank(title) && isBlank(icon) && !status && !slot && !tool && !row) return "";
-    /* The body goes straight after the title, so the line reads room, then
-       what the room is doing -- and the status and the control stay where
-       they are on every other card, at the end. */
-    return `<div class="titlebar${row ? " oneline" : ""}">`
+    if (isBlank(title) && isBlank(icon) && !status && !slot && !tool) return "";
+    return `<div class="titlebar">`
       + `<span class="tick"></span>`
       + iconMarkup(icon)
       + (isBlank(title) ? "" : `<h3>${esc(title)}</h3>`)
-      + row
       + (status
         ? `<span class="metagroup">`
           + (isBlank(status.icon) ? "" : `<ha-icon class="metaicon" icon="${esc(status.icon)}"></ha-icon>`)
