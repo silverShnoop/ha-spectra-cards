@@ -1882,6 +1882,18 @@ function toneStyle(v) {
   return accentStyle(v);
 }
 
+/** Whether a tone resolves to anything at all, without caring which kind. */
+function toneSet(v) {
+  return levelName(v) !== null || accentNumber(v) !== null;
+}
+
+/** A tone's base colour, for an icon or a dot. Null when unset. */
+function toneBase(v) {
+  const level = levelName(v);
+  if (level) return `var(--sp-${level})`;
+  return accentBase(v);
+}
+
 /** The three custom properties a level sets on the card it is dressing.
     Same shape as accentStyle, deliberately: a body that already knows how
     to wear --accent-soft can wear --outline-soft without learning a second
@@ -4756,19 +4768,25 @@ const BODIES = {
       const label = firstOf(r.action_label, r.button);
       const hasAction = Boolean(r.action) && !isBlank(label);
 
-      /* A row with an accent takes that accent's soft fill as its wash, which
-         overrides zebra. Never both — see the emphasis ladder. */
-      const washed = accentNumber(r.accent) !== null;
+      /* A row with a tone takes its soft fill as a wash, which overrides
+         zebra. Never both — see the emphasis ladder.
+
+         A Needs-you row is a job, so its tone is a LEVEL and it arrives
+         under `level`. `accent` still works, because this body also draws
+         lists that are not jobs -- what finished today, a bin schedule --
+         and those are decorated, not levelled. */
+      const tone = firstOf(r.level, r.accent);
+      const washed = toneSet(tone);
       const classes = ["row"];
       if (flow) classes.push("tile");
       if (prose) classes.push("prose");
       if (washed) classes.push("wash");
       else if (zebra && index % 2 === 0) classes.push("zebra");
       if (hasAction) classes.push("hasact");
-      const rowStyle = washed ? ` style="${accentStyle(r.accent)}"` : "";
+      const rowStyle = washed ? ` style="${toneStyle(tone)}"` : "";
 
       let lead = "";
-      const iconColour = accentBase(r.accent);
+      const iconColour = toneBase(tone);
       if (!isBlank(r.icon)) {
         lead = String(r.icon).startsWith("spectra:")
           ? iconMarkup(r.icon, "rowicon")

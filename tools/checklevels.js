@@ -205,6 +205,36 @@ const js = fs.readFileSync(file);
     check("...and takes a level name just as well",
       discInk() !== discSlate, `${discInk()} vs ${discSlate}`);
 
+    /* ---- a Needs-you row --------------------------------------------
+       The row is where the level is most load-bearing: it is the only
+       place a job is written down, and the colour on it is the same
+       claim the card's border makes. It arrives under `level`, while
+       `accent` goes on working for the lists that are not jobs. */
+    const showRows = async (row) => {
+      const items = [Object.assign({ id: "salt", name: "Add salt" }, row)];
+      el.setConfig(JSON.parse(JSON.stringify({
+        type: "custom:spectra-card", accent: 3, title: "Needs you",
+        body: { type: "list",
+          rows: { entity: "sensor.needs_you", attribute: "items" } },
+      })));
+      el.hass = {
+        states: { "sensor.needs_you": { entity_id: "sensor.needs_you",
+          state: String(items.length), attributes: { items } } },
+        callService: () => Promise.resolve(),
+      };
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => requestAnimationFrame(r));
+      return getComputedStyle(q(".row")).backgroundColor;
+    };
+    check("a row with a level washes in that level",
+      await showRows({ level: "critical" }) === tok("critical-soft"),
+      await showRows({ level: "critical" }));
+    check("...and a row with an accent still washes in that accent",
+      await showRows({ accent: 5 }) === tok("a5-soft"),
+      await showRows({ accent: 5 }));
+    check("...and a row with neither is not washed at all",
+      await showRows({}) !== tok("critical-soft"), await showRows({}));
+
     /* The tick is the card's identity and a level must not touch it --
        the whole point of splitting the two slots. */
     await show("critical");

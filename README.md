@@ -272,15 +272,20 @@ right, in order of precedence, an action button, a `pill`, a `bar`, or a
 `value`. `title` and `detail` are accepted as aliases of `name` and `sub`, so
 a row coming straight from `home_signals`' `items` contract renders as-is.
 
-A row with an `accent` takes that accent's soft wash, which **overrides
-zebra** — never both. That is step 4 on the emphasis ladder; zebra is step 2
-and carries no meaning at all.
+A row with a tone takes its soft wash, which **overrides zebra** — never
+both. That is step 4 on the emphasis ladder; zebra is step 2 and carries no
+meaning at all.
+
+A Needs-you row is a job, so its tone is a **level** and it arrives under
+`level`. `accent` still works here, because this body also draws lists that
+are not jobs — what finished today, a bin schedule — and those are
+decorated, not levelled.
 
 An action row:
 
 ```yaml
 - icon: mdi:hanger
-  accent: 1
+  level: attention
   title: Hang the washing
   detail: Door opened 14m ago
   action: {service: script.laundry_done}
