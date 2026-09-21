@@ -129,6 +129,22 @@ meta: {count: light.downstairs, suffix: " lights on", singular: " light on",
 meta: {count: [light.kitchen, light.study_2], state: "on", suffix: " rooms"}
 ```
 
+`state` takes a list as readily as a word, and `attribute` — the same key an
+entity read uses — says which fact to count. Both exist because heating is
+not a lamp. A radiator valve left on its schedule reads `auto` whether it is
+burning or idle, so the state cannot say which; the air conditioner in the
+same house reads `cool` when it is working, so one word cannot cover both.
+The rail's Climate button asks one question over the lot of them.
+
+```yaml
+summary: {count: [climate.kitchen, climate.bedroom_master_aircon],
+          attribute: hvac_action, state: [heating, cooling],
+          suffix: " rooms on", singular: " room on", none: Nothing on}
+```
+
+A room that cannot be read, or that has no such attribute, counts as nothing
+rather than as something — an offline valve carries no `hvac_action` at all.
+
 `sum` adds the states together. No operators and no expressions — a tab tile
 that counts two to-do lists needs addition and nothing else.
 

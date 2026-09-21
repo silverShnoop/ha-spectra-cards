@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.105.0";
+const VERSION = "0.106.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2352,11 +2352,29 @@ function readCount(hass, spec) {
     members = group.attributes && group.attributes.entity_id;
   }
   if (!Array.isArray(members)) return null;
-  const want = isBlank(spec.state) ? "on" : String(spec.state);
+  /* What "on" means is not the same word everywhere. A radiator valve is
+     heating; an air conditioner cooling; a lamp on. So `state` takes a list
+     as readily as a word, and a member counts if it reads as any of them --
+     which is the only way one number can cover a floor of valves and the one
+     aircon among them without a second tile to add up.
+
+     And `attribute`, the same key an entity read uses, because the fact is
+     not always the state. A valve left in `auto` all winter reads `auto`
+     whether it is burning or idle; `hvac_action` is the one that says which,
+     and "how many rooms are heating right now" is a question about that. */
+  const wanted = (Array.isArray(spec.state) ? spec.state : [spec.state])
+    .filter((v) => !isBlank(v))
+    .map((v) => String(v));
+  if (!wanted.length) wanted.push("on");
   let n = 0;
   for (const id of members) {
     const member = hass.states[id];
-    if (member && member.state === want) n += 1;
+    if (!member) continue;
+    const value = isBlank(spec.attribute)
+      ? member.state
+      : (member.attributes || {})[spec.attribute];
+    if (value === null || value === undefined) continue;
+    if (wanted.includes(String(value))) n += 1;
   }
   /* "1 lights on" is the kind of thing that makes a panel look unfinished,
      and the fix is one optional string rather than a pluralisation engine. */
