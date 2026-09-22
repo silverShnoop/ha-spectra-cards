@@ -128,7 +128,11 @@ grey. Two tokens that happen to agree can be told apart later; one cannot.
 `checklevels` pins both values.
 
 The same exemption is what lets the climate stripe be a temperature ramp —
-`--sp-ramp-0` through `--sp-ramp-4`, blue through yellow to red. It holds
+`--sp-ramp-0` through `--sp-ramp-5`, blue-green through yellow to the
+darkest red, each stop anchored to a temperature (`RAMP_STOPS`: 10, 16, 21,
+27, 33, 40) rather than to a position. So 21° is yellow on every stripe, and
+the darkest red is kept for 40° — a room that is genuinely hot, not one
+that is merely warm. It holds
 two of the three level colours and is allowed to, for the reason `--sp-sun`
 is allowed to: cold is blue because cold is blue, and nobody chose it. Its
 own five tokens rather than the levels' so neither can restate the other —
@@ -614,9 +618,8 @@ body:
     attribute: temperature
     service: climate.set_temperature
     field: temperature
-    step: 0.5
-    min: 15
-    max: 25
+    step: 0.5                                 # min/max come off the thermostat
+  # scale: {min: 10, max: 40}                 # the default; colours stay put
 ```
 
 One room. The stripe leads the body, where the lights card puts its scene
@@ -630,11 +633,28 @@ the words that qualify it: `Following schedule · 20.5°` reads as one
 statement and `Manual · 22.5°` reads as a different one. The dial showed one
 number and you had to know which it was.
 
+**The scale is temperature, not the thermostat.** The stripe runs 10° to 40°
+whatever the room, and what can be *set* is the thermostat's own range cut
+to fit inside it — so for Tado, 10 to 25. Two ranges, because the room is
+not bound by the thermostat: Tado stops at 25 while a kitchen in August sits
+at 27, and a stripe that ended at 25 could only ever show that kitchen as
+25. The cost is paid knowingly — past 25 the thumb stops, the way a physical
+slider stops at its end, and that stretch is veiled so a finger can see it
+before it tries. Override with `scale: {min, max}` if a room needs another;
+the colours stay anchored to their temperatures either way.
+
 **The ramp is the scale, the lit span is the gap.** The colour under any
-point of the track is that point's temperature, held back behind the surface
-except across the span between the needle and the thumb. Brightness fills
-from the left edge because brightness *is* a quantity; 18° is not less full
-than 22°, so the fill is the work still to do, and at target it has no width.
+point of the track is that point's temperature. It is held back behind the
+surface except across the span between the needle and the thumb, which is
+drawn at full strength. Brightness fills from the left edge because
+brightness *is* a quantity; 18° is not less full than 22°, so the fill is
+the work still to do, and at target it has no width.
+
+The layers are elements in paint order — veil, unsettable ends, gap — and
+not a `::after` veil, which is what the first build had. `::after` paints
+after every child, so the veil sat on top of the gap and the gap was never
+on screen, with every clip value correct. `checkclimate` now removes the gap
+layer and re-shoots the same pixels; identical shots fail.
 
 **Two marks, two shapes.** The target is the brightness slider's own thumb —
 filled, because you chose it, and the thing you take hold of. The reading is
@@ -642,14 +662,19 @@ a needle: a reading has no handle, and two grabbable circles on one track is
 an invitation to drag the wrong one. The needle draws *over* the disc, so
 where they coincide you can still see where the room actually is.
 
-**Bounds are worth setting.** `_fitDials` will take `min`, `max` and `step`
-off the thermostat when config leaves them out, which was the right answer
-for a barrel — a barrel only ever shows three cells, so a wide range costs
-nothing. A stripe spends its whole width on its range, and Tado's own 5–25
-puts every temperature anybody sets in the last inch of the track. 15–25
-makes a half degree about fifteen pixels. 5° stays unreachable by dragging
-on purpose: that is off, the title bar switch does it, and a control must not
-be draggable to a value it cannot be dragged back from.
+**A reading past either end of the scale becomes an arrowhead.** Pinned to
+the end as a needle, a 43° reading would say 40. So it changes shape: an
+arrowhead flush inside the end, pointing off the scale, with the true number
+in the title bar. On 10–40 that is a cold room in January or a sensor fault,
+not a normal day. A *target* outside the settable range (an away setting of
+8, say) is simply pinned; the readout on the mode line says the true number.
+
+**Bounds need no special care.** Because the scale is fixed, a thermostat's
+own `min`/`max` — whether `_fitDials` took them off the entity or config set
+them — only decide where the veil begins. Tado's 5–25 becomes a settable
+10–25, and 5 stays unreachable by dragging on purpose: that is off, the
+title bar switch does it, and a control must not be draggable to a value it
+cannot be dragged back from.
 
 **Nothing is sent until the finger lifts.** This is the one place the stripe
 diverges from the brightness slider it otherwise shares code with. Live
@@ -1950,7 +1975,9 @@ finger covers, and that the needle paints over the disc where they coincide —
 both marks are `pointer-events:none`, so `elementFromPoint` cannot answer it
 and a `z-index` in the sheet is not proof anything was painted. It hides the
 needle and takes the same pixels again. Identical shots mean it was behind
-the disc all along.
+the disc all along. The gap gets the same test, for the same reason and
+because it once failed it — and a drag into the veiled stretch must ask the
+thermostat for 25, where a missing clamp would have asked for 34.
 
 ## Licence
 

@@ -77,9 +77,12 @@ const TOKENS_LIGHT = `
      not a role, it is what the thing looks like. Its own tokens rather than
      the levels' so neither can ever restate the other: repaint a level and
      the scale does not move, repaint the scale and no alarm changes colour.
-     Five stops, matte rather than neon, so a stripe belongs to this panel. */
-  --sp-ramp-0:#39699A; --sp-ramp-1:#7BA6A4; --sp-ramp-2:#CDB855;
-  --sp-ramp-3:#C87F2E; --sp-ramp-4:#A33526;
+     Six stops, each anchored to a TEMPERATURE rather than to a position --
+     see RAMP_STOPS -- so 21 degrees is yellow on every stripe whatever its
+     range, and the darkest red is kept for 40, a room that is genuinely hot.
+     Matte rather than neon, so a stripe belongs to this panel. */
+  --sp-ramp-0:#3B7A99; --sp-ramp-1:#6FA394; --sp-ramp-2:#D1BC57;
+  --sp-ramp-3:#D08A36; --sp-ramp-4:#B5452E; --sp-ramp-5:#6E1A1A;
   --sp-attention:#B6862A; --sp-attention-soft:#F2E6C9; --sp-attention-on:#8A6310;
   --sp-waiting:#B0512C;   --sp-waiting-soft:#F0DED4;   --sp-waiting-on:#8C3E20;
   --sp-critical:#8E0C14;  --sp-critical-soft:#F2D7D8;  --sp-critical-on:#7A0B12;
@@ -124,8 +127,8 @@ const TOKENS_DARK = `
   --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
   --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
   --sp-sun:#D9A63F;
-  --sp-ramp-0:#5A93BF; --sp-ramp-1:#86B4BE; --sp-ramp-2:#D9C77E;
-  --sp-ramp-3:#DFA25B; --sp-ramp-4:#C75C48;
+  --sp-ramp-0:#5A9CBF; --sp-ramp-1:#86BFAE; --sp-ramp-2:#DECB78;
+  --sp-ramp-3:#E3A15C; --sp-ramp-4:#D0614B; --sp-ramp-5:#A63A3A;
   --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
   --sp-waiting:#E08054;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
   --sp-critical:#E2333F;  --sp-critical-soft:#3A1618;  --sp-critical-on:#F0949B;
@@ -1095,24 +1098,37 @@ ha-icon { display:inline-flex; line-height:0; }
  * on this control that means something -- the work still to do -- and at
  * target it has no width, which is the state worth reading from a doorway.
  */
+/* The track's layers, as ELEMENTS in the order they must paint: veil,
+   then the unsettable ends, then the gap on top.
+
+   The veil used to be the track's ::after, and ::after paints after every
+   child -- so it sat on top of the gap it was meant to sit behind, and the
+   gap, the one quantity on this control that means anything, was never
+   visible at all. Nothing failed: the clip values were right and the card
+   looked finished. A generated box cannot be ordered against its siblings
+   except by coming last, so the veil is a span now, placed first.
+
+   --ramp is set per stripe from RAMP_STOPS, because the colour is a
+   function of the temperature and the stripe's range is configurable; the
+   declaration here is only the default range's. */
 .ramptrack {
-  background:linear-gradient(to right,
-    var(--sp-ramp-0) 0%, var(--sp-ramp-1) 26%, var(--sp-ramp-2) 52%,
-    var(--sp-ramp-3) 76%, var(--sp-ramp-4) 100%);
+  --ramp:linear-gradient(to right,
+    var(--sp-ramp-0) 0%, var(--sp-ramp-1) 20%, var(--sp-ramp-2) 36.667%,
+    var(--sp-ramp-3) 56.667%, var(--sp-ramp-4) 76.667%, var(--sp-ramp-5) 100%);
+  background:var(--ramp);
 }
-.ramptrack::after {
-  content:""; position:absolute; inset:0;
-  background:var(--sp-surface); opacity:.28;
-}
+.rampveil, .rampdead, .rampgap { position:absolute; top:0; bottom:0; }
+.rampveil { left:0; right:0; background:var(--sp-surface); opacity:.28; }
+/* Past what the thermostat will accept. The ramp carries on -- a room can
+   be 30 degrees -- but a thumb cannot go there, and a finger should be able
+   to see that before it tries. */
+.rampdead { background:var(--sp-surface); opacity:.42; }
 /* The same ramp at full strength, clipped to the gap. ONE full-width layer
    rather than a positioned slice: clipped, the colour at any point stays
    the colour of that point's temperature at any card width, and there is
    nothing to keep in register. */
 .rampgap {
-  position:absolute; inset:0;
-  background:linear-gradient(to right,
-    var(--sp-ramp-0) 0%, var(--sp-ramp-1) 26%, var(--sp-ramp-2) 52%,
-    var(--sp-ramp-3) 76%, var(--sp-ramp-4) 100%);
+  left:0; right:0; background:var(--ramp);
   transition:clip-path 320ms cubic-bezier(.25,.1,.25,1);
 }
 .slide.picking .rampgap { transition:none; }
@@ -1129,6 +1145,28 @@ ha-icon { display:inline-flex; line-height:0; }
   transition:left 320ms cubic-bezier(.25,.1,.25,1);
 }
 .slide .dimthumb { z-index:2; }
+/* Past either end of the stripe: pinned there, and no longer a needle.
+   Widening the track to fit the reading was the other way, and it costs
+   the thing the stripe is for -- a third of the width would be somewhere
+   the thumb cannot go, the thumb would stop following the finger at 25,
+   and the whole track would stop being the control the way it is on the
+   lights card. So the scale stays the settable range and the reading says
+   it has left it: an arrowhead flush inside the end, pointing out.
+
+   The shape is on ::before and the halo on the span, because clip-path is
+   applied after filter on the same box and would cut the halo off. */
+.nowline.over, .nowline.under {
+  width:10px; height:18px; margin-top:-9px; border-radius:0;
+  background:none; box-shadow:none;
+  filter:drop-shadow(0 0 1px var(--sp-surface)) drop-shadow(0 0 1px var(--sp-surface));
+}
+.nowline.over { margin-left:-10px; }
+.nowline.under { margin-left:0; }
+.nowline.over::before, .nowline.under::before {
+  content:""; position:absolute; inset:0; background:var(--sp-ink);
+}
+.nowline.over::before { clip-path:polygon(0 0, 100% 50%, 0 100%); }
+.nowline.under::before { clip-path:polygon(100% 0, 0 50%, 100% 100%); }
 /* An off zone has no target. Tado's off is a five-degree frost setting,
    which is below the bottom of any stripe worth dragging -- so the thumb
    leaves at the cold end and fades rather than parking on a number nobody
@@ -5583,25 +5621,67 @@ function sceneTrackMarkup(key, scenes, activeName, lit) {
     + slideLens() + `</div></div>`;
 }
 
-/* The target, as a stripe, with the room's own reading standing on it.
+/* The stripe's scale, and what can be set on it -- two ranges, not one.
 
-   Bounds are required rather than guessed. `_fitDials` will take them off
-   the thermostat when config leaves them out, and for a barrel that was
-   the right answer -- a barrel only ever shows three cells, so a wide range
-   costs nothing. A stripe spends its whole width on its range, and Tado's
-   own 5 to 25 puts every temperature anybody actually sets in the last
-   inch of the track. Give it fifteen to twenty-five and a half degree is a
-   comfortable fifteen pixels. */
-function tempStripeMarkup(row) {
+   The SCALE is temperature itself: 10 at the cold end, 40 at the warm,
+   whatever the thermostat. It has to be wider than anything a thermostat
+   will accept, because the room is not bound by the thermostat -- Tado
+   stops at 25 while a kitchen in August sits at 27, and a scale that ended
+   at 25 could only show that kitchen as 25. The settable range is the
+   thermostat's own `adjust.min`/`max`, cut to fit inside the scale.
+
+   That costs something, and it is paid knowingly: the thumb stops at 25
+   part-way along, and the stretch beyond it is somewhere a finger cannot
+   set. The alternative was a scale that lied about hot rooms. The dead
+   stretch is veiled so a finger can see it before trying. */
+const TEMP_SCALE_MIN = 10;
+const TEMP_SCALE_MAX = 40;
+
+/* Where each colour of the ramp lives, in degrees. Anchored to temperature
+   rather than to position so the colour means the same thing on every
+   stripe: yellow is 21, a comfortable room; the darkest red is 40, a room
+   that is genuinely hot. The ramp's red stays off every ordinary day. */
+const RAMP_STOPS = [10, 16, 21, 27, 33, 40];
+
+function tempScale(row) {
   const adjust = row.adjust || {};
-  const min = Number(adjust.min);
-  const max = Number(adjust.max);
-  if (!isFinite(min) || !isFinite(max) || max <= min) return "";
+  const scale = row.scale || {};
+  const smin = isFinite(Number(scale.min)) && scale.min !== undefined
+    ? Number(scale.min) : TEMP_SCALE_MIN;
+  const smax = isFinite(Number(scale.max)) && scale.max !== undefined
+    ? Number(scale.max) : TEMP_SCALE_MAX;
+  if (!(smax > smin)) return null;
+  const amin = Number(adjust.min);
+  const amax = Number(adjust.max);
+  const lo = Math.max(smin, isFinite(amin) ? amin : smin);
+  const hi = Math.min(smax, isFinite(amax) ? amax : smax);
+  if (!(hi > lo)) return null;
+  return {
+    smin, smax, lo, hi,
+    place: (v) => Math.min(100, Math.max(0, ((v - smin) / (smax - smin)) * 100)),
+  };
+}
+
+/* The ramp for one stripe's range: each stop placed where its temperature
+   falls. Stops outside the range still count -- the gradient is clamped
+   at the ends -- so a narrow scale shows the part of the ramp it covers
+   rather than the whole ramp squeezed in. */
+function rampGradient(smin, smax) {
+  const at = (t) => (((t - smin) / (smax - smin)) * 100).toFixed(3);
+  return "linear-gradient(to right, "
+    + RAMP_STOPS.map((t, n) => `var(--sp-ramp-${n}) ${at(t)}%`).join(", ")
+    + ")";
+}
+
+/* The target, as a stripe, with the room's own reading standing on it. */
+function tempStripeMarkup(row) {
+  const scale = tempScale(row);
+  if (!scale) return "";
+  const { smin, smax, lo, hi, place } = scale;
 
   const lit = row.on === undefined ? true : Boolean(row.on);
   const target = parseFloat(row.value);
   const now = parseFloat(row.now);
-  const place = (v) => Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
 
   /* An off zone has no target to point at, so the thumb sits at the cold
      end where the CSS fades it out -- rather than at whatever number the
@@ -5609,23 +5689,36 @@ function tempStripeMarkup(row) {
      temperature anybody chose. */
   const at = lit && isFinite(target) ? place(target) : 0;
   const here = isFinite(now) ? place(now) : null;
+  /* A reading past either end of the SCALE is pinned there -- but a needle
+     standing on the end claims that end's number exactly. So it changes
+     shape instead: an arrowhead pointing off the scale. The number itself
+     is in the title bar. With a scale of 10 to 40 this is a cold room in
+     January or a fault, not a normal day. */
+  const beyond = !isFinite(now) ? ""
+    : (now > smax ? " over" : (now < smin ? " under" : ""));
   /* Clipped from both sides: the gap is a span, not a fill, and it has two
      ends that both move. */
-  const lo = here === null ? at : Math.min(at, here);
-  const hi = here === null ? at : Math.max(at, here);
+  const from = here === null ? at : Math.min(at, here);
+  const to = here === null ? at : Math.max(at, here);
+  const deadLo = place(lo);
+  const deadHi = place(hi);
 
   return `<div class="slide lead climstripe${lit ? "" : " off"}" data-temp`
     + ` role="slider" tabindex="${lit ? "0" : "-1"}"`
     + ` aria-label="Target temperature"`
-    + ` aria-valuemin="${min}" aria-valuemax="${max}"`
+    + ` aria-valuemin="${lo}" aria-valuemax="${hi}"`
     + (lit && isFinite(target) ? ` aria-valuenow="${target}"` : ` aria-disabled="true"`)
     + ` aria-valuetext="${lit && isFinite(target) ? esc(String(target)) : "off"}">`
     + `<div class="slidehold">`
-    + `<div class="dimtrack ramptrack"><span class="rampgap" data-rampgap`
-    + ` style="clip-path:inset(0 ${(100 - hi).toFixed(3)}% 0 ${lo.toFixed(3)}%)"></span></div>`
+    + `<div class="dimtrack ramptrack" style="--ramp:${rampGradient(smin, smax)}">`
+    + `<span class="rampveil"></span>`
+    + (deadLo > 0 ? `<span class="rampdead" style="left:0;width:${deadLo.toFixed(3)}%"></span>` : "")
+    + (deadHi < 100 ? `<span class="rampdead" style="left:${deadHi.toFixed(3)}%;right:0"></span>` : "")
+    + `<span class="rampgap" data-rampgap`
+    + ` style="clip-path:inset(0 ${(100 - to).toFixed(3)}% 0 ${from.toFixed(3)}%)"></span></div>`
     + `<span class="dimthumb" data-tempthumb style="left:${at.toFixed(3)}%"></span>`
     + (here === null ? ""
-      : `<span class="nowline" data-nowline style="left:${here.toFixed(3)}%"></span>`)
+      : `<span class="nowline${beyond}" data-nowline style="left:${here.toFixed(3)}%"></span>`)
     + slideLens() + `</div></div>`;
 }
 
@@ -8345,9 +8438,9 @@ class SpectraCard extends HTMLElement {
   _bindTemp(el, row) {
     if (!row) return;
     const adjust = row.adjust || {};
-    const min = Number(adjust.min);
-    const max = Number(adjust.max);
-    if (!isFinite(min) || !isFinite(max) || max <= min) return;
+    const scale = tempScale(row);
+    if (!scale) return;
+    const { smin, smax, lo, hi, place } = scale;
 
     const step = Number(adjust.step) || DIAL_MIN_STEP;
     const decimals = String(step).includes(".") ? 1 : 0;
@@ -8356,16 +8449,18 @@ class SpectraCard extends HTMLElement {
     const thumb = el.querySelector("[data-tempthumb]");
     const now = parseFloat(row.now);
     const start = parseFloat(row.value);
-    const place = (v) => Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
 
     this._bindSlide(el, {
       inert: () => el.classList.contains("off"),
-      read: () => (isFinite(start) ? start : min),
+      read: () => (isFinite(start) ? Math.min(hi, Math.max(lo, start)) : lo),
+      /* Across the SCALE, then held to what can be SET: dragged into the
+         veiled stretch past 25 the thumb stops at 25, the way a physical
+         slider stops at its end, and the lens says so. */
       valueAt: (ratio) => {
-        const raw = min + ratio * (max - min);
-        return Math.min(max, Math.max(min, Math.round(raw / step) * step));
+        const raw = smin + ratio * (smax - smin);
+        return Math.min(hi, Math.max(lo, Math.round(raw / step) * step));
       },
-      step: (v, by) => Math.min(max, Math.max(min, v + by * step)),
+      step: (v, by) => Math.min(hi, Math.max(lo, v + by * step)),
       describe: (v) => ({ text: v.toFixed(decimals) + suffix, icon: "" }),
       paint: (v) => {
         const at = place(v);
