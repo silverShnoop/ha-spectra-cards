@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -460,6 +460,45 @@ reports itself empty and `hide_when_empty` stands the card down rather than
 drawing a lone dot in an empty box — which is what a fourteen-day chart did
 on its first day. An `icons` row is exempt: one icon over one hour is still
 a forecast saying something.
+
+### `daysplit` — where did it go, and roughly when?
+
+```yaml
+body:
+  type: daysplit
+  slots: 7
+  names: {entity: sensor.energy_day, attribute: block_names}
+  days:  {entity: sensor.energy_day, attribute: block_days}
+```
+
+A column per day, cut into the blocks the sensor reports and stacked. Each
+column prints what that day cost and what it used underneath, and the legend
+names the blocks in the order they are stacked.
+
+It exists because **a day's total says nothing about the day**. Two days at
+the same total can be a morning of laundry and an evening of the oven, and
+only one of those is something anybody would change.
+
+The segments **sum to the column** — that is the only honest reason to stack
+anything, and it is asserted in pixels by `tools/checkdaysplit.js` rather
+than trusted. Height is money; the units are printed as the check.
+
+Nothing here knows that a block is six hours, or what the blocks are called:
+`names` arrives with the data and the segments are drawn in the order given,
+so re-cutting the day is a change to the sensor and not to this card.
+
+`slots` lays the card out for that many columns even when fewer have
+arrived, so a week filling up does not restretch every morning. A day whose
+blocks are missing is a **gap** rather than a column of nothing — the house
+never used nothing, and a flat column under a real date would say it did.
+
+Colour is one hue getting lighter through the day, because time of day is
+*ordered*: four unrelated hues would say the blocks are four kinds of thing
+rather than four parts of one day. The steps are uneven on purpose — adjacent
+pairs clear ΔE 16.7 by eye and 15.1 under colour-blind simulation, where the
+first, evenly-spaced ramp managed 10.2 and had Overnight and Morning reading
+as a single taller block. Dark mode has its own steps chosen against the dark
+surface, not a flip of the light ones, whose darkest step vanishes into it.
 
 ### `forecast` — what will it be like later?
 
