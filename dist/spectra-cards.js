@@ -69,6 +69,13 @@ const TOKENS_LIGHT = `
   --sp-a4:#2F7576; --sp-a4-soft:#D6E7E5; --sp-a4-on:#1E5657;
   --sp-a5:#4C5D8A; --sp-a5-soft:#DCE1ED; --sp-a5-on:#3A496E;
   --sp-a6:#7A4C6B; --sp-a6-soft:#EDDEE8; --sp-a6-on:#5E3452;
+  /* The day's four blocks. One hue getting lighter through the day, because
+     time of day is ORDERED -- four unrelated colours would say the blocks
+     are four kinds of thing rather than four parts of one day. Stepped for
+     separation rather than evenly: adjacent pairs clear 16.7 by eye and
+     15.1 under colour-blind simulation, where the first even ramp tried
+     managed 10.2 and had Overnight and Morning reading as one block. */
+  --sp-b1:#0F3132; --sp-b2:#357F80; --sp-b3:#8FBDBB; --sp-b4:#DDEBE9;
   --sp-sun:#B6862A;
   /* The temperature ramp. A DEPICTION, like --sp-sun and like a bulb's
      colour temperature: cold is blue because cold is blue, and nobody chose
@@ -123,6 +130,9 @@ const TOKENS_DARK = `
   --sp-a4:#4FA9AA; --sp-a4-soft:#14302F; --sp-a4-on:#8CCBCB;
   --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
   --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
+  /* Chosen against the dark surface rather than flipped from the light
+     ramp: the light one's darkest step disappears into this background. */
+  --sp-b1:#17494A; --sp-b2:#3E9596; --sp-b3:#7DC8C6; --sp-b4:#DCF0EE;
   --sp-sun:#D9A63F;
   --sp-ramp-0:#5A93BF; --sp-ramp-1:#86B4BE; --sp-ramp-2:#D9C77E;
   --sp-ramp-3:#DFA25B; --sp-ramp-4:#C75C48;
@@ -1584,6 +1594,10 @@ img.avatar { object-fit:cover; display:block; }
    that the chart stops growing and the card's own padding takes the
    slack. Below it the chart still shrinks to fit a phone. */
 .chart { display:block; width:100%; max-width:480px; height:auto; }
+/* A split day carries a legend, two lines of figures and a date under every
+   column, so its box is half as tall again as a line chart's at the same
+   width -- and the cap is what keeps its type at the size the rows use. */
+.chart.tall { max-width:460px; }
 
 /* control — the one body you touch rather than read. Same row metrics as
    list, so a panel of controls and a panel of readings sit at the same
@@ -5048,6 +5062,86 @@ const BODIES = {
   },
 
   /* What are the several things, and how does each stand? */
+  /* Where did it go, and roughly when? A column per day, cut into the
+     blocks the sensor reports -- and they SUM to the column, which is the
+     only honest reason to stack anything.
+
+     This exists because a day's total says nothing about the day. Two days
+     at the same total can be a morning of laundry and an evening of the
+     oven, and only one of those is a thing anybody would change.
+
+     Nothing here knows a block is six hours, or what the blocks are called.
+     The names arrive with the data and the segments are drawn in the order
+     given, so re-cutting the day is a change to the sensor and not to this. */
+  daysplit(b) {
+    const days = (Array.isArray(b.days) ? b.days : []).filter(
+      (d) => d && Array.isArray(d.cost) && d.cost.length
+    );
+    if (!days.length) return "";
+    const names = Array.isArray(b.names) ? b.names : [];
+    const FILL = ["var(--sp-b1)", "var(--sp-b2)", "var(--sp-b3)", "var(--sp-b4)"];
+
+    const W = 320, H = 122;
+    /* The column band. Everything below FOOT is text: the day's money, its
+       units, and which day it was. */
+    const TOP = 26, FOOT = 78;
+    /* Laid out for `slots` columns even when fewer have arrived, so a week
+       filling up does not restretch every morning. */
+    const slots = Math.max(days.length, Number(b.slots) || 0);
+    const step = slots > 1 ? (W - 34) / (slots - 1) : 0;
+    const x = (i) => (slots > 1 ? 17 + i * step : W / 2);
+    const bw = Math.min(34, Math.max(8, step * 0.66)) || 34;
+    const peak = Math.max(
+      ...days.map((d) => d.cost.reduce((a, v) => a + (Number(v) || 0), 0)), 0
+    ) || 1;
+
+    let out = `<svg class="chart tall" viewBox="0 0 ${W} ${H}" role="img"`
+      + ` aria-label="${esc(b.label || "Where the power went")}">`;
+
+    /* A legend, because four series is past what direct labels can carry --
+       and in the same order as the stack, so the picture teaches the key. */
+    let lx = 2;
+    names.slice(0, FILL.length).forEach((name, i) => {
+      const text = String(name);
+      out += `<rect x="${lx.toFixed(1)}" y="3" width="7" height="7" rx="1.5"`
+        + ` fill="${FILL[i]}"/>`
+        + `<text x="${(lx + 10).toFixed(1)}" y="9.5" font-size="7.5"`
+        + ` fill="var(--sp-ink-2)">${esc(text)}</text>`;
+      lx += 17 + text.length * 4;
+    });
+
+    days.forEach((day, i) => {
+      let acc = 0;
+      day.cost.forEach((raw, si) => {
+        const v = Number(raw) || 0;
+        if (v <= 0) return;
+        const h = (v / peak) * (FOOT - TOP);
+        const y = FOOT - ((acc + v) / peak) * (FOOT - TOP);
+        acc += v;
+        /* A hairline of surface between segments, so two neighbouring
+           blocks never read as one taller one. */
+        out += `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${y.toFixed(1)}"`
+          + ` width="${bw.toFixed(1)}" height="${Math.max(1, h - 1.5).toFixed(1)}"`
+          + ` rx="1" fill="${FILL[si % FILL.length]}"/>`;
+      });
+      /* Both totals under every column. The bars are money, so the money is
+         the bigger line and the units sit under it as the check. */
+      if (!isBlank(day.total_cost_text)) {
+        out += `<text x="${x(i).toFixed(1)}" y="90" font-size="9.5"`
+          + ` text-anchor="middle" fill="var(--sp-ink)">`
+          + `${esc(day.total_cost_text)}</text>`;
+      }
+      if (day.total_kwh !== undefined && day.total_kwh !== null) {
+        out += `<text x="${x(i).toFixed(1)}" y="100" font-size="8"`
+          + ` text-anchor="middle" fill="var(--sp-ink-3)">`
+          + `${esc(day.total_kwh)} kWh</text>`;
+      }
+      out += `<text x="${x(i).toFixed(1)}" y="114" font-size="9"`
+        + ` text-anchor="middle" fill="var(--sp-ink-2)">`
+        + `${esc(day.label || "")}</text>`;
+    });
+    return out + `</svg>`;
+  },
   list(b) {
     const rows = Array.isArray(b.rows) ? b.rows : [];
     /* Tiles rather than a column. A wall panel is mostly much wider than a
@@ -5134,6 +5228,10 @@ const BODIES = {
 /** A cell with nothing to say renders nothing, and takes no grid space. */
 function bodyIsEmpty(type, b) {
   switch (type) {
+    /* A day with no blocks is a gap, not a column of nothing. */
+    case "daysplit":
+      return !Array.isArray(b.days)
+        || !b.days.some((d) => d && Array.isArray(d.cost) && d.cost.length);
     case "list":
       return !Array.isArray(b.rows) || b.rows.length === 0;
     case "stat":
