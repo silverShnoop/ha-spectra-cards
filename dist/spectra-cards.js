@@ -70,6 +70,16 @@ const TOKENS_LIGHT = `
   --sp-a5:#4C5D8A; --sp-a5-soft:#DCE1ED; --sp-a5-on:#3A496E;
   --sp-a6:#7A4C6B; --sp-a6-soft:#EDDEE8; --sp-a6-on:#5E3452;
   --sp-sun:#B6862A;
+  /* The temperature ramp. A DEPICTION, like --sp-sun and like a bulb's
+     colour temperature: cold is blue because cold is blue, and nobody chose
+     it. It holds yellow, orange and red, which are the three level colours,
+     and that is allowed for exactly the reason --sp-sun is allowed -- it is
+     not a role, it is what the thing looks like. Its own tokens rather than
+     the levels' so neither can ever restate the other: repaint a level and
+     the scale does not move, repaint the scale and no alarm changes colour.
+     Five stops, matte rather than neon, so a stripe belongs to this panel. */
+  --sp-ramp-0:#39699A; --sp-ramp-1:#7BA6A4; --sp-ramp-2:#CDB855;
+  --sp-ramp-3:#C87F2E; --sp-ramp-4:#A33526;
   --sp-attention:#B6862A; --sp-attention-soft:#F2E6C9; --sp-attention-on:#8A6310;
   --sp-waiting:#B0512C;   --sp-waiting-soft:#F0DED4;   --sp-waiting-on:#8C3E20;
   --sp-critical:#8E0C14;  --sp-critical-soft:#F2D7D8;  --sp-critical-on:#7A0B12;
@@ -114,6 +124,8 @@ const TOKENS_DARK = `
   --sp-a5:#8094C4; --sp-a5-soft:#1E2435; --sp-a5-on:#AFBDE0;
   --sp-a6:#B87BA4; --sp-a6-soft:#2E1F2A; --sp-a6-on:#D6A9C8;
   --sp-sun:#D9A63F;
+  --sp-ramp-0:#5A93BF; --sp-ramp-1:#86B4BE; --sp-ramp-2:#D9C77E;
+  --sp-ramp-3:#DFA25B; --sp-ramp-4:#C75C48;
   --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
   --sp-waiting:#E08054;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
   --sp-critical:#E2333F;  --sp-critical-soft:#3A1618;  --sp-critical-on:#F0949B;
@@ -1063,6 +1075,83 @@ ha-icon { display:inline-flex; line-height:0; }
 .slide.off .dimthumb { display:none; }
 .slide.picking .picklens { display:flex; }
 .slide.adrift .picklens, .slide.adrift .dimthumb { opacity:.3; }
+
+/* --- the temperature stripe ---------------------------------------- *
+ *
+ * The brightness slider's twin, and deliberately the same object: same
+ * track, same thumb, same lens, same gestures. What differs is what the
+ * colour and the fill are FOR.
+ *
+ * The ramp is the scale. The colour under any point of the track is that
+ * point's temperature, lit or not, so the band says where twenty degrees
+ * is without a number under it. Held back behind the surface everywhere
+ * except the span being reported, because marks have to read over it.
+ *
+ * The lit span is the GAP -- from where the room is to where it was asked
+ * to be. Brightness fills from the left edge because brightness is a
+ * quantity: 30% is less light than 60%. Temperature is not. Eighteen
+ * degrees is not less full than twenty-two, and a bar filled to the
+ * setpoint would be measuring nothing at all. The gap is the one quantity
+ * on this control that means something -- the work still to do -- and at
+ * target it has no width, which is the state worth reading from a doorway.
+ */
+.ramptrack {
+  background:linear-gradient(to right,
+    var(--sp-ramp-0) 0%, var(--sp-ramp-1) 26%, var(--sp-ramp-2) 52%,
+    var(--sp-ramp-3) 76%, var(--sp-ramp-4) 100%);
+}
+.ramptrack::after {
+  content:""; position:absolute; inset:0;
+  background:var(--sp-surface); opacity:.28;
+}
+/* The same ramp at full strength, clipped to the gap. ONE full-width layer
+   rather than a positioned slice: clipped, the colour at any point stays
+   the colour of that point's temperature at any card width, and there is
+   nothing to keep in register. */
+.rampgap {
+  position:absolute; inset:0;
+  background:linear-gradient(to right,
+    var(--sp-ramp-0) 0%, var(--sp-ramp-1) 26%, var(--sp-ramp-2) 52%,
+    var(--sp-ramp-3) 76%, var(--sp-ramp-4) 100%);
+  transition:clip-path 320ms cubic-bezier(.25,.1,.25,1);
+}
+.slide.picking .rampgap { transition:none; }
+/* Now, as a needle. Not a disc: a reading has no handle, and two grabbable
+   circles on one track is an invitation to drag the wrong one. Drawn OVER
+   the thumb, because when they coincide the one you must still be able to
+   see is where the room actually is -- the target is already written out
+   in the row below. */
+.nowline {
+  position:absolute; top:50%; width:3px; height:34px;
+  margin:-17px 0 0 -1.5px; border-radius:2px;
+  background:var(--sp-ink); pointer-events:none; z-index:3;
+  box-shadow:0 0 0 1px var(--sp-surface);
+  transition:left 320ms cubic-bezier(.25,.1,.25,1);
+}
+.slide .dimthumb { z-index:2; }
+/* An off zone has no target. Tado's off is a five-degree frost setting,
+   which is below the bottom of any stripe worth dragging -- so the thumb
+   leaves at the cold end and fades rather than parking on a number nobody
+   set. The needle stays: the room still has a temperature. */
+.slide.off .dimthumb { opacity:0; }
+.slide.off .nowline { opacity:1; }
+/* Leading the body, where the lights card puts its scene strip. */
+.slide.lead { margin:0 0 9px; }
+/* The lens hangs above the track and always will: a finger covers what is
+   below it, and a readout under a thumb is a readout nobody can read. On a
+   leading stripe that means it clears the card's own top edge, so the gap
+   closes to 4px and it lands on the title bar -- which is where it lands
+   on a mid-card slider too, and during a drag the title bar is not the
+   thing being read. */
+.slide.lead .picklens { bottom:calc(100% + 4px); }
+/* What the room was asked for, at the end of the mode line. A readout, not
+   a control: the stripe above is the control, and a second place to set
+   the same number is a second place for it to disagree. */
+.climtarget {
+  margin-left:auto; font-family:var(--sp-mono); font-size:16px;
+  font-weight:500; flex:none;
+}
+.climtarget.pending { color:var(--accent-on); }
 
 /* metric strip */
 .metrics {
@@ -3015,18 +3104,11 @@ function pickerScene(b, label) {
    leftover width equally, so the control sits on the midline whatever the
    sentence beside it says. */
 const BODY_ASIDE = {
-  climate(b) {
-    if (!b || typeof b !== "object") return "";
-    const power = Number(b.flame);
-    const firing = isFinite(power) && power > 0;
-    /* A shallow copy rather than a flag on the body: the dial is shared with
-       `control`, and it should know that a row is running hot without knowing
-       that radiators exist. */
-    if (b.adjust) return dialMarkup(firing ? Object.assign({}, b, { hot: true }) : b, 0);
-    /* A room with no dial puts its word in the same column, so the middle
-       does not empty out and shift when a room goes off. */
-    return isBlank(b.value) ? "" : `<span class="ctlvalue">${esc(b.value)}</span>`;
-  },
+  /* Empty, and kept for the next body that wants the middle column.
+     Climate held the only entry: a 44px dial in a band of its own, which
+     is what made the card three bands deep. The stripe leads the body
+     instead, so there is nothing to send to a middle column and the card
+     goes back to being an ordinary one. */
 };
 
 /* The one control a body puts in the title bar.
@@ -4441,13 +4523,19 @@ const BODIES = {
     /* `on` is not read here any more -- the switch that wanted it went to
        the title bar, and BODY_TOOL.climate reads it there. */
     const auto = Boolean(b.auto);
+    const lit = b.on === undefined ? true : Boolean(b.on);
+
+    /* The stripe leads the body, where the lights card puts its scene
+       strip, so the two cards open with the same shape: a band you drag,
+       then one line saying what it is doing. */
+    let out = tempStripeMarkup(b);
 
     /* No side padding -- `.row`'s 6px is there for the zebra stripe this row
        does not wear, and on the right it was holding the dial in from the
        edge the title bar's switch reaches. In the sheet rather than inline,
        because an inline style beats every selector there is and this row is
        one a modifier may yet want to reach. */
-    let out = `<div class="row pickrow climrow">`;
+    out += `<div class="row pickrow climrow">`;
 
     /* Live in every state, unlike the lights' twin: see above. */
     if (!isBlank(b.zone)) {
@@ -4489,6 +4577,16 @@ const BODIES = {
     /* Reserved whether or not it has anything to say, so nothing below it
        moves when the room changes what it is doing. */
     out += `<p class="pickinfo${b.warn ? " warn" : ""}">${esc(firstOf(b.info, ""))}</p>`;
+
+    /* What the room was ASKED for, at the end of the line the mode is
+       written on: "Following schedule · 20.5" reads as one statement and
+       "Manual · 22.5" reads as a different one. What the room IS goes in
+       the title bar, where the card's status lives -- two numbers that used
+       to sit on the same line in the same type, where the only way to tell
+       which was which was to know. */
+    const target = lit ? firstOf(b.value, "\u2014") : "\u2014";
+    out += `<span class="climtarget${b.pending ? " pending" : ""}">`
+      + `${esc(target)}</span>`;
 
     /* No spinner here. The card has exactly one, in the title bar, and it
        is the shell's -- driven by whether this card has a call in flight
@@ -5144,6 +5242,17 @@ const SLIDE_LIVE_MS = 200;
 const DIM_SETTLE = 2;
 const DIM_GIVE_UP_MS = 12000;
 
+/* How long a claimed TARGET is held before the card stops claiming it.
+
+   Not the dimmer's twelve seconds. That number is a Hue bridge's: a light
+   disagrees within a second or two, and twelve is generous. Tado is a cloud
+   integration on a polling interval -- a setpoint accepted immediately can
+   take the better part of a minute to come back down and be reconciled. At
+   twelve the card would drop the value the finger left and snap to the old
+   one while the change was still in flight, which is the precise failure
+   the optimistic contract exists to prevent. */
+const ADJUST_GIVE_UP_MS = 45000;
+
 const LEAVE_MS = 420;
 /* Matches the sp-press keyframes. A flash outliving its own animation
    would be carried onto a node that then never clears it. */
@@ -5471,6 +5580,52 @@ function sceneTrackMarkup(key, scenes, activeName, lit) {
     + `<span class="bandmark${at < 0 ? " gone" : ""}" data-bandmark`
     + ` style="width:${width.toFixed(4)}%;left:${((at < 0 ? 0 : at) * width).toFixed(4)}%">`
     + `</span>`
+    + slideLens() + `</div></div>`;
+}
+
+/* The target, as a stripe, with the room's own reading standing on it.
+
+   Bounds are required rather than guessed. `_fitDials` will take them off
+   the thermostat when config leaves them out, and for a barrel that was
+   the right answer -- a barrel only ever shows three cells, so a wide range
+   costs nothing. A stripe spends its whole width on its range, and Tado's
+   own 5 to 25 puts every temperature anybody actually sets in the last
+   inch of the track. Give it fifteen to twenty-five and a half degree is a
+   comfortable fifteen pixels. */
+function tempStripeMarkup(row) {
+  const adjust = row.adjust || {};
+  const min = Number(adjust.min);
+  const max = Number(adjust.max);
+  if (!isFinite(min) || !isFinite(max) || max <= min) return "";
+
+  const lit = row.on === undefined ? true : Boolean(row.on);
+  const target = parseFloat(row.value);
+  const now = parseFloat(row.now);
+  const place = (v) => Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
+
+  /* An off zone has no target to point at, so the thumb sits at the cold
+     end where the CSS fades it out -- rather than at whatever number the
+     thermostat reports while it is off, which is a frost setting and not a
+     temperature anybody chose. */
+  const at = lit && isFinite(target) ? place(target) : 0;
+  const here = isFinite(now) ? place(now) : null;
+  /* Clipped from both sides: the gap is a span, not a fill, and it has two
+     ends that both move. */
+  const lo = here === null ? at : Math.min(at, here);
+  const hi = here === null ? at : Math.max(at, here);
+
+  return `<div class="slide lead climstripe${lit ? "" : " off"}" data-temp`
+    + ` role="slider" tabindex="${lit ? "0" : "-1"}"`
+    + ` aria-label="Target temperature"`
+    + ` aria-valuemin="${min}" aria-valuemax="${max}"`
+    + (lit && isFinite(target) ? ` aria-valuenow="${target}"` : ` aria-disabled="true"`)
+    + ` aria-valuetext="${lit && isFinite(target) ? esc(String(target)) : "off"}">`
+    + `<div class="slidehold">`
+    + `<div class="dimtrack ramptrack"><span class="rampgap" data-rampgap`
+    + ` style="clip-path:inset(0 ${(100 - hi).toFixed(3)}% 0 ${lo.toFixed(3)}%)"></span></div>`
+    + `<span class="dimthumb" data-tempthumb style="left:${at.toFixed(3)}%"></span>`
+    + (here === null ? ""
+      : `<span class="nowline" data-nowline style="left:${here.toFixed(3)}%"></span>`)
     + slideLens() + `</div></div>`;
 }
 
@@ -8176,6 +8331,65 @@ class SpectraCard extends HTMLElement {
     });
   }
 
+  /* The target, dragged. The brightness slider's gesture, whole, with one
+     deliberate difference: nothing is sent until the finger lifts.
+
+     Live stepping earns its place on a light because the room answers under
+     the thumb -- the feedback loop IS the point, and the queue in
+     `_bindSlide` exists to keep the bridge in step with the hand. A radiator
+     answers in twenty minutes. Forty calls across one drag would buy no
+     feedback at all (the lens is already saying the number) and every one of
+     them is a round trip to a cloud that rate limits. So `live` is left
+     unset: the queue, the throttle and the recant come along unused, and one
+     gesture implementation covers both controls instead of two. */
+  _bindTemp(el, row) {
+    if (!row) return;
+    const adjust = row.adjust || {};
+    const min = Number(adjust.min);
+    const max = Number(adjust.max);
+    if (!isFinite(min) || !isFinite(max) || max <= min) return;
+
+    const step = Number(adjust.step) || DIAL_MIN_STEP;
+    const decimals = String(step).includes(".") ? 1 : 0;
+    const suffix = adjust.suffix || "\u00b0";
+    const gap = el.querySelector("[data-rampgap]");
+    const thumb = el.querySelector("[data-tempthumb]");
+    const now = parseFloat(row.now);
+    const start = parseFloat(row.value);
+    const place = (v) => Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
+
+    this._bindSlide(el, {
+      inert: () => el.classList.contains("off"),
+      read: () => (isFinite(start) ? start : min),
+      valueAt: (ratio) => {
+        const raw = min + ratio * (max - min);
+        return Math.min(max, Math.max(min, Math.round(raw / step) * step));
+      },
+      step: (v, by) => Math.min(max, Math.max(min, v + by * step)),
+      describe: (v) => ({ text: v.toFixed(decimals) + suffix, icon: "" }),
+      paint: (v) => {
+        const at = place(v);
+        /* The needle does not move -- the room did not change because a
+           thumb did -- but both ends of the gap are recomputed, because
+           either of them can be the left one. */
+        const here = isFinite(now) ? place(now) : at;
+        if (gap) {
+          gap.style.clipPath = `inset(0 ${(100 - Math.max(at, here)).toFixed(3)}% `
+            + `0 ${Math.min(at, here).toFixed(3)}%)`;
+        }
+        if (thumb) thumb.style.left = `${at.toFixed(3)}%`;
+        el.setAttribute("aria-valuenow", String(v));
+        el.setAttribute("aria-valuetext", v.toFixed(decimals) + suffix);
+      },
+      /* Straight into the contract the dial already had: claim the number,
+         debounce the send, report through the title bar's one spinner, and
+         stop claiming it if the house never agrees. `_setTarget` was written
+         for exactly this -- "a drag already knows the number it landed on,
+         so it comes straight here". */
+      commit: (v) => this._setTarget(adjust, v),
+    });
+  }
+
   _choose(label, entity) {
     if (this._pickGiveUp) clearTimeout(this._pickGiveUp);
     this._pick = { label: label, at: Date.now() };
@@ -8493,21 +8707,24 @@ class SpectraCard extends HTMLElement {
       });
     });
 
-    /* The climate body is one room, so its dial is the body itself rather
+    const body = model.body || {};
+    const climate = body.type === "climate" ? body : null;
+    this._holder.querySelectorAll("[data-dial]").forEach((el) => {
+      this._bindDial(el, controls[Number(el.dataset.dial)]);
+    });
+    /* The climate body is one room, so the stripe is the body itself rather
        than a row of one — otherwise `controls` would have to be faked just
        to be indexed into. */
-    const body = model.body || {};
-    const dialRow = body.type === "climate" ? body : null;
-    this._holder.querySelectorAll("[data-dial]").forEach((el) => {
-      this._bindDial(el, dialRow || controls[Number(el.dataset.dial)]);
+    this._holder.querySelectorAll("[data-temp]").forEach((el) => {
+      this._bindTemp(el, climate);
     });
 
     /* Tado's own vocabulary: a zone is driven by its schedule, or held by an
        overlay, and turning it off is itself an overlay. So "on" means hand it
        back to the schedule rather than pick a mode — the same press as the
        schedule button, which is correct and not a coincidence. */
-    if (dialRow && !isBlank(dialRow.zone)) {
-      const zone = dialRow.zone;
+    if (climate && !isBlank(climate.zone)) {
+      const zone = climate.zone;
       const setMode = (mode) => this._callAction({
         service: "climate.set_hvac_mode",
         target: { entity_id: zone },
@@ -8532,7 +8749,7 @@ class SpectraCard extends HTMLElement {
       }
       const power = this._holder.querySelector("[data-climpower]");
       if (power) {
-        const on = dialRow.on === undefined ? true : Boolean(dialRow.on);
+        const on = climate.on === undefined ? true : Boolean(climate.on);
         const run = (event) => {
           event.stopPropagation();
           /* The knob travels on the press, before the thermostat answers,
@@ -8759,7 +8976,7 @@ class SpectraCard extends HTMLElement {
         }));
       }, 450),
       /* If the house never agrees, stop claiming it did. */
-      giveUp: setTimeout(() => this._settle(adjust.entity), 12000),
+      giveUp: setTimeout(() => this._settle(adjust.entity), ADJUST_GIVE_UP_MS),
       attribute: adjust.attribute,
     };
     this._signature = null;
