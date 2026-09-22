@@ -127,6 +127,14 @@ it — which is exactly what happened when they shared `a2` and the sun turned
 grey. Two tokens that happen to agree can be told apart later; one cannot.
 `checklevels` pins both values.
 
+The same exemption is what lets the climate stripe be a temperature ramp —
+`--sp-ramp-0` through `--sp-ramp-4`, blue through yellow to red. It holds
+two of the three level colours and is allowed to, for the reason `--sp-sun`
+is allowed to: cold is blue because cold is blue, and nobody chose it. Its
+own five tokens rather than the levels' so neither can restate the other —
+repaint a level and the scale does not move, repaint the scale and no alarm
+changes colour.
+
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
 is never a seventh: if a new meaning appears, map it onto one of the six.
@@ -588,6 +596,76 @@ Every target is at least 44px.
 sends an absolute one, because that is what the services take — config cannot
 do arithmetic and should not learn how. Clamping never reverses a press: from
 below a floor, minus does nothing rather than raising the value.
+
+### `climate` — how warm is this room, and what was it asked for?
+
+```yaml
+body:
+  type: climate
+  zone: climate.kitchen                      # the room, for the schedule button
+  on: {entity: climate.kitchen, map: {off: false}, default: true}
+  auto: {entity: binary_sensor.kitchen_overlay, map: {on: false}, default: true}
+  info: Following schedule
+  flame: {entity: sensor.kitchen_heating}
+  value: {entity: climate.kitchen, attribute: temperature, suffix: "°"}
+  now: {entity: climate.kitchen, attribute: current_temperature}
+  adjust:
+    entity: climate.kitchen
+    attribute: temperature
+    service: climate.set_temperature
+    field: temperature
+    step: 0.5
+    min: 15
+    max: 25
+```
+
+One room. The stripe leads the body, where the lights card puts its scene
+strip, so the two cards open with the same shape: a band you drag, then one
+line saying what it is doing.
+
+**Two numbers, two places.** What the room *is* belongs in the card's `meta`,
+beside the switch — it is status, and it never changes what the control does.
+What the room was *asked for* is drawn at the end of the mode line, next to
+the words that qualify it: `Following schedule · 20.5°` reads as one
+statement and `Manual · 22.5°` reads as a different one. The dial showed one
+number and you had to know which it was.
+
+**The ramp is the scale, the lit span is the gap.** The colour under any
+point of the track is that point's temperature, held back behind the surface
+except across the span between the needle and the thumb. Brightness fills
+from the left edge because brightness *is* a quantity; 18° is not less full
+than 22°, so the fill is the work still to do, and at target it has no width.
+
+**Two marks, two shapes.** The target is the brightness slider's own thumb —
+filled, because you chose it, and the thing you take hold of. The reading is
+a needle: a reading has no handle, and two grabbable circles on one track is
+an invitation to drag the wrong one. The needle draws *over* the disc, so
+where they coincide you can still see where the room actually is.
+
+**Bounds are worth setting.** `_fitDials` will take `min`, `max` and `step`
+off the thermostat when config leaves them out, which was the right answer
+for a barrel — a barrel only ever shows three cells, so a wide range costs
+nothing. A stripe spends its whole width on its range, and Tado's own 5–25
+puts every temperature anybody sets in the last inch of the track. 15–25
+makes a half degree about fifteen pixels. 5° stays unreachable by dragging
+on purpose: that is off, the title bar switch does it, and a control must not
+be draggable to a value it cannot be dragged back from.
+
+**Nothing is sent until the finger lifts.** This is the one place the stripe
+diverges from the brightness slider it otherwise shares code with. Live
+stepping earns its place on a light because the room answers under the
+thumb; a radiator answers in twenty minutes, so forty calls across a drag buy
+no feedback the lens is not already giving and spend forty round trips on a
+cloud that rate limits. The commit goes through the same optimistic contract
+the dial used — claim the number, debounce the send, report through the title
+bar's one spinner — with its own `ADJUST_GIVE_UP_MS` of 45 seconds, because
+twelve is a Hue bridge's number and Tado polls.
+
+An off zone has no target: the thumb leaves at the cold end and fades, the
+needle stays, and the readout is an em dash. The room still has a
+temperature; it is the target that went away. `checkclimate` holds all of it,
+including the one that would fail silently — that a whole drag says nothing
+to the house and the lift says it once.
 
 ### `scenes` — which scene is this room in?
 
@@ -1850,6 +1928,29 @@ the offset the panel's Roboto needed.
 So the probe is now empty and zero-height, and every card is measured through
 five unrelated font stacks. An offset that only lines up in one of them is
 not lined up.
+
+```
+node tools/checkclimate.js
+```
+
+The temperature stripe, and mostly the half of it that is invisible. The
+stripe shares its whole gesture implementation with the brightness slider and
+differs in one place: the light is told about every step of a drag, the
+thermostat is told once, on the lift. That difference is an *absent* `live`
+in a spec object, and nothing about adding one back would look wrong — the
+drag would still work, the value would still land, the card would render
+identically. It would just spend forty round trips on a rate-limited cloud
+every time somebody moved a setpoint.
+
+So it counts calls, not pixels: none across a whole drag, exactly one after
+the lift, none at all from a gesture abandoned clear of the track or from an
+off zone. Two things it does check by eye, because nothing else can: that the
+lens hangs *above* the track, since a readout under the thumb is a readout a
+finger covers, and that the needle paints over the disc where they coincide —
+both marks are `pointer-events:none`, so `elementFromPoint` cannot answer it
+and a `z-index` in the sheet is not proof anything was painted. It hides the
+needle and takes the same pixels again. Identical shots mean it was behind
+the disc all along.
 
 ## Licence
 
