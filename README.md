@@ -923,7 +923,7 @@ body:
     from: {entity: sensor.washing_machine, attribute: finished_today}
     each:
       at: {field: finished_at, format: time}
-      ran: {field: duration_minutes, prefix: "took ", suffix: " min"}
+      ran: {field: duration_minutes, prefix: "ran for ", suffix: " min"}
       used: {field: energy_kwh, suffix: " kWh"}
       cost: {field: cost_text}
       hanging: {field: hanging}

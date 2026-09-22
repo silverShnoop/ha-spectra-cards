@@ -549,8 +549,8 @@ const js = fs.readFileSync(file);
     // ---- finished today
     await show({
       finished: [
-        { at: "20:55", ran: "took 1h 58m", used: "1.12 kWh" },
-        { at: "18:20", ran: "took 2h 06m", used: "1.31 kWh" },
+        { at: "20:55", ran: "ran for 1h 58m", used: "1.12 kWh" },
+        { at: "18:20", ran: "ran for 2h 06m", used: "1.31 kWh" },
       ],
     });
     check("it lists what finished today",
@@ -573,9 +573,9 @@ const js = fs.readFileSync(file);
     await show({
       pending: 1,
       finished: [
-        { at: "20:55", ran: "took 1h 58m", used: "1.12 kWh",
+        { at: "20:55", ran: "ran for 1h 58m", used: "1.12 kWh",
           cost: "31p", hanging: true },
-        { at: "18:20", ran: "took 2h 06m", used: "1.31 kWh", cost: "26p" },
+        { at: "18:20", ran: "ran for 2h 06m", used: "1.31 kWh", cost: "26p" },
       ],
     });
     const rowsOf = () => all(".washfinrow");
@@ -621,7 +621,7 @@ const js = fs.readFileSync(file);
       costPill ? getComputedStyle(costPill).color : "(none)");
 
     await show({
-      finished: [{ at: "20:55", ran: "took 1h 58m", used: "1.12 kWh" }],
+      finished: [{ at: "20:55", ran: "ran for 1h 58m", used: "1.12 kWh" }],
     });
     check("a wash with no price leaves the row without a chip",
       !/\d+p/.test(rowsOf()[0].textContent || ""),
