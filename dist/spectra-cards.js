@@ -908,12 +908,22 @@ ha-icon { display:inline-flex; line-height:0; }
 }
 .washfinrule { flex:1 1 auto; height:1px; background:var(--sp-edge); }
 .washfinrow {
-  display:flex; align-items:center; gap:10px; padding:5px 6px;
-  border-radius:3px; background:var(--sp-zebra);
+  display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px;
+  padding:5px 6px; border-radius:3px; background:var(--sp-zebra);
 }
 .washfinrow .at { font-family:var(--sp-mono); font-size:12px; width:46px; }
 .washfinrow .ran { font-size:12px; color:var(--sp-ink-2); flex:1 1 auto; }
 .washfinrow .used { font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); }
+.washfinmarks { display:flex; flex-wrap:wrap; gap:4px; margin-left:auto; }
+/* A row still waiting on somebody, in the same ochre the card is already
+   trimmed in. Ground and ink both, rather than ink alone: yellow text on
+   a zebra stripe at 12px is a colour-blind reader's coin toss, and the
+   ground is what carries the mark across a kitchen. Same pairing as the
+   adrift person, for the same reason. */
+.washfinrow.hanging { background:var(--sp-attention-soft); }
+.washfinrow.hanging .at,
+.washfinrow.hanging .ran,
+.washfinrow.hanging .used { color:var(--sp-attention-on); }
 
 /* A confirmation is a modal over the card it belongs to, not a browser
    dialog: the panel has no keyboard and no window chrome, and a native
@@ -3736,15 +3746,51 @@ const BODIES = {
        the first wants "what is it doing", the second "what did it do". */
     if (running || b.drum_full) out += washerPhases(b, running);
 
+    /* Which of today's loads is which.
+
+       The list used to be four interchangeable lines of arithmetic: a
+       time, a length and a number of kilowatt-hours, with no way of
+       telling the load still on the kitchen floor from the three already
+       on the airer. The card said "1 to hang" three centimetres above a
+       list that did not say WHICH -- and which is the only thing the list
+       can answer that the chip cannot.
+
+       So a row that is still queued is marked, and marked the way every
+       other waiting job on this panel is: attention, a soft ground and a
+       chip naming it. This is not a job moving onto the card. Nothing
+       here presses, nothing dismisses; the row states which load, and the
+       row in `Needs you` is still the only place it can be finished from
+       -- which is also why the mark disappears the instant it is hung,
+       from a phone or from the wall button, without the card being
+       touched.
+
+       The cost rides the row for the same reason it earned a chip on the
+       hero: it is stated nowhere else, and "was the half load worth it"
+       is a question about one wash rather than about today. It is the
+       same neutral chip, because a price asks nothing of anybody -- and
+       putting a neutral chip beside an attention one is what keeps the
+       ochre meaning "this one". */
     const finished = Array.isArray(b.finished) ? b.finished : [];
     if (finished.length) {
-      const rows = finished.map((run) => `<div class="washfinrow">`
-        + `<span class="at">${esc(firstOf(run.at, ""))}</span>`
-        + `<span class="ran">${esc(firstOf(run.ran, ""))}</span>`
-        + `<span class="used">${esc(firstOf(run.used, ""))}</span>`
-        + `</div>`).join("");
+      const rows = finished.map((run) => {
+        const hanging = Boolean(run.hanging);
+        const marks = [];
+        if (!isBlank(run.cost)) {
+          marks.push(chipOf(String(run.cost), "mdi:currency-gbp", null));
+        }
+        if (hanging) {
+          marks.push(chipOf("Needs hanging", "mdi:hanger", "attention"));
+        }
+        return `<div class="washfinrow${hanging ? " hanging" : ""}">`
+          + `<span class="at">${esc(firstOf(run.at, ""))}</span>`
+          + `<span class="ran">${esc(firstOf(run.ran, ""))}</span>`
+          + `<span class="used">${esc(firstOf(run.used, ""))}</span>`
+          + (marks.length ? `<span class="washfinmarks">${marks.join("")}</span>` : "")
+          + `</div>`;
+      }).join("");
       out += `<div class="washfin">`
-        + `<div class="washfinhead"><span>${esc(firstOf(b.finished_label, "Finished today"))}</span>`
+        + `<div class="washfinhead">`
+        + `<span>${esc(firstOf(b.finished_label, "Loads finished today"))}</span>`
         + `<span class="washfinrule"></span></div>`
         + `<div class="chips" style="flex-direction:column;gap:3px;margin-top:0">${rows}</div>`
         + `</div>`;
@@ -5395,6 +5441,27 @@ function washerLevel(leak, powered, wants) {
   return null;
 }
 
+/* Whether the drum has a job to show, which is not the same question as
+   whether the card has one.
+
+   A machine that is RUNNING has no job in the drum. The queue behind it is
+   real -- the card is still outlined, the chip still says "1 to hang", and
+   the row in Needs you is still there -- but the drum is the one element
+   saying what the machine is doing NOW, and now it is washing. An amber
+   porthole over a live phase glyph puts the last load's colour on this
+   load's picture, and the glyph and the colour then say different things
+   at the same time.
+
+   It is also the one state where the job is about to change under you: a
+   drum full of the next wash will be another load to hang, and painting
+   the queue while that is still turning is warning about a number that is
+   not final yet. Washing waits on the airer; it does not get more urgent
+   because the machine is busy. */
+function washerWants(b, cycle, waiting) {
+  if (cycle === "running") return false;
+  return Boolean(b.drum_full) || waiting > 0;
+}
+
 /* A chip states a fact, and the coloured ones state a fact a person has to
    act on -- so they wear a level, never a decorative accent. A chip with no
    level is ink on sink: still a fact, just not one asking for anything. */
@@ -5419,7 +5486,7 @@ function washerDrum(b, cycle, leak, powered, waiting) {
   const circ = 2 * Math.PI * r;
   /* A drum to empty, or washing waiting to be hung. Both are jobs, both
      outline the card, and both now colour the drum to match it. */
-  const level = washerLevel(leak, powered, b.drum_full || waiting > 0);
+  const level = washerLevel(leak, powered, washerWants(b, cycle, waiting));
   const frac = Math.max(0, Math.min(1, Number(b.progress)));
   const arc = cycle === "running" && isFinite(frac) && frac > 0
     ? `<circle class="drumarc" cx="${c}" cy="${c}" r="${r}"`
