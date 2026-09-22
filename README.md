@@ -1404,6 +1404,24 @@ buttons:
     summary: {entity: sensor.security_status, attribute: detail}
 ```
 
+**A status button names a level, never a slot number.** The `accent` above
+maps `amber` to `waiting` and `red` to `critical` — names, not `2` and `1`.
+Those two slots once *were* the ochre and the terracotta, and a config that
+still maps onto them is a level wearing a disguise: the levels work moved
+both hues out of the decorative palette, so `2` is now a bone and `1` a tan.
+Such a config throws nothing and logs nothing. It just goes quiet — a load
+of washing waiting to be hung turns the tab bone-white, and a leak turns it
+tan.
+
+Better still, read a level the sensor already publishes
+(`{entity: sensor.cleaning_status, attribute: level, fallback: 4}`) rather
+than translating that sensor's own vocabulary here. Green/amber/red is the
+sensor's word for its own state; a second place that knows what those mean
+is a second place that can drift, and a colour cannot express the
+difference between a machine left without power (`waiting`) and washing to
+hang (`attention`) in any case. `checkdock` pins all of it, including that
+the decorative slots have not quietly become the levels again.
+
 **Domain-based, never room-based** — you reach for "the lights" before you
 reach for "the kitchen", so room selection belongs inside each pop-up.
 

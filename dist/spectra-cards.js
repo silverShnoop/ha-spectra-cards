@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.108.0";
+const VERSION = "0.108.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -7783,6 +7783,10 @@ class SpectraCard extends HTMLElement {
   _voiceReview(items, said) {
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
+    /* The card's own accent: this sheet belongs to the list it is
+       proposing rows for, and Phoenix's bone is what the tick beneath
+       it already wears. */
+    this._wearAccent(wrap, this._model && this._model.accent);
     const row = (item, i) => `<li>`
       + `<button type="button" class="voiceitem" data-item="${i}" aria-pressed="true">`
       + `<span class="voicetick"><ha-icon icon="mdi:check-bold"></ha-icon></span>`
@@ -9057,14 +9061,35 @@ class SpectraCard extends HTMLElement {
     });
   }
 
+  /* The three properties everything in a dialog takes its colour from.
+
+     Set on the dialog rather than inherited from the card, and that is
+     not belt and braces. `--accent` is written on the CARD element, and
+     a dialog is appended to the holder BESIDE it -- so inside one
+     `var(--accent)` resolves to nothing at all.
+
+     What that looks like is worth writing down, because it does not
+     look like a colour bug. Every rule reading `--accent` silently
+     stops applying: the review sheet lost its tick boxes, and its Add
+     button was drawn transparent on transparent with `--sp-surface`
+     text, which on a dark panel is dark on dark. The button was there,
+     laid out and pressable, and completely invisible -- so the sheet
+     read as one that would only let you cancel. It shipped that way
+     because the confirmation dialog sets these three by hand and the
+     review sheet was written to inherit them instead. Now there is one
+     place to set them and both use it. */
+  _wearAccent(element, accent) {
+    const a = accentNumber(accent) || 4;
+    element.style.setProperty("--accent", `var(--sp-a${a})`);
+    element.style.setProperty("--accent-soft", `var(--sp-a${a}-soft)`);
+    element.style.setProperty("--accent-on", `var(--sp-a${a}-on)`);
+  }
+
   _confirm(spec) {
     if (!spec) return Promise.resolve(true);
-    const accent = Number(spec.accent) || 1;
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
-    wrap.style.setProperty("--accent", `var(--sp-a${accent})`);
-    wrap.style.setProperty("--accent-soft", `var(--sp-a${accent}-soft)`);
-    wrap.style.setProperty("--accent-on", `var(--sp-a${accent}-on)`);
+    this._wearAccent(wrap, Number(spec.accent) || 1);
     wrap.innerHTML = `<div class="confirmbox" role="alertdialog" aria-modal="true">`
       + `<div class="confirmhead"><ha-icon icon="${esc(firstOf(spec.icon, "mdi:alert"))}"></ha-icon>`
       + `<span>${esc(firstOf(spec.title, "Are you sure?"))}</span></div>`
