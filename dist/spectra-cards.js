@@ -1132,6 +1132,22 @@ ha-icon { display:inline-flex; line-height:0; }
   transition:clip-path 320ms cubic-bezier(.25,.1,.25,1);
 }
 .slide.picking .rampgap { transition:none; }
+/* animateFrom holds these while it paints where the stripe WAS. */
+.rampgap.instant, .dimtrack.instant { transition:none; }
+/* The thumb fades as it leaves for the cold end, rather than vanishing at
+   the start of its journey. */
+.climstripe .dimthumb {
+  transition:left 320ms cubic-bezier(.25,.1,.25,1),
+             opacity 320ms cubic-bezier(.25,.1,.25,1);
+}
+.climstripe .dimthumb.instant { transition:none; }
+/* The dimmer hides its thumb when the room is off -- .slide.off .dimthumb
+   is display:none -- and that rule matches the stripe too. display:none
+   cancels every transition, so the fade above had nothing to animate and
+   the thumb vanished at the start of its journey instead of the end. At
+   rest the two look identical, which is why only a mid-flight sample finds
+   it. The stripe keeps its thumb in the box and lets opacity take it. */
+.slide.climstripe.off .dimthumb { display:block; }
 /* Now, as a needle. Not a disc: a reading has no handle, and two grabbable
    circles on one track is an invitation to drag the wrong one. Drawn OVER
    the thumb, because when they coincide the one you must still be able to
@@ -4622,7 +4638,7 @@ const BODIES = {
        the title bar, where the card's status lives -- two numbers that used
        to sit on the same line in the same type, where the only way to tell
        which was which was to know. */
-    const target = lit ? firstOf(b.value, "\u2014") : "\u2014";
+    const target = lit && !b.powering ? firstOf(b.value, "\u2014") : "\u2014";
     out += `<span class="climtarget${b.pending ? " pending" : ""}">`
       + `${esc(target)}</span>`;
 
@@ -5687,7 +5703,10 @@ function tempStripeMarkup(row) {
      end where the CSS fades it out -- rather than at whatever number the
      thermostat reports while it is off, which is a frost setting and not a
      temperature anybody chose. */
-  const at = lit && isFinite(target) ? place(target) : 0;
+  /* Being switched on, the thumb waits at the cold end for the schedule's
+     target to arrive and then travels to it -- rather than sitting on the
+     frost setting the thermostat reports until it does. */
+  const at = lit && !row.powering && isFinite(target) ? place(target) : 0;
   const here = isFinite(now) ? place(now) : null;
   /* A reading past either end of the SCALE is pinned there -- but a needle
      standing on the end claims that end's number exactly. So it changes
@@ -5704,6 +5723,7 @@ function tempStripeMarkup(row) {
   const deadHi = place(hi);
 
   return `<div class="slide lead climstripe${lit ? "" : " off"}" data-temp`
+    + ` data-at="${at.toFixed(3)}" data-from="${from.toFixed(3)}" data-to="${to.toFixed(3)}"`
     + ` role="slider" tabindex="${lit ? "0" : "-1"}"`
     + ` aria-label="Target temperature"`
     + ` aria-valuemin="${lo}" aria-valuemax="${hi}"`
@@ -6694,6 +6714,11 @@ class SpectraCard extends HTMLElement {
            outline, whether the mode tab is live — so they all move together
            rather than the switch arguing with the rest of the card. */
         model.body.on = power.want;
+        /* Said aloud, so a body can tell "on" from "being switched on".
+           A thermostat switched back on has a target nobody knows yet --
+           the schedule's -- and the number it still reports is the frost
+           setting it was holding while off. */
+        model.body.powering = true;
       }
     }
 
@@ -7499,14 +7524,14 @@ class SpectraCard extends HTMLElement {
   /* The switch shows what you asked for until the light reports it. Given up
      on after twelve seconds, so a call that never lands leaves a switch
      telling the truth rather than one stuck on a promise. */
-  _wantPower(want) {
+  _wantPower(want, giveUp) {
     if (this._powerGiveUp) clearTimeout(this._powerGiveUp);
     this._power = { want: Boolean(want) };
     this._powerGiveUp = setTimeout(() => {
       this._power = null;
       this._signature = null;
       this._update();
-    }, 12000);
+    }, giveUp || 12000);
   }
 
   /* The door answers on the press. A Nuki takes a second or two to throw
@@ -8447,8 +8472,32 @@ class SpectraCard extends HTMLElement {
     const suffix = adjust.suffix || "\u00b0";
     const gap = el.querySelector("[data-rampgap]");
     const thumb = el.querySelector("[data-tempthumb]");
+    const track = el.querySelector(".dimtrack");
     const now = parseFloat(row.now);
     const start = parseFloat(row.value);
+
+    /* Every render builds a new stripe, and a node created already in its
+       new position does not transition -- so switching the zone off, or
+       handing it back to the schedule, made the thumb jump rather than
+       travel. The dimmer solved this long ago: remember where the control
+       was, paint that on the fresh node with transitions held, release
+       them, paint where it is now. Same here, for the thumb, the gap and
+       the dim together, so none of them moves without the others. */
+    const key = firstOf(row.zone, adjust.entity, "");
+    if (!this._wasTemp) this._wasTemp = {};
+    const current = {
+      at: Number(el.dataset.at), from: Number(el.dataset.from),
+      to: Number(el.dataset.to), lit: !el.classList.contains("off"),
+    };
+    const settle = (st) => {
+      el.classList.toggle("off", !st.lit);
+      if (thumb) thumb.style.left = `${st.at.toFixed(3)}%`;
+      if (gap) {
+        gap.style.clipPath = `inset(0 ${(100 - st.to).toFixed(3)}% 0 ${st.from.toFixed(3)}%)`;
+      }
+    };
+    animateFrom([thumb, gap, track], this._wasTemp[key], settle, current);
+    this._wasTemp[key] = current;
 
     this._bindSlide(el, {
       inert: () => el.classList.contains("off"),
@@ -8473,6 +8522,12 @@ class SpectraCard extends HTMLElement {
             + `0 ${Math.min(at, here).toFixed(3)}%)`;
         }
         if (thumb) thumb.style.left = `${at.toFixed(3)}%`;
+        /* Kept current under the finger. Without it the render after the
+           lift would animate from where the drag STARTED -- back to the old
+           target and then forward again to the one just chosen. */
+        this._wasTemp[key] = {
+          at, from: Math.min(at, here), to: Math.max(at, here), lit: true,
+        };
         el.setAttribute("aria-valuenow", String(v));
         el.setAttribute("aria-valuetext", v.toFixed(decimals) + suffix);
       },
@@ -8847,9 +8902,22 @@ class SpectraCard extends HTMLElement {
         const on = climate.on === undefined ? true : Boolean(climate.on);
         const run = (event) => {
           event.stopPropagation();
-          /* The knob travels on the press, before the thermostat answers,
-             for the same reason every other control here does. */
+          /* The lights switch's whole contract, and every part of it is
+             load-bearing. This one used to do only the first line: the knob
+             moved on the live element, the spinner's re-render replaced the
+             node straight away, and the new one read Tado's real state --
+             which had not caught up -- so the knob snapped back and sat
+             there until the cloud answered, the better part of a minute.
+
+             So: move the knob, hold renders while it travels, and claim the
+             state until the thermostat agrees. The claim runs through the
+             whole card -- the stripe dims and the target leaves -- and it
+             is held for ADJUST_GIVE_UP_MS rather than the lights' twelve
+             seconds, because it is the same thermostat on the same cloud. */
           power.classList.toggle("on", !on);
+          power.setAttribute("aria-checked", on ? "false" : "true");
+          this._pressedAt = Date.now();
+          this._wantPower(!on, ADJUST_GIVE_UP_MS);
           flashPress(power);
           this._work(() => setMode(on ? "off" : "auto"));
         };

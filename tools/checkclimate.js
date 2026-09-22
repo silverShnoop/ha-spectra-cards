@@ -419,6 +419,114 @@ const card = (extra) => ({
   await page.waitForTimeout(700);
   check("and it cannot be dragged", (await calls()) === 0, `${await calls()} calls`);
 
+  // ---- 9. the power switch answers on the press, and KEEPS answering --
+  /* The switch used to move its knob and nothing else. The spinner's
+     re-render then read Tado's real state -- which had not caught up -- and
+     the knob snapped back for the better part of a minute. A test that only
+     looks straight after the click passes that bug; this one waits past the
+     render hold with the house still saying "on". */
+  const live = (extra) => card(Object.assign({
+    on: { entity: "climate.kitchen", map: { off: false, auto: true, heat: true }, fallback: false },
+    value: { entity: "climate.kitchen", attribute: "temperature", suffix: "°" },
+  }, extra || {}));
+  const report = (state, temperature) => page.evaluate(([st, t]) => {
+    const el = window.__card;
+    el.hass = {
+      states: { "climate.kitchen": { entity_id: "climate.kitchen", state: st,
+        attributes: { current_temperature: 19.4, temperature: t,
+          min_temp: 5, max_temp: 25, target_temp_step: 0.1 } } },
+      callService: (domain, service, data) => {
+        window.__calls.push({ domain, service, data });
+        return Promise.resolve();
+      },
+    };
+  }, [state, temperature]);
+  const look = () => page.evaluate(() => {
+    const root = window.__card.shadowRoot || window.__card;
+    const sw = root.querySelector("[data-climpower]");
+    const st = root.querySelector("[data-temp]");
+    const th = root.querySelector("[data-tempthumb]");
+    const tr = root.querySelector(".dimtrack").getBoundingClientRect();
+    return {
+      on: sw.classList.contains("on"), aria: sw.getAttribute("aria-checked"),
+      off: st.classList.contains("off"),
+      target: root.querySelector(".climtarget").textContent.trim(),
+      thumb: (parseFloat(getComputedStyle(th).left) / tr.width) * 100,
+      fade: Number(getComputedStyle(th).opacity),
+    };
+  });
+
+  await mount(live());
+  await report("heat", 20.5);
+  await page.waitForTimeout(120);
+  await page.evaluate(() => {
+    const root = window.__card.shadowRoot || window.__card;
+    root.querySelector("[data-climpower]").click();
+  });
+  const pressed = await look();
+  check("the knob moves on the press", !pressed.on, String(pressed.on));
+  check("and says so to a screen reader", pressed.aria === "false", pressed.aria);
+
+  await page.waitForTimeout(450);
+  await report("heat", 20.5);            // Tado has not answered yet
+  await page.waitForTimeout(120);
+  const waiting = await look();
+  check("the knob stays where it was put while the thermostat catches up",
+    !waiting.on, "it snapped back to on");
+  check("the stripe follows the claim", waiting.off, String(waiting.off));
+  check("and no target is claimed for a zone going off",
+    waiting.target === "—", waiting.target);
+  const offCall = await page.evaluate(() => window.__calls);
+  check("the thermostat is asked to switch off",
+    offCall.length === 1 && offCall[0].service === "set_hvac_mode"
+      && offCall[0].data.hvac_mode === "off",
+    JSON.stringify(offCall));
+
+  await report("off", 5);                // and now it has
+  await page.waitForTimeout(150);
+  const agreed = await look();
+  check("once the house agrees, the card simply shows the house",
+    !agreed.on && agreed.off, JSON.stringify(agreed));
+
+  // ---- 10. switched back on, the target is not the frost setting -------
+  await mount(live());
+  await report("off", 5);
+  await page.waitForTimeout(120);
+  await page.evaluate(() => {
+    const root = window.__card.shadowRoot || window.__card;
+    root.querySelector("[data-climpower]").click();
+  });
+  await page.waitForTimeout(450);
+  await report("off", 5);
+  await page.waitForTimeout(120);
+  const rising = await look();
+  check("switched on, the zone is on at once", rising.on && !rising.off,
+    JSON.stringify(rising));
+  check("but the frost setting is not passed off as its target",
+    rising.target === "—", rising.target);
+
+  // ---- 11. and the thumb TRAVELS when the state changes ----------------
+  /* A re-render builds a new node, and a new node does not transition.
+     Sampled mid-flight: a thumb already at the end 40ms after the state
+     changed did not travel, it teleported. */
+  await mount(live());
+  await report("heat", 20.5);
+  await page.waitForTimeout(200);
+  const before = await look();
+  await report("off", 5);
+  await page.waitForTimeout(60);
+  const during = await look();
+  await page.waitForTimeout(600);
+  const after = await look();
+  check("switched off, the thumb starts from where it was",
+    during.thumb > 5 && during.thumb < before.thumb + 0.5,
+    `${before.thumb.toFixed(1)}% -> ${during.thumb.toFixed(1)}% at 60ms`);
+  check("and fades as it goes, rather than vanishing",
+    during.fade > 0.05, `opacity ${during.fade} at 60ms`);
+  check("and ends at the cold end, gone",
+    after.thumb < 1 && after.fade < 0.05,
+    `${after.thumb.toFixed(1)}%, opacity ${after.fade}`);
+
   await browser.close();
   server.close();
   if (problems.length) {
@@ -426,5 +534,5 @@ const card = (extra) => ({
     problems.forEach((p) => console.log(`  - ${p}`));
     process.exit(1);
   }
-  console.log("OK (climate: one stripe, one call, the needle on top, and never a false 25)");
+  console.log("OK (climate: one stripe, one call, a switch that holds, and a thumb that travels)");
 })();

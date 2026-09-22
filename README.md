@@ -686,6 +686,26 @@ the dial used — claim the number, debounce the send, report through the title
 bar's one spinner — with its own `ADJUST_GIVE_UP_MS` of 45 seconds, because
 twelve is a Hue bridge's number and Tado polls.
 
+**The switch answers on the press, and keeps answering.** It is the lights
+switch's whole contract: the knob moves on the live element, renders are
+held while it travels, and the new state is claimed until the thermostat
+agrees — for `ADJUST_GIVE_UP_MS`, because it is the same thermostat on the
+same slow cloud. The first build did only the first of the three, so the
+spinner's re-render read Tado's real state, which had not caught up, and the
+knob snapped back for the better part of a minute. The claim runs through
+the whole card: switched off, the stripe dims and the target leaves at once;
+switched on, the target reads as an em dash until the schedule's arrives,
+rather than passing the frost setting off as one.
+
+**The thumb travels between states.** Every render builds a new stripe, and
+a node created already in its new place does not transition — so the
+dimmer's `animateFrom` is used here too: the old position is painted on the
+new node with transitions held, then released. The drag keeps that record
+current, or the render after a lift would glide back to where the drag
+began and then forward again. And the dimmer's `display:none` for an off
+thumb is overridden on the stripe: it cancels the fade outright, and at rest
+the two look identical, which is why `checkclimate` samples mid-flight.
+
 An off zone has no target: the thumb leaves at the cold end and fades, the
 needle stays, and the readout is an em dash. The room still has a
 temperature; it is the target that went away. `checkclimate` holds all of it,
