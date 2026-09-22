@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.107.3";
+const VERSION = "0.108.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -832,6 +832,77 @@ ha-icon { display:inline-flex; line-height:0; }
   background:none; border:none; padding:3px 6px; cursor:pointer;
   border-radius:6px;
 }
+/* The mic. The one control on a card that proposes rather than does.
+
+   It carries its own state rather than leaving that to the line beside
+   it, because it is the thing under the finger: a button that looks
+   exactly the same while it listens, while it thinks and while it is
+   done gets pressed again, and a second press here is a second
+   recording, a second model call and a second bill. */
+.tdvoice {
+  display:flex; align-items:center; gap:10px; margin-top:10px;
+  padding-top:9px; border-top:1px solid var(--sp-edge);
+}
+/* 44px like everything else touched on this panel, and round because it
+   is not a row of the list above -- drawn square it read as one more
+   item, with a checkbox that had lost its word. */
+.tdmic {
+  position:relative; flex:none; width:44px; height:44px; padding:0;
+  border:2px solid var(--sp-edge); border-radius:50%; background:none;
+  color:var(--sp-ink-2); cursor:pointer; display:inline-flex;
+  align-items:center; justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+  transition:border-color 140ms, background 140ms, color 140ms;
+}
+.tdmic ha-icon { --mdc-icon-size:22px; }
+.tdmic.live { border-color:var(--accent); background:var(--accent); color:var(--sp-surface); }
+/* A ring that grows and fades rather than a colour that flashes. The
+   panel is read from the doorway, where movement carries and a tint
+   does not -- and "is it listening" is the one question the answer to
+   has to be visible from there. */
+.tdmic.live::after {
+  content:""; position:absolute; inset:-2px; border-radius:50%;
+  border:2px solid var(--accent);
+  animation:sp-mic-pulse 1.4s ease-out infinite;
+}
+@keyframes sp-mic-pulse {
+  0%   { transform:scale(1); opacity:.7; }
+  100% { transform:scale(1.45); opacity:0; }
+}
+.tdmic.thinking { border-color:var(--accent); color:var(--accent); }
+.tdmic.thinking ha-icon { animation:sp-spin 1.6s linear infinite; }
+.tdvoicesay { font-size:12px; color:var(--sp-ink-2); line-height:1.35; min-width:0; }
+
+/* The review sheet's rows. A dropped row stays on the sheet struck
+   through rather than leaving it: a list that shortens under the finger
+   moves the row below into the place just pressed, which on a panel is
+   how the wrong thing gets dropped twice. */
+.voicelist { margin:4px 0 0; padding:0; list-style:none; }
+.voiceitem {
+  display:flex; align-items:flex-start; gap:10px; width:100%;
+  padding:7px 0; font:inherit; text-align:left; cursor:pointer;
+  background:none; border:none; border-bottom:1px solid var(--sp-edge);
+  -webkit-tap-highlight-color:transparent;
+}
+.voicelist li:last-child .voiceitem { border-bottom:none; }
+.voicetick {
+  flex:none; width:21px; height:21px; border-radius:6px; margin-top:1px;
+  border:2px solid var(--accent); background:var(--accent);
+  box-sizing:border-box; display:inline-flex; align-items:center;
+  justify-content:center; color:var(--sp-surface);
+  transition:background 140ms, border-color 140ms;
+}
+.voicetick ha-icon { --mdc-icon-size:15px; }
+.voiceitem.dropped .voicetick {
+  background:none; border-color:var(--sp-ink-3); color:transparent;
+}
+.voicename { flex:1 1 auto; min-width:0; font-size:14px; color:var(--sp-ink); line-height:1.3; }
+.voiceitem.dropped .voicename { color:var(--sp-ink-3); text-decoration:line-through; }
+.voicespec { color:var(--sp-ink-3); }
+/* Nothing kept is a real answer to this sheet -- it is "no, none of
+   that" -- so the button stays put and says so rather than vanishing
+   and moving Cancel under the finger. */
+.confirmyes:disabled { opacity:.45; cursor:default; }
 
 .washmain, .lockmain { flex:1 1 auto; min-width:0; }
 /* One hero size for both. The lock card and the washer card sit on
@@ -2297,7 +2368,10 @@ function publishTokens(hass) {
    nobody has to. */
 const RAW_KEYS = new Set([
   "action", "tap_action", "hold_action", "double_tap_action", "adjust",
-  "scenes",
+  /* `voice` is a place to call, not a value to read -- and it carries a
+     key called `agent`, which the resolver would be entitled to walk.
+     Raw, for the same reason an action is. */
+  "scenes", "voice",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -3600,10 +3674,12 @@ const BODIES = {
     const doneItems = Array.isArray(b.done) ? b.done : [];
     const doneCells = section(doneItems, "done:");
 
-    if (!cells && !doneCells) {
-      return `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
-    }
-
+    /* An empty list used to return here and nothing else was drawn.
+       That was right while the only control was a tick -- there is
+       nothing to tick -- and it is wrong the moment the card has a mic:
+       a list with nothing on it is exactly when somebody stands there
+       wanting to put something on it. So the empty line is a line like
+       any other now, and whatever is configured below it still draws. */
     let out = cells
       || `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
     if (all.length > shown.length) {
@@ -3619,6 +3695,46 @@ const BODIES = {
         + doneCells
         + `</div>`;
     }
+    /* The mic, which proposes rather than does.
+
+       A tick is a person saying something about a row in front of them.
+       This is a microphone's guess at a sentence, handed to a model's
+       guess at what the sentence meant -- so it stops at the sheet and
+       a person says yes. What is drawn here is only the button and the
+       one line that says what it is doing; the sheet is the card's, not
+       the body's, because a body is a pure function of the model and a
+       modal outlives several of them. */
+    let voice = "";
+    if (b.voice && !isBlank(b.voice.script)) {
+      const phase = isBlank(b.voice_phase) ? "idle" : String(b.voice_phase);
+      const busy = phase === "thinking" || phase === "adding";
+      const glyph = busy ? "mdi:loading"
+        : (isBlank(b.voice.icon) ? "mdi:microphone" : String(b.voice.icon));
+      const idleWord = String(firstOf(b.voice.label, "Say what to add"));
+      const WORDS = {
+        idle: idleWord,
+        listening: "Listening\u2026",
+        thinking: "Reading that back\u2026",
+        adding: "Adding\u2026",
+      };
+      /* The note outranks the word. The word is what the button is for
+         and is true all day; the note is what just happened to it --
+         what was heard, what went on the list, what failed -- and it
+         expires, which is why the word can be the fallback rather than
+         something that has to be restored. */
+      const say = isBlank(b.voice_note) ? (WORDS[phase] || idleWord) : String(b.voice_note);
+      voice = `<div class="tdvoice">`
+        + `<button type="button" class="tdmic${phase === "listening" ? " live" : ""}`
+        + `${busy ? " thinking" : ""}" data-voice`
+        + ` aria-pressed="${phase === "listening" ? "true" : "false"}"`
+        + ` aria-label="${esc(phase === "listening" ? "Stop listening" : idleWord)}">`
+        + iconMarkup(glyph)
+        + `</button>`
+        + `<span class="tdvoicesay">${esc(say)}</span>`
+        + `</div>`;
+    }
+    out += voice;
+
     const undo = b.undo
       ? `<button type="button" class="tdundo" data-todo-undo>Undo</button>` : "";
     const foot = isBlank(b.foot) ? "" : esc(b.foot);
@@ -5774,6 +5890,87 @@ function dialMarkup(row, position) {
     + `</span></span>`;
 }
 
+/* ------------------------------------------------------------------ *
+ * Speech
+ *
+ * The panel has a microphone and the house has a speech pipeline, and the
+ * shortest line between them does not go through the browser's own speech
+ * API. That API is missing in the companion app's webview on iOS, it sends
+ * the audio to whichever cloud the browser vendor prefers, and it knows
+ * nothing about this house. The pipeline is already configured, already
+ * has an engine, and is the one the rest of the house talks to -- so the
+ * browser is asked for a microphone and nothing else.
+ * ------------------------------------------------------------------ */
+
+/* What the pipeline is told to expect, and what every frame must be. */
+const SAMPLE_RATE = 16000;
+/* Long enough for a list, short enough that a button left live in an
+   empty kitchen stops on its own. The pipeline's own silence detection
+   usually ends the take well before this. */
+const VOICE_MAX_SECONDS = 15;
+/* How long after the audio stops before a pipeline that never answers is
+   treated as one that never will. */
+const VOICE_GRACE_SECONDS = 10;
+/* Same twelve seconds an optimistic tick gives up after: long enough to
+   read what happened, short enough that it is not still there tomorrow. */
+const VOICE_NOTE_MS = 12000;
+
+/* An error carrying the sentence a person is meant to read.
+
+   Every failure on this path ends in the same 12px line under the list,
+   and "TypeError: undefined is not a function" there is worse than
+   nothing -- it tells whoever is standing at the panel that something
+   broke without telling them whether pressing again would help. So the
+   readable sentence travels on the error, and the real one goes to the
+   console as usual. */
+function voiceError(say, cause) {
+  const error = new Error(cause || say);
+  error.say = say;
+  return error;
+}
+
+/* Float samples to 16-bit little-endian PCM, with the handler id in front.
+
+   The id is the first BYTE of the frame rather than a field in an
+   envelope: Home Assistant routes binary websocket frames by that byte
+   alone. A frame sent before `run-start` has named one has nowhere to go
+   and is dropped without a word, which is why the sender waits. */
+function pcmFrame(handler, samples) {
+  const frame = new Uint8Array(1 + (samples.length * 2));
+  frame[0] = handler;
+  const view = new DataView(frame.buffer, 1);
+  for (let i = 0; i < samples.length; i += 1) {
+    const clipped = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(i * 2, Math.round(clipped * 32767), true);
+  }
+  return frame;
+}
+
+/* 16 kHz, whatever rate the microphone actually gave us.
+
+   Asking the AudioContext for 16000 is honoured on the panel and ignored
+   on some builds -- and being ignored is not an error anywhere: the
+   context simply runs at 48 kHz, every frame sent is three times too
+   fast, and the transcript comes back empty or as nonsense with nothing
+   in any log to say why.
+
+   Linear interpolation with no low-pass in front of it will alias, and
+   that is a knowing trade: the alternative is carrying a resampler for a
+   signal about to be handed to a speech model, and this is the
+   difference between working and not. */
+function downsample(samples, from, to) {
+  if (!(from > to)) return samples;
+  const ratio = from / to;
+  const out = new Float32Array(Math.floor(samples.length / ratio));
+  for (let i = 0; i < out.length; i += 1) {
+    const at = i * ratio;
+    const low = Math.floor(at);
+    const high = Math.min(low + 1, samples.length - 1);
+    out[i] = samples[low] + ((samples[high] - samples[low]) * (at - low));
+  }
+  return out;
+}
+
 function flashPress(element) {
   if (!element) return;
   element.classList.remove("pressed");
@@ -5856,6 +6053,12 @@ class SpectraCard extends HTMLElement {
     this._power = null;
     this._lock = null;
     this._mode = null;
+    /* What the mic is doing, and how to end a take that is running.
+       Separate, because the second only exists while the first says
+       "listening" and a press has to be able to find it. */
+    this._voice = null;
+    this._voiceStop = null;
+    this._voiceClear = null;
   }
 
   setConfig(config) {
@@ -6295,6 +6498,14 @@ class SpectraCard extends HTMLElement {
        provokes, or the note shuts itself the moment the list moves. */
     if (model.body && model.body.type === "todo" && this._openNote) {
       model.body.open_note = this._openNote;
+    }
+    /* What the mic is doing, by the same route and for the same reason:
+       the body cannot see the card, and every one of these renders
+       several times a minute. Without the claim the button would drop
+       back to "Say what to add" the first time the clock moved. */
+    if (model.body && model.body.type === "todo" && model.body.voice) {
+      model.body.voice_phase = this._voice ? this._voice.phase : "idle";
+      model.body.voice_note = (this._voice && this._voice.note) || "";
     }
 
     const mode = this._mode;
@@ -7109,6 +7320,408 @@ class SpectraCard extends HTMLElement {
     if (this._undo && this._undo.uid === uid) this._undo = null;
   }
 
+  /* What the mic is doing, in the one line beside it.
+
+     Phase and note answer different questions -- what it is doing now,
+     and what came of the last press -- and the note has to outlive the
+     phase, because "4 added" is only worth anything once the spinner has
+     gone. A note that stayed would become furniture, so it expires. */
+  _voiceSay(phase, note) {
+    if (this._voiceClear) { clearTimeout(this._voiceClear); this._voiceClear = null; }
+    this._voice = (phase === "idle" && isBlank(note)) ? null : { phase, note: note || "" };
+    if (this._voice && phase === "idle") {
+      this._voiceClear = setTimeout(() => {
+        this._voice = null;
+        this._signature = null;
+        this._update();
+      }, VOICE_NOTE_MS);
+    }
+    this._signature = null;
+    this._update();
+  }
+
+  /* One button, and three things a press can mean.
+
+     While it is listening, a press ends the take. That is the honest
+     reading of pressing a live microphone, and it is also the way out
+     when the kitchen is loud enough that the pipeline's own silence
+     detection never fires.
+
+     While the parse is in flight, a press does nothing. A second press
+     there is a second recording, a second model call and a second bill,
+     for a sentence that is already being read.
+
+     Otherwise it starts. Nothing is written to the list anywhere in
+     here: the only writer is _addItems, it runs only after the sheet has
+     been answered, and the sheet is never skipped -- not even for one
+     item. A tick is undone by pressing it again; four wrong things that
+     Bring has already pushed to everybody's phone are not. */
+  _voicePress(spec, list) {
+    if (this._voiceStop) {
+      const stop = this._voiceStop;
+      this._voiceStop = null;
+      stop();
+      return;
+    }
+    if (this._voice && this._voice.phase !== "idle") return;
+    this._voiceSay("listening", "");
+    Promise.resolve()
+      .then(() => this._listen(spec))
+      .then((said) => {
+        if (isBlank(said)) {
+          this._voiceSay("idle", "Nothing was heard.");
+          return null;
+        }
+        /* Shown while the parse runs, and not for decoration: a
+           mishearing is obvious in the words and invisible by the time
+           they are items. Reading it back is what makes "Tenderstem"
+           arriving as "ten der stem" something you catch here rather
+           than in the shop. */
+        this._voiceSay("thinking", `“${said}”`);
+        return this._parseSpeech(spec, said)
+          .then((items) => ({ said, items }));
+      })
+      .then((got) => {
+        if (!got) return null;
+        if (!got.items.length) {
+          this._voiceSay("idle", "Nothing in that was something to add.");
+          return null;
+        }
+        this._voiceSay("idle", "");
+        return this._voiceReview(got.items, got.said).then((keep) => {
+          if (!keep.length) return null;
+          this._voiceSay("adding", "");
+          this._work(() => this._addItems(list, keep).then(() => {
+            this._voiceSay("idle", keep.length === 1
+              ? `${keep[0].name} added`
+              : `${keep.length} added`);
+          }, (error) => {
+            this._voiceSay("idle", (error && error.say) || "That did not work.");
+          }));
+          return null;
+        });
+      })
+      .catch((error) => {
+        LOGGER_WARN("spectra-card: the voice control stopped", error);
+        this._voiceSay("idle", (error && error.say) || "That did not work.");
+      });
+  }
+
+  /* A press to a sentence, through Home Assistant rather than the browser.
+
+     `end_stage: "stt"` is the whole difference between dictation and a
+     conversation. Without it the transcript runs on to the agent, which
+     answers it -- so "milk and bread" would be replied to rather than
+     written down, and the reply would be spoken in the kitchen. */
+  _listen(spec) {
+    const conn = this._hass && this._hass.connection;
+    if (!conn || !conn.socket || !conn.subscribeMessage) {
+      return Promise.reject(voiceError("The panel is not connected to Home Assistant."));
+    }
+    const media = navigator.mediaDevices;
+    /* getUserMedia does not exist outside a secure context, and its
+       absence is not an error -- the property is simply undefined. A
+       dashboard opened at http://<ip> therefore has no microphone and
+       nothing to say about why, so it is said here: the fix is the
+       address, not the button. */
+    if (!media || !media.getUserMedia) {
+      return Promise.reject(voiceError(
+        "This panel has no microphone unless the dashboard is loaded over https.",
+      ));
+    }
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return Promise.reject(voiceError("This browser cannot record audio."));
+    const cap = Number(spec.max_seconds) > 0
+      ? Number(spec.max_seconds) : VOICE_MAX_SECONDS;
+
+    return Promise.resolve(media.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+    })).catch(() => {
+      throw voiceError("The panel was not allowed to use the microphone.");
+    }).then((stream) => new Promise((resolve, reject) => {
+      let handler = null;
+      let unsub = null;
+      let ctx = null;
+      let node = null;
+      let source = null;
+      let heard = null;
+      let done = false;
+      const timers = [];
+
+      const shut = () => {
+        timers.forEach((timer) => clearTimeout(timer));
+        this._voiceStop = null;
+        /* The track, not just the node: a media stream left running
+           holds the recording light on and tells everyone in the room
+           the panel is still listening when it is not. */
+        (stream.getTracks ? stream.getTracks() : []).forEach((track) => track.stop());
+        if (node) { node.onaudioprocess = null; node.disconnect(); }
+        if (source) source.disconnect();
+        if (ctx && ctx.state !== "closed" && ctx.close) {
+          Promise.resolve(ctx.close()).catch(() => {});
+        }
+        /* By now the run has usually ended by itself, and
+           unsubscribing from a run that is over throws an error nobody
+           needs to read. */
+        if (unsub) Promise.resolve(unsub()).catch(() => {});
+      };
+      const finish = (text) => {
+        if (done) return;
+        done = true;
+        shut();
+        resolve(isBlank(text) ? "" : String(text));
+      };
+      const fail = (error) => {
+        if (done) return;
+        done = true;
+        shut();
+        reject(error);
+      };
+
+      /* The end of the take, whoever calls it -- the cap, or the finger
+         on the live button. A frame carrying only the handler id is the
+         pipeline's end-of-stream: after it the engine transcribes what
+         it has and `stt-end` follows. */
+      const endTake = () => {
+        if (done || handler === null || handler === undefined) return;
+        if (node) node.onaudioprocess = null;
+        try {
+          conn.socket.send(new Uint8Array([handler]));
+        } catch (error) {
+          /* The socket has gone. Nothing more can be sent and nothing
+             more will arrive, so the grace timer below is what answers
+             -- there is no second thing to try here. */
+          LOGGER_WARN("spectra-card: could not close the audio stream", error);
+        }
+      };
+      this._voiceStop = endTake;
+
+      Promise.resolve(conn.subscribeMessage((event) => {
+        const type = event && event.type;
+        const data = (event && event.data) || {};
+        if (type === "run-start") {
+          const runner = data.runner_data || {};
+          handler = runner.stt_binary_handler_id;
+          if (handler === null || handler === undefined) {
+            fail(voiceError("Home Assistant did not offer anywhere to send the audio."));
+          }
+        } else if (type === "stt-end") {
+          heard = (data.stt_output && data.stt_output.text) || "";
+          finish(heard);
+        } else if (type === "error") {
+          fail(voiceError("Home Assistant could not make out that recording.",
+            data.code || data.message || "pipeline error"));
+        } else if (type === "run-end") {
+          /* A run that ends without an stt-end heard nothing. That is
+             not a failure -- it is an empty answer, and the line under
+             the list says so rather than a red box. */
+          finish(heard);
+        }
+      }, {
+        type: "assist_pipeline/run",
+        start_stage: "stt",
+        end_stage: "stt",
+        input: { sample_rate: SAMPLE_RATE },
+        pipeline: isBlank(spec.pipeline) ? undefined : String(spec.pipeline),
+        timeout: cap + VOICE_GRACE_SECONDS,
+      })).then((off) => {
+        unsub = off;
+        /* Subscribed after the take was already over, which happens
+           when the socket is slow and the finger is not. */
+        if (done) Promise.resolve(off()).catch(() => {});
+      }, () => fail(voiceError("Home Assistant would not start listening.")));
+
+      try {
+        ctx = new Ctx({ sampleRate: SAMPLE_RATE });
+      } catch (error) {
+        /* Some builds refuse a rate rather than ignoring it. Taking the
+           default and resampling below is the same answer either way. */
+        ctx = new Ctx();
+      }
+      if (ctx.resume) Promise.resolve(ctx.resume()).catch(() => {});
+      source = ctx.createMediaStreamSource(stream);
+      node = ctx.createScriptProcessor(4096, 1, 1);
+      node.onaudioprocess = (event) => {
+        /* Until run-start has named a handler there is nowhere for a
+           frame to go, and one sent anyway is dropped in silence -- so
+           the first fraction of a second is deliberately lost rather
+           than misrouted. */
+        if (done || handler === null || handler === undefined) return;
+        const rate = ctx.sampleRate || SAMPLE_RATE;
+        const samples = downsample(event.inputBuffer.getChannelData(0), rate, SAMPLE_RATE);
+        try {
+          conn.socket.send(pcmFrame(handler, samples));
+        } catch (error) {
+          fail(voiceError("The connection dropped while listening.", error && error.message));
+        }
+      };
+      /* Connected to the destination because a ScriptProcessorNode that
+         goes nowhere is not pumped by some browsers. Its output buffer
+         is never written, so what reaches the destination is silence:
+         the panel does not repeat you back into the room. */
+      source.connect(node);
+      node.connect(ctx.destination);
+
+      timers.push(setTimeout(endTake, cap * 1000));
+      timers.push(setTimeout(
+        () => fail(voiceError("Home Assistant never said what it heard.")),
+        (cap + VOICE_GRACE_SECONDS) * 1000,
+      ));
+    }));
+  }
+
+  /* The parse belongs to a script, not to this file.
+
+     A card that decided for itself what "a couple of bags of that
+     fusilli" meant would be a card holding an opinion, and everything
+     else here is a fact it was handed. The script names the model,
+     carries the wording, and can be rewritten without touching a bundle
+     the panel has cached -- which matters, because a prompt that works
+     is found by trying prompts. */
+  _parseSpeech(spec, said) {
+    const name = String(spec.script || "");
+    if (!name.includes(".")) {
+      return Promise.reject(voiceError("This card's voice control has no script to call."));
+    }
+    const [domain, service] = name.split(".");
+    const data = { transcript: said };
+    if (!isBlank(spec.about)) data.about = String(spec.about);
+    if (!isBlank(spec.agent)) data.agent = String(spec.agent);
+    return Promise.resolve(this._hass.callWS({
+      type: "call_service",
+      domain,
+      service,
+      service_data: data,
+      return_response: true,
+    })).catch((error) => {
+      throw voiceError("Could not work out what was said.", error && error.message);
+    }).then((result) => {
+      const rows = result && result.response && result.response.items;
+      if (!Array.isArray(rows)) {
+        throw voiceError("Could not work out what was said.", "no items in the response");
+      }
+      /* Trusted for its words and not for its shape: a model asked for
+         a name can return a number, a null, or a row that is not an
+         object at all, and one of those on a wall panel is a row
+         called "undefined" on everybody's shopping list. */
+      return rows
+        .filter((row) => row && typeof row === "object" && !isBlank(row.name))
+        .map((row) => ({
+          name: String(row.name).trim(),
+          specification: isBlank(row.specification) ? "" : String(row.specification).trim(),
+        }));
+    });
+  }
+
+  /* The sheet. Nothing reaches the list without passing it.
+
+     This is a confirmation, which the tick next to it deliberately is
+     not, and the difference is who is guessing. A tick is a person
+     saying something about a row in front of them, and it reverses in
+     one press. This is a model's reading of a microphone's reading of a
+     sentence, landing on a list that is on three phones a second later.
+     Two guesses deep is where a card stops acting on its own.
+
+     A row can be dropped instead of the take being cancelled, because
+     the usual failure is four right and one wrong -- and if that costs
+     the other four, the mic is not worth pressing. */
+  _voiceReview(items, said) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    const row = (item, i) => `<li>`
+      + `<button type="button" class="voiceitem" data-item="${i}" aria-pressed="true">`
+      + `<span class="voicetick"><ha-icon icon="mdi:check-bold"></ha-icon></span>`
+      + `<span class="voicename">${esc(item.name)}`
+      + (item.specification ? `<span class="voicespec"> · ${esc(item.specification)}</span>` : "")
+      + `</span></button></li>`;
+    wrap.innerHTML = `<div class="confirmbox" role="alertdialog" aria-modal="true">`
+      + `<div class="confirmhead">`
+      + `<ha-icon icon="mdi:microphone-message"></ha-icon>`
+      + `<span>${esc(items.length === 1 ? "One thing to add" : `${items.length} things to add`)}</span>`
+      + `</div>`
+      + (isBlank(said) ? "" : `<p class="confirmtext quiet">“${esc(said)}”</p>`)
+      + `<ul class="voicelist">${items.map(row).join("")}</ul>`
+      + `<div class="confirmbtns">`
+      + `<button type="button" class="confirmno" data-no>Cancel</button>`
+      + `<button type="button" class="confirmyes" data-yes></button>`
+      + `</div></div>`;
+
+    return new Promise((resolve) => {
+      const dropped = new Set();
+      const yes = wrap.querySelector("[data-yes]");
+      const label = () => {
+        const kept = items.length - dropped.size;
+        yes.textContent = kept ? `Add ${kept}` : "Add nothing";
+        yes.disabled = !kept;
+      };
+      let done = false;
+      const finish = (answer) => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("keydown", onKey, true);
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        resolve(answer);
+      };
+      const onKey = (event) => {
+        if (event.key === "Escape") { event.preventDefault(); finish([]); }
+      };
+      wrap.querySelectorAll("[data-item]").forEach((el) => {
+        el.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const i = Number(el.getAttribute("data-item"));
+          const wasDropped = dropped.has(i);
+          if (wasDropped) dropped.delete(i); else dropped.add(i);
+          el.classList.toggle("dropped", !wasDropped);
+          el.setAttribute("aria-pressed", wasDropped ? "true" : "false");
+          flashPress(el);
+          label();
+        });
+      });
+      wrap.querySelector("[data-no]").addEventListener("click", () => finish([]));
+      yes.addEventListener("click", () => {
+        if (yes.disabled) return;
+        finish(items.filter((item, i) => !dropped.has(i)));
+      });
+      /* Only the backdrop, never the box -- the same rule the other
+         dialog keeps, and here a mis-tap inside would throw away a
+         parse that cost a model call. */
+      wrap.addEventListener("click", (event) => {
+        if (event.target === wrap) finish([]);
+      });
+      document.addEventListener("keydown", onKey, true);
+      label();
+      this._holder.appendChild(wrap);
+      if (yes.focus) yes.focus();
+    });
+  }
+
+  /* One at a time, in the order they were spoken.
+
+     todo.add_item returns before Bring has been told, and four sent at
+     once arrive at Bring in whatever order its API pleases -- which
+     leaves the list in an order nobody said. Sequential costs a second
+     and keeps milk, bread and crumpets in that order.
+
+     A failure stops the chain instead of carrying on past it. Three
+     added and the fourth quietly missing is the worst of the available
+     outcomes, because the list looks finished. The error says which one
+     stopped it, so the rest can be said again. */
+  _addItems(list, items) {
+    return items.reduce((chain, item) => chain.then(() => {
+      const data = { item: item.name };
+      if (!isBlank(item.specification)) data.description = item.specification;
+      /* notifyOnError off: this reports in the line under the list,
+         and Home Assistant's own toast on top of that is two reports
+         of one failure, one of which cannot be dismissed by the person
+         standing in front of it. */
+      return Promise.resolve(
+        this._hass.callService("todo", "add_item", data, { entity_id: list }, false),
+      ).catch((error) => {
+        throw voiceError(`Could not add ${item.name}.`, error && error.message);
+      });
+    }), Promise.resolve());
+  }
+
   /* Auto and Manual answer on the press and are corrected by the bridge, not
      waited on: a mode button that does nothing for a second is a mode button
      you press twice. */
@@ -7707,6 +8320,31 @@ class SpectraCard extends HTMLElement {
           target: { entity_id: entity },
           data: { item: undo.uid, status: "needs_action" },
         })));
+      });
+    });
+
+    /* The mic. Bound only when there is both a script to call and a
+       list to add to: a button that listens, parses and then has
+       nowhere to put the answer would spend a model call to say so. */
+    this._holder.querySelectorAll("[data-voice]").forEach((el) => {
+      const body = model.body || {};
+      const spec = body.voice;
+      if (!spec || isBlank(spec.script) || isBlank(body.list)) return;
+      const run = (event) => {
+        event.stopPropagation();
+        /* flashPress, not onPress: the button already carries the whole
+           state of the take -- live, spinning, back to idle -- and
+           markBusy would drop a second spinner inside it for a call
+           that has not started yet. */
+        flashPress(el);
+        this._voicePress(spec, body.list);
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
       });
     });
 
