@@ -181,6 +181,7 @@ const js = fs.readFileSync(file);
       await painted();
     };
     const settle = () => new Promise((r) => setTimeout(r, 30));
+    const wrapOf = (el) => el.closest(".confirmwrap");
     const text = (sel) => (q(sel) ? q(sel).textContent.trim() : null);
     const reset = () => {
       calls.length = 0;
@@ -347,6 +348,40 @@ const js = fs.readFileSync(file);
       /crumpets/.test(text(".confirmtext") || ""), text(".confirmtext"));
     check("and the button says how many it would add",
       text("[data-yes]") === "Add 3", text("[data-yes]"));
+
+    /* The sheet is appended to the holder BESIDE the card, and
+       `--accent` is written on the card -- so a sheet that expects to
+       inherit it gets nothing, and every rule reading it silently stops
+       applying. On the panel that meant no tick boxes and an Add button
+       drawn transparent on transparent with dark text: present, laid
+       out, pressable and invisible. It read as a sheet that would only
+       let you cancel, which is why this is checked by COLOUR and not by
+       the button's existence. */
+    const paint = (el, prop) => getComputedStyle(el)[prop];
+    const yes = q("[data-yes]");
+    check("the sheet carries an accent of its own, not the holder's nothing",
+      getComputedStyle(wrapOf(yes)).getPropertyValue("--accent").trim() !== "",
+      JSON.stringify(getComputedStyle(wrapOf(yes)).getPropertyValue("--accent")));
+    check("so the Add button is actually painted",
+      paint(yes, "backgroundColor") !== "rgba(0, 0, 0, 0)",
+      paint(yes, "backgroundColor"));
+    /* Against what the word is ACTUALLY sitting on, which is the
+       button's fill only while it has one: when the fill dropped out,
+       the text colour was unchanged and what showed through was the
+       sheet -- the same colour, so the word vanished with the button.
+       Comparing against the button's own background would have called
+       transparent a difference and passed. */
+    const under = (el) => {
+      const own = paint(el, "backgroundColor");
+      return own === "rgba(0, 0, 0, 0)"
+        ? paint(q(".confirmbox"), "backgroundColor") : own;
+    };
+    check("and its word is not the colour it is sitting on",
+      paint(yes, "color") !== under(yes),
+      `${paint(yes, "color")} on ${under(yes)}`);
+    check("and a kept row's tick box can be seen",
+      paint(q(".voicetick"), "backgroundColor") !== "rgba(0, 0, 0, 0)",
+      paint(q(".voicetick"), "backgroundColor"));
 
     // ---- a wrong row is dropped without losing the right ones
     /* The row dropped here is the one WITH a specification, so what
