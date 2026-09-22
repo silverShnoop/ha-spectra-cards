@@ -321,6 +321,15 @@ const js = fs.readFileSync(file);
     check("washing waiting takes it too, for the same reason",
       !(await differs({ state: "idle", pending: 2, drum_full: true })),
       "waiting still spent the colour on identity");
+    /* The one exception to the exception. A running machine has no job in
+       the drum: the queue behind it is real and the card is still outlined
+       for it, but the drum is the element saying what the machine is doing
+       NOW. An amber porthole over a live phase glyph puts the last load's
+       colour on this load's picture -- and it is the state where identity
+       is worth most, because the pair are both doing something. */
+    check("but a running machine keeps its identity, queue or no queue",
+      await differs({ state: "running", power: 600, pending: 2 }),
+      "the hanging queue painted a running drum");
 
     const tickOf = () => {
       const t = q(".tick");
@@ -338,6 +347,26 @@ const js = fs.readFileSync(file);
     check("the ring goes with it, not just the glyph",
       getComputedStyle(q(".drumring")).stroke === tokenColour("--sp-attention-soft"),
       getComputedStyle(q(".drumring")).stroke);
+
+    /* The reported bug, pinned from the other side: a wash running with
+       one load already waiting showed an amber drum around a tumbling
+       glyph. The chip, the outline and the Needs-you row all stay. */
+    await show({ state: "running", power: 600, pending: 1 }, 6);
+    check("a running drum is not painted by the queue behind it",
+      getComputedStyle(q(".drumglyph")).color !== lvl("attention"),
+      getComputedStyle(q(".drumglyph")).color);
+    check("nor is its ring",
+      getComputedStyle(q(".drumring")).stroke !== tokenColour("--sp-attention-soft"),
+      getComputedStyle(q(".drumring")).stroke);
+    check("while the chip still says there is one to hang",
+      all(".pill").some((p) => p.textContent.includes("1 to hang")),
+      all(".pill").map((p) => p.textContent.trim()).join(" | "));
+    /* A leak and a dead plug are not "the job in hand" -- they are the
+       machine failing -- so they keep the drum whatever it is doing. */
+    await show({ state: "running", power: 600, leak: true }, 6);
+    check("but a leak still paints a running drum",
+      getComputedStyle(q(".drumglyph")).color === lvl("critical"),
+      getComputedStyle(q(".drumglyph")).color);
 
     const washerTick = tickOf();
     await show(Object.assign({ state: "idle", drum_full: true }, DRYER), 5);
@@ -520,8 +549,8 @@ const js = fs.readFileSync(file);
     // ---- finished today
     await show({
       finished: [
-        { at: "20:55", ran: "ran 1h 58m", used: "1.12 kWh" },
-        { at: "18:20", ran: "ran 2h 06m", used: "1.31 kWh" },
+        { at: "20:55", ran: "took 1h 58m", used: "1.12 kWh" },
+        { at: "18:20", ran: "took 2h 06m", used: "1.31 kWh" },
       ],
     });
     check("it lists what finished today",
@@ -530,6 +559,73 @@ const js = fs.readFileSync(file);
       (text(".washfinrow .at") || "") === "20:55"
         && (text(".washfinrow .used") || "").includes("1.12"),
       `${text(".washfinrow .at")} / ${text(".washfinrow .used")}`);
+    check("and names the list as loads, not as an unlabelled heap",
+      (text(".washfinhead") || "").toLowerCase().includes("loads"),
+      text(".washfinhead"));
+
+    /* ---- which load is still on the floor -------------------------
+       The chip above says how MANY are waiting. Only the list can say
+       WHICH, and without a mark it was four interchangeable lines of
+       arithmetic. So a queued row wears the same ochre the card is
+       already trimmed in -- ground as well as ink, because yellow text
+       on a zebra stripe at 12px is a coin toss for a colour-blind
+       reader and the ground is what survives the distance. */
+    await show({
+      pending: 1,
+      finished: [
+        { at: "20:55", ran: "took 1h 58m", used: "1.12 kWh",
+          cost: "31p", hanging: true },
+        { at: "18:20", ran: "took 2h 06m", used: "1.31 kWh", cost: "26p" },
+      ],
+    });
+    const rowsOf = () => all(".washfinrow");
+    check("the load still to hang is the marked one",
+      rowsOf().length === 2 && rowsOf()[0].classList.contains("hanging")
+        && !rowsOf()[1].classList.contains("hanging"),
+      rowsOf().map((r) => r.className).join(" | "));
+    check("and says so in words, not only in colour",
+      (rowsOf()[0].textContent || "").toLowerCase().includes("needs hanging"),
+      rowsOf()[0].textContent.trim());
+    check("with a hanger on it, the same glyph the drum uses",
+      Array.from(rowsOf()[0].querySelectorAll("ha-icon"))
+        .some((i) => i.getAttribute("icon") === "mdi:hanger"),
+      Array.from(rowsOf()[0].querySelectorAll("ha-icon"))
+        .map((i) => i.getAttribute("icon")).join(" | "));
+    check("the marked row is grounded, not just inked",
+      getComputedStyle(rowsOf()[0]).backgroundColor
+        === tokenColour("--sp-attention-soft"),
+      getComputedStyle(rowsOf()[0]).backgroundColor);
+    check("and the hung one beside it is left alone",
+      getComputedStyle(rowsOf()[1]).backgroundColor
+        !== getComputedStyle(rowsOf()[0]).backgroundColor,
+      "both rows are marked");
+    /* The rule the whole card lives under: it states facts and offers one
+       optional control. A mark that could be tapped would be a second
+       place to finish the job, and the one place a phone could not
+       reach. */
+    check("but the mark is not a button",
+      !rowsOf()[0].querySelector("button")
+        && !rowsOf()[0].querySelector("[tabindex]"),
+      "the row grew something to press");
+
+    check("every row says what that wash cost",
+      rowsOf().every((r) => /\d+p/.test(r.textContent || "")),
+      rowsOf().map((r) => r.textContent.trim()).join(" | "));
+    const costPill = Array.from(rowsOf()[1].querySelectorAll(".pill"))
+      .find((el2) => (el2.textContent || "").includes("26p"));
+    check("as a chip, the same one the hero uses",
+      !!costPill, "the cost is not a chip");
+    check("and a cost is never a warning, wherever it sits",
+      !costPill
+        || getComputedStyle(costPill).color !== tokenColour("--sp-attention-on"),
+      costPill ? getComputedStyle(costPill).color : "(none)");
+
+    await show({
+      finished: [{ at: "20:55", ran: "took 1h 58m", used: "1.12 kWh" }],
+    });
+    check("a wash with no price leaves the row without a chip",
+      !/\d+p/.test(rowsOf()[0].textContent || ""),
+      rowsOf()[0].textContent.trim());
 
     /* ---- Yellow is a promise that something wants doing ----------
        And the job it promises lives in `Needs you`, never on the card.

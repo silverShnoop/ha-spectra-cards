@@ -923,8 +923,10 @@ body:
     from: {entity: sensor.washing_machine, attribute: finished_today}
     each:
       at: {field: finished_at, format: time}
-      ran: {field: duration_minutes, prefix: "ran ", suffix: " min"}
+      ran: {field: duration_minutes, prefix: "took ", suffix: " min"}
       used: {field: energy_kwh, suffix: " kWh"}
+      cost: {field: cost_text}
+      hanging: {field: hanging}
   action:
     cut:
       service: switch.turn_off
@@ -998,11 +1000,41 @@ rather than a confident `0p` — `home_signals` drops the cost for any cycle
 it could not price all the way through, and a chip reading zero is
 indistinguishable from a wash that was genuinely free.
 
+**The list says which load, not just how many.** `finished` draws one row
+per wash under a `Loads finished today` rule — the time it ended, how long
+it took, what it drew, what it cost, and whether it is still waiting to be
+hung. A row whose `hanging` is true takes the **attention** ground and a
+`Needs hanging` chip.
+
+That mark is not a job moving onto the card. The chip above already says
+*how many* are waiting; only the list can say *which*, and without the mark
+it was four interchangeable lines of arithmetic with the load still on the
+kitchen floor indistinguishable from the three already on the airer.
+Nothing in the row presses and nothing in it dismisses — the row in `Needs
+you` is still the only place the load can be finished from, which is also
+why the mark disappears the instant it is hung, from a phone or from the
+wall button, with the card untouched.
+
+**Ground as well as ink.** Ochre text on a zebra stripe at 12px is a coin
+toss for a colour-blind reader, and it is the ground that carries the mark
+across a kitchen. Same pairing the adrift person on the `people` card uses,
+for the same reason.
+
+**The cost rides the row too**, as the same neutral chip the hero wears: it
+is stated nowhere else per-wash, and *was the half load worth it* is a
+question about one wash rather than about today. A neutral chip beside an
+ochre one is also what keeps the ochre meaning *this one* — two coloured
+chips on a row would be two claims where there is one.
+
+**A load still to hang stays on the list past midnight**, because midnight
+is a fact about the clock and not about the washing; `home_signals` keeps
+it in `finished_today` until it is hung. See its README for why.
+
 **The card carries no jobs.** A load waiting to be hung is a job, and jobs
 live in `Needs you`. Putting it here as well would be the same sentence in
 two places, with the copy on the card being the one a phone cannot finish.
-So `pending` shows as a count in the drum — a fact — and there is no button
-to clear it.
+So `pending` shows as a count in the drum and a mark on the row it belongs
+to — facts, both of them — and there is no button to clear either.
 
 **The one control is the emergency stop, and it is deliberately not a
 switch.** A switch says "this is how you turn the machine off", and it is
@@ -1051,6 +1083,16 @@ card's hue — and those are exactly the states that also outline the card. A
 card trimmed amber with a plum porthole in the middle of it was the one
 element not joining in.
 
+**A running machine is the one exception, and only for the two it can
+outrank.** The drum is the element saying what the machine is doing *now*,
+and now it is washing: an amber porthole around a live phase glyph puts the
+last load's colour on this load's picture, so the glyph and the colour end
+up saying different things in the same 78px. A full drum and a hanging
+queue therefore leave a running drum alone — the chip, the card's outline
+and the `Needs you` row all still carry them, and none of those is the
+picture of the wash in progress. A leak and a dead plug are not the job in
+hand but the machine failing, so they keep the drum whatever it is doing.
+
 These three used to be written as accent numbers 1 and 2, which was level
 meaning hidden in a decorative slot: the card picked an alarm by asking for
 a hue, and repainting `a1` would silently have repainted the leak.
@@ -1067,6 +1109,7 @@ identity the first time.
 | --- | --- | --- |
 | idle | `machine` | the card's accent |
 | running | the live phase's glyph, moving | the card's accent |
+| running, with washing still to hang | the live phase's glyph, moving | **the card's accent** |
 | running, no phase known | `mdi:autorenew` | the card's accent |
 | drum to empty | `mdi:basket-unfill` | **attention** |
 | washing waiting | the count | **attention** |
@@ -1538,17 +1581,21 @@ for the same fact. Otherwise the colour is a job that exists only on the
 panel: nobody can clear it from a phone, and doing the thing will not
 make it go away.
 
-On the washer, three chips earn it — `Full`, `N to hang` and `Plug off`
-each have a row behind them. `Door open` does not, and used to be drawn
-in ochre anyway. That was worse than decorative: the full-drum row reads
+On the washer, four marks earn it — `Full`, `N to hang`, `Plug off` and
+the `Needs hanging` row in the finished list each have a row behind them.
+The last one is the same load as the `N to hang` chip, seen from the other
+end: the chip says how many, the row says which, and one Needs-you row
+clears both. `Door open` does not have a row, and used to be drawn in
+ochre anyway. That was worse than decorative: the full-drum row reads
 *"clears when the door is opened"*, so an open door is the **resolution**
 and warning about it said the opposite of what was true. On the dryer it
 simply sat there yellow between loads, which is the state a dryer spends
 most of its life in.
 
 `checkwasher` asserts it in both directions — the door chips are not
-ochre, and the three that are stay that way, so the rule cannot be
-satisfied by draining the colour out of everything.
+ochre, the ones that are stay that way, and a per-wash cost is not ochre
+wherever it sits, so the rule cannot be satisfied by draining the colour
+out of everything.
 
 ## Theming
 
