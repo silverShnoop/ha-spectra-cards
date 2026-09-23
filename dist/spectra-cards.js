@@ -294,22 +294,22 @@ ha-icon { display:inline-flex; line-height:0; }
    small-caps eyebrow, only larger. You had to measure it against the
    card below to tell which was which.
 
-   So the accent moves instead of growing. The tick goes -- a tick
-   labels the row it stands beside, and this is labelling everything
-   under it -- and the colour it was carrying becomes a 2px rule along
-   the bottom of the whole header. That is the one line wide enough to
-   say "and all of this", and it is a mark no ordinary card has.
-   The type still grows one step, because a header the same size as the
-   rows under it is not a header, it is the first row. */
-/* Square, unlike every other card. The rule is the bottom edge of a box
-   whose other three sides are transparent, so the box's 6px radius was
-   bending the last few pixels at each end upwards into the corner it used
-   to turn -- a straight line with a curl at both ends, hunting for a box
-   that is not being drawn. A radius is only worth having where there is a
-   corner to round. */
+   So the tick goes -- a tick labels the row it stands beside, and this
+   is labelling everything under it -- the box goes with it, and the type
+   grows one step, because a header the same size as the rows under it is
+   not a header, it is the first row.
+
+   For a while the accent moved rather than went, as a 2px rule along the
+   bottom of the whole header. It read as a line under a heading, which is
+   a thing a heading does not need here: the section it heads is already
+   bounded, by its own background and by the gap above it, so the rule was
+   drawing a boundary that the layout had drawn already. Without it the
+   header is still unmistakable -- no box and no tick where every card has
+   both, and a larger, wider-tracked word. So the border is transparent on
+   all four sides now, kept only so the header occupies the same width as
+   the cards below it rather than shifting 2px out. */
 .card.asheader {
-  background:none; border-color:transparent; border-radius:0;
-  border-bottom-color:var(--accent); padding:2px 2px 9px;
+  background:none; border-color:transparent; padding:2px 2px 9px;
 }
 .card.asheader .titlebar { margin-bottom:2px; }
 .card.asheader .titlebar h3 { font-size:13px; letter-spacing:.12em; }
