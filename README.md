@@ -658,7 +658,7 @@ body:
     service: climate.set_temperature
     field: temperature
     step: 0.5                                 # min/max come off the thermostat
-  # scale: {min: 10, max: 40}                 # the default; colours stay put
+  # scale: {min: 15, max: 30}                 # the default; colours stay put
 ```
 
 One room. The stripe leads the body, where the lights card puts its scene
@@ -672,9 +672,10 @@ the words that qualify it: `Following schedule · 20.5°` reads as one
 statement and `Manual · 22.5°` reads as a different one. The dial showed one
 number and you had to know which it was.
 
-**The scale is temperature, not the thermostat.** The stripe runs 10° to 40°
-whatever the room, and what can be *set* is the thermostat's own range cut
-to fit inside it — so for Tado, 10 to 25. Two ranges, because the room is
+**The scale is temperature, not the thermostat.** The stripe runs 15° to 30°
+whatever the room — the span a lived-in room actually moves through, so a
+degree is wide enough to set by finger — and what can be *set* is the
+thermostat's own range cut to fit inside it: so for Tado, 15 to 25. Two ranges, because the room is
 not bound by the thermostat: Tado stops at 25 while a kitchen in August sits
 at 27, and a stripe that ended at 25 could only ever show that kitchen as
 25. The cost is paid knowingly — past 25 the thumb stops, the way a physical
@@ -704,8 +705,9 @@ where they coincide you can still see where the room actually is.
 **A reading past either end of the scale becomes an arrowhead.** Pinned to
 the end as a needle, a 43° reading would say 40. So it changes shape: an
 arrowhead flush inside the end, pointing off the scale, with the true number
-in the title bar. On 10–40 that is a cold room in January or a sensor fault,
-not a normal day. A *target* outside the settable range (an away setting of
+in the title bar. On 15–30 that is an unheated room in January or a kitchen
+in a heatwave — real, and not rare, which is why the number is always a
+glance away. A *target* outside the settable range (an away setting of
 8, say) is simply pinned; the readout on the mode line says the true number.
 
 **Bounds need no special care.** Because the scale is fixed, a thermostat's
@@ -725,16 +727,31 @@ the dial used — claim the number, debounce the send, report through the title
 bar's one spinner — with its own `ADJUST_GIVE_UP_MS` of 45 seconds, because
 twelve is a Hue bridge's number and Tado polls.
 
-**The switch answers on the press, and keeps answering.** It is the lights
-switch's whole contract: the knob moves on the live element, renders are
-held while it travels, and the new state is claimed until the thermostat
-agrees — for `ADJUST_GIVE_UP_MS`, because it is the same thermostat on the
-same slow cloud. The first build did only the first of the three, so the
-spinner's re-render read Tado's real state, which had not caught up, and the
-knob snapped back for the better part of a minute. The claim runs through
-the whole card: switched off, the stripe dims and the target leaves at once;
-switched on, the target reads as an em dash until the schedule's arrives,
-rather than passing the frost setting off as one.
+**The switch and the schedule button answer on the press, and keep
+answering.** It is the lights switch's whole contract: the control moves on
+the live element, renders are held while it travels, and what was asked for
+is claimed until the thermostat reports it — for `ADJUST_GIVE_UP_MS`,
+because it is the same thermostat on the same slow cloud.
+
+What is claimed is the zone's **mode**, not the switch. Tado answers a mode
+change several seconds late and all at once — state, overlay and target in
+one refresh — so a claim on `on` alone moved the switch and left the
+schedule button, the mode line and the thumb on the old mode: a card that
+half heard you. Now every part of the body that follows from a mode is
+written from the claim. Switched off: the stripe dims, the target leaves,
+the schedule button goes out and the line says *Off*. Switched on, or handed
+back to the schedule: the button lights and the line says *Following
+schedule* — unless a window is open, whose line outranks it. Back from off,
+the target reads as an em dash until the schedule's arrives, rather than
+passing the frost setting off as one; from a manual hold the held target
+stays, marked as about to change.
+
+The claim ends when the zone reports that mode in a state it had not
+reported at the press — not merely when the two agree. Off and straight
+back on starts from a zone still reporting `auto`; agreeing with that would
+drop the second claim, and the off landing a moment later would flip the
+card to off under a finger that asked for on. A setpoint dragged meanwhile
+is a manual hold, so it drops a pending schedule claim.
 
 **The thumb travels between states.** Every render builds a new stripe, and
 a node created already in its new place does not transition — so the
@@ -2036,7 +2053,13 @@ and a `z-index` in the sheet is not proof anything was painted. It hides the
 needle and takes the same pixels again. Identical shots mean it was behind
 the disc all along. The gap gets the same test, for the same reason and
 because it once failed it — and a drag into the veiled stretch must ask the
-thermostat for 25, where a missing clamp would have asked for 34.
+thermostat for 25, where a missing clamp would have asked for 27.
+
+And the mode claim, against a thermostat that has not answered: the
+schedule button lit and the mode line rewritten through a re-render with
+Tado still on its old report, the same for both directions of the switch,
+and off-then-on with the off landing between — the case a claim that ends
+on mere agreement gets wrong.
 
 ## Licence
 

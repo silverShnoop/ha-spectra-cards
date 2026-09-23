@@ -44,12 +44,12 @@ const file = process.argv[2]
   || path.join(__dirname, "..", "dist", "spectra-cards.js");
 const js = fs.readFileSync(file);
 
-/* What can be SET, from the card's own adjust... */
-const MIN = 15;
+/* What can be SET, from the card's own adjust -- Tado's range... */
+const MIN = 5;
 const MAX = 25;
 /* ...and the SCALE it is drawn on, which is temperature itself. */
-const SMIN = 10;
-const SMAX = 40;
+const SMIN = 15;
+const SMAX = 30;
 const pos = (t) => Math.min(100, Math.max(0, ((t - SMIN) / (SMAX - SMIN)) * 100));
 const near = (a, b) => Math.abs(a - b) < 0.05;
 /* inset(0 R% 0 L%) -> [R, L]; the browser writes 0 as 0px. */
@@ -201,16 +201,22 @@ const card = (extra) => ({
     Number(shape.zNeedle) > Number(shape.zThumb),
     `${shape.zNeedle} vs ${shape.zThumb}`);
 
-  /* Both ends are past what the thermostat takes: 10..15 and 25..40. */
-  check("what cannot be set is veiled at both ends", shape.dead.length === 2,
-    `${shape.dead.length} dead spans`);
-  if (shape.dead.length === 2) {
-    check("  below the settable range",
-      shape.dead[0].left === 0 && near(shape.dead[0].width, pos(MIN)),
-      JSON.stringify(shape.dead[0]));
-    check("  and above it", near(shape.dead[1].left, pos(MAX)),
-      JSON.stringify(shape.dead[1]));
-  }
+  /* Tado takes 5..25 and the scale is 15..30, so only the warm end is
+     past what can be set -- the cold end is veiled only when the
+     thermostat stops short of it. */
+  check("what cannot be set is veiled, and only that",
+    shape.dead.length === 1 && near(shape.dead[0].left, pos(MAX)),
+    JSON.stringify(shape.dead));
+  await mount(card({ adjust: Object.assign({}, card().body.adjust, { min: 17 }) }));
+  const both = await page.evaluate(() => {
+    const root = window.__card.shadowRoot || window.__card;
+    return Array.from(root.querySelectorAll(".rampdead")).map((d) => ({
+      left: parseFloat(d.style.left), width: parseFloat(d.style.width || "NaN"),
+    }));
+  });
+  check("a thermostat that stops short of the cold end is veiled there too",
+    both.length === 2 && both[0].left === 0 && near(both[0].width, pos(17)),
+    JSON.stringify(both));
 
   // ---- 8. the gap is VISIBLE, not merely clipped right ----------------
   /* The first build clipped the gap perfectly and then painted the veil on
@@ -347,13 +353,13 @@ const card = (extra) => ({
     check("it is the thermostat that is asked",
       sent[0].domain === "climate" && sent[0].service === "set_temperature",
       `${sent[0].domain}.${sent[0].service}`);
-    /* 40% of 10..40 is 22. */
+    /* 40% of 15..30 is 21. */
     check("for the value the finger stopped on",
-      Math.abs(sent[0].data.temperature - 22) < 0.001,
+      Math.abs(sent[0].data.temperature - 21) < 0.001,
       String(sent[0].data.temperature));
   }
 
-  /* Into the veiled stretch: the scale runs to 40, the thermostat to 25. */
+  /* Into the veiled stretch: the scale runs to 30, the thermostat to 25. */
   await mount(card());
   await page.mouse.move(track.x + track.w * 0.35, tmid.y);
   await page.mouse.down();
@@ -527,6 +533,147 @@ const card = (extra) => ({
     after.thumb < 1 && after.fade < 0.05,
     `${after.thumb.toFixed(1)}%, opacity ${after.fade}`);
 
+  // ---- 12. the MODE is claimed, not just the knob --------------------
+  /* Tado reports a mode change several seconds after it is asked, and
+     reports all of it at once. Claiming only `on` moved the switch and left
+     the schedule button, the mode line and the thumb on the old mode --
+     a card that half heard you. The config here derives all three from the
+     zone the way the real dashboard does, so a claim that skipped any of
+     them shows the old value. */
+  const moded = (extra) => live(Object.assign({
+    auto: { entity: "climate.kitchen", map: { auto: true, heat: false, off: false }, fallback: false },
+    info: { entity: "climate.kitchen", map: { auto: "Following schedule", heat: "Manual", off: "Off" } },
+  }, extra || {}));
+  const reportAt = (state, temperature, updated, hang) => page.evaluate(([st, t, lu, h]) => {
+    const el = window.__card;
+    el.hass = {
+      states: { "climate.kitchen": { entity_id: "climate.kitchen", state: st,
+        last_updated: lu,
+        attributes: { current_temperature: 19.4, temperature: t,
+          min_temp: 5, max_temp: 25, target_temp_step: 0.1 } } },
+      callService: (domain, service, data) => {
+        window.__calls.push({ domain, service, data });
+        /* A cloud that has not answered yet: the call stays in flight. */
+        return h ? new Promise(() => {}) : Promise.resolve();
+      },
+    };
+  }, [state, temperature, updated, hang]);
+  const row = () => page.evaluate(() => {
+    const root = window.__card.shadowRoot || window.__card;
+    const a = root.querySelector("[data-climauto]");
+    const t = root.querySelector(".climtarget");
+    return {
+      auto: a.classList.contains("on"), pressed: a.getAttribute("aria-pressed"),
+      info: root.querySelector(".pickinfo").textContent.trim(),
+      target: t.textContent.trim(), pending: t.classList.contains("pending"),
+      on: root.querySelector("[data-climpower]").classList.contains("on"),
+    };
+  });
+  const press = (sel) => page.evaluate((s) => {
+    const root = window.__card.shadowRoot || window.__card;
+    root.querySelector(s).click();
+  }, sel);
+
+  await mount(moded());
+  await reportAt("heat", 22, "t0", true);
+  await page.waitForTimeout(120);
+  await press("[data-climauto]");
+  const lit0 = await row();
+  check("Auto lights on the press", lit0.auto && lit0.pressed === "true",
+    JSON.stringify(lit0));
+  await page.waitForTimeout(450);
+  await reportAt("heat", 22, "t0", true);   // Tado has not answered
+  await page.waitForTimeout(120);
+  const held = await row();
+  check("and stays lit while Tado catches up", held.auto, JSON.stringify(held));
+  check("the mode line says the schedule is driving",
+    held.info === "Following schedule", held.info);
+  check("the held target stays, marked as about to change",
+    held.target === "22°" && held.pending, JSON.stringify(held));
+  const autoCall = await page.evaluate(() => window.__calls);
+  check("the zone is handed back to its schedule",
+    autoCall.length === 1 && autoCall[0].data.hvac_mode === "auto",
+    JSON.stringify(autoCall));
+  await reportAt("auto", 20, "t1", false);
+  await page.waitForTimeout(150);
+  const landed = await row();
+  check("once Tado says so, the schedule's own target shows",
+    landed.auto && landed.target === "20°" && !landed.pending,
+    JSON.stringify(landed));
+
+  // ---- 13. switched off, the whole row goes with the switch -----------
+  await mount(moded());
+  await reportAt("auto", 20, "t0", true);
+  await page.waitForTimeout(120);
+  await press("[data-climpower]");
+  await page.waitForTimeout(450);
+  await reportAt("auto", 20, "t0", true);
+  await page.waitForTimeout(120);
+  const goingOff = await row();
+  check("off: the schedule button goes out with the switch",
+    !goingOff.on && !goingOff.auto, JSON.stringify(goingOff));
+  check("and the mode line says Off", goingOff.info === "Off", goingOff.info);
+
+  // ---- 14. switched on, the row says schedule at once ----------------
+  await mount(moded());
+  await reportAt("off", 5, "t0", true);
+  await page.waitForTimeout(120);
+  await press("[data-climpower]");
+  await page.waitForTimeout(450);
+  await reportAt("off", 5, "t0", true);
+  await page.waitForTimeout(120);
+  const goingOn = await row();
+  check("on: the schedule button lights with the switch",
+    goingOn.on && goingOn.auto, JSON.stringify(goingOn));
+  check("and the mode line says the schedule",
+    goingOn.info === "Following schedule", goingOn.info);
+
+  // ---- 15. off and straight back on ----------------------------------
+  /* The second press asks for the mode the zone is ALREADY reporting --
+     the off has not landed. Dropping the claim because the two agree
+     lets the off land a moment later and flip the card to off, under a
+     finger that asked for on. */
+  await mount(moded());
+  await reportAt("auto", 20, "t0", true);
+  await page.waitForTimeout(120);
+  await press("[data-climpower]");
+  await page.waitForTimeout(450);
+  await press("[data-climpower]");
+  await page.waitForTimeout(450);
+  /* Something else on the panel moves and the card re-renders, with the
+     zone still on its old report -- which is what a real house does
+     several times a minute. */
+  await reportAt("auto", 20, "t0", true);
+  await page.waitForTimeout(120);
+  await reportAt("off", 5, "t1", true);     // the first call lands
+  await page.waitForTimeout(120);
+  const back = await row();
+  check("off then on: the first call landing does not undo the second",
+    back.on && back.auto, JSON.stringify(back));
+  check("nor passes its frost setting off as the target",
+    back.target === "—", back.target);
+  await reportAt("auto", 20, "t2", true);   // and the second
+  await page.waitForTimeout(120);
+  const settled = await row();
+  check("and the second lands as on", settled.on && settled.target === "20°",
+    JSON.stringify(settled));
+
+  // ---- 16. a drag supersedes a claimed mode ---------------------------
+  await mount(moded());
+  await reportAt("heat", 22, "t0", true);
+  await page.waitForTimeout(120);
+  await press("[data-climauto]");
+  await page.waitForTimeout(450);
+  const t16 = await box(".slidehold");
+  await page.mouse.move(t16.x + t16.w * 0.3, t16.y + t16.h / 2);
+  await page.mouse.down();
+  await page.mouse.move(t16.x + t16.w * 0.5, t16.y + t16.h / 2);
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+  const dragged = await row();
+  check("a setpoint dragged after Auto puts Auto out -- it is a manual hold",
+    !dragged.auto && dragged.info === "Manual", JSON.stringify(dragged));
+
   await browser.close();
   server.close();
   if (problems.length) {
@@ -534,5 +681,5 @@ const card = (extra) => ({
     problems.forEach((p) => console.log(`  - ${p}`));
     process.exit(1);
   }
-  console.log("OK (climate: one stripe, one call, a switch that holds, and a thumb that travels)");
+  console.log("OK (climate: one stripe, one call, a mode that holds, and a thumb that travels)");
 })();
