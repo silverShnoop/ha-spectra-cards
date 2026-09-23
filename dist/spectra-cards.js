@@ -5737,8 +5737,9 @@ function sceneTrackMarkup(key, scenes, activeName, lit) {
 
 /* The stripe's scale, and what can be set on it -- two ranges, not one.
 
-   The SCALE is temperature itself: 10 at the cold end, 40 at the warm,
-   whatever the thermostat. It has to be wider than anything a thermostat
+   The SCALE is temperature itself: 15 at the cold end, 30 at the warm,
+   whatever the thermostat -- the span a lived-in room actually moves
+   through, so a degree is wide enough to set by finger. It has to be wider than anything a thermostat
    will accept, because the room is not bound by the thermostat -- Tado
    stops at 25 while a kitchen in August sits at 27, and a scale that ended
    at 25 could only show that kitchen as 25. The settable range is the
@@ -5748,8 +5749,8 @@ function sceneTrackMarkup(key, scenes, activeName, lit) {
    part-way along, and the stretch beyond it is somewhere a finger cannot
    set. The alternative was a scale that lied about hot rooms. The dead
    stretch is veiled so a finger can see it before trying. */
-const TEMP_SCALE_MIN = 10;
-const TEMP_SCALE_MAX = 40;
+const TEMP_SCALE_MIN = 15;
+const TEMP_SCALE_MAX = 30;
 
 /* Where each colour of the ramp lives, in degrees. Anchored to temperature
    rather than to position so the colour means the same thing on every
@@ -5809,8 +5810,8 @@ function tempStripeMarkup(row) {
   /* A reading past either end of the SCALE is pinned there -- but a needle
      standing on the end claims that end's number exactly. So it changes
      shape instead: an arrowhead pointing off the scale. The number itself
-     is in the title bar. With a scale of 10 to 40 this is a cold room in
-     January or a fault, not a normal day. */
+     is in the title bar. With a scale of 15 to 30 that is an unheated
+     room in January or a kitchen in a heatwave -- real, and not rare. */
   const beyond = !isFinite(now) ? ""
     : (now > smax ? " over" : (now < smin ? " under" : ""));
   /* Clipped from both sides: the gap is a span, not a fill, and it has two
@@ -6419,6 +6420,7 @@ class SpectraCard extends HTMLElement {
     this._power = null;
     this._lock = null;
     this._mode = null;
+    this._zoneMode = null;
     /* What the mic is doing, and how to end a take that is running.
        Separate, because the second only exists while the first says
        "listening" and a press has to be able to find it. */
@@ -6504,6 +6506,8 @@ class SpectraCard extends HTMLElement {
     this._power = null;
     this._lock = null;
     this._mode = null;
+    this._zoneMode = null;
+    if (this._zoneGiveUp) { clearTimeout(this._zoneGiveUp); this._zoneGiveUp = null; }
     if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
     if (this._powerGiveUp) { clearTimeout(this._powerGiveUp); this._powerGiveUp = null; }
     if (this._modeGiveUp) { clearTimeout(this._modeGiveUp); this._modeGiveUp = null; }
@@ -6800,6 +6804,68 @@ class SpectraCard extends HTMLElement {
     this._render(model);
   }
 
+  /* A thermostat's mode, claimed from the press until Tado says it.
+
+     Tado answers a mode change several seconds later, and it answers with
+     everything at once -- the zone's state, its overlay, its target -- so
+     the card cannot get the switch right by claiming `on` alone: the
+     switch moved while the schedule button, the mode line and the thumb
+     all sat on the old mode, which reads as a card that half heard you.
+     So the claim is the MODE, and every part of the body that follows
+     from a mode is written from it.
+
+     Held until the zone reports that mode in a state it had not yet
+     reported when the button was pressed -- not merely until the two
+     agree, because off-then-on in quick succession starts from a zone
+     already in "auto", and agreeing with that would drop the second claim
+     before the first call had even landed. A press that asks for what the
+     zone is already doing changes nothing Tado will report, so that one
+     is let go as soon as no call is in flight. */
+  _wantZoneMode(zone, mode) {
+    const was = this._hass && this._hass.states ? this._hass.states[zone] : null;
+    this._zoneMode = {
+      zone, mode,
+      from: was ? `${was.state}|${was.last_updated}` : "",
+    };
+    if (this._zoneGiveUp) clearTimeout(this._zoneGiveUp);
+    this._zoneGiveUp = setTimeout(() => {
+      this._zoneMode = null;
+      this._signature = null;
+      this._update();
+    }, ADJUST_GIVE_UP_MS);
+  }
+
+  _dropZoneMode() {
+    this._zoneMode = null;
+    if (this._zoneGiveUp) { clearTimeout(this._zoneGiveUp); this._zoneGiveUp = null; }
+  }
+
+  _applyZoneMode(model) {
+    const claim = this._zoneMode;
+    const b = model.body;
+    if (!claim || !b || b.type !== "climate" || b.zone !== claim.zone) return;
+    const now = this._hass && this._hass.states ? this._hass.states[claim.zone] : null;
+    if (now && now.state === claim.mode
+        && (`${now.state}|${now.last_updated}` !== claim.from || this._busy === 0)) {
+      this._dropZoneMode();
+      return;
+    }
+    const on = claim.mode !== "off";
+    b.on = on;
+    b.auto = on;
+    /* The window's line outranks the mode's in every config this card has
+       been given, and a claim is no reason to hide an open window. */
+    if (!b.warn) b.info = on ? "Following schedule" : "Off";
+    /* Coming back from off, the schedule's target is not known until Tado
+       says it, and what the zone reports meanwhile is the frost setting.
+       Read off the zone as it is NOW rather than as it was at the press:
+       an off landing under a later "on" is still a frost setting. From a
+       manual hold the target in hand is at least a real one, so it stays,
+       marked as about to change. */
+    if (on && (!now || now.state === "off")) b.powering = true;
+    else if (on) b.pending = true;
+  }
+
   /* What the user asked for, shown in place of what the house last said. */
   _applyPending(model) {
     const power = this._power;
@@ -6819,6 +6885,8 @@ class SpectraCard extends HTMLElement {
         model.body.powering = true;
       }
     }
+
+    this._applyZoneMode(model);
 
     const lock = this._lock;
     if (lock && model.body && model.body.type === "lock") {
@@ -8634,7 +8702,9 @@ class SpectraCard extends HTMLElement {
          stop claiming it if the house never agrees. `_setTarget` was written
          for exactly this -- "a drag already knows the number it landed on,
          so it comes straight here". */
-      commit: (v) => this._setTarget(adjust, v),
+      /* A setpoint is a manual hold, so it supersedes any mode still
+         being claimed -- the schedule button must not stay lit over it. */
+      commit: (v) => { this._dropZoneMode(); this._setTarget(adjust, v); },
     });
   }
 
@@ -8987,6 +9057,12 @@ class SpectraCard extends HTMLElement {
              this card to report from. The press is shown by the flash; the
              call is shown by the one spinner in the title bar. Exactly what
              the room's schedule button does. */
+          /* And claimed, like the switch: lit, the line rewritten, from
+             the press -- Tado will not say so for several seconds. */
+          auto.classList.add("on");
+          auto.setAttribute("aria-pressed", "true");
+          this._pressedAt = Date.now();
+          this._wantZoneMode(zone, "auto");
           flashPress(auto);
           this._work(() => setMode("auto"));
         };
@@ -9008,14 +9084,15 @@ class SpectraCard extends HTMLElement {
              there until the cloud answered, the better part of a minute.
 
              So: move the knob, hold renders while it travels, and claim the
-             state until the thermostat agrees. The claim runs through the
-             whole card -- the stripe dims and the target leaves -- and it
-             is held for ADJUST_GIVE_UP_MS rather than the lights' twelve
-             seconds, because it is the same thermostat on the same cloud. */
+             MODE until the thermostat reports it -- see _wantZoneMode. The
+             claim runs through the whole card, the stripe, the schedule
+             button and the mode line alike, and it is held for
+             ADJUST_GIVE_UP_MS because it is the same thermostat on the same
+             cloud as a setpoint. */
           power.classList.toggle("on", !on);
           power.setAttribute("aria-checked", on ? "false" : "true");
           this._pressedAt = Date.now();
-          this._wantPower(!on, ADJUST_GIVE_UP_MS);
+          this._wantZoneMode(zone, on ? "off" : "auto");
           flashPress(power);
           this._work(() => setMode(on ? "off" : "auto"));
         };
