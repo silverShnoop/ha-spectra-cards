@@ -214,12 +214,16 @@ const js = fs.readFileSync(file);
       /rgba\(0, 0, 0, 0\)/.test(boxed(".card").split("|")[1]),
       boxed(".card"));
 
-    /* The accent moves rather than grows. A tick labels the row it
-       stands beside; a header labels everything under it, so the colour
-       it was carrying becomes a rule along the bottom of the whole
-       block -- a mark no ordinary card has. Scaling the tick up was the
-       first attempt and it read as a bigger card, which is the entire
-       problem this exists to solve. */
+    /* A tick labels the row it stands beside; a header labels everything
+       under it, so the tick goes and the box goes with it.
+
+       The accent used to move rather than go, as a rule along the bottom
+       of the whole block. That is reversed: on the panel it read as a line
+       under a heading, drawing a boundary the section's own background and
+       the gap above it had already drawn. These two checks are kept and
+       inverted rather than deleted, because the rule coming back by
+       accident -- a stray border-bottom-color, a card losing its
+       transparent border -- is exactly the regression worth catching. */
     const rule = () => {
       const st = getComputedStyle(q(".card"));
       return `${st.borderBottomWidth}|${st.borderBottomColor}`;
@@ -227,14 +231,14 @@ const js = fs.readFileSync(file);
     check("the tick is gone",
       !q(".tick") || getComputedStyle(q(".tick")).display === "none",
       q(".tick") ? getComputedStyle(q(".tick")).display : "absent");
-    check("and the accent is underneath the whole header instead",
-      rule().startsWith("2px") && !/rgba\(0, 0, 0, 0\)/.test(rule()),
-      rule());
-    check("in the card's own accent, not a grey line",
-      rule().split("|")[1]
-        === getComputedStyle(q(".card")).getPropertyValue("--accent").trim()
-        || rule().split("|")[1] === "rgb(169, 161, 144)",
-      `${rule()} vs accent 2`);
+    check("and no rule is drawn under the header",
+      /rgba\(0, 0, 0, 0\)/.test(rule().split("|")[1]), rule());
+    check("on every side, so nothing shows at the edges either",
+      ["borderTopColor", "borderRightColor", "borderLeftColor"]
+        .every((side) => /rgba\(0, 0, 0, 0\)/.test(
+          getComputedStyle(q(".card"))[side])),
+      ["borderTopColor", "borderRightColor", "borderLeftColor"]
+        .map((side) => getComputedStyle(q(".card"))[side]).join(" "));
 
     /* It is still a spectra card underneath: same eyebrow, same icon.
        A header in another typeface is the other way to get this wrong. */
