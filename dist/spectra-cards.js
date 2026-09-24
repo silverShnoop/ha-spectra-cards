@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.111.0";
+const VERSION = "0.112.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1418,6 +1418,34 @@ ha-icon { display:inline-flex; line-height:0; }
 
 
 /* people */
+/* The floor plan. The picture and the overlay share one box and one
+   aspect ratio, so a room's points are the picture's own pixels whatever
+   width the card is drawn at. */
+.plan { position:relative; width:100%; border-radius:4px; overflow:hidden; }
+.plan .planimg, .plan svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.planroom { stroke:var(--accent); stroke-width:3; stroke-linejoin:round; }
+/* A marker sits on the room it names: kind and age, on the card's own
+   surface so it reads over a sofa as well as a floor. */
+.planmark {
+  position:absolute; transform:translate(-50%,-50%);
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 7px 2px 5px; border-radius:999px;
+  background:var(--sp-surface); border:1.5px solid var(--accent);
+  font-size:12px; line-height:16px; color:var(--sp-ink); white-space:nowrap;
+}
+.planmark ha-icon { --mdc-icon-size:14px; color:var(--accent); }
+.planmark.old { border-color:var(--sp-edge); color:var(--sp-ink-3); }
+.planmark.old ha-icon { color:var(--sp-ink-3); }
+.planelse { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:8px; font-size:12px; }
+.planchip { display:inline-flex; align-items:center; gap:5px; }
+.planchip ha-icon { --mdc-icon-size:14px; color:var(--accent); }
+.planchip .trail { margin-left:2px; }
+/* The picture is a daylit render. On a dark panel it would be the
+   brightest thing in the room, so it steps down to sit with the cards. */
+:host([data-theme="dark"]) .planimg { filter:brightness(.72) saturate(.85); }
+@media (prefers-color-scheme: dark) {
+  :host(:not([data-theme="light"])) .planimg { filter:brightness(.72) saturate(.85); }
+}
 .people { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .person { padding:8px; border-radius:4px; background:var(--sp-zebra); }
 /* Home is the moss role, not the card's accent.
@@ -3094,6 +3122,10 @@ function collectSources(spec, found) {
      the number as well as the words -- to tell a late reading from a
      missed one. So it ticks the way a `since` does. */
   if (spec.type === "softener" && spec.read_at !== undefined) found.live = true;
+  /* A floor plan fades by the clock, not by the feed: the feed only changes
+     when something happens, and a quiet house is exactly when the glow
+     has to keep going down. */
+  if (spec.type === "floorplan") found.live = true;
   if (typeof spec.entity === "string") {
     found.entities.add(spec.entity);
     return found;
@@ -3689,6 +3721,40 @@ function festBursts(palette) {
       + `<svg viewBox="0 0 100 100"><path d="${FEST_SPLAT}" fill="${colour}"/></svg></span>`;
   });
   return `<span class="bursts" aria-hidden="true">${out.join("")}</span>`;
+}
+
+/* The floor plan's heat, by area: area (lower-cased) -> {name, kind, times}
+   with times in ms, newest first.
+
+   Read from the feed's `by_area` when it is there, which is the last hour
+   per room; from the rail's `events` otherwise, which is the last twenty
+   things. The second works on any feed and quietly under-reads a busy
+   hour, so it is the fallback and not the source. */
+function planHeat(b) {
+  const out = new Map();
+  const add = (area, kind, t) => {
+    if (isBlank(area) || !Number.isFinite(t)) return;
+    const key = String(area).toLowerCase();
+    let row = out.get(key);
+    if (!row) { row = { name: String(area), kind, times: [] }; out.set(key, row); }
+    row.times.push(t);
+  };
+  if (b.areas && typeof b.areas === "object" && !Array.isArray(b.areas)) {
+    for (const [area, row] of Object.entries(b.areas)) {
+      if (!row || !Array.isArray(row.times)) continue;
+      for (const t of row.times) add(area, row.kind, Number(t) * 1000);
+      const kept = out.get(String(area).toLowerCase());
+      if (kept && !isBlank(row.kind)) kept.kind = row.kind;
+    }
+  } else if (Array.isArray(b.events)) {
+    for (const e of b.events) {
+      if (e) add(e.area, e.kind, Date.parse(e.at));
+    }
+  }
+  /* The kind shown is the newest one's: `by_area` names it, and events
+     arrive newest first so the first one seen already set it. */
+  for (const row of out.values()) row.times.sort((x, y) => y - x);
+  return out;
 }
 
 const BODIES = {
@@ -4937,6 +5003,113 @@ const BODIES = {
     }).join("");
   },
 
+  /* Where in the house, lately? The same feed as the rail, drawn on the
+     house instead of down a list -- the rail answers "in what order", this
+     answers "which rooms", and a busy hall is a warm hall rather than
+     nineteen rows.
+
+     Heat is the sum of what each event has left of its life, one at the
+     moment it happens and nothing at `fade` minutes, so a room is warm
+     because it was busy or because it was recent and the plan does not have
+     to say which. Squashed through 1 - e^-heat so one fresh trip reads
+     clearly and twenty cannot do more than fill the room.
+
+     The heat is the card's own accent and nothing else. A heat map "wants"
+     to go yellow through red, and those three are the levels: a hot hall
+     painted orange would be claiming a job that does not exist. How warm
+     a room is here is a fact, and it wears the tab's colour. */
+  floorplan(b) {
+    const src = safePicture(b.image);
+    const size = Array.isArray(b.size) ? b.size.map(Number) : [];
+    const W = size[0] > 0 ? size[0] : 1000;
+    const H = size[1] > 0 ? size[1] : 750;
+    const fade = Number(b.fade) > 0 ? Number(b.fade) : 60;
+    const now = Date.now();
+    const heat = planHeat(b);
+    const icons = Object.assign({
+      motion: "mdi:walk",
+      occupancy: "mdi:account",
+      button: "mdi:gesture-tap-button",
+      lock: "mdi:lock-open-variant",
+      door: "mdi:door-open",
+    }, b.iconMap || {});
+
+    const rooms = (Array.isArray(b.rooms) ? b.rooms : []).filter((r) => r
+      && Array.isArray(r.points) && r.points.length >= 3);
+    const drawn = new Set();
+    let shapes = "";
+    let marks = "";
+
+    rooms.forEach((room, i) => {
+      const names = (Array.isArray(room.area) ? room.area : [room.area])
+        .filter((a) => !isBlank(a)).map((a) => String(a).toLowerCase());
+      names.forEach((n) => drawn.add(n));
+      const found = names.map((n) => heat.get(n)).filter(Boolean);
+      const pts = room.points.map((p) => (Array.isArray(p) ? p.map(Number) : []))
+        .filter((p) => p.length === 2 && p.every(Number.isFinite));
+      if (pts.length < 3) return;
+
+      let sum = 0;
+      let latest = null;
+      for (const f of found) {
+        for (const t of f.times) sum += Math.max(0, 1 - (now - t) / 60000 / fade);
+        if (f.times.length && (!latest || f.times[0] > latest.at)) {
+          latest = { at: f.times[0], kind: f.kind };
+        }
+      }
+      const glow = 1 - Math.exp(-sum);
+      const xs = pts.map((p) => p[0]);
+      const ys = pts.map((p) => p[1]);
+      const at = Array.isArray(room.label) && room.label.length === 2
+        ? room.label.map(Number)
+        : [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+      const r = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 2;
+      const points = pts.map((p) => p.join(",")).join(" ");
+
+      if (glow > 0.01) {
+        /* Hot in the middle, and still visibly the room at its edge: a
+           gradient alone would leave the corners of a big room looking
+           untouched by a trip that happened in it. */
+        shapes += `<radialGradient id="pg${i}" gradientUnits="userSpaceOnUse"`
+          + ` cx="${at[0]}" cy="${at[1]}" r="${r.toFixed(0)}">`
+          + `<stop offset="0" style="stop-color:var(--accent);stop-opacity:${(0.72 * glow).toFixed(3)}"/>`
+          + `<stop offset="1" style="stop-color:var(--accent);stop-opacity:${(0.38 * glow).toFixed(3)}"/>`
+          + `</radialGradient>`
+          + `<polygon class="planroom" points="${points}" fill="url(#pg${i})"`
+          + ` style="stroke-opacity:${Math.min(1, 0.25 + glow).toFixed(3)}"/>`;
+      }
+
+      const mins = latest ? (now - latest.at) / 60000 : Infinity;
+      if (mins < fade) {
+        marks += `<div class="planmark${mins > fade / 2 ? " old" : ""}"`
+          + ` style="left:${(100 * at[0] / W).toFixed(2)}%;top:${(100 * at[1] / H).toFixed(2)}%">`
+          + `<ha-icon icon="${esc(icons[latest.kind] || "mdi:circle-small")}"></ha-icon>`
+          + `<span>${esc(shortDuration(Math.max(0, now - latest.at) / 1000))}</span></div>`;
+      }
+    });
+
+    /* A plan is one floor, and the house is not. Upstairs and the garden
+       still happened, so they are named under the plan rather than lost --
+       most recent first, one each, for as long as they would have glowed. */
+    const elsewhere = [...heat.entries()]
+      .filter(([key, f]) => !drawn.has(key) && f.times.length
+        && (now - f.times[0]) / 60000 < fade)
+      .sort((a, b2) => b2[1].times[0] - a[1].times[0])
+      .slice(0, Number(b.max_elsewhere) > 0 ? Number(b.max_elsewhere) : 4);
+
+    return `<div class="plan" style="aspect-ratio:${W} / ${H}">`
+      + (src ? `<img class="planimg" src="${esc(src)}" alt="">` : "")
+      + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${shapes}</svg>`
+      + marks
+      + `</div>`
+      + (elsewhere.length
+        ? `<div class="planelse">` + elsewhere.map(([, f]) =>
+          `<span class="planchip"><ha-icon icon="${esc(icons[f.kind] || "mdi:circle-small")}"></ha-icon>`
+          + `${esc(f.name)}<span class="trail">${esc(shortDuration((now - f.times[0]) / 1000))}</span></span>`,
+        ).join("") + `</div>`
+        : "");
+  },
+
   /* Who is in. Presence is a category, not a verdict — being out is not
      worse than being in — so "here" is the soft wash and "out" is the plain
      zebra, one step apart on the ladder rather than two accents arguing
@@ -5557,6 +5730,11 @@ function bodyIsEmpty(type, b) {
         && (!Array.isArray(b.metrics) || b.metrics.length === 0);
     case "rail":
       return !Array.isArray(b.events) || b.events.length === 0;
+    /* A quiet house is still a house. The plan with nothing on it is the
+       answer "nobody has moved for an hour", so only a missing picture
+       counts as having nothing to show. */
+    case "floorplan":
+      return !safePicture(b.image);
     case "alert":
       return isBlank(b.title);
     case "quote":
@@ -9822,6 +10000,7 @@ class SpectraCard extends HTMLElement {
       return 1 + Math.min(6, (Array.isArray(body.rows) ? body.rows.length : 3));
     }
     if (this._config.body.type === "forecast") return 3;
+    if (this._config.body.type === "floorplan") return 8;
     if (this._config.body.type === "rail") {
       return 1 + Math.min(8, (Array.isArray(body.events) ? body.events.length : 3));
     }
