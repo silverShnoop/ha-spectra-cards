@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -503,6 +503,38 @@ pairs clear ΔE 16.7 by eye and 15.1 under colour-blind simulation, where the
 first, evenly-spaced ramp managed 10.2 and had Overnight and Morning reading
 as a single taller block. Dark mode has its own steps chosen against the dark
 surface, not a flip of the light ones, whose darkest step vanishes into it.
+
+### `batteries` — which one needs changing, and how do the rest stand?
+
+```yaml
+type: custom:spectra-card
+accent: 5
+icon: mdi:battery-heart-variant
+title: Batteries
+outline: {entity: sensor.system_health, attribute: battery_level}
+body:
+  type: batteries
+  items:     {entity: sensor.system_health, attribute: batteries}
+  threshold: {entity: sensor.system_health, attribute: battery_threshold}
+```
+
+The flat ones are **rows**, at the top and worst first, because they are the
+part a person reads. Everything else is a **pip** on one 0–100 axis, stacked
+into ten bins: a battery at 80% does not need its name on a wall panel, it
+needs to be visibly nowhere near the line. A house of thirty batteries is
+three rows of pips, and the one creeping towards the line is the pip standing
+on its own — which is also the one the line underneath names: `18 fine ·
+lowest Water Softener 30%`.
+
+`low` is the **sensor's** word. `threshold` only draws the dashed line, so the
+card and `Needs you` cannot disagree about which side of it a battery is on.
+A battery with no reading is left out rather than drawn at 0.
+
+Flat rows and flat pips wear `attention`, because a `Needs you` row stands
+behind every one of them; healthy pips wear the card's accent and the low zone
+is shaded neutral, so a morning with nothing flat has no yellow in it. The
+card's `outline` reads `battery_level`, which is `attention` exactly while
+something is flat — the same level the Maintenance tab's rail button wears.
 
 ### `forecast` — what will it be like later?
 
