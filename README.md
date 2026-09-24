@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -362,6 +362,64 @@ read as broken, a rail of grey rows with three bright locks from the same two
 minutes looking like the only thing that had happened. Whether the door is
 locked is answered in the present tense by its own cell — the rail only says
 *when*, and an hour-old lock is as old as an hour-old anything.
+
+### `floorplan` — which rooms, lately?
+
+The rail's feed drawn on the house. Each room glows in the card's accent by
+how much has happened there and how recently, fading to nothing over `fade`
+minutes; the room's newest event sits on it as a marker, kind and age.
+
+```yaml
+type: custom:spectra-card
+accent: 4
+icon: mdi:floor-plan
+title: Downstairs
+meta: {entity: sensor.activity_feed, format: relative, prefix: "Quiet "}
+body:
+  type: floorplan
+  image: /hacsfiles/ha-spectra-cards/ground-floor.webp
+  size: [1392, 1010]          # the picture's pixels; points are in these
+  areas: {entity: sensor.activity_feed, attribute: by_area}
+  fade: 60                    # minutes
+  rooms:
+    - {area: Study,  points: [[70,47],[365,47],[365,264],[70,264]]}
+    - {area: Toilet, points: [[70,284],[365,284],[365,420],[70,420]]}
+    - area: Hall
+      points: [[385,42],[765,42],[765,142],[670,142],[670,477],[525,477],[525,507],[385,507]]
+    - area: Kitchen
+      points: [[65,444],[360,444],[360,507],[525,507],[525,482],[760,482],[760,857],[65,857]]
+    - area: Living Room
+      points: [[795,42],[1305,42],[1305,687],[795,687],[795,477],[670,477],[670,337],[795,337]]
+```
+
+`ground-floor.webp` ships in `dist/`, so HACS serves it beside the card; any
+root-relative path works (`/local/...` for a picture of your own). A room's
+`area` matches the feed's area name, case aside, and may be a list. `label:
+[x, y]` moves its marker off the middle of its bounding box, which is where
+it goes by default.
+
+**Heat is summed and squashed.** Every event contributes what is left of its
+life — one when it happens, nothing at `fade` — and the room glows by
+`1 − e^−sum`. One fresh trip reads clearly; twenty cannot do more than fill
+the room. The marker turns `ink-3` at half of `fade`.
+
+**Read `by_area`, not `events`, when the feed has it.** `events` is the
+rail's twenty rows, which is about ten minutes of an ordinary evening; a plan
+fading over an hour drawn from ten minutes shows a busy house going quiet.
+`by_area` is the feed's last hour per room. `events:` still works, for a feed
+that has no `by_area`, and simply under-reads.
+
+**The heat is never yellow, orange or red.** A heat map wants to be, and
+those three are the levels: a hot hall painted orange claims a job that does
+not exist. How busy a room was is a fact, and it wears the tab's accent.
+
+**A plan is one floor and the house is not.** Rooms with activity that the
+plan does not draw — upstairs, the garden — are named under it, newest first
+(`max_elsewhere`, default 4), for as long as they would have glowed.
+
+The picture is dimmed in dark mode: a daylit render is otherwise the
+brightest thing on a dark panel. The card ticks every 30 seconds on its own,
+because the fade must keep going in a house where nothing is happening.
 
 ### `strip` — where are we in a cycle?
 
