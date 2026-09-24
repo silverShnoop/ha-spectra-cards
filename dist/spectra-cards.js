@@ -77,6 +77,11 @@ const TOKENS_LIGHT = `
      managed 10.2 and had Overnight and Morning reading as one block. */
   --sp-b1:#0F3132; --sp-b2:#357F80; --sp-b3:#8FBDBB; --sp-b4:#DDEBE9;
   --sp-sun:#B6862A;
+  /* Salt, on the softener card. A DEPICTION, like --sp-sun: salt is white in
+     both themes, so these do not follow paper and ink into the dark. Three
+     faces lit from one side, plus the pencil line that holds them together. */
+  --sp-salt-top:#FFFFFF; --sp-salt-front:#ECE7DB; --sp-salt-side:#D8D1C0;
+  --sp-salt-line:#A9A190;
   /* The temperature ramp. A DEPICTION, like --sp-sun and like a bulb's
      colour temperature: cold is blue because cold is blue, and nobody chose
      it. It holds yellow, orange and red, which are the three level colours,
@@ -137,6 +142,8 @@ const TOKENS_DARK = `
      ramp: the light one's darkest step disappears into this background. */
   --sp-b1:#17494A; --sp-b2:#3E9596; --sp-b3:#7DC8C6; --sp-b4:#DCF0EE;
   --sp-sun:#D9A63F;
+  --sp-salt-top:#EDE8DC; --sp-salt-front:#CFC8B7; --sp-salt-side:#ADA591;
+  --sp-salt-line:#6F695C;
   --sp-ramp-0:#5A9CBF; --sp-ramp-1:#86BFAE; --sp-ramp-2:#DECB78;
   --sp-ramp-3:#E3A15C; --sp-ramp-4:#D0614B; --sp-ramp-5:#A63A3A;
   --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
@@ -1472,6 +1479,35 @@ img.avatar { object-fit:cover; display:block; }
    Step 7 of the emphasis ladder is by definition a level. */
 .invert { background:var(--sp-critical); color:var(--sp-surface); border-color:var(--sp-critical); }
 .invert .sub { color:var(--sp-surface); opacity:.85; }
+
+/* softener -- two salt blocks, each in the outline of its tank.
+
+   The block keeps its width and depth and loses height, because that is how
+   a salt block goes: it dissolves from the top down. The tank is drawn so
+   the empty space above a low block reads as room rather than as nothing,
+   and so both sides are the same size whatever is in them. An empty side
+   is the last few crumbs, never an outline of the block that used to be
+   there -- an outline is the same size as a full block, and read as one. */
+.salt { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.saltside { text-align:center; min-width:0; }
+.saltside svg { display:block; width:100%; max-width:150px; height:auto; margin:0 auto; }
+.salttank { fill:none; stroke:var(--sp-edge); stroke-width:1.2; stroke-linejoin:round; }
+.saltfloor { fill:var(--sp-sink); }
+.saltblock { stroke:var(--sp-salt-line); stroke-width:1; stroke-linejoin:round; }
+.saltblock.top { fill:var(--sp-salt-top); }
+.saltblock.front { fill:var(--sp-salt-front); }
+.saltblock.side { fill:var(--sp-salt-side); }
+.saltside .mlabel { margin:2px 0 0; }
+.saltside .hero { font-size:26px; margin-top:2px; }
+.saltside .sub { margin-top:3px; }
+/* When the numbers were last read. A fact, not a level: a missed reading
+   raises no Needs-you row, so it may not wear ochre. It goes hollow. */
+.saltread {
+  display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:8px;
+  border-top:2px solid var(--sp-sink); font-size:12px; color:var(--sp-ink-2);
+}
+.saltread .dot { width:7px; height:7px; background:var(--accent); }
+.saltread.stale .dot { background:none; box-shadow:inset 0 0 0 1.5px var(--sp-ink-3); }
 
 /* ---- additions to the reference sheet ---- */
 
@@ -3025,6 +3061,10 @@ function collectSources(spec, found) {
      reads a `field` off a collection and carries no entity of its own --
      the finished-today times went stale for exactly that reason. */
   if (spec.format === "relative" || spec.format === "since") found.live = true;
+  /* The softener reads its own age off a raw timestamp, because it needs
+     the number as well as the words -- to tell a late reading from a
+     missed one. So it ticks the way a `since` does. */
+  if (spec.type === "softener" && spec.read_at !== undefined) found.live = true;
   if (typeof spec.entity === "string") {
     found.entities.add(spec.entity);
     return found;
@@ -3895,6 +3935,37 @@ const BODIES = {
     const foot = isBlank(b.foot) ? "" : esc(b.foot);
     if (foot || undo) {
       out += `<div class="tdfoot"><span>${foot}</span>${undo}</div>`;
+    }
+    return out;
+  },
+
+  /* How much salt is in each side, and is that still true? */
+  softener(b) {
+    const sides = (Array.isArray(b.sides) ? b.sides : []).filter((x) => x && typeof x === "object");
+    let out = `<div class="salt">` + sides.map((side) => {
+      const level = saltLevel(side.level);
+      const label = isBlank(side.label) ? "" : `<p class="mlabel">${esc(side.label)}</p>`;
+      const hero = level === null ? "" : `<p class="hero">${Math.round(level)}%</p>`;
+      const name = isBlank(side.label) ? "Salt" : `${side.label} salt`;
+      const said = level === null ? "no reading" : `${Math.round(level)}%`;
+      return `<div class="saltside">`
+        + `<svg viewBox="0 8 124 116" role="img" aria-label="${esc(name)}, ${said}">${saltScene(level)}</svg>`
+        + label + hero + `<p class="sub">${esc(saltLeft(level, side.days))}</p></div>`;
+    }).join("") + `</div>`;
+
+    /* The softener reports once a day, and the reading reaches Home
+       Assistant hours after it was taken -- up to most of a day. So the
+       time shown is when the salt was READ, which is how old the figures
+       are, and a reading only counts as missed once it is well past the
+       next one plus that lag. */
+    if (!isBlank(b.read_at)) {
+      const ago = sinceBoth(b.read_at);
+      if (ago !== null) {
+        const hours = Number(b.stale_after_hours) > 0 ? Number(b.stale_after_hours) : 54;
+        const stale = minutesSince(b.read_at) > hours * 60;
+        out += `<div class="saltread${stale ? " stale" : ""}"><span class="dot"></span>`
+          + `<span>${esc(stale ? `No new reading · last ${ago}` : `Read ${ago}`)}</span></div>`;
+      }
     }
     return out;
   },
@@ -5415,6 +5486,11 @@ function bodyIsEmpty(type, b) {
       return isBlank(b.zone) && isBlank(b.value) && !b.adjust;
     case "forecast":
       return !Array.isArray(b.slots) || b.slots.length === 0;
+    /* A softener with no side reporting and no reading time has nothing to
+       say. One side reading still draws both, so they stay the same size. */
+    case "softener":
+      return !(Array.isArray(b.sides) && b.sides.some((x) => x && saltLevel(x.level) !== null))
+        && isBlank(b.read_at);
     case "agenda":
       return !Array.isArray(b.events) || b.events.length === 0;
     /* One point is not a shape. A fortnight chart drawn on the house's
@@ -5967,6 +6043,94 @@ function dimmerMarkup(key, light, raw, lit) {
    one that must never be a guess. Leaking outranks everything -- it is the
    only state where what the machine is doing matters less than what is on
    the floor. */
+/* ---- softener ---- */
+
+/* A side's level as a number from 0 to 100, or null where there is no
+   reading. Null is not zero: a sensor that has not reported draws an empty
+   tank with no crumbs in it, rather than claiming the salt has run out. */
+function saltLevel(v) {
+  if (isBlank(v)) return null;
+  const n = Number(v);
+  return isFinite(n) ? Math.max(0, Math.min(100, n)) : null;
+}
+
+function saltLeft(level, days) {
+  if (level === null) return "No reading";
+  if (level <= 0) return "Empty";
+  const n = Number(days);
+  if (isBlank(days) || !isFinite(n)) return "No estimate";
+  const d = Math.max(0, Math.round(n));
+  return d === 1 ? "1 day left" : `${d} days left`;
+}
+
+/* The view: turned 20 degrees off square so the front of the block carries
+   it and the side is a strip, and looking down 14 degrees -- close to eye
+   level, which is where you see a softener from when you lift the lid. The
+   45-degree isometric view was tried first and made both faces argue. */
+const SALT_YAW = 20 * Math.PI / 180;
+const SALT_PITCH = 14 * Math.PI / 180;
+const SALT_CX = 62;
+const SALT_BASE = 110;
+const SALT_HALF = 24;       /* half the block's width and depth */
+const SALT_HIGH = 78;       /* a full block */
+const SALT_TANK_HALF = 31;
+const SALT_TANK_HIGH = 90;
+
+function saltPoint(x, y, z) {
+  const c = Math.cos(SALT_YAW);
+  const s = Math.sin(SALT_YAW);
+  const xr = x * c + z * s;
+  const zr = -x * s + z * c;
+  return `${(SALT_CX + xr).toFixed(1)},`
+    + `${(SALT_BASE - y * Math.cos(SALT_PITCH) + zr * Math.sin(SALT_PITCH)).toFixed(1)}`;
+}
+
+/* The six faces of a box, each with its outward normal. A face is visible
+   when its normal, turned by the yaw, points towards the viewer; the top
+   always is, because the view looks down. */
+function saltFaces(x0, x1, y0, y1, z0, z1) {
+  return [
+    { n: [0, 1, 0], k: "top", p: [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]] },
+    { n: [0, -1, 0], k: "floor", p: [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]] },
+    { n: [0, 0, 1], k: "front", p: [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]] },
+    { n: [0, 0, -1], k: "front", p: [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]] },
+    { n: [1, 0, 0], k: "side", p: [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]] },
+    { n: [-1, 0, 0], k: "side", p: [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]] },
+  ];
+}
+
+function saltFacing(face) {
+  return face.n[1] > 0
+    || (-face.n[0] * Math.sin(SALT_YAW) + face.n[2] * Math.cos(SALT_YAW)) > 1e-6;
+}
+
+function saltPolygon(face, cls) {
+  return `<polygon class="${cls}" points="${face.p.map((q) => saltPoint(q[0], q[1], q[2])).join(" ")}"></polygon>`;
+}
+
+function saltBlock(cx, cz, half, high) {
+  return saltFaces(cx - half, cx + half, 0, high, cz - half, cz + half)
+    .filter(saltFacing)
+    .map((f) => saltPolygon(f, `saltblock ${f.k}`))
+    .join("");
+}
+
+function saltScene(level) {
+  const tank = saltFaces(-SALT_TANK_HALF, SALT_TANK_HALF, 0, SALT_TANK_HIGH,
+    -SALT_TANK_HALF, SALT_TANK_HALF);
+  let out = saltPolygon(tank[1], "saltfloor");
+  /* Far walls first, then the salt, then the near walls over it: the tank
+     is glass in the drawing, and the salt is inside it. */
+  tank.forEach((f) => { if (!saltFacing(f) && f.k !== "floor") out += saltPolygon(f, "salttank"); });
+  if (level !== null && level <= 0) {
+    out += saltBlock(-9, 4, 6, 4) + saltBlock(8, -3, 4.5, 3) + saltBlock(1, 12, 3, 2.5);
+  } else if (level !== null) {
+    out += saltBlock(0, 0, SALT_HALF, Math.max(4, SALT_HIGH * level / 100));
+  }
+  tank.forEach((f) => { if (saltFacing(f)) out += saltPolygon(f, "salttank"); });
+  return out;
+}
+
 function washerWord(cycle, leak, powered) {
   if (leak) return "Leaking";
   if (!powered) return "No power";
