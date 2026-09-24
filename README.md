@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1447,6 +1447,53 @@ the machine has no power: a circle with a power glyph, on a card that also
 has a power button, reads as a second button — and the first thing anyone
 did with an earlier draft was try to press it. Off is a struck-through
 machine on a broken ring.
+
+### `softener` — how much salt is left in each side, and is that still true?
+
+Two salt blocks, each drawn inside the outline of its tank.
+
+```yaml
+body:
+  type: softener
+  sides:
+    - label: Left
+      level: {entity: sensor.my_water_softener_salt_left_side_percentage}
+      days: {entity: sensor.my_water_softener_salt_left_side_time_remaining}
+    - label: Right
+      level: {entity: sensor.my_water_softener_salt_right_side_percentage}
+      days: {entity: sensor.my_water_softener_salt_right_side_time_remaining}
+  read_at: {entity: sensor.my_water_softener_last_update}   # a raw timestamp
+  stale_after_hours: 54                                      # the default
+```
+
+**A block loses height, not size.** Salt dissolves from the top down, so
+the block keeps its width and depth and gets shorter. Scaling it evenly was
+tried first. It made a low block look like a far-away one, and the empty
+side, drawn as an outline of a full block, was the biggest thing on the card.
+
+**Empty is crumbs.** At 0% the tank holds the last few fragments. A side
+with no reading at all draws an empty tank with nothing in it, and its line
+says `No reading`. No reading is not the same as no salt.
+
+**The tank is drawn so the space means something.** Without it, the room
+above a low block is blank card, and the two sides only look the same size
+while both hold similar amounts.
+
+**The view** is turned 20° and looks down 14°. At 45° both faces of the
+block are the same width and neither leads. Looking further down makes the
+top face the largest thing in the drawing, and the top is not what changes.
+
+**`read_at` is when the salt was read, not when Home Assistant heard.**
+The softener reports once a day, and the reading arrives anything from a few
+hours to most of a day later. So the line says `Read 7h ago · 12:04`, which
+is how old the figures are. It goes hollow and says `No new reading · last …`
+only after `stale_after_hours`. The default of 54 is a daily reading plus
+the longest lag seen, which was nearly 23 hours. At 26 the line went hollow
+every other day on a softener that was working.
+
+A missed reading is a fact and not a job, so it never takes ochre. **The
+card's outline is the dashboard's to set** through `outline`, and only while
+the salt row is in Needs you. The body paints no level of its own.
 
 ## Confirming an action
 
