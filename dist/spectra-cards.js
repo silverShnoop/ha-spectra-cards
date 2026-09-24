@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.109.0";
+const VERSION = "0.110.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1652,6 +1652,11 @@ img.avatar { object-fit:cover; display:block; }
    column, so its box is half as tall again as a line chart's at the same
    width -- and the cap is what keeps its type at the size the rows use. */
 .chart.tall { max-width:460px; }
+/* batteries — the flat ones as rows, and everything else as pips on one
+   0-100 axis. The chart is capped a little narrower than a line chart's
+   because it has no labels worth reading at size, only positions. */
+.chart.batt { max-width:420px; margin:4px 0 0; }
+.battsum { margin:4px 6px 0; }
 
 /* control — the one body you touch rather than read. Same row metrics as
    list, so a panel of controls and a panel of readings sit at the same
@@ -5196,6 +5201,95 @@ const BODIES = {
     });
     return out + `</svg>`;
   },
+  /* Which battery needs changing, and how do the rest stand?
+
+     The flat ones are rows, at the top, because they are the part a person
+     reads. Everything else is a pip on one 0-100 axis: a battery at 80%
+     does not need its name on a wall panel, it needs to be visibly nowhere
+     near the line. Stacked into ten bins, a house of thirty batteries fits
+     in three rows of pips, and the one creeping towards the line is the
+     pip standing on its own.
+
+     `low` is the sensor's word, not this body's. The threshold is only
+     here to draw the line, so the card and Needs you can never disagree
+     about which side of it a battery is on. Low pips wear the attention
+     level because a Needs you row stands behind every one of them;
+     healthy ones wear the card's own accent, and the low zone is shaded
+     neutral, so a morning with nothing flat has no yellow in it. */
+  batteries(b) {
+    const threshold = Number.isFinite(Number(b.threshold)) ? Number(b.threshold) : 20;
+    const items = (Array.isArray(b.items) ? b.items : [])
+      .filter((i) => i && Number.isFinite(Number(i.percent)))
+      .map((i) => {
+        const pct = Math.max(0, Math.min(100, Number(i.percent)));
+        const low = typeof i.low === "boolean" ? i.low : pct <= threshold;
+        return { name: isBlank(i.name) ? "" : String(i.name), area: i.area, pct, low };
+      })
+      .sort((x, y) => x.pct - y.pct);
+    if (!items.length) return "";
+    const pctText = (p) => `${Math.round(p)}%`;
+
+    let out = items.filter((i) => i.low).map((i) => {
+      const middle = isBlank(i.area)
+        ? `<p class="name">${esc(i.name)}</p>`
+        : `<div><p class="name">${esc(i.name)}</p><p class="sub">${esc(i.area)}</p></div>`;
+      return `<div class="row wash" style="${toneStyle("attention")}">`
+        + `<ha-icon icon="mdi:battery-alert-variant-outline"`
+        + ` style="--mdc-icon-size:19px;color:${toneBase("attention")}"></ha-icon>`
+        + `${middle}<span class="value">${esc(pctText(i.pct))}</span></div>`;
+    }).join("");
+
+    /* Ten bins of ten, four pips across each and stacked upwards, so the
+       height grows with the fullest bin and not with the house. 100% goes
+       in the top bin rather than an eleventh of its own. */
+    const W = 320, L = 4, R = W - 4, BINS = 10, ACROSS = 4, PITCH = 7, RAD = 2.8;
+    const span = R - L;
+    const bins = Array.from({ length: BINS }, () => []);
+    for (const i of items) bins[Math.min(BINS - 1, Math.floor(i.pct / 10))].push(i);
+    const rows = Math.max(1, ...bins.map((bin) => Math.ceil(bin.length / ACROSS)));
+    const TOP = 4, BASE = TOP + rows * PITCH, AXIS = BASE + 2, H = AXIS + 14;
+    const at = (p) => L + (p / 100) * span;
+    const line = at(Math.max(0, Math.min(100, threshold)));
+
+    let svg = `<svg class="chart batt" viewBox="0 0 ${W} ${H}" role="img"`
+      + ` aria-label="${esc(items.length)} batteries by charge">`
+      + `<rect x="${L}" y="${TOP - 2}" width="${(line - L).toFixed(1)}"`
+      + ` height="${BASE - TOP + 4}" rx="2" fill="var(--sp-zebra)"/>`;
+    bins.forEach((bin, bi) => {
+      const left = L + (bi * span) / BINS + (span / BINS - (ACROSS - 1) * PITCH) / 2;
+      bin.forEach((i, k) => {
+        const cx = left + (k % ACROSS) * PITCH;
+        const cy = BASE - PITCH / 2 - Math.floor(k / ACROSS) * PITCH;
+        const fill = i.low ? toneBase("attention") : "var(--accent)";
+        svg += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${RAD}"`
+          + ` fill="${fill}"><title>${esc(`${i.name} ${pctText(i.pct)}`)}</title></circle>`;
+      });
+    });
+    svg += `<line x1="${L}" y1="${AXIS}" x2="${R}" y2="${AXIS}"`
+      + ` stroke="var(--sp-edge)" stroke-width="1"/>`
+      + `<line x1="${line.toFixed(1)}" y1="${TOP - 2}" x2="${line.toFixed(1)}" y2="${AXIS}"`
+      + ` stroke="var(--sp-ink-3)" stroke-width="1" stroke-dasharray="2 2"/>`;
+    /* The line's own label replaces the 0 when they would collide, and the
+       far end names the unit once. */
+    const ticks = [[line, `${Math.round(threshold)}%`, "middle"],
+      [at(50), "50", "middle"], [R, "100%", "end"]];
+    if (line - L > 16) ticks.unshift([L, "0", "start"]);
+    for (const [x, text, anchor] of ticks) {
+      svg += `<text x="${x.toFixed(1)}" y="${AXIS + 11}" font-size="8.5"`
+        + ` text-anchor="${anchor}" fill="var(--sp-ink-3)">${esc(text)}</text>`;
+    }
+    out += svg + `</svg>`;
+
+    /* The one pip worth naming: the lowest that is still fine, because it
+       is the next row this card will grow. */
+    const fine = items.filter((i) => !i.low);
+    if (fine.length) {
+      const next = fine[0];
+      out += `<p class="sub battsum">${esc(`${fine.length} fine`)}`
+        + ` · lowest ${esc(next.name)} ${esc(pctText(next.pct))}</p>`;
+    }
+    return out;
+  },
   list(b) {
     const rows = Array.isArray(b.rows) ? b.rows : [];
     /* Tiles rather than a column. A wall panel is mostly much wider than a
@@ -5286,6 +5380,9 @@ function bodyIsEmpty(type, b) {
     case "daysplit":
       return !Array.isArray(b.days)
         || !b.days.some((d) => d && Array.isArray(d.cost) && d.cost.length);
+    case "batteries":
+      return !Array.isArray(b.items)
+        || !b.items.some((i) => i && Number.isFinite(Number(i.percent)));
     case "list":
       return !Array.isArray(b.rows) || b.rows.length === 0;
     case "stat":
