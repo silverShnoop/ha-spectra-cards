@@ -76,6 +76,20 @@ const TOKENS_LIGHT = `
      15.1 under colour-blind simulation, where the first even ramp tried
      managed 10.2 and had Overnight and Morning reading as one block. */
   --sp-b1:#0F3132; --sp-b2:#357F80; --sp-b3:#8FBDBB; --sp-b4:#DDEBE9;
+  /* Wedges, for a breakdown of one whole into named things. A CATEGORICAL
+     set rather than a ramp: these are different things, not more and less
+     of one. Deliberately NOT the six accents -- a1 and a2 are spoken for
+     (terracotta is water on the floor, ochre is a promise that something
+     wants doing) and the remaining four failed as a chart palette anyway:
+     olive against terracotta measured 2.0 under deuteranopia, a red-green
+     collision, and the four non-status hues could not clear 15 by eye in
+     any order because they share a lightness by design.
+     So lightness alternates as well as hue, which is what buys the
+     separation: adjacent wedges clear 24.5 by eye and 22.8 simulated.
+     The rest wedge is grey on purpose -- the unmetered remainder is a gap,
+     not a thing, and giving it a hue would make it look measured. */
+  --sp-w1:#14504F; --sp-w2:#8CA0D0; --sp-w3:#7A4C6B; --sp-w4:#A8C57E;
+  --sp-w-rest:#BFB8A6;
   --sp-sun:#B6862A;
   /* The temperature ramp. A DEPICTION, like --sp-sun and like a bulb's
      colour temperature: cold is blue because cold is blue, and nobody chose
@@ -136,6 +150,10 @@ const TOKENS_DARK = `
   /* Chosen against the dark surface rather than flipped from the light
      ramp: the light one's darkest step disappears into this background. */
   --sp-b1:#17494A; --sp-b2:#3E9596; --sp-b3:#7DC8C6; --sp-b4:#DCF0EE;
+  /* Stepped against the dark surface, not flipped: 19.6 simulated, 24.7 by
+     eye. The light set's darkest wedges vanish into this background. */
+  --sp-w1:#8CCBCB; --sp-w2:#4C5D8A; --sp-w3:#D6A9C8; --sp-w4:#6E8F43;
+  --sp-w-rest:#6A6458;
   --sp-sun:#D9A63F;
   --sp-ramp-0:#5A9CBF; --sp-ramp-1:#86BFAE; --sp-ramp-2:#DECB78;
   --sp-ramp-3:#E3A15C; --sp-ramp-4:#D0614B; --sp-ramp-5:#A63A3A;
@@ -5131,11 +5149,26 @@ const BODIES = {
     const days = (Array.isArray(b.days) ? b.days : []).filter(
       (d) => d && Array.isArray(d.cost) && d.cost.length
     );
-    if (!days.length) return "";
     const names = Array.isArray(b.names) ? b.names : [];
     const FILL = ["var(--sp-b1)", "var(--sp-b2)", "var(--sp-b3)", "var(--sp-b4)"];
 
-    const W = 320, H = 122;
+    /* Figures under the columns: the week, the week before, the average.
+       Optional, and each one absent until the sensor has a full window for
+       it -- so this grows a row at a time rather than showing a blank. */
+    const figures = (Array.isArray(b.figures) ? b.figures : []).filter(
+      (f) => f && !isBlank(f.value)
+    ).slice(0, 3);
+    if (!days.length && !figures.length) return "";
+    const FIG = figures.length ? 30 : 0;
+
+    /* The figures can outlive the columns. A week's total arrives from
+       statistics kept for ever; the columns need days this integration has
+       written down itself. So a card with one and not the other draws the
+       one it has rather than nothing. */
+    const bare = !days.length;
+    const W = 320;
+    const FIG_TOP = bare ? 6 : 126;
+    const H = bare ? FIG_TOP + 30 : 122 + FIG;
     /* The column band. Everything below FOOT is text: the day's money, its
        units, and which day it was. */
     const TOP = 26, FOOT = 78;
@@ -5193,6 +5226,99 @@ const BODIES = {
       out += `<text x="${x(i).toFixed(1)}" y="114" font-size="9"`
         + ` text-anchor="middle" fill="var(--sp-ink-2)">`
         + `${esc(day.label || "")}</text>`;
+    });
+
+    if (figures.length) {
+      /* A rule, then the figures three-up -- the same shape the status
+         body's metrics use, so a card of columns and a card of readings
+         sit at one rhythm. */
+      if (!bare) {
+        out += `<line x1="4" y1="${FIG_TOP}" x2="${W - 4}" y2="${FIG_TOP}"`
+          + ` stroke="var(--sp-edge)" stroke-width="1.5"/>`;
+      }
+      const slot = (W - 8) / figures.length;
+      figures.forEach((f, i) => {
+        const cx = 4 + slot * (i + 0.5);
+        out += `<text x="${cx.toFixed(1)}" y="${FIG_TOP + 14}" font-size="11"`
+          + ` text-anchor="middle" fill="var(--sp-ink)">${esc(f.value)}</text>`;
+        if (!isBlank(f.label)) {
+          out += `<text x="${cx.toFixed(1)}" y="${FIG_TOP + 23}" font-size="8"`
+            + ` text-anchor="middle" fill="var(--sp-ink-3)">${esc(f.label)}</text>`;
+        }
+      });
+    }
+    return out + `</svg>`;
+  },
+  /* What did one whole go on? A pie, with every wedge's own figures beside
+     it -- and the figures are the reason the picture is allowed to be a
+     pie at all. A four percent wedge cannot be read as a shape, so the
+     number carries it and the geometry only has to show which is biggest.
+
+     Six wedges is the most this will draw. Past that, a breakdown is a
+     table wearing a costume.
+
+     Nothing here knows what the slices are called or which is the
+     remainder. The sensor marks that one, because "everything else" is a
+     phrase about a particular house and this body is not. */
+  pie(b) {
+    const all = (Array.isArray(b.slices) ? b.slices : []).filter(
+      (s) => s && Number(s.share) > 0
+    );
+    if (!all.length) return "";
+    const slices = all.slice(0, 6);
+    const HUES = ["var(--sp-w1)", "var(--sp-w2)", "var(--sp-w3)", "var(--sp-w4)"];
+    const fill = (s, i) => (s.rest ? "var(--sp-w-rest)" : HUES[i % HUES.length]);
+
+    const W = 320;
+    const ROW = 19;
+    /* Tall enough for the legend or the pie, whichever needs more: with two
+       wedges the pie is the tall part, with six the legend is. */
+    const H = Math.max(116, 16 + slices.length * ROW);
+    const CX = 52, CY = 58, R = 42;
+
+    const total = slices.reduce((a, s) => a + Number(s.share), 0) || 100;
+    let out = `<svg class="chart tall" viewBox="0 0 ${W} ${H}" role="img"`
+      + ` aria-label="${esc(b.label || "Where it went")}">`;
+
+    let from = -Math.PI / 2;   // twelve o'clock, where a reader starts
+    slices.forEach((s, i) => {
+      const frac = Number(s.share) / total;
+      /* A single wedge is a circle. Drawn as an arc it would sweep back to
+         its own start point and paint nothing at all. */
+      if (frac >= 0.999) {
+        out += `<circle cx="${CX}" cy="${CY}" r="${R}" fill="${fill(s, i)}"/>`;
+        from += Math.PI * 2;
+        return;
+      }
+      const to = from + frac * Math.PI * 2;
+      const x0 = (CX + R * Math.cos(from)).toFixed(2);
+      const y0 = (CY + R * Math.sin(from)).toFixed(2);
+      const x1 = (CX + R * Math.cos(to)).toFixed(2);
+      const y1 = (CY + R * Math.sin(to)).toFixed(2);
+      /* A hairline of surface around each wedge, so two neighbours never
+         read as one -- the same reason the stacked columns have a gap. */
+      out += `<path d="M${CX},${CY} L${x0},${y0}`
+        + ` A${R},${R} 0 ${frac > 0.5 ? 1 : 0} 1 ${x1},${y1} Z"`
+        + ` fill="${fill(s, i)}" stroke="var(--sp-surface)" stroke-width="1.5"/>`;
+      from = to;
+    });
+
+    /* The legend IS the data table. Name, what it cost, what share it was --
+       because a wedge this small is identified by its row, not its angle. */
+    const LX = 108;
+    slices.forEach((s, i) => {
+      const y = 18 + i * ROW;
+      out += `<rect x="${LX}" y="${(y - 7).toFixed(1)}" width="8" height="8"`
+        + ` rx="2" fill="${fill(s, i)}"/>`;
+      out += `<text x="${LX + 13}" y="${y}" font-size="9.5"`
+        + ` fill="var(--sp-ink)">${esc(s.name || "")}</text>`;
+      const money = isBlank(s.cost_text) ? "" : String(s.cost_text);
+      if (money) {
+        out += `<text x="${W - 42}" y="${y}" font-size="9.5" text-anchor="end"`
+          + ` fill="var(--sp-ink)">${esc(money)}</text>`;
+      }
+      out += `<text x="${W - 4}" y="${y}" font-size="8.5" text-anchor="end"`
+        + ` fill="var(--sp-ink-3)">${esc(Number(s.share).toFixed(1))}%</text>`;
     });
     return out + `</svg>`;
   },
@@ -5282,10 +5408,16 @@ const BODIES = {
 /** A cell with nothing to say renders nothing, and takes no grid space. */
 function bodyIsEmpty(type, b) {
   switch (type) {
+    /* A breakdown of nothing is not a breakdown. */
+    case "pie":
+      return !Array.isArray(b.slices)
+        || !b.slices.some((s) => s && Number(s.share) > 0);
     /* A day with no blocks is a gap, not a column of nothing. */
     case "daysplit":
-      return !Array.isArray(b.days)
-        || !b.days.some((d) => d && Array.isArray(d.cost) && d.cost.length);
+      return (!Array.isArray(b.days)
+          || !b.days.some((d) => d && Array.isArray(d.cost) && d.cost.length))
+        && !(Array.isArray(b.figures)
+          && b.figures.some((f) => f && !isBlank(f.value)));
     case "list":
       return !Array.isArray(b.rows) || b.rows.length === 0;
     case "stat":

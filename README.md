@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `pie`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -491,6 +491,17 @@ Nothing here knows that a block is six hours, or what the blocks are called:
 `names` arrives with the data and the segments are drawn in the order given,
 so re-cutting the day is a change to the sensor and not to this card.
 
+`figures` is an optional row of up to three readings under the columns,
+each `{value, label}` — a week's total, the week before, the average week.
+They can **outlive the columns**: a week's total comes from statistics kept
+for ever, while the columns need days the sensor wrote down itself, so a
+card with one and not the other draws the one it has. A figure with no
+`value` is left out rather than labelled blank.
+
+The same body draws a **month** per column: one segment is the whole, so
+passing `names: []` drops the legend and each column becomes a month's
+total. Re-cutting the period is a change to the sensor, not to this.
+
 `slots` lays the card out for that many columns even when fewer have
 arrived, so a week filling up does not restretch every morning. A day whose
 blocks are missing is a **gap** rather than a column of nothing — the house
@@ -503,6 +514,43 @@ pairs clear ΔE 16.7 by eye and 15.1 under colour-blind simulation, where the
 first, evenly-spaced ramp managed 10.2 and had Overnight and Morning reading
 as a single taller block. Dark mode has its own steps chosen against the dark
 surface, not a flip of the light ones, whose darkest step vanishes into it.
+
+### `pie` — what did one whole go on?
+
+```yaml
+body:
+  type: pie
+  slices: {entity: sensor.energy_day, attribute: breakdown}
+```
+
+A wedge per slice, with every slice's own figures in the legend beside it —
+name, what it cost, what share it was. **The figures are the reason the
+picture is allowed to be a pie at all.** A 3.9% wedge cannot be read as a
+shape, so the number carries it and the geometry only has to show which is
+biggest. Six wedges is the most it draws; past that a breakdown is a table
+in a costume.
+
+The wedges must **close the circle**, and `tools/checkpie.js` measures that
+rather than trusting it: angles that sum short leave a gap that reads as a
+missing category, and angles that sum long silently overlap the first wedge
+and hide it.
+
+Nothing here knows what the slices are called or which one is the
+remainder. A slice marked `rest: true` is drawn **grey** — an unmetered
+remainder is a gap, not a thing, and giving it a hue would make it look
+measured. "Everything else" is a phrase about a particular house; this body
+is not.
+
+Colour is categorical — these are different things, not more and less of
+one — and deliberately **not** the six accents. Two are spoken for
+(terracotta is water on the floor, ochre is a promise that something wants
+doing), and the remaining four failed as a chart palette anyway: olive
+against terracotta measures ΔE 2.0 under deuteranopia, a red-green
+collision, and the four non-status hues could not clear 15 by eye in any
+order because they share a lightness by design. So `--sp-w1`…`--sp-w4`
+alternate lightness as well as hue, which is what buys the separation:
+adjacent wedges clear 24.5 by eye and 22.8 simulated, with dark mode
+stepped against its own surface.
 
 ### `forecast` — what will it be like later?
 
