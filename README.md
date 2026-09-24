@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -535,6 +535,36 @@ behind every one of them; healthy pips wear the card's accent and the low zone
 is shaded neutral, so a morning with nothing flat has no yellow in it. The
 card's `outline` reads `battery_level`, which is `attention` exactly while
 something is flat — the same level the Maintenance tab's rail button wears.
+
+### `devices` — how many devices are answering, and which are not?
+
+```yaml
+type: custom:spectra-card
+accent: 4
+icon: mdi:lan-connect
+title: Devices
+outline: {entity: sensor.devices, attribute: level}
+body:
+  type: devices
+  connected: {entity: sensor.devices, attribute: connected}
+  offline:   {entity: sensor.devices, attribute: offline}
+  partial:   {entity: sensor.devices, attribute: partial}
+  problems:  {entity: sensor.devices, attribute: problems}
+  networks:  {entity: sensor.devices, attribute: networks}
+```
+
+Three numbers first — connected, offline, partly offline — because they are
+the part read from the doorway. Then every device not fully answering, under
+the room it is in, with what is missing (`offline`, `No temperature`, `5 of 8
+missing`) and **how long**: `offline · 3d`. Last, a bar per network, which is
+what tells five dead speakers apart from one dead Wi-Fi.
+
+The time is the sensor's, remembered across restarts. A problem whose time is
+unknown shows none: Home Assistant's own `last_changed` would say it died at
+the last reboot, and a confident wrong number is worse than no number.
+
+Offline and partial wear `attention`, because the offline row in `Needs you`
+stands behind them. With everything answering there is no yellow on the card.
 
 ### `forecast` — what will it be like later?
 

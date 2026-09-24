@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.110.0";
+const VERSION = "0.111.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1692,6 +1692,35 @@ img.avatar { object-fit:cover; display:block; }
    0-100 axis. The chart is capped a little narrower than a line chart's
    because it has no labels worth reading at size, only positions. */
 .chart.batt { max-width:420px; margin:4px 0 0; }
+/* devices — three numbers, the problems by room, then a bar per network.
+   The tiles are the one place on the card read from across the room, so
+   they take the hero's size; everything under them is row-sized. */
+.devtiles { display:flex; gap:6px; padding:2px 6px 4px; }
+.devtile { flex:1 1 0; min-width:0; padding:7px 10px; border-radius:4px; background:var(--sp-zebra); }
+.devtile.lvl { background:var(--sp-attention-soft); color:var(--sp-attention-on); }
+.devtile .n { margin:0; font-size:28px; line-height:1.05; font-variant-numeric:tabular-nums; }
+.devtile .sub { margin:2px 0 0; }
+.devtile.lvl .sub { color:inherit; }
+.devroom { margin:8px 6px 2px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
+.devrow { display:flex; align-items:center; gap:8px; padding:3px 6px; font-size:12.5px; }
+.devrow .name { margin:0; font-size:12.5px; min-width:0; }
+.devrow .what { margin-left:auto; text-align:right; font-size:12px; color:var(--sp-ink-2); white-space:nowrap; }
+.devrow .for { font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); }
+.devdot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; box-sizing:border-box; }
+.devdot.offline { background:var(--sp-attention); }
+.devdot.partial { border:2px solid var(--sp-attention); }
+.devhead { display:flex; align-items:center; gap:8px; margin:10px 6px 4px; font-size:10px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
+.devhead::after { content:""; flex:1 1 auto; height:1px; background:var(--sp-edge); }
+.devnets { display:grid; grid-template-columns:auto 1fr auto; gap:5px 10px; align-items:center; padding:0 6px 2px; font-size:12.5px; }
+.devnets .label { color:var(--sp-ink-2); }
+.devnets .of { font-family:var(--sp-mono); font-size:11.5px; color:var(--sp-ink-3); text-align:right; }
+.devnets .of.lvl { color:var(--sp-attention-on); }
+.devbar { display:flex; gap:1px; height:7px; border-radius:2px; overflow:hidden; background:var(--sp-zebra); }
+.devbar i { display:block; }
+.devbar .offline { background:var(--sp-attention); }
+.devbar .partial { background:var(--sp-attention-soft); box-shadow:inset 0 0 0 1px var(--sp-attention); }
+.devbar .online { background:var(--accent); }
 .battsum { margin:4px 6px 0; }
 
 /* control — the one body you touch rather than read. Same row metrics as
@@ -5361,6 +5390,65 @@ const BODIES = {
     }
     return out;
   },
+  /* How many devices are answering, and which are not.
+
+     Three numbers first, because they are the part read from the doorway.
+     Then every device that is not fully answering, under the room it is
+     in -- the room is where you walk to -- with what is missing and how
+     long it has been missing. Last, a bar per network, which is what tells
+     five dead speakers apart from one dead Wi-Fi.
+
+     "How long" is the sensor's, remembered across restarts. A device whose
+     time is unknown just says what is wrong: Home Assistant's own
+     `last_changed` would claim it died at the last reboot, and a confident
+     wrong number is worse than none.
+
+     Offline and partly offline wear the attention level: a Needs you row
+     stands behind every one. A house with everything answering has no
+     yellow in it at all. */
+  devices(b) {
+    const problems = (Array.isArray(b.problems) ? b.problems : []).filter((p) => p && !isBlank(p.name));
+    const networks = (Array.isArray(b.networks) ? b.networks : []).filter((n) => n && !isBlank(n.name));
+    const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+    const offline = num(b.offline), partial = num(b.partial);
+    const connected = num(b.connected);
+    if (!networks.length && !problems.length && !connected) return "";
+
+    const tile = (n, label, lvl) => `<div class="devtile${lvl ? " lvl" : ""}">`
+      + `<p class="n">${esc(n)}</p><p class="sub">${esc(label)}</p></div>`;
+    let out = `<div class="devtiles">${tile(connected, "connected", false)}`
+      + `${tile(offline, "offline", offline > 0)}${tile(partial, "partly offline", partial > 0)}</div>`;
+
+    let room = null;
+    for (const p of problems) {
+      const here = isBlank(p.area) ? "No room" : String(p.area);
+      if (here !== room) {
+        room = here;
+        out += `<p class="devroom">${esc(room)}</p>`;
+      }
+      const state = p.state === "offline" ? "offline" : "partial";
+      const what = state === "offline" ? "offline" : (isBlank(p.detail) ? "partly offline" : p.detail);
+      const since = isBlank(p.since) ? null : shortSince(p.since);
+      out += `<div class="devrow"><span class="devdot ${state}"></span>`
+        + `<p class="name">${esc(p.name)}</p>`
+        + `<span class="what">${esc(what)}${since ? ` <span class="for">· ${esc(since)}</span>` : ""}</span></div>`;
+    }
+
+    if (networks.length) {
+      out += `<p class="devhead">By network</p><div class="devnets">`;
+      for (const n of networks) {
+        const on = num(n.online), off = num(n.offline), part = num(n.partial);
+        const all = on + off + part;
+        const seg = (k, cls) => (k ? `<i class="${cls}" style="flex:${k} 0 0"></i>` : "");
+        out += `<span class="label">${esc(n.name)}</span>`
+          + `<span class="devbar" role="img" aria-label="${esc(`${n.name}: ${on} of ${all} answering`)}">`
+          + `${seg(off, "offline")}${seg(part, "partial")}${seg(on, "online")}</span>`
+          + `<span class="of${off + part ? " lvl" : ""}">${on}/${all}</span>`;
+      }
+      out += `</div>`;
+    }
+    return out;
+  },
   list(b) {
     const rows = Array.isArray(b.rows) ? b.rows : [];
     /* Tiles rather than a column. A wall panel is mostly much wider than a
@@ -5454,6 +5542,9 @@ function bodyIsEmpty(type, b) {
     case "batteries":
       return !Array.isArray(b.items)
         || !b.items.some((i) => i && Number.isFinite(Number(i.percent)));
+    case "devices":
+      return !(Array.isArray(b.networks) && b.networks.length)
+        && !(Array.isArray(b.problems) && b.problems.length);
     case "list":
       return !Array.isArray(b.rows) || b.rows.length === 0;
     case "stat":
