@@ -1628,6 +1628,10 @@ body:
   types: [dinner]                                     # or [breakfast, lunch, dinner]
   say: {script: script.meal_plan_say}
   shop: {script: script.meal_ingredients_to_items, list: todo.phoenix}
+  pick: {script: script.meal_plan_pick}
+  move: {script: script.meal_plan_move}
+  week: {script: script.meal_plan_week}
+  shop_week: {script: script.meal_week_to_items, list: todo.phoenix}
 ```
 
 **Days run down, not across.** A calendar app lays a week out in seven
@@ -1648,7 +1652,25 @@ only when it has something to do:
 | --- | --- | --- |
 | mic | `say` is set | records, hands the words to `say.script` with the day and meal, and says back what was planned |
 | **Ingredients to list** | the meal is a recipe and `shop` is set | `shop.script` reads the recipe and returns items, which go on the list's own review sheet |
+| **Recipe** | the meal is a recipe | opens it on a sheet over the card: time, servings, ingredients, method. Set `recipe: false` to hide it |
+| **Pick one** / **Pick another** | `pick` is set | `pick.script` fills the slot from the recipe box at random |
+| **Move** | the slot holds anything and `move` is set | the card asks for a day; tap one and `move.script` moves the meal there, swapping if that day was planned. Tap the same day, or Cancel, to leave it |
 | **Clear** | the slot holds anything | asks, then deletes that entry |
+
+Under the last day are the week's own controls:
+
+| Control | Shown when | Does |
+| --- | --- | --- |
+| **Fill empty days** | `week` is set | `week.script` plans every empty day in `days`, never a planned one, and says how many |
+| **Shop for the week** | `shop_week` is set | `shop_week.script` returns every planned recipe's items combined; they go on the review sheet |
+
+A whole-week answer ("3 days planned") is written under the week rather
+than in a tray, because it belongs to no one day.
+
+**The recipe is fetched when it is opened**, not with the plan. A week of
+recipes is a lot to carry for the one that gets read, and the sheet is
+written for reading at the hob: bigger type than the card, and scrolled
+inside the sheet so a long method never pushes Close off the card.
 
 **The mic writes straight to the plan. The ingredients go past the sheet.**
 That split is deliberate. A spoken dinner lands in the slot in front of the
