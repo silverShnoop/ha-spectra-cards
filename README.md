@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1722,6 +1722,43 @@ card makes itself.
 `days` is local days starting today. At twenty past midnight in summer the
 UTC date is still yesterday, and a card working in UTC would plan tonight's
 dinner on the wrong day.
+
+### `recipes` — what is in the recipe box?
+
+The whole box on a card of its own, with search along the top. The meals
+card also opens the box, as a sheet. That size suits choosing a dinner, but
+not looking after a box that keeps growing.
+
+```yaml
+type: custom:spectra-card
+accent: 6
+icon: mdi:book-open-variant
+title: Recipes
+body:
+  type: recipes
+  box: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, recipes: true}
+  edit:                                    # optional; without it the box is read-only
+    save: home_signals.save_recipe
+    delete: home_signals.delete_recipe
+    dictate: script.meal_recipe_from_speech
+  import: {script: script.meal_import_recipe}   # optional: "From a link"
+```
+
+A name opens its recipe on the same sheet the meals card uses, with Edit and
+Delete in the same places. **New recipe** opens an empty form. **From a
+link** takes a pasted address. The whole message can be pasted, because the
+first link in it is the one sent. The card expects the script to answer
+`{recipe}`, and when the page has no recipe on it the sheet says so and
+stays open.
+
+**Search filters the list without repainting it.** A repaint would take the
+keyboard away after every letter. What is typed is kept on the card, so the
+five-minute reread leaves the filter as it was. Every word has to appear in
+the name, in any order, so "pie fish" finds the fish pie.
+
+`box` is the plan source with `recipes: true`. It calls
+`mealie.get_recipes` and is refetched on the same timer as the plan. It is
+also refetched straight after anything the card saves, deletes or imports.
 
 ## Confirming an action
 

@@ -100,6 +100,11 @@ const js = fs.readFileSync(file);
         if (msg.domain === "home_signals" && msg.service === "delete_recipe") {
           return Promise.resolve({});
         }
+        if (msg.service === "meal_import_recipe") {
+          return String(msg.service_data.url).includes("no-recipe")
+            ? Promise.reject(new Error("Bad request to Mealie"))
+            : Promise.resolve({ response: { recipe: "Chicken fajitas", planned: "" } });
+        }
         if (msg.service === "meal_recipe_from_speech") {
           return Promise.resolve({ response: {
             name: "Nana's curry", total_time: "1 hour", servings: 4,
@@ -572,6 +577,90 @@ const js = fs.readFileSync(file);
     check("and deletes that recipe after a yes", gone && gone.service_data.recipe === "sea-bass"
       && sheets() === 0 && el._editing === false, gone && JSON.stringify(gone.service_data));
     el._voiceSay("idle", "");
+
+    /* ---- the recipe box, as a card of its own ---- */
+    const rc = document.createElement("spectra-card");
+    document.getElementById("a").appendChild(rc);
+    const rroot = () => rc.shadowRoot || rc;
+    const rq = (sel) => rroot().querySelector(sel);
+    const rall = (sel) => Array.from(rroot().querySelectorAll(sel));
+    const rtop = () => rroot().querySelector(".confirmwrap:last-of-type");
+    rc.setConfig({
+      type: "custom:spectra-card", accent: 6, icon: "mdi:book-open-variant", title: "Recipes",
+      body: {
+        type: "recipes",
+        box: { mealie: "entry1", recipes: true },
+        edit: { save: "home_signals.save_recipe", delete: "home_signals.delete_recipe" },
+        import: { script: "script.meal_import_recipe" },
+      },
+    });
+    rc.hass = hass;
+    await settle();
+    const boxAsk = asked.filter((m) => m.service === "get_recipes").pop();
+    check("the recipe card reads the box, not the plan",
+      boxAsk && boxAsk.service_data.config_entry_id === "entry1", JSON.stringify(boxAsk));
+    const listed = () => rall("[data-recipe-open]").filter((b) => !b.parentNode.hidden).map((b) => text(b.querySelector("span")));
+    check("every recipe, by name", listed().join("|") === "Sea bass with ginger|Spaghetti bolognese"
+      || listed().join("|") === "Spaghetti bolognese|Sea bass with ginger", listed().join("|"));
+    check("in name order", listed()[0] === "Sea bass with ginger", listed().join("|"));
+
+    const findBox = rq("[data-recipe-find]");
+    findBox.value = "ginger bass";
+    findBox.dispatchEvent(new Event("input"));
+    check("search keeps every word, in any order", listed().join("|") === "Sea bass with ginger", listed().join("|"));
+    check("without repainting, so the keyboard stays", rq("[data-recipe-find]") === findBox, "repainted");
+    findBox.value = "curry";
+    findBox.dispatchEvent(new Event("input"));
+    check("and says when nothing matches", listed().length === 0 && !rq("[data-recipe-none]").hidden,
+      listed().join("|"));
+    rc._signature = null;
+    rc._update();
+    await settle();
+    check("a repaint keeps what was typed", rq("[data-recipe-find]").value === "curry"
+      && listed().length === 0, rq("[data-recipe-find]").value);
+    rq("[data-recipe-find]").value = "";
+    rq("[data-recipe-find]").dispatchEvent(new Event("input"));
+
+    rall("[data-recipe-open]").find((b) => text(b).includes("Sea bass")).click();
+    await settle();
+    check("a name opens its recipe", text(rtop()).includes("Season the fish.")
+      && Boolean(rtop().querySelector("[data-edit]")), text(rtop()));
+    rtop().querySelector("[data-no]").click();
+    await settle();
+
+    rq("[data-recipe-new]").click();
+    await settle();
+    check("New opens an empty form", text(rtop()).includes("New recipe")
+      && rtop().querySelector("[data-f=name]").value === "", text(rtop()));
+    rtop().querySelector("[data-no]").click();
+    await settle();
+
+    rq("[data-recipe-link]").click();
+    await settle();
+    rtop().querySelector("[data-f=url]").value = "not a link";
+    rtop().querySelector("[data-yes]").click();
+    await settle();
+    check("a link that is not one is refused before anything is sent",
+      text(rtop()).includes("not a web address") && !asked.some((m) => m.service === "meal_import_recipe"),
+      text(rtop()));
+    rtop().querySelector("[data-f=url]").value = "https://example.com/no-recipe";
+    rtop().querySelector("[data-yes]").click();
+    await settle();
+    check("a page with no recipe says so, and the sheet stays",
+      text(rtop()).includes("No recipe could be read"), text(rtop()));
+    const beforeBox = asked.filter((m) => m.service === "get_recipes").length;
+    rtop().querySelector("[data-f=url]").value = "Look at this https://example.com/fajitas";
+    rtop().querySelector("[data-yes]").click();
+    await settle();
+    const imp = asked.filter((m) => m.service === "meal_import_recipe").pop();
+    check("a pasted message is cut down to its link", imp && imp.service_data.url === "https://example.com/fajitas",
+      JSON.stringify(imp && imp.service_data));
+    check("says what was saved and rereads the box", text(rtop()).includes("Chicken fajitas is in the box")
+      && asked.filter((m) => m.service === "get_recipes").length > beforeBox, text(rtop()));
+    await new Promise((r) => setTimeout(r, 1400));
+    check("then closes", rroot().querySelectorAll(".confirmwrap").length === 0 && rc._editing === false,
+      rroot().querySelectorAll(".confirmwrap").length);
+    rc.remove();
 
     /* ---- the timer ---- */
     check("a reread is scheduled", Boolean(el._mealTimer), "no timer");

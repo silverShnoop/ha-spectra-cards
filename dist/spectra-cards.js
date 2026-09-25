@@ -1625,6 +1625,16 @@ img.avatar { object-fit:cover; display:block; }
   background:none; border:none; color:var(--sp-ink); cursor:pointer;
 }
 .mlbox .mltime { margin-left:auto; }
+/* The recipe box as a card of its own: search and the two ways in along
+   the top, then the names. */
+.rchead { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:6px; }
+.rcfind {
+  flex:1 1 160px; min-height:40px; box-sizing:border-box; font:inherit; font-size:14px;
+  color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge);
+  border-radius:4px; padding:8px 10px;
+}
+.rclist { max-height:min(70vh, 640px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.rcnone { margin:10px 2px; font-size:13px; color:var(--sp-ink-2); }
 /* Editing a recipe. Labels above fields, because on a phone the field is
    full width and a label beside it would leave the name no room. */
 .mlform label {
@@ -3121,7 +3131,7 @@ function readCalendar(store, spec) {
    the card needs both to clear a slot or shop for it. So the plan is
    fetched the way a calendar's events are, from mealie.get_mealplan. */
 function mealKey(spec) {
-  return `${spec.mealie}|${Number(spec.days) || 7}`;
+  return spec.recipes ? `${spec.mealie}|box` : `${spec.mealie}|${Number(spec.days) || 7}`;
 }
 
 function readMeals(store, spec) {
@@ -3327,6 +3337,8 @@ function collectSources(spec, found) {
       found.meals.set(mealKey(spec), {
         entry: spec.mealie,
         days: Number(spec.days) || 7,
+        /* The recipe box rather than the plan: `{mealie: ..., recipes: true}`. */
+        recipes: Boolean(spec.recipes),
       });
     }
     return found;
@@ -4267,6 +4279,35 @@ const BODIES = {
       out += `</div></div>`;
     }
     return out + mealFoot(b, picked, moving) + `</div>`;
+  },
+
+  /* The whole recipe box, on a card of its own. The meals card only opens
+     it as a sheet, which is the right size for choosing a dinner and the
+     wrong one for looking after the box. Search narrows the list as it is
+     typed, on the page rather than by repainting, so the keyboard stays up. */
+  recipes(b) {
+    const box = recipeList(b.box);
+    const find = isBlank(b.find) ? "" : String(b.find);
+    const add = b.edit && typeof b.edit === "object" && !isBlank(b.edit.save);
+    const link = b.import && typeof b.import === "object" && !isBlank(b.import.script);
+    let out = `<div class="rcbox"><div class="rchead">`
+      + `<input type="search" class="rcfind" data-recipe-find placeholder="Find a recipe"`
+      + ` aria-label="Find a recipe" autocomplete="off" value="${esc(find)}">`
+      + (link ? `<button type="button" class="mlbtn quiet" data-recipe-link>From a link</button>` : "")
+      + (add ? `<button type="button" class="mlbtn" data-recipe-new>New recipe</button>` : "")
+      + `</div>`;
+    if (!box.length) return out + `<p class="rcnone">The recipe box is empty.</p></div>`;
+    let shown = 0;
+    out += `<ul class="mlbox rclist">`;
+    box.forEach((r, i) => {
+      const hide = !recipeMatches(r, find);
+      if (!hide) shown += 1;
+      out += `<li data-recipe-name="${esc(String(r.name).toLowerCase())}"${hide ? " hidden" : ""}>`
+        + `<button type="button" data-recipe-open="${i}"><span>${esc(r.name)}</span>`
+        + (mealTime(r) ? `<span class="mltime">${esc(mealTime(r))}</span>` : "")
+        + `</button></li>`;
+    });
+    return out + `</ul><p class="rcnone" data-recipe-none${shown ? " hidden" : ""}>No recipe matches.</p></div>`;
   },
 
   washer(b) {
@@ -6569,6 +6610,21 @@ function mealTray(b, entry, type) {
    while no slot is open, because a whole-week answer ("5 planned") belongs
    to no one day. While a meal is being moved this is where the card says
    what it is waiting for, and the one way out. */
+/* A recipe box as it is shown: named, identifiable, in name order. */
+function recipeList(box) {
+  return (Array.isArray(box) ? box : [])
+    .filter((r) => r && typeof r === "object" && !isBlank(r.name) && !isBlank(r.recipe_id))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+/* Every word typed has to appear somewhere in the name, in any order:
+   "pie fish" finds the fish pie. */
+function recipeMatches(recipe, find) {
+  const name = String(recipe.name).toLowerCase();
+  return String(find || "").toLowerCase().split(/\s+/).filter(Boolean)
+    .every((word) => name.includes(word));
+}
+
 function mealFoot(b, picked, moving) {
   const week = b.week && !isBlank(b.week.script);
   const shop = b.shop_week && !isBlank(b.shop_week.script) && !isBlank(b.shop_week.list);
@@ -7224,6 +7280,8 @@ class SpectraCard extends HTMLElement {
     this._mealPick = null;
     /* The slot whose meal is being moved, waiting for where to. */
     this._mealMoving = null;
+    /* What is typed in a recipe box's search. */
+    this._recipeFind = "";
     this._failed = {};
     this._optimistic = {};
     /* Which note is open, at most one. Per card rather than per row,
@@ -7421,7 +7479,7 @@ class SpectraCard extends HTMLElement {
     }
     for (const [sources, store, what] of asked) {
       for (const key of sources.keys()) {
-        if (!store[key]) return `Waiting for ${what}…`;
+        if (!store[key]) return `Waiting for ${key.endsWith("|box") ? "the recipe box" : what}…`;
       }
     }
     return "";
@@ -7525,27 +7583,28 @@ class SpectraCard extends HTMLElement {
   _fetchMeals(key, source) {
     if (this._fetched.has(key)) return;
     this._fetched.add(key);
-    Promise.resolve(
-      this._hass.callWS({
-        type: "call_service",
-        domain: "mealie",
+    const ask = source.recipes
+      ? { service: "get_recipes", service_data: { config_entry_id: source.entry, result_limit: 500 } }
+      : {
         service: "get_mealplan",
         service_data: {
           config_entry_id: source.entry,
           start_date: localDay(0),
           end_date: localDay(source.days - 1),
         },
-        return_response: true,
-      }),
+      };
+    Promise.resolve(
+      this._hass.callWS(Object.assign({ type: "call_service", domain: "mealie", return_response: true }, ask)),
     ).then((result) => {
-      const plan = result && result.response && result.response.mealplan;
-      if (!Array.isArray(plan)) throw new Error("no mealplan in the response");
-      this._meals[key] = plan;
+      const response = (result && result.response) || {};
+      const got = source.recipes ? response.recipes && response.recipes.items : response.mealplan;
+      if (!Array.isArray(got)) throw new Error(`no ${source.recipes ? "recipes" : "mealplan"} in the response`);
+      this._meals[key] = got;
       delete this._failed[key];
       this._signature = null;
       this._update();
     }).catch((error) => {
-      this._failed[key] = "Could not read the meal plan.";
+      this._failed[key] = source.recipes ? "Could not read the recipe box." : "Could not read the meal plan.";
       this._signature = null;
       LOGGER_WARN("spectra-card: could not fetch the meal plan", error);
       this._update();
@@ -7839,6 +7898,10 @@ class SpectraCard extends HTMLElement {
       model.body.moving = this._mealMoving || "";
       model.body.voice_phase = this._voice ? this._voice.phase : "idle";
       model.body.voice_note = (this._voice && this._voice.note) || "";
+    }
+    /* What is typed in the recipe box's search, so a repaint keeps it. */
+    if (model.body && model.body.type === "recipes") {
+      model.body.find = this._recipeFind || "";
     }
 
     const mode = this._mode;
@@ -9790,6 +9853,7 @@ class SpectraCard extends HTMLElement {
     });
 
     this._bindMeals(model);
+    this._bindRecipes(model);
 
     this._holder.querySelectorAll("[data-estop]").forEach((el) => {
       const body = model.body || {};
@@ -10570,6 +10634,96 @@ class SpectraCard extends HTMLElement {
       LOGGER_WARN(`spectra-card: ${name} failed`, error);
       this._voiceSay("idle", "That did not work.");
     }).then(() => this._refetchMeals());
+  }
+
+  _bindRecipes(model) {
+    const body = model.body || {};
+    if (body.type !== "recipes" || !this._mealSources.size) return;
+    const [source] = this._mealSources.values();
+    const box = recipeList(body.box);
+    const edit = body.edit && typeof body.edit === "object" ? body.edit : null;
+
+    const find = this._holder.querySelector("[data-recipe-find]");
+    if (find) {
+      find.addEventListener("input", () => {
+        this._recipeFind = find.value;
+        let shown = 0;
+        this._holder.querySelectorAll("[data-recipe-open]").forEach((el) => {
+          const hide = !recipeMatches(box[Number(el.getAttribute("data-recipe-open"))] || { name: "" }, find.value);
+          el.parentNode.hidden = hide;
+          if (!hide) shown += 1;
+        });
+        const none = this._holder.querySelector("[data-recipe-none]");
+        if (none) none.hidden = shown > 0;
+      });
+    }
+    this._holder.querySelectorAll("[data-recipe-open]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const r = box[Number(el.getAttribute("data-recipe-open"))];
+        if (r) this._mealRecipe(source.entry, r, model.accent, edit);
+      });
+    });
+    const add = this._holder.querySelector("[data-recipe-new]");
+    if (add) add.addEventListener("click", () => this._mealEdit(source.entry, null, model.accent, edit));
+    const link = this._holder.querySelector("[data-recipe-link]");
+    if (link) link.addEventListener("click", () => this._mealImport(body.import, model.accent));
+  }
+
+  /* A recipe from a web page, by pasting its address. The phone's share
+     sheet does the same without the paste; this is for the panel, and for
+     a link that arrived in a message rather than a browser. */
+  _mealImport(spec, accent) {
+    if (!spec || isBlank(spec.script)) return;
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Recipe from a link">`
+      + `<div class="confirmhead"><ha-icon icon="mdi:link-plus"></ha-icon><span>Recipe from a link</span></div>`
+      + `<div class="mlrecipe mlform"><label for="rclink">The recipe's web address</label>`
+      + `<input id="rclink" type="url" inputmode="url" data-f="url" placeholder="https://" autocomplete="off">`
+      + `<p class="confirmtext quiet" data-status></p></div>`
+      + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button>`
+      + `<button type="button" class="confirmyes" data-yes>Save</button></div></div>`;
+    const input = wrap.querySelector("[data-f=url]");
+    const status = (text) => { wrap.querySelector("[data-status]").textContent = text; };
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      this._editing = false;
+      this._signature = null;
+      this._update();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); finish(); }
+    };
+    wrap.querySelector("[data-no]").addEventListener("click", finish);
+    wrap.querySelector("[data-yes]").addEventListener("click", (event) => {
+      const yes = event.currentTarget;
+      const found = input.value.match(/https?:\/\/\S+/);
+      if (!found) { status("That is not a web address."); return; }
+      const [domain, service] = String(spec.script).split(".");
+      yes.disabled = true;
+      status("Reading the page\u2026");
+      Promise.resolve(this._hass.callWS({
+        type: "call_service", domain, service, service_data: { url: found[0] }, return_response: true,
+      })).then((result) => {
+        const saved = (result && result.response) || {};
+        status(`${firstOf(saved.recipe, "The recipe")} is in the box.`);
+        this._refetchMeals();
+        setTimeout(finish, 1200);
+      }, (error) => {
+        LOGGER_WARN("spectra-card: could not import the recipe", error);
+        yes.disabled = false;
+        status("No recipe could be read from that page.");
+      });
+    });
+    document.addEventListener("keydown", onKey, true);
+    this._editing = true;
+    this._holder.appendChild(wrap);
+    if (input.focus) input.focus({ preventScroll: true });
   }
 
   /* The recipe, on a sheet over the card, for reading at the hob. Fetched
