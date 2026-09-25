@@ -88,12 +88,37 @@ const js = fs.readFileSync(file);
       },
       callWS: (msg) => {
         asked.push(msg);
+        if (msg.domain === "mealie" && msg.service === "get_recipe") {
+          return Promise.resolve({ response: { recipe: {
+            name: "Sea bass with ginger", total_time: "25 minutes", recipe_servings: 6,
+            ingredients: [{ display: "6 sea bass fillets" }, { display: "1 bunch spring onions" }],
+            instructions: [{ text: "Season the fish." }, { text: "Fry it skin-side down." }],
+          } } });
+        }
         if (msg.domain === "mealie") {
           const answer = () => ({ response: { mealplan: plan } });
           return hold ? hold.then(answer) : Promise.resolve(answer());
         }
         if (msg.service === "meal_plan_say") {
           return Promise.resolve({ response: { planned: "Lasagne", recipe: false } });
+        }
+        if (msg.service === "meal_plan_pick") {
+          return Promise.resolve({ response: { planned: "Sea bass with ginger" } });
+        }
+        if (msg.service === "meal_plan_move") {
+          return Promise.resolve({ response: { moved: "Takeaway", swapped: "" } });
+        }
+        if (msg.service === "meal_plan_week") {
+          return Promise.resolve({ response: { planned: [
+            { date: "x", meal: "A" }, { date: "y", meal: "B" }, { date: "z", meal: "C" },
+          ] } });
+        }
+        if (msg.service === "meal_week_to_items") {
+          return Promise.resolve({ response: {
+            recipe: "2 planned recipes",
+            items: [{ name: "Garlic", specification: "6 cloves" }, { name: "Spaghetti", specification: "500g" }],
+            already: 1,
+          } });
         }
         if (msg.service === "meal_ingredients_to_items") {
           return Promise.resolve({ response: {
@@ -283,6 +308,135 @@ const js = fs.readFileSync(file);
     check("and each is labelled", text(q(".mltype")) === "Breakfast", text(q(".mltype")));
     check("the lunch is in the lunch slot", text(all(".mlday")[1]).includes("Soup"),
       text(all(".mlday")[1]));
+
+    /* ---- the rest of a slot, and the week ---- */
+    await show({
+      pick: { script: "script.meal_plan_pick" },
+      move: { script: "script.meal_plan_move" },
+      week: { script: "script.meal_plan_week" },
+      shop_week: { script: "script.meal_week_to_items", list: "todo.phoenix" },
+    });
+    /* A new config is not a new card: the slot opened in the last section is
+       still open, and a press on it would shut it. */
+    el._mealPick = null;
+    el._signature = null;
+    el._update();
+    await settle();
+    check("the week's own controls sit under the days",
+      Boolean(q(".mlfoot [data-meal-week]")) && Boolean(q(".mlfoot [data-meal-shopweek]")),
+      q(".mlfoot") && text(q(".mlfoot")));
+
+    all(".mlslot")[0].click();
+    await settle();
+    check("a recipe can be opened", Boolean(q("[data-meal-recipe]")), "no recipe button");
+    check("a planned meal can be picked again, moved and cleared",
+      text(q("[data-meal-pick]")) === "Pick another" && Boolean(q("[data-meal-move]")),
+      text(q(".mltray")));
+
+    q("[data-meal-recipe]").click();
+    await settle();
+    const book = root().querySelector(".confirmwrap");
+    const read = asked.filter((m) => m.service === "get_recipe").pop();
+    check("the recipe is fetched from the right Mealie when asked for",
+      read && read.service_data.config_entry_id === "entry1" && read.service_data.recipe_id === "fa4a",
+      read && JSON.stringify(read.service_data));
+    check("and shows its ingredients and method in order",
+      book && book.querySelectorAll(".mlrecipe ul li").length === 2
+        && text(book.querySelector(".mlrecipe ol li")) === "Season the fish.",
+      book && text(book));
+    check("with the time and servings", book && text(book).includes("25 min · serves 6"), book && text(book));
+    check("and writes nothing", !calls.length || calls.every((c) => c.service !== "mealie.set_mealplan"),
+      JSON.stringify(calls));
+    book.querySelector("[data-no]").click();
+    await settle();
+    check("Close shuts it", !root().querySelector(".confirmwrap"), "still open");
+
+    all(".mlslot")[1].click();
+    await settle();
+    check("an empty slot offers Pick one, and no Move", text(q("[data-meal-pick]")) === "Pick one"
+      && !q("[data-meal-move]") && !q("[data-meal-recipe]"), text(q(".mltray")));
+    let before2 = fetches();
+    q("[data-meal-pick]").click();
+    await settle();
+    const picked = asked.filter((m) => m.service === "meal_plan_pick").pop();
+    check("Pick one asks the script for that day and meal",
+      picked && picked.service_data.date === day(1) && picked.service_data.entry_type === "dinner",
+      picked && JSON.stringify(picked.service_data));
+    check("says what it picked", text(q(".mltray .tdvoicesay")) === "Sea bass with ginger planned",
+      text(q(".mltray .tdvoicesay")));
+    check("and rereads the plan", fetches() > before2, `${fetches()} vs ${before2}`);
+    el._voiceSay("idle", "");
+
+    /* Move: the Takeaway on day 2, onto day 5. */
+    all(".mlslot")[2].click();
+    await settle();
+    q("[data-meal-move]").click();
+    await settle();
+    check("Move shuts the tray and asks for a day", !q(".mltray")
+      && text(q(".mlfoot")).includes("Tap the day to move it to"), text(q(".mlfoot")));
+    check("the meal being moved is marked", all(".mlslot")[2].classList.contains("moving"),
+      all(".mlslot")[2].className);
+    check("the week's buttons step aside while it waits", !q("[data-meal-week]"), "still there");
+    q("[data-meal-cancel]").click();
+    await settle();
+    check("Cancel puts everything back", !q(".mlslot.moving") && Boolean(q("[data-meal-week]")),
+      text(q(".mlfoot")));
+
+    all(".mlslot")[2].click();
+    await settle();
+    q("[data-meal-move]").click();
+    await settle();
+    before2 = fetches();
+    all(".mlslot")[5].click();
+    await settle();
+    const moved = asked.filter((m) => m.service === "meal_plan_move").pop();
+    check("tapping a day moves the meal there",
+      moved && moved.service_data.from_date === day(2) && moved.service_data.to_date === day(5)
+        && moved.service_data.entry_type === "dinner",
+      moved && JSON.stringify(moved.service_data));
+    check("says so on the day it went to", text(q(".mltray .tdvoicesay")) === "Takeaway moved",
+      text(q(".mltray .tdvoicesay")));
+    check("and rereads the plan", fetches() > before2, `${fetches()} vs ${before2}`);
+    el._voiceSay("idle", "");
+    all(".mlslot")[5].click();
+    await settle();
+
+    all(".mlslot")[2].click();
+    await settle();
+    q("[data-meal-move]").click();
+    await settle();
+    const moves = asked.filter((m) => m.service === "meal_plan_move").length;
+    all(".mlslot")[2].click();
+    await settle();
+    check("tapping the same day again moves nothing",
+      asked.filter((m) => m.service === "meal_plan_move").length === moves && !q(".mlslot.moving"),
+      "a move was sent");
+
+    q("[data-meal-week]").click();
+    await settle();
+    const wk = asked.filter((m) => m.service === "meal_plan_week").pop();
+    check("Fill empty days asks for the card's days and meal",
+      wk && wk.service_data.days === 7 && wk.service_data.entry_type === "dinner",
+      wk && JSON.stringify(wk.service_data));
+    check("and says how many it planned, under the week", text(q(".mlfoot .tdvoicesay")) === "3 days planned",
+      text(q(".mlfoot")));
+    el._voiceSay("idle", "");
+
+    const addsBefore = calls.filter((c) => c.service === "todo.add_item").length;
+    q("[data-meal-shopweek]").click();
+    await settle();
+    const sw = asked.filter((m) => m.service === "meal_week_to_items").pop();
+    check("Shop for the week asks for the week's items for the list",
+      sw && sw.service_data.days === 7 && sw.service_data.list === "todo.phoenix",
+      sw && JSON.stringify(sw.service_data));
+    const sheet2 = root().querySelector(".confirmwrap");
+    check("and puts them on the review sheet", sheet2 && sheet2.querySelectorAll("[data-item]").length === 2
+      && text(sheet2).includes("For 2 planned recipes"), sheet2 && text(sheet2));
+    sheet2.querySelector("[data-yes]").click();
+    await settle();
+    check("only after a yes are they added",
+      calls.filter((c) => c.service === "todo.add_item").length === addsBefore + 2,
+      calls.filter((c) => c.service === "todo.add_item").length);
 
     /* ---- the timer ---- */
     check("a reread is scheduled", Boolean(el._mealTimer), "no timer");

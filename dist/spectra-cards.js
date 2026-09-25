@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.113.0";
+const VERSION = "0.114.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1593,6 +1593,28 @@ img.avatar { object-fit:cover; display:block; }
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
 }
 .mlbtn.quiet { border-color:var(--sp-edge); color:var(--sp-ink-2); }
+/* The slot being moved, while the card waits for where to. Dashed rather
+   than a second colour: it is the same slot, in the middle of going. */
+.mlslot.moving { box-shadow:inset 0 0 0 2px var(--accent); background:none; }
+.mlslot.target .mlname { color:var(--accent-on); }
+/* The week's own controls, under the last day. */
+.mlfoot {
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
+  margin-top:6px; padding-top:10px; border-top:1px solid var(--sp-edge);
+}
+.mlfoot .tdvoicesay { flex:1 1 140px; }
+/* The recipe, read at the hob. Bigger than the card's own type, because it
+   is read from a step back with something in the other hand, and scrolled
+   inside the sheet so a long method never pushes the Close button off the
+   card. */
+.mlrecipe { max-height:min(62vh, 520px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.mlrecipe h4 {
+  margin:12px 0 6px; font-size:11px; font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--sp-ink-2);
+}
+.mlrecipe ul, .mlrecipe ol { margin:0; padding-left:20px; }
+.mlrecipe li { font-size:14px; line-height:1.45; color:var(--sp-ink); margin:0 0 6px; }
+.mlrecipe .confirmtext { font-size:12px; }
 
 /* ---- additions to the reference sheet ---- */
 
@@ -2685,7 +2707,7 @@ const RAW_KEYS = new Set([
      Raw, for the same reason an action is. */
   "scenes", "voice",
   /* The meal card's two scripts, raw for the same reason as `voice`. */
-  "say", "shop",
+  "say", "shop", "pick", "move", "week", "shop_week",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -4186,6 +4208,7 @@ const BODIES = {
     const plan = (Array.isArray(b.plan) ? b.plan : [])
       .filter((e) => e && typeof e === "object" && !isBlank(e.mealplan_date));
     const picked = isBlank(b.picked) ? "" : String(b.picked);
+    const moving = isBlank(b.moving) ? "" : String(b.moving);
     const labelled = types.length > 1;
 
     let out = `<div class="meals">`;
@@ -4202,9 +4225,13 @@ const BODIES = {
           && String(e.entry_type).toLowerCase() === type);
         const name = mealName(entry);
         const time = entry ? mealTime(entry.recipe) : "";
-        const open = picked === slot;
+        const open = picked === slot && !moving;
         const word = type.charAt(0).toUpperCase() + type.slice(1);
-        out += `<button type="button" class="mlslot${name ? "" : " empty"}${open ? " picked" : ""}"`
+        /* While a meal is being moved every other slot of its kind is a
+           place it could go, and says so by colour rather than by a tray. */
+        const state = moving === slot ? " moving"
+          : (moving && moving.split("|")[1] === type ? " target" : (open ? " picked" : ""));
+        out += `<button type="button" class="mlslot${name ? "" : " empty"}${state}"`
           + ` data-meal="${esc(slot)}" aria-expanded="${open ? "true" : "false"}">`
           + (labelled ? `<span class="mltype">${esc(word)}</span>` : "")
           + `<span class="mlname">${esc(name || "Nothing planned")}</span>`
@@ -4214,7 +4241,7 @@ const BODIES = {
       }
       out += `</div></div>`;
     }
-    return out + `</div>`;
+    return out + mealFoot(b, picked, moving) + `</div>`;
   },
 
   washer(b) {
@@ -6498,11 +6525,42 @@ function mealTray(b, entry, type) {
   } else if (!isBlank(b.voice_note)) {
     out += `<span class="tdvoicesay">${esc(line)}</span>`;
   }
+  const recipe = entry && entry.recipe && !isBlank(entry.recipe.recipe_id) && b.recipe !== false;
+  if (recipe) out += `<button type="button" class="mlbtn" data-meal-recipe>Recipe</button>`;
   if (shop) out += `<button type="button" class="mlbtn" data-meal-shop>Ingredients to list</button>`;
+  if (b.pick && !isBlank(b.pick.script)) {
+    out += `<button type="button" class="mlbtn quiet" data-meal-pick>${entry ? "Pick another" : "Pick one"}</button>`;
+  }
+  if (entry && b.move && !isBlank(b.move.script)) {
+    out += `<button type="button" class="mlbtn quiet" data-meal-move>Move</button>`;
+  }
   if (entry && !isBlank(entry.mealplan_id)) {
     out += `<button type="button" class="mlbtn quiet" data-meal-clear>Clear</button>`;
   }
   return out + `</div>`;
+}
+
+/* The week's controls, and the line that answers them. The line lives here
+   while no slot is open, because a whole-week answer ("5 planned") belongs
+   to no one day. While a meal is being moved this is where the card says
+   what it is waiting for, and the one way out. */
+function mealFoot(b, picked, moving) {
+  const week = b.week && !isBlank(b.week.script);
+  const shop = b.shop_week && !isBlank(b.shop_week.script) && !isBlank(b.shop_week.list);
+  if (moving) {
+    return `<div class="mlfoot"><span class="tdvoicesay">Tap the day to move it to.</span>`
+      + `<button type="button" class="mlbtn quiet" data-meal-cancel>Cancel</button></div>`;
+  }
+  const phase = isBlank(b.voice_phase) ? "idle" : String(b.voice_phase);
+  const note = picked ? "" : (isBlank(b.voice_note)
+    ? (phase === "thinking" ? "Working that out\u2026" : (phase === "adding" ? "Adding\u2026" : ""))
+    : String(b.voice_note));
+  if (!week && !shop && !note) return "";
+  return `<div class="mlfoot">`
+    + (note ? `<span class="tdvoicesay">${esc(note)}</span>` : "")
+    + (week ? `<button type="button" class="mlbtn" data-meal-week>Fill empty days</button>` : "")
+    + (shop ? `<button type="button" class="mlbtn" data-meal-shopweek>Shop for the week</button>` : "")
+    + `</div>`;
 }
 
 /* ---- softener ---- */
@@ -7137,6 +7195,8 @@ class SpectraCard extends HTMLElement {
     this._mealTimer = null;
     /* Which meal slot is open, "YYYY-MM-DD|dinner", at most one. */
     this._mealPick = null;
+    /* The slot whose meal is being moved, waiting for where to. */
+    this._mealMoving = null;
     this._failed = {};
     this._optimistic = {};
     /* Which note is open, at most one. Per card rather than per row,
@@ -7744,6 +7804,7 @@ class SpectraCard extends HTMLElement {
     /* The open slot and what its mic is doing, by the same route. */
     if (model.body && model.body.type === "meals") {
       model.body.picked = this._mealPick || "";
+      model.body.moving = this._mealMoving || "";
       model.body.voice_phase = this._voice ? this._voice.phase : "idle";
       model.body.voice_note = (this._voice && this._voice.note) || "";
     }
@@ -10228,8 +10289,85 @@ class SpectraCard extends HTMLElement {
            the tray away would leave it answering into a slot nobody is
            looking at. */
         if (this._voice && this._voice.phase !== "idle") return;
+        const from = this._mealMoving;
+        if (from) {
+          this._mealMoving = null;
+          /* The same slot again is "never mind"; a slot of another kind is
+             not somewhere a dinner can go, and is ignored the same way. */
+          if (key === from || key.split("|")[1] !== from.split("|")[1]) {
+            this._voiceSay("idle", "");
+            return;
+          }
+          this._mealPick = key;
+          const [fromDay, type] = from.split("|");
+          this._mealRun(body.move, { from_date: fromDay, to_date: key.split("|")[0], entry_type: type },
+            "Moving\u2026", (r) => (isBlank(r.moved) ? "Nothing to move."
+              : (isBlank(r.swapped) ? `${r.moved} moved` : `Swapped with ${r.swapped}`)));
+          return;
+        }
         this._mealPick = this._mealPick === key ? null : key;
         this._voiceSay("idle", "");
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-cancel]").forEach((el) => {
+      press(el, () => {
+        this._mealMoving = null;
+        this._voiceSay("idle", "");
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-move]").forEach((el) => {
+      if (!slot || !entry || !body.move || isBlank(body.move.script)) return;
+      press(el, () => {
+        flashPress(el);
+        this._mealMoving = this._mealPick;
+        this._mealPick = null;
+        this._voiceSay("idle", "");
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-pick]").forEach((el) => {
+      if (!slot || !body.pick || isBlank(body.pick.script)) return;
+      press(el, () => {
+        flashPress(el);
+        this._mealRun(body.pick, { date: slot[0], entry_type: slot[1] }, "Picking one\u2026",
+          (r) => (isBlank(r.planned) ? "The recipe box is empty." : `${r.planned} planned`));
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-week]").forEach((el) => {
+      if (!body.week || isBlank(body.week.script)) return;
+      press(el, () => {
+        flashPress(el);
+        this._mealPick = null;
+        const types = Array.isArray(body.types) && body.types.length ? body.types : ["dinner"];
+        this._mealRun(body.week, { days: Number(body.days) || 7, entry_type: String(types[0]) },
+          "Planning the week\u2026", (r) => {
+            const n = Array.isArray(r.planned) ? r.planned.length : 0;
+            if (!n) return isBlank(r.note) ? "Nothing was planned." : String(r.note);
+            return n === 1 ? "1 day planned" : `${n} days planned`;
+          });
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-shopweek]").forEach((el) => {
+      const shop = body.shop_week;
+      if (!shop || isBlank(shop.script) || isBlank(shop.list)) return;
+      press(el, () => {
+        flashPress(el);
+        this._mealPick = null;
+        this._mealShop(shop, { days: Number(body.days) || 7 }, "Reading this week\u2019s recipes\u2026",
+          "this week");
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-recipe]").forEach((el) => {
+      if (!entry || !entry.recipe || !this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      press(el, () => {
+        flashPress(el);
+        this._mealRecipe(source.entry, entry.recipe, model.accent);
       });
     });
 
@@ -10246,7 +10384,8 @@ class SpectraCard extends HTMLElement {
       if (!entry || !entry.recipe || !shop || isBlank(shop.script) || isBlank(shop.list)) return;
       press(el, () => {
         flashPress(el);
-        this._mealShop(shop, entry.recipe);
+        this._mealShop(shop, { recipe: String(entry.recipe.recipe_id) }, "Reading the recipe\u2026",
+          entry.recipe.name);
       });
     });
 
@@ -10317,14 +10456,14 @@ class SpectraCard extends HTMLElement {
   /* A recipe's ingredients onto the shopping list, past the same sheet the
      list's own mic uses -- a model read the recipe, so a person says yes,
      and it is where the salt and oil already in the cupboard get dropped. */
-  _mealShop(spec, recipe) {
+  _mealShop(spec, ask, while_, about) {
     if (this._voice && this._voice.phase !== "idle") return;
     const name = String(spec.script);
     if (!name.includes(".")) return;
     const [domain, service] = name.split(".");
     const list = String(spec.list);
-    this._voiceSay("thinking", "Reading the recipe\u2026");
-    const data = { recipe: String(recipe.recipe_id), list };
+    this._voiceSay("thinking", while_);
+    const data = Object.assign({}, ask, { list });
     if (!isBlank(spec.agent)) data.agent = String(spec.agent);
     Promise.resolve(this._hass.callWS({
       type: "call_service", domain, service, service_data: data, return_response: true,
@@ -10344,7 +10483,7 @@ class SpectraCard extends HTMLElement {
         return null;
       }
       this._voiceSay("idle", "");
-      return this._voiceReview(items, "", firstOf(response.recipe, recipe.name)).then((keep) => {
+      return this._voiceReview(items, "", firstOf(response.recipe, about)).then((keep) => {
         if (!keep.length) return null;
         this._voiceSay("adding", "");
         this._work(() => this._addItems(list, keep).then(() => {
@@ -10358,6 +10497,88 @@ class SpectraCard extends HTMLElement {
     }).catch((error) => {
       LOGGER_WARN("spectra-card: could not shop for the recipe", error);
       this._voiceSay("idle", (error && error.say) || "That did not work.");
+    });
+  }
+
+  /* A script that changes the plan and answers in a line: pick, move, fill
+     the week. The answer is the script's, worded by `say`, and the plan is
+     reread either way -- a failure part-way through a week can still have
+     planned some of it. */
+  _mealRun(spec, data, while_, say) {
+    if (!spec || isBlank(spec.script)) return;
+    if (this._voice && this._voice.phase !== "idle") return;
+    const name = String(spec.script);
+    if (!name.includes(".")) return;
+    const [domain, service] = name.split(".");
+    const ask = Object.assign({}, data);
+    if (!isBlank(spec.agent)) ask.agent = String(spec.agent);
+    this._voiceSay("thinking", while_);
+    Promise.resolve(this._hass.callWS({
+      type: "call_service", domain, service, service_data: ask, return_response: true,
+    })).then((result) => {
+      this._voiceSay("idle", say((result && result.response) || {}));
+    }, (error) => {
+      LOGGER_WARN(`spectra-card: ${name} failed`, error);
+      this._voiceSay("idle", "That did not work.");
+    }).then(() => this._refetchMeals());
+  }
+
+  /* The recipe, on a sheet over the card, for reading at the hob. Fetched
+     when asked for rather than with the plan: a week of recipes is a lot to
+     carry for the one that gets opened. */
+  _mealRecipe(entry, recipe, accent) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    const title = String(firstOf(recipe.name, "Recipe"));
+    const fill = (inner) => {
+      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${esc(title)}">`
+        + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
+        + `<div class="mlrecipe">${inner}</div>`
+        + `<div class="confirmbtns"><button type="button" class="confirmyes" data-no>Close</button></div>`
+        + `</div>`;
+      wrap.querySelector("[data-no]").addEventListener("click", finish);
+    };
+    let done = false;
+    const onKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); finish(); }
+    };
+    function finish() {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    }
+    wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
+    document.addEventListener("keydown", onKey, true);
+    fill(`<p class="confirmtext">Opening the recipe\u2026</p>`);
+    this._holder.appendChild(wrap);
+
+    Promise.resolve(this._hass.callWS({
+      type: "call_service", domain: "mealie", service: "get_recipe",
+      service_data: { config_entry_id: entry, recipe_id: String(recipe.recipe_id) },
+      return_response: true,
+    })).then((result) => {
+      if (done) return;
+      const r = (result && result.response && result.response.recipe) || {};
+      const facts = [mealTime(r), Number(r.recipe_servings) > 0 ? `serves ${Math.round(Number(r.recipe_servings))}` : ""]
+        .filter((x) => !isBlank(x)).join(" \u00b7 ");
+      const ingredients = (Array.isArray(r.ingredients) ? r.ingredients : [])
+        .map((i) => (i && !isBlank(i.display) ? String(i.display) : (i && i.note) || ""))
+        .filter((x) => !isBlank(x));
+      const steps = (Array.isArray(r.instructions) ? r.instructions : [])
+        .map((i) => (i && !isBlank(i.text) ? String(i.text) : ""))
+        .filter((x) => !isBlank(x));
+      fill((facts ? `<p class="confirmtext">${esc(facts)}</p>` : "")
+        + (ingredients.length
+          ? `<h4>Ingredients</h4><ul>${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "")
+        + (steps.length
+          ? `<h4>Method</h4><ol>${steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : "")
+        + (!ingredients.length && !steps.length
+          ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : ""));
+    }, (error) => {
+      LOGGER_WARN("spectra-card: could not open the recipe", error);
+      if (!done) fill(`<p class="confirmtext">Could not open the recipe.</p>`);
     });
   }
 
