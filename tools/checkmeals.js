@@ -440,9 +440,10 @@ const js = fs.readFileSync(file);
     await settle();
     const wk = asked.filter((m) => m.service === "meal_plan_week").pop();
     check("Fill empty days asks for the card's days and meal",
-      wk && wk.service_data.days === 7 && wk.service_data.entry_type === "dinner",
+      wk && wk.service_data.days === 7 && wk.service_data.entry_type === "dinner"
+      && wk.service_data.start_date === day(0),
       wk && JSON.stringify(wk.service_data));
-    check("and says how many it planned, under the week", text(q(".mlfoot .tdvoicesay")) === "3 days planned",
+    check("and says how many it planned, under the week", text(q(".mlfoot .tdvoicesay")) === "3 dinners planned",
       text(q(".mlfoot")));
     el._voiceSay("idle", "");
 

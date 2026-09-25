@@ -1615,7 +1615,7 @@ A missed reading is a fact and not a job, so it never takes ochre. **The
 card's outline is the dashboard's to set** through `outline`, and only while
 the salt row is in Needs you. The body paints no level of its own.
 
-### `meals` — what is for dinner this week?
+### `meals` — what are we eating this week?
 
 A row per day, a slot per meal, read from and written to
 [Mealie](https://mealie.io) through Home Assistant's Mealie integration.
@@ -1642,6 +1642,65 @@ body:
 columns. On a card a third of the panel wide, that leaves each dinner about
 fifty pixels, enough for "Sea". One row per day keeps the whole name, and
 the name is the only thing on the card anybody reads.
+
+### The grid: a column per day, a row per meal
+
+`layout: grid` lays the plan out the way a calendar does. It suits two
+shapes, a card on Home for today and tomorrow and a card on a tab of its
+own for the whole week:
+
+```yaml
+# Home: today and tomorrow, every meal
+body:
+  type: meals
+  layout: grid
+  days: 2
+  types: [breakfast, lunch, dinner, snack]
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 2}
+
+# Kitchen: Monday to Sunday, this week or next
+body:
+  type: meals
+  layout: grid
+  start: monday
+  types: [breakfast, lunch, dinner, snack]
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}   # this week and next
+  pick: {script: script.meal_plan_pick, types: [lunch, dinner]}
+  week: {script: script.meal_plan_week, types: [dinner]}
+  # ...and say, shop, move, shop_week and recipes as above
+```
+
+- **The rows come from `types`, in the order given.** Each has its own icon.
+  Mealie's `side`, `dessert` and `drink` work too.
+- **An empty cell is a faint plus, not words.** On a Monday morning most of
+  the week is empty, and twenty-eight "Nothing planned"s would be the
+  loudest thing on the card.
+- **Today's column is tinted.** The meal due next today wears the accent
+  and says **Up next**, by the clock: breakfast until 10:30, lunch until
+  14:30, snack until 17:00, dinner until 21:00.
+- **A meal with no recipe behind it is set in italics.** It is still a
+  meal, but it has nothing to open or shop for.
+- **A tapped cell opens its controls under the grid**, headed with the
+  day, the meal and its name. A tray inside a cell a seventh of the card
+  wide would be all wrapping.
+- **`start: monday` shows Monday to Sunday**, with a **This week / Next
+  week** switch and a count of how full the week shown is. Days that have
+  gone are faded. They can be opened to read the recipe, but not planned.
+  A move onto one is ignored. `plan` needs `start: monday` too, and
+  `days: 14` so that next week is already there when the switch is
+  pressed.
+- **A narrow card shows one day at a time.** Seven columns on a phone
+  would leave each meal forty pixels, so under 700px the week becomes a
+  strip of days, each with a dot per meal planned, above that day's meals
+  as rows. The card's own width decides, through a container query,
+  because a card cannot know how wide it is until it has been laid out.
+- **Fill empty days asks which meals**, starting with those in
+  `week.types` (dinner when that is not set), and plans one kind at a
+  time. It covers the days shown that have not gone, and sends them to the
+  script as `start_date` and `days`. **Shop for the week** covers the same
+  days.
+- **`pick.types` limits Pick one** to the meals it makes sense for. A
+  random dinner is a fair suggestion for lunch, but not for breakfast.
 
 **The slots come from `days` and `types`, not from the plan.** A day with
 nothing planned still has its slot, greyed and saying `Nothing planned`.
