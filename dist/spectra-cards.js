@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.114.0";
+const VERSION = "0.115.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1603,6 +1603,137 @@ img.avatar { object-fit:cover; display:block; }
   margin-top:6px; padding-top:10px; border-top:1px solid var(--sp-edge);
 }
 .mlfoot .tdvoicesay { flex:1 1 140px; }
+.mlday.past .mlname, .mlday.past .mlword { color:var(--sp-ink-3); }
+
+/* The grid: a column per day and a row per meal, for a card wide enough.
+
+   Filled cells are the objects on this card, so they are the only things
+   with a ground. An empty one is a faint plus in a dashed outline -- on a
+   Monday morning most of the week is empty, and twenty-eight grey
+   sentences would be the loudest thing in the kitchen. Today's column is
+   tinted from its heading down, because "what are we eating today" is the
+   question the card is looked at for; the meal due next wears the accent
+   and says "Up next", so the answer is findable from across the room.
+   Days gone are faded rather than hidden: the week keeps its shape. */
+.mlg { container-type:inline-size; container-name:meals; }
+.mlgrid {
+  display:grid; grid-template-columns:minmax(70px, 88px) repeat(var(--mldays), minmax(0, 1fr));
+  gap:6px; align-items:stretch;
+}
+.mlcorner { min-height:1px; }
+.mlhead {
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+  padding:6px 2px 8px; border-radius:8px 8px 0 0; text-align:center; min-width:0;
+}
+.mlhead .mlword {
+  font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--sp-ink-2);
+}
+.mlhead .mldate { font-size:11px; color:var(--sp-ink-3); margin-top:1px; }
+.mlhead.today { background:var(--accent-soft); }
+.mlhead.today .mlword { color:var(--accent-on); }
+.mlhead.past { opacity:.55; }
+.mlrow {
+  display:flex; align-items:center; gap:7px; min-width:0; padding:0 2px;
+  font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--sp-ink-2);
+}
+.mlrow ha-icon { --mdc-icon-size:18px; color:var(--accent); flex:none; }
+.mlrow span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mlcell {
+  position:relative; display:flex; flex-direction:column; justify-content:center; gap:3px;
+  min-height:62px; min-width:0; box-sizing:border-box; padding:8px 9px; margin:0;
+  border:none; border-radius:8px; background:var(--sp-sink); font:inherit;
+  text-align:left; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  transition:box-shadow .15s ease, background-color .15s ease, transform .12s ease;
+}
+.mlcell:active { transform:scale(.97); }
+.mlcell .mlname {
+  font-size:13.5px; font-weight:500; line-height:1.25; color:var(--sp-ink);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+  overflow-wrap:anywhere;
+}
+.mlcell .mltime { margin:0; font-size:11px; color:var(--sp-ink-2); }
+/* A meal that is only a name, with no recipe behind it. */
+.mlcell.note .mlname { font-style:italic; font-weight:400; color:var(--sp-ink-2); }
+.mlcell.empty { align-items:center; background:none; border:1px dashed var(--sp-edge); }
+.mladd ha-icon { --mdc-icon-size:18px; color:var(--sp-ink-3); opacity:.7; }
+.mlcell.today:not(.empty) { background:var(--accent-soft); }
+.mlcell.today.empty { border-color:var(--accent); opacity:.8; }
+.mlcell.past { opacity:.5; }
+.mlcell.past.empty { border:none; background:var(--sp-sink); opacity:.2; }
+.mlcell.next, .mlcell.today.next:not(.empty) { background:var(--accent); }
+.mlcell.next .mlname, .mlcell.next .mltime, .mlcell.next .mlnext { color:var(--sp-surface); }
+.mlcell.next.empty { background:none; border:2px solid var(--accent); }
+.mlcell.next.empty .mlnext { color:var(--accent-on); }
+.mlnext {
+  font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--accent-on);
+}
+.mlcell.picked { box-shadow:0 0 0 2px var(--sp-surface), 0 0 0 4px var(--accent); }
+.mlcell.moving { box-shadow:inset 0 0 0 2px var(--accent); background:none; }
+.mlcell.target { box-shadow:inset 0 0 0 2px var(--accent); }
+.mlcell.target.empty { border-color:var(--accent); }
+/* The open cell's controls, under the grid. */
+.mldetail {
+  margin-top:10px; padding:10px 12px 4px; border-radius:10px;
+  background:var(--accent-soft); animation:mlrise .18s ease-out;
+}
+.mldetailhead { display:flex; flex-direction:column; gap:2px; padding:0 8px; }
+.mldetailhead .mlword {
+  font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--accent-on);
+}
+.mldetailname { font-size:18px; font-weight:600; line-height:1.25; color:var(--sp-ink); }
+.mldetailname.empty { color:var(--sp-ink-3); font-weight:500; }
+@keyframes mlrise { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .mldetail { animation:none; } .mlcell { transition:none; } }
+
+/* One day at a time, for the week on a phone. */
+.mldayview { display:none; }
+.mlstrip { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:4px; margin-bottom:6px; }
+.mlpill {
+  display:flex; flex-direction:column; align-items:center; gap:1px; min-width:0;
+  padding:6px 0 7px; border:none; border-radius:10px; background:none; font:inherit;
+  color:var(--sp-ink-2); cursor:pointer; -webkit-tap-highlight-color:transparent;
+}
+.mlpill .mlword { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.mlpill .mldate { font-size:16px; font-weight:600; color:var(--sp-ink); }
+.mlpill.past { opacity:.5; }
+.mlpill.today .mlword { color:var(--accent-on); }
+.mlpill.on { background:var(--accent); }
+.mlpill.on .mlword, .mlpill.on .mldate { color:var(--sp-surface); }
+.mldots { display:flex; gap:3px; margin-top:3px; }
+.mldots i { width:5px; height:5px; border-radius:50%; background:var(--sp-edge); }
+.mldots i.on { background:var(--accent); }
+.mlpill.on .mldots i { background:rgba(255,255,255,.4); }
+.mlpill.on .mldots i.on { background:var(--sp-surface); }
+@container meals (max-width: 699px) {
+  .mlg.wide .mlgridview { display:none; }
+  .mlg.wide .mldayview { display:block; }
+}
+
+/* This week or next, and how full the week shown is. */
+.mlweeks { display:inline-flex; padding:3px; border-radius:999px; background:var(--sp-sink); }
+.mlweek {
+  position:relative; font:inherit; font-size:12px; font-weight:600; padding:6px 12px;
+  border:none; border-radius:999px; background:none; color:var(--sp-ink-2); cursor:pointer;
+}
+.mlweek::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; width:100%;
+}
+.mlweek.on { background:var(--sp-surface); color:var(--sp-ink); box-shadow:0 1px 2px rgba(0,0,0,.12); }
+.mlcount { flex:1 1 auto; font-size:12px; color:var(--sp-ink-3); font-variant-numeric:tabular-nums; }
+/* Which meals a Fill should plan. */
+.mlchoose { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 4px; }
+.mlchip {
+  display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:0 14px;
+  font:inherit; font-size:14px; border:2px solid var(--sp-edge); border-radius:999px;
+  background:none; color:var(--sp-ink-2); cursor:pointer;
+}
+.mlchip ha-icon { --mdc-icon-size:18px; }
+.mlchip[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-on); }
 /* The recipe, read at the hob. Bigger than the card's own type, because it
    is read from a step back with something in the other hand, and scrolled
    inside the sheet so a long method never pushes the Close button off the
@@ -1615,6 +1746,41 @@ img.avatar { object-fit:cover; display:block; }
 .mlrecipe ul, .mlrecipe ol { margin:0; padding-left:20px; }
 .mlrecipe li { font-size:14px; line-height:1.45; color:var(--sp-ink); margin:0 0 6px; }
 .mlrecipe .confirmtext { font-size:12px; }
+/* The recipe box: a list of names, each a way into its recipe. */
+.mlbox { list-style:none; margin:0; padding:0; }
+.mlbox li { border-bottom:1px solid var(--sp-edge); }
+.mlbox li:last-child { border-bottom:none; }
+.mlbox button {
+  display:flex; align-items:baseline; gap:8px; width:100%; min-height:44px;
+  padding:10px 2px; font:inherit; font-size:14px; text-align:left;
+  background:none; border:none; color:var(--sp-ink); cursor:pointer;
+}
+.mlbox .mltime { margin-left:auto; }
+/* The recipe box as a card of its own: search and the two ways in along
+   the top, then the names. */
+.rchead { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:6px; }
+.rcfind {
+  flex:1 1 160px; min-height:40px; box-sizing:border-box; font:inherit; font-size:14px;
+  color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge);
+  border-radius:4px; padding:8px 10px;
+}
+.rclist { max-height:min(70vh, 640px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.rcnone { margin:10px 2px; font-size:13px; color:var(--sp-ink-2); }
+/* Editing a recipe. Labels above fields, because on a phone the field is
+   full width and a label beside it would leave the name no room. */
+.mlform label {
+  display:block; margin:10px 0 4px; font-size:11px; font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--sp-ink-2);
+}
+.mlform input, .mlform textarea {
+  width:100%; box-sizing:border-box; font:inherit; font-size:14px;
+  color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge);
+  border-radius:4px; padding:8px 10px;
+}
+.mlform textarea { min-height:110px; resize:vertical; line-height:1.45; }
+.mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
+.mlform .mldictate { display:flex; align-items:center; gap:10px; margin-top:10px; }
+.confirmbtns .mldelete { margin-right:auto; border:1px solid var(--sp-edge); background:none; color:var(--sp-ink-2); }
 
 /* ---- additions to the reference sheet ---- */
 
@@ -2707,7 +2873,7 @@ const RAW_KEYS = new Set([
      Raw, for the same reason an action is. */
   "scenes", "voice",
   /* The meal card's two scripts, raw for the same reason as `voice`. */
-  "say", "shop", "pick", "move", "week", "shop_week",
+  "say", "shop", "pick", "move", "week", "shop_week", "recipes",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -3096,7 +3262,59 @@ function readCalendar(store, spec) {
    the card needs both to clear a slot or shop for it. So the plan is
    fetched the way a calendar's events are, from mealie.get_mealplan. */
 function mealKey(spec) {
-  return `${spec.mealie}|${Number(spec.days) || 7}`;
+  if (spec.recipes) return `${spec.mealie}|box`;
+  return `${spec.mealie}|${Number(spec.days) || 7}${mealFromMonday(spec.start) ? "|monday" : ""}`;
+}
+
+/* `start: monday` is a week as a calendar draws one, Monday to Sunday,
+   rather than the next seven days. Anything else starts today. */
+function mealFromMonday(start) {
+  return String(start || "").toLowerCase() === "monday";
+}
+
+/* How many days back this week's Monday is: 0 on a Monday, 6 on a Sunday. */
+function daysSinceMonday() {
+  return (new Date().getDay() + 6) % 7;
+}
+
+/* The local dates a meals card shows, YYYY-MM-DD, in order. A Monday week
+   is seven days, this week or the next; otherwise `days` from today. */
+function mealDates(b) {
+  if (mealFromMonday(b.start)) {
+    const week = Math.max(0, Math.min(1, Number(b.week_offset) || 0));
+    const back = daysSinceMonday();
+    return Array.from({ length: 7 }, (_, i) => localDay(i - back + 7 * week));
+  }
+  const days = Math.max(1, Math.min(14, Number(b.days) || 7));
+  return Array.from({ length: days }, (_, i) => localDay(i));
+}
+
+/* What each kind of meal is called and drawn with. `until` is the hour it
+   stops being the next meal today: breakfast is "up next" until half past
+   ten, and so on. Side, dessert and drink are Mealie's too, and are never
+   "up next" -- they go with a meal rather than being one. */
+const MEAL_TYPES = {
+  breakfast: { word: "Breakfast", icon: "mdi:coffee-outline", until: 10.5 },
+  lunch: { word: "Lunch", icon: "mdi:bowl-mix-outline", until: 14.5 },
+  snack: { word: "Snack", icon: "mdi:food-apple-outline", until: 17 },
+  dinner: { word: "Dinner", icon: "mdi:silverware-fork-knife", until: 21 },
+  side: { word: "Side", icon: "mdi:bowl-outline" },
+  dessert: { word: "Dessert", icon: "mdi:cupcake" },
+  drink: { word: "Drink", icon: "mdi:glass-cocktail" },
+};
+
+function mealType(type) {
+  const t = String(type || "").toLowerCase();
+  return MEAL_TYPES[t] || { word: t.charAt(0).toUpperCase() + t.slice(1), icon: "mdi:silverware-variant" };
+}
+
+/* Which of the card's meals is next today, by the clock: the first whose
+   `until` has not passed. After nine at night there is none. */
+function nextMealType(types, hour) {
+  const h = Number.isFinite(Number(hour)) ? Number(hour) : new Date().getHours() + new Date().getMinutes() / 60;
+  const timed = types.filter((t) => MEAL_TYPES[t] && MEAL_TYPES[t].until)
+    .sort((a, b) => MEAL_TYPES[a].until - MEAL_TYPES[b].until);
+  return timed.find((t) => MEAL_TYPES[t].until > h) || "";
 }
 
 function readMeals(store, spec) {
@@ -3302,6 +3520,9 @@ function collectSources(spec, found) {
       found.meals.set(mealKey(spec), {
         entry: spec.mealie,
         days: Number(spec.days) || 7,
+        monday: mealFromMonday(spec.start),
+        /* The recipe box rather than the plan: `{mealie: ..., recipes: true}`. */
+        recipes: Boolean(spec.recipes),
       });
     }
     return found;
@@ -4202,46 +4423,62 @@ const BODIES = {
      still there to be planned. One meal per slot, which is what the
      planning script keeps it to. */
   meals(b) {
-    const days = Math.max(1, Math.min(14, Number(b.days) || 7));
+    const dates = mealDates(b);
     const types = (Array.isArray(b.types) && b.types.length ? b.types : ["dinner"])
       .map((t) => String(t).toLowerCase());
     const plan = (Array.isArray(b.plan) ? b.plan : [])
       .filter((e) => e && typeof e === "object" && !isBlank(e.mealplan_date));
     const picked = isBlank(b.picked) ? "" : String(b.picked);
     const moving = isBlank(b.moving) ? "" : String(b.moving);
+    if (String(b.layout || "").toLowerCase() === "grid") {
+      return mealGrid(b, dates, types, plan, picked, moving);
+    }
     const labelled = types.length > 1;
+    const today = localDay(0);
 
     let out = `<div class="meals">`;
-    for (let i = 0; i < days; i += 1) {
-      const day = localDay(i);
+    for (const day of dates) {
       const noon = `${day}T12:00:00`;
-      out += `<div class="mlday${i === 0 ? " today" : ""}">`
+      const past = day < today;
+      out += `<div class="mlday${day === today ? " today" : ""}${past ? " past" : ""}">`
         + `<div class="mlwhen"><span class="mlword">${esc(weekdayLabel(noon) || day)}</span>`
         + `<span class="mldate">${esc(dayDateLabel(noon) || "")}</span></div>`
         + `<div class="mlslots">`;
       for (const type of types) {
-        const slot = `${day}|${type}`;
-        const entry = plan.find((e) => String(e.mealplan_date).slice(0, 10) === day
-          && String(e.entry_type).toLowerCase() === type);
-        const name = mealName(entry);
-        const time = entry ? mealTime(entry.recipe) : "";
-        const open = picked === slot && !moving;
-        const word = type.charAt(0).toUpperCase() + type.slice(1);
-        /* While a meal is being moved every other slot of its kind is a
-           place it could go, and says so by colour rather than by a tray. */
-        const state = moving === slot ? " moving"
-          : (moving && moving.split("|")[1] === type ? " target" : (open ? " picked" : ""));
-        out += `<button type="button" class="mlslot${name ? "" : " empty"}${state}"`
-          + ` data-meal="${esc(slot)}" aria-expanded="${open ? "true" : "false"}">`
-          + (labelled ? `<span class="mltype">${esc(word)}</span>` : "")
-          + `<span class="mlname">${esc(name || "Nothing planned")}</span>`
-          + (time ? `<span class="mltime">${esc(time)}</span>` : "")
-          + `</button>`;
-        if (open) out += mealTray(b, entry, type);
+        out += mealSlot(b, plan, day, type, picked, moving, labelled);
       }
       out += `</div></div>`;
     }
-    return out + mealFoot(b, picked, moving) + `</div>`;
+    return out + mealFoot(b, picked, moving, dates, plan, types) + `</div>`;
+  },
+
+  /* The whole recipe box, on a card of its own. The meals card only opens
+     it as a sheet, which is the right size for choosing a dinner and the
+     wrong one for looking after the box. Search narrows the list as it is
+     typed, on the page rather than by repainting, so the keyboard stays up. */
+  recipes(b) {
+    const box = recipeList(b.box);
+    const find = isBlank(b.find) ? "" : String(b.find);
+    const add = b.edit && typeof b.edit === "object" && !isBlank(b.edit.save);
+    const link = b.import && typeof b.import === "object" && !isBlank(b.import.script);
+    let out = `<div class="rcbox"><div class="rchead">`
+      + `<input type="search" class="rcfind" data-recipe-find placeholder="Find a recipe"`
+      + ` aria-label="Find a recipe" autocomplete="off" value="${esc(find)}">`
+      + (link ? `<button type="button" class="mlbtn quiet" data-recipe-link>From a link</button>` : "")
+      + (add ? `<button type="button" class="mlbtn" data-recipe-new>New recipe</button>` : "")
+      + `</div>`;
+    if (!box.length) return out + `<p class="rcnone">The recipe box is empty.</p></div>`;
+    let shown = 0;
+    out += `<ul class="mlbox rclist">`;
+    box.forEach((r, i) => {
+      const hide = !recipeMatches(r, find);
+      if (!hide) shown += 1;
+      out += `<li data-recipe-name="${esc(String(r.name).toLowerCase())}"${hide ? " hidden" : ""}>`
+        + `<button type="button" data-recipe-open="${i}"><span>${esc(r.name)}</span>`
+        + (mealTime(r) ? `<span class="mltime">${esc(mealTime(r))}</span>` : "")
+        + `</button></li>`;
+    });
+    return out + `</ul><p class="rcnone" data-recipe-none${shown ? " hidden" : ""}>No recipe matches.</p></div>`;
   },
 
   washer(b) {
@@ -6500,7 +6737,144 @@ function dimmerMarkup(key, light, raw, lit) {
 /* The picked slot's controls: say what it is, shop for it, clear it.
    Each only when there is something for it to do -- a note has no
    ingredients, an empty slot has nothing to clear. */
-function mealTray(b, entry, type) {
+/* The entry planned for one day and meal, if any. */
+function mealAt(plan, day, type) {
+  return plan.find((e) => String(e.mealplan_date).slice(0, 10) === day
+    && String(e.entry_type).toLowerCase() === type) || null;
+}
+
+/* What a Fill or a Shop should cover: the days shown that have not gone,
+   as the scripts' `start_date` and `days`. Null when every day shown is
+   past, which is a Sunday night looking at this week. */
+function mealSpan(b) {
+  const today = localDay(0);
+  const ahead = mealDates(b).filter((d) => d >= today);
+  if (!ahead.length) return null;
+  return { start_date: ahead[0], days: ahead.length };
+}
+
+/* One slot as a row, with its tray under it when it is open. The list
+   layout, and the grid's one-day view on a phone. */
+function mealSlot(b, plan, day, type, picked, moving, labelled) {
+  const slot = `${day}|${type}`;
+  const entry = mealAt(plan, day, type);
+  const name = mealName(entry);
+  const time = entry ? mealTime(entry.recipe) : "";
+  const past = day < localDay(0);
+  const open = picked === slot && !moving;
+  /* While a meal is being moved every other slot of its kind is a
+     place it could go, and says so by colour rather than by a tray. */
+  const state = moving === slot ? " moving"
+    : (moving && moving.split("|")[1] === type && !past ? " target" : (open ? " picked" : ""));
+  const kind = mealType(type);
+  let out = `<button type="button" class="mlslot${name ? "" : " empty"}${state}"`
+    + ` data-meal="${esc(slot)}" aria-expanded="${open ? "true" : "false"}">`
+    + (labelled ? `<span class="mltype">${esc(kind.word)}</span>` : "")
+    + `<span class="mlname">${esc(name || (past ? "Nothing" : "Nothing planned"))}</span>`
+    + (time ? `<span class="mltime">${esc(time)}</span>` : "")
+    + `</button>`;
+  if (open) out += mealTray(b, entry, type, past);
+  return out;
+}
+
+/* The week as a calendar draws one: a column per day, a row per meal.
+   For a card wide enough to give each day a column -- the Kitchen tab's
+   week across the panel, or Today and Tomorrow on Home, where two columns
+   fit anywhere. A seven-day grid on a phone would leave each meal forty
+   pixels, so there the same card shows one day at a time with a strip of
+   days to choose from. Both are drawn and the card's own width picks one,
+   because a card cannot know how wide it will be until it is laid out.
+
+   The open slot's controls sit under the grid, not in the cell: a tray in
+   a column a seventh of the card wide would be all wrapping. */
+function mealGrid(b, dates, types, plan, picked, moving) {
+  const today = localDay(0);
+  const next = dates.includes(today) ? nextMealType(types, b.hour) : "";
+  const wide = dates.length > 3;
+  let out = `<div class="meals mlg${wide ? " wide" : ""}">`;
+
+  out += `<div class="mlgridview"><div class="mlgrid" style="--mldays:${dates.length}">`
+    + `<div class="mlcorner" aria-hidden="true"></div>`;
+  for (const day of dates) {
+    const noon = `${day}T12:00:00`;
+    out += `<div class="mlhead${day === today ? " today" : ""}${day < today ? " past" : ""}">`
+      + `<span class="mlword">${esc(weekdayLabel(noon) || day)}</span>`
+      + `<span class="mldate">${esc(dayDateLabel(noon) || "")}</span></div>`;
+  }
+  for (const type of types) {
+    const kind = mealType(type);
+    out += `<div class="mlrow">${iconMarkup(kind.icon)}<span>${esc(kind.word)}</span></div>`;
+    for (const day of dates) out += mealCell(plan, day, type, picked, moving, next);
+  }
+  out += `</div>`;
+  const open = picked && !moving ? picked.split("|") : null;
+  if (open && dates.includes(open[0]) && types.includes(open[1])) {
+    const entry = mealAt(plan, open[0], open[1]);
+    const noon = `${open[0]}T12:00:00`;
+    const when = open[0] === today ? "Today"
+      : new Date(Date.parse(noon)).toLocaleDateString([], { weekday: "long" });
+    out += `<div class="mldetail"><div class="mldetailhead">`
+      + `<span class="mlword">${esc(when)} \u00b7 ${esc(mealType(open[1]).word)}</span>`
+      + `<span class="mldetailname${entry ? "" : " empty"}">${esc(mealName(entry) || "Nothing planned")}</span>`
+      + `</div>${mealTray(b, entry, open[1], open[0] < today)}</div>`;
+  }
+  out += `</div>`;
+
+  if (wide) {
+    /* The phone's view: a strip of days, and the chosen day's meals. */
+    const chosen = dates[Number.isInteger(b.day_index) && dates[b.day_index] ? b.day_index
+      : Math.max(0, dates.indexOf(today))];
+    out += `<div class="mldayview"><div class="mlstrip" role="tablist">`;
+    dates.forEach((day, i) => {
+      const noon = `${day}T12:00:00`;
+      const count = types.filter((t) => mealAt(plan, day, t)).length;
+      out += `<button type="button" role="tab" class="mlpill${day === chosen ? " on" : ""}`
+        + `${day === today ? " today" : ""}${day < today ? " past" : ""}" data-meal-day="${i}"`
+        + ` aria-selected="${day === chosen ? "true" : "false"}">`
+        + `<span class="mlword">${esc(day === today ? "Today" : new Date(Date.parse(noon)).toLocaleDateString([], { weekday: "short" }))}</span>`
+        + `<span class="mldate">${esc(String(new Date(Date.parse(noon)).getDate()))}</span>`
+        + `<span class="mldots" aria-label="${count} of ${types.length} planned">`
+        + types.map((t) => `<i${mealAt(plan, day, t) ? " class=\"on\"" : ""}></i>`).join("")
+        + `</span></button>`;
+    });
+    out += `</div><div class="mlslots">`;
+    for (const type of types) out += mealSlot(b, plan, chosen, type, picked, moving, true);
+    out += `</div></div>`;
+  }
+  return out + mealFoot(b, picked, moving, dates, plan, types) + `</div>`;
+}
+
+/* One cell of the grid. An empty one is a faint plus rather than words:
+   twenty-eight "Nothing planned"s would be the loudest thing on the card. */
+function mealCell(plan, day, type, picked, moving, next) {
+  const slot = `${day}|${type}`;
+  const today = localDay(0);
+  const past = day < today;
+  const entry = mealAt(plan, day, type);
+  const name = mealName(entry);
+  const time = entry ? mealTime(entry.recipe) : "";
+  const upNext = day === today && type === next;
+  const classes = ["mlcell"];
+  if (!name) classes.push("empty");
+  if (entry && !entry.recipe) classes.push("note");
+  if (past) classes.push("past");
+  if (day === today) classes.push("today");
+  if (upNext) classes.push("next");
+  if (moving === slot) classes.push("moving");
+  else if (moving && moving.split("|")[1] === type && !past) classes.push("target");
+  else if (picked === slot && !moving) classes.push("picked");
+  const noon = `${day}T12:00:00`;
+  const label = `${weekdayLabel(noon) || day} ${mealType(type).word.toLowerCase()}: ${name || "nothing planned"}`;
+  return `<button type="button" class="${classes.join(" ")}" data-meal="${esc(slot)}"`
+    + ` aria-label="${esc(label)}" aria-pressed="${picked === slot ? "true" : "false"}">`
+    + (upNext ? `<span class="mlnext">Up next</span>` : "")
+    + (name ? `<span class="mlname">${esc(name)}</span>`
+      : (past ? "" : `<span class="mladd" aria-hidden="true">${iconMarkup("mdi:plus")}</span>`))
+    + (time ? `<span class="mltime">${esc(time)}</span>` : "")
+    + `</button>`;
+}
+
+function mealTray(b, entry, type, past) {
   const say = b.say && !isBlank(b.say.script);
   const shop = b.shop && !isBlank(b.shop.script) && !isBlank(b.shop.list)
     && entry && entry.recipe && !isBlank(entry.recipe.recipe_id);
@@ -6515,7 +6889,7 @@ function mealTray(b, entry, type) {
   };
   const line = isBlank(b.voice_note) ? (WORDS[phase] || idle) : String(b.voice_note);
   let out = `<div class="mltray">`;
-  if (say) {
+  if (say && !past) {
     out += `<button type="button" class="tdmic${phase === "listening" ? " live" : ""}`
       + `${busy ? " thinking" : ""}" data-meal-say`
       + ` aria-pressed="${phase === "listening" ? "true" : "false"}"`
@@ -6524,11 +6898,17 @@ function mealTray(b, entry, type) {
       + `</button><span class="tdvoicesay">${esc(line)}</span>`;
   } else if (!isBlank(b.voice_note)) {
     out += `<span class="tdvoicesay">${esc(line)}</span>`;
+  } else if (past && !entry) {
+    out += `<span class="tdvoicesay">Nothing was planned.</span>`;
   }
   const recipe = entry && entry.recipe && !isBlank(entry.recipe.recipe_id) && b.recipe !== false;
   if (recipe) out += `<button type="button" class="mlbtn" data-meal-recipe>Recipe</button>`;
   if (shop) out += `<button type="button" class="mlbtn" data-meal-shop>Ingredients to list</button>`;
-  if (b.pick && !isBlank(b.pick.script)) {
+  /* A day that has gone can be read, not planned. */
+  if (past) return out + `</div>`;
+  const pickable = b.pick && !isBlank(b.pick.script)
+    && (!Array.isArray(b.pick.types) || b.pick.types.map((t) => String(t).toLowerCase()).includes(type));
+  if (pickable) {
     out += `<button type="button" class="mlbtn quiet" data-meal-pick>${entry ? "Pick another" : "Pick one"}</button>`;
   }
   if (entry && b.move && !isBlank(b.move.script)) {
@@ -6544,7 +6924,22 @@ function mealTray(b, entry, type) {
    while no slot is open, because a whole-week answer ("5 planned") belongs
    to no one day. While a meal is being moved this is where the card says
    what it is waiting for, and the one way out. */
-function mealFoot(b, picked, moving) {
+/* A recipe box as it is shown: named, identifiable, in name order. */
+function recipeList(box) {
+  return (Array.isArray(box) ? box : [])
+    .filter((r) => r && typeof r === "object" && !isBlank(r.name) && !isBlank(r.recipe_id))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+/* Every word typed has to appear somewhere in the name, in any order:
+   "pie fish" finds the fish pie. */
+function recipeMatches(recipe, find) {
+  const name = String(recipe.name).toLowerCase();
+  return String(find || "").toLowerCase().split(/\s+/).filter(Boolean)
+    .every((word) => name.includes(word));
+}
+
+function mealFoot(b, picked, moving, dates, plan, types) {
   const week = b.week && !isBlank(b.week.script);
   const shop = b.shop_week && !isBlank(b.shop_week.script) && !isBlank(b.shop_week.list);
   if (moving) {
@@ -6555,9 +6950,27 @@ function mealFoot(b, picked, moving) {
   const note = picked ? "" : (isBlank(b.voice_note)
     ? (phase === "thinking" ? "Working that out\u2026" : (phase === "adding" ? "Adding\u2026" : ""))
     : String(b.voice_note));
-  if (!week && !shop && !note) return "";
-  return `<div class="mlfoot">`
+  const box = b.recipes && typeof b.recipes === "object";
+  /* A Monday week can look one week ahead, which is when a plan is made.
+     The count is how full the week shown is: a fact, so it is plain text. */
+  const monday = mealFromMonday(b.start);
+  const offset = Number(b.week_offset) || 0;
+  let lead = "";
+  if (monday) {
+    const slots = (dates || []).length * (types || []).length;
+    const filled = (dates || []).reduce((n, d) => n + (types || [])
+      .filter((t) => mealAt(plan || [], d, t)).length, 0);
+    lead = `<div class="mlweeks" role="tablist">`
+      + [["This week", 0], ["Next week", 1]].map(([word, n]) => `<button type="button" role="tab"`
+        + ` class="mlweek${offset === n ? " on" : ""}" data-meal-weekto="${n}"`
+        + ` aria-selected="${offset === n ? "true" : "false"}">${word}</button>`).join("")
+      + `</div>`
+      + (note ? "" : `<span class="mlcount">${filled} of ${slots} planned</span>`);
+  }
+  if (!week && !shop && !box && !note && !lead) return "";
+  return `<div class="mlfoot">` + lead
     + (note ? `<span class="tdvoicesay">${esc(note)}</span>` : "")
+    + (box ? `<button type="button" class="mlbtn quiet" data-meal-box>Recipes</button>` : "")
     + (week ? `<button type="button" class="mlbtn" data-meal-week>Fill empty days</button>` : "")
     + (shop ? `<button type="button" class="mlbtn" data-meal-shopweek>Shop for the week</button>` : "")
     + `</div>`;
@@ -7197,6 +7610,12 @@ class SpectraCard extends HTMLElement {
     this._mealPick = null;
     /* The slot whose meal is being moved, waiting for where to. */
     this._mealMoving = null;
+    /* What is typed in a recipe box's search. */
+    this._recipeFind = "";
+    /* A Monday week's view: 0 this week, 1 next. And which day the
+       one-day view shows, by index; null means today. */
+    this._mealWeek = 0;
+    this._mealDay = null;
     this._failed = {};
     this._optimistic = {};
     /* Which note is open, at most one. Per card rather than per row,
@@ -7394,7 +7813,7 @@ class SpectraCard extends HTMLElement {
     }
     for (const [sources, store, what] of asked) {
       for (const key of sources.keys()) {
-        if (!store[key]) return `Waiting for ${what}…`;
+        if (!store[key]) return `Waiting for ${key.endsWith("|box") ? "the recipe box" : what}…`;
       }
     }
     return "";
@@ -7498,27 +7917,28 @@ class SpectraCard extends HTMLElement {
   _fetchMeals(key, source) {
     if (this._fetched.has(key)) return;
     this._fetched.add(key);
-    Promise.resolve(
-      this._hass.callWS({
-        type: "call_service",
-        domain: "mealie",
+    const ask = source.recipes
+      ? { service: "get_recipes", service_data: { config_entry_id: source.entry, result_limit: 500 } }
+      : {
         service: "get_mealplan",
         service_data: {
           config_entry_id: source.entry,
-          start_date: localDay(0),
-          end_date: localDay(source.days - 1),
+          start_date: localDay(source.monday ? -daysSinceMonday() : 0),
+          end_date: localDay((source.monday ? -daysSinceMonday() : 0) + source.days - 1),
         },
-        return_response: true,
-      }),
+      };
+    Promise.resolve(
+      this._hass.callWS(Object.assign({ type: "call_service", domain: "mealie", return_response: true }, ask)),
     ).then((result) => {
-      const plan = result && result.response && result.response.mealplan;
-      if (!Array.isArray(plan)) throw new Error("no mealplan in the response");
-      this._meals[key] = plan;
+      const response = (result && result.response) || {};
+      const got = source.recipes ? response.recipes && response.recipes.items : response.mealplan;
+      if (!Array.isArray(got)) throw new Error(`no ${source.recipes ? "recipes" : "mealplan"} in the response`);
+      this._meals[key] = got;
       delete this._failed[key];
       this._signature = null;
       this._update();
     }).catch((error) => {
-      this._failed[key] = "Could not read the meal plan.";
+      this._failed[key] = source.recipes ? "Could not read the recipe box." : "Could not read the meal plan.";
       this._signature = null;
       LOGGER_WARN("spectra-card: could not fetch the meal plan", error);
       this._update();
@@ -7624,6 +8044,11 @@ class SpectraCard extends HTMLElement {
     /* A finger is on the bar. Rebuilding it now would take the element the
        pointer is captured on out from under the gesture. */
     if (this._dragging) return;
+    /* Someone is typing into a recipe. Moving the sheet across a repaint
+       keeps it on screen but takes the caret out of the field, which on a
+       phone also shuts the keyboard -- so nothing paints until it closes,
+       and closing it paints whatever was held back. */
+    if (this._editing) return;
     /* A press mid-answer: the switch's knob part-way through its travel, a
        button still flashing. Replacing the node now would teleport the one
        and swallow the other. */
@@ -7805,8 +8230,17 @@ class SpectraCard extends HTMLElement {
     if (model.body && model.body.type === "meals") {
       model.body.picked = this._mealPick || "";
       model.body.moving = this._mealMoving || "";
+      model.body.week_offset = this._mealWeek || 0;
+      model.body.day_index = this._mealDay;
+      /* The hour, so "Up next" moves on through the day: a changed model
+         is what makes the card paint again. */
+      model.body.hour = new Date().getHours() + (new Date().getMinutes() >= 30 ? 0.5 : 0);
       model.body.voice_phase = this._voice ? this._voice.phase : "idle";
       model.body.voice_note = (this._voice && this._voice.note) || "";
+    }
+    /* What is typed in the recipe box's search, so a repaint keeps it. */
+    if (model.body && model.body.type === "recipes") {
+      model.body.find = this._recipeFind || "";
     }
 
     const mode = this._mode;
@@ -8061,7 +8495,15 @@ class SpectraCard extends HTMLElement {
     const wasFocused = active ? pressables().indexOf(active) : -1;
 
     const shot = had ? motionSnapshot(holder) : null;
+    /* A sheet open over the card -- a confirmation, the review sheet, a
+       recipe -- is appended to the holder beside the card, so replacing
+       the holder's markup deleted it. Nothing noticed while sheets were
+       answered in seconds; a recipe read at the hob for ten minutes,
+       across a plan refetch or a note expiring, vanished mid-read. */
+    const sheets = Array.from(holder.children)
+      .filter((el) => el.classList && el.classList.contains("confirmwrap"));
     holder.innerHTML = html;
+    for (const sheet of sheets) holder.appendChild(sheet);
     motionFrom(holder, shot);
 
     if (wasFocused >= 0) {
@@ -9750,6 +10192,7 @@ class SpectraCard extends HTMLElement {
     });
 
     this._bindMeals(model);
+    this._bindRecipes(model);
 
     this._holder.querySelectorAll("[data-estop]").forEach((el) => {
       const body = model.body || {};
@@ -10294,7 +10737,8 @@ class SpectraCard extends HTMLElement {
           this._mealMoving = null;
           /* The same slot again is "never mind"; a slot of another kind is
              not somewhere a dinner can go, and is ignored the same way. */
-          if (key === from || key.split("|")[1] !== from.split("|")[1]) {
+          if (key === from || key.split("|")[1] !== from.split("|")[1]
+            || key.split("|")[0] < localDay(0)) {
             this._voiceSay("idle", "");
             return;
           }
@@ -10306,6 +10750,25 @@ class SpectraCard extends HTMLElement {
           return;
         }
         this._mealPick = this._mealPick === key ? null : key;
+        this._voiceSay("idle", "");
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-weekto]").forEach((el) => {
+      press(el, () => {
+        const n = Number(el.getAttribute("data-meal-weekto")) || 0;
+        if (n === (this._mealWeek || 0)) return;
+        this._mealWeek = n;
+        this._mealPick = null;
+        this._mealDay = null;
+        this._voiceSay("idle", "");
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-day]").forEach((el) => {
+      press(el, () => {
+        this._mealDay = Number(el.getAttribute("data-meal-day")) || 0;
+        this._mealPick = null;
         this._voiceSay("idle", "");
       });
     });
@@ -10341,13 +10804,17 @@ class SpectraCard extends HTMLElement {
       press(el, () => {
         flashPress(el);
         this._mealPick = null;
-        const types = Array.isArray(body.types) && body.types.length ? body.types : ["dinner"];
-        this._mealRun(body.week, { days: Number(body.days) || 7, entry_type: String(types[0]) },
-          "Planning the week\u2026", (r) => {
-            const n = Array.isArray(r.planned) ? r.planned.length : 0;
-            if (!n) return isBlank(r.note) ? "Nothing was planned." : String(r.note);
-            return n === 1 ? "1 day planned" : `${n} days planned`;
-          });
+        const types = (Array.isArray(body.types) && body.types.length ? body.types : ["dinner"])
+          .map((t) => String(t).toLowerCase());
+        const span = mealSpan(body);
+        if (!span) { this._voiceSay("idle", "This week is over. Look at next week."); return; }
+        /* One kind of meal: straight in, as before. Several: ask which. */
+        if (types.length === 1) {
+          this._mealFill(body.week, types, span);
+          return;
+        }
+        this._mealChoose(types, body.week.types, model.accent)
+          .then((chosen) => { if (chosen.length) this._mealFill(body.week, chosen, span); });
       });
     });
 
@@ -10357,8 +10824,10 @@ class SpectraCard extends HTMLElement {
       press(el, () => {
         flashPress(el);
         this._mealPick = null;
-        this._mealShop(shop, { days: Number(body.days) || 7 }, "Reading this week\u2019s recipes\u2026",
-          "this week");
+        const span = mealSpan(body);
+        if (!span) { this._voiceSay("idle", "This week is over. Look at next week."); return; }
+        this._mealShop(shop, span, "Reading the week\u2019s recipes\u2026",
+          (Number(body.week_offset) || 0) ? "next week" : "this week");
       });
     });
 
@@ -10367,7 +10836,16 @@ class SpectraCard extends HTMLElement {
       const [source] = this._mealSources.values();
       press(el, () => {
         flashPress(el);
-        this._mealRecipe(source.entry, entry.recipe, model.accent);
+        this._mealRecipe(source.entry, entry.recipe, model.accent, body.recipes);
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-box]").forEach((el) => {
+      if (!body.recipes || !this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      press(el, () => {
+        flashPress(el);
+        this._mealBox(source.entry, model.accent, body.recipes);
       });
     });
 
@@ -10504,6 +10982,88 @@ class SpectraCard extends HTMLElement {
      the week. The answer is the script's, worded by `say`, and the plan is
      reread either way -- a failure part-way through a week can still have
      planned some of it. */
+  /* Fill the empty slots of each kind asked for, one kind at a time: the
+     script plans one kind per call, and runs one call at a time. */
+  _mealFill(spec, types, span) {
+    if (this._voice && this._voice.phase !== "idle") return;
+    const [domain, service] = String(spec.script).split(".");
+    const plural = (t, n) => {
+      const word = mealType(t).word.toLowerCase();
+      return `${n} ${n === 1 ? word : (word.endsWith("h") ? `${word}es` : `${word}s`)}`;
+    };
+    const done = [];
+    let chain = Promise.resolve();
+    types.forEach((type) => {
+      chain = chain.then(() => {
+        this._voiceSay("thinking", `Planning ${mealType(type).word.toLowerCase()}\u2026`);
+        const ask = Object.assign({ entry_type: type }, span);
+        if (!isBlank(spec.agent)) ask.agent = String(spec.agent);
+        return Promise.resolve(this._hass.callWS({
+          type: "call_service", domain, service, service_data: ask, return_response: true,
+        })).then((result) => {
+          const r = (result && result.response) || {};
+          const n = Array.isArray(r.planned) ? r.planned.length : 0;
+          if (n) done.push(plural(type, n));
+          this._refetchMeals();
+        });
+      });
+    });
+    chain.then(() => {
+      this._voiceSay("idle", done.length ? `${done.join(", ")} planned` : "Everything was already planned.");
+    }, (error) => {
+      LOGGER_WARN(`spectra-card: ${spec.script} failed`, error);
+      this._voiceSay("idle", done.length ? `${done.join(", ")} planned, then it stopped.` : "That did not work.");
+      this._refetchMeals();
+    });
+  }
+
+  /* Which kinds of meal to fill, as a row of toggles. Dinner is on to
+     begin with (or whatever `week.types` says), because an empty
+     breakfast is often not a gap anybody wants filled. */
+  _mealChoose(types, preset, accent) {
+    return new Promise((resolve) => {
+      const on = new Set((Array.isArray(preset) && preset.length ? preset : ["dinner"])
+        .map((t) => String(t).toLowerCase()).filter((t) => types.includes(t)));
+      if (!on.size) on.add(types[0]);
+      const wrap = document.createElement("div");
+      wrap.className = "confirmwrap";
+      this._wearAccent(wrap, accent);
+      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Fill empty days">`
+        + `<div class="confirmhead"><ha-icon icon="mdi:calendar-star"></ha-icon><span>Fill empty days</span></div>`
+        + `<p class="confirmtext">Which meals? Only empty ones are filled, from the recipe box first.</p>`
+        + `<div class="mlchoose">${types.map((t) => `<button type="button" class="mlchip" data-type="${esc(t)}"`
+          + ` aria-pressed="${on.has(t) ? "true" : "false"}">${iconMarkup(mealType(t).icon)}`
+          + `<span>${esc(mealType(t).word)}</span></button>`).join("")}</div>`
+        + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button>`
+        + `<button type="button" class="confirmyes" data-yes>Plan them</button></div></div>`;
+      let done = false;
+      const finish = (answer) => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("keydown", onKey, true);
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        resolve(answer);
+      };
+      const onKey = (event) => {
+        if (event.key === "Escape") { event.preventDefault(); finish([]); }
+      };
+      const yes = wrap.querySelector("[data-yes]");
+      wrap.querySelectorAll("[data-type]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          const t = chip.getAttribute("data-type");
+          if (on.has(t)) on.delete(t); else on.add(t);
+          chip.setAttribute("aria-pressed", on.has(t) ? "true" : "false");
+          yes.disabled = !on.size;
+        });
+      });
+      wrap.querySelector("[data-no]").addEventListener("click", () => finish([]));
+      yes.addEventListener("click", () => finish(types.filter((t) => on.has(t))));
+      wrap.addEventListener("click", (event) => { if (event.target === wrap) finish([]); });
+      document.addEventListener("keydown", onKey, true);
+      this._holder.appendChild(wrap);
+    });
+  }
+
   _mealRun(spec, data, while_, say) {
     if (!spec || isBlank(spec.script)) return;
     if (this._voice && this._voice.phase !== "idle") return;
@@ -10523,21 +11083,122 @@ class SpectraCard extends HTMLElement {
     }).then(() => this._refetchMeals());
   }
 
+  _bindRecipes(model) {
+    const body = model.body || {};
+    if (body.type !== "recipes" || !this._mealSources.size) return;
+    const [source] = this._mealSources.values();
+    const box = recipeList(body.box);
+    const edit = body.edit && typeof body.edit === "object" ? body.edit : null;
+
+    const find = this._holder.querySelector("[data-recipe-find]");
+    if (find) {
+      find.addEventListener("input", () => {
+        this._recipeFind = find.value;
+        let shown = 0;
+        this._holder.querySelectorAll("[data-recipe-open]").forEach((el) => {
+          const hide = !recipeMatches(box[Number(el.getAttribute("data-recipe-open"))] || { name: "" }, find.value);
+          el.parentNode.hidden = hide;
+          if (!hide) shown += 1;
+        });
+        const none = this._holder.querySelector("[data-recipe-none]");
+        if (none) none.hidden = shown > 0;
+      });
+    }
+    this._holder.querySelectorAll("[data-recipe-open]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const r = box[Number(el.getAttribute("data-recipe-open"))];
+        if (r) this._mealRecipe(source.entry, r, model.accent, edit);
+      });
+    });
+    const add = this._holder.querySelector("[data-recipe-new]");
+    if (add) add.addEventListener("click", () => this._mealEdit(source.entry, null, model.accent, edit));
+    const link = this._holder.querySelector("[data-recipe-link]");
+    if (link) link.addEventListener("click", () => this._mealImport(body.import, model.accent));
+  }
+
+  /* A recipe from a web page, by pasting its address. The phone's share
+     sheet does the same without the paste; this is for the panel, and for
+     a link that arrived in a message rather than a browser. */
+  _mealImport(spec, accent) {
+    if (!spec || isBlank(spec.script)) return;
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Recipe from a link">`
+      + `<div class="confirmhead"><ha-icon icon="mdi:link-plus"></ha-icon><span>Recipe from a link</span></div>`
+      + `<div class="mlrecipe mlform"><label for="rclink">The recipe's web address</label>`
+      + `<input id="rclink" type="url" inputmode="url" data-f="url" placeholder="https://" autocomplete="off">`
+      + `<p class="confirmtext quiet" data-status></p></div>`
+      + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button>`
+      + `<button type="button" class="confirmyes" data-yes>Save</button></div></div>`;
+    const input = wrap.querySelector("[data-f=url]");
+    const status = (text) => { wrap.querySelector("[data-status]").textContent = text; };
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      this._editing = false;
+      this._signature = null;
+      this._update();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); finish(); }
+    };
+    wrap.querySelector("[data-no]").addEventListener("click", finish);
+    wrap.querySelector("[data-yes]").addEventListener("click", (event) => {
+      const yes = event.currentTarget;
+      const found = input.value.match(/https?:\/\/\S+/);
+      if (!found) { status("That is not a web address."); return; }
+      const [domain, service] = String(spec.script).split(".");
+      yes.disabled = true;
+      status("Reading the page\u2026");
+      Promise.resolve(this._hass.callWS({
+        type: "call_service", domain, service, service_data: { url: found[0] }, return_response: true,
+      })).then((result) => {
+        const saved = (result && result.response) || {};
+        status(`${firstOf(saved.recipe, "The recipe")} is in the box.`);
+        this._refetchMeals();
+        setTimeout(finish, 1200);
+      }, (error) => {
+        LOGGER_WARN("spectra-card: could not import the recipe", error);
+        yes.disabled = false;
+        status("No recipe could be read from that page.");
+      });
+    });
+    document.addEventListener("keydown", onKey, true);
+    this._editing = true;
+    this._holder.appendChild(wrap);
+    if (input.focus) input.focus({ preventScroll: true });
+  }
+
   /* The recipe, on a sheet over the card, for reading at the hob. Fetched
      when asked for rather than with the plan: a week of recipes is a lot to
      carry for the one that gets opened. */
-  _mealRecipe(entry, recipe, accent) {
+  _mealRecipe(entry, recipe, accent, edit) {
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
     const title = String(firstOf(recipe.name, "Recipe"));
+    let full = null;
     const fill = (inner) => {
+      const canEdit = Boolean(full && edit && !isBlank(edit.save));
       wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${esc(title)}">`
         + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
         + `<div class="mlrecipe">${inner}</div>`
-        + `<div class="confirmbtns"><button type="button" class="confirmyes" data-no>Close</button></div>`
+        + `<div class="confirmbtns">`
+        + (canEdit ? `<button type="button" class="confirmno" data-edit>Edit</button>` : "")
+        + `<button type="button" class="confirmyes" data-no>Close</button></div>`
         + `</div>`;
       wrap.querySelector("[data-no]").addEventListener("click", finish);
+      const e = wrap.querySelector("[data-edit]");
+      if (e) {
+        e.addEventListener("click", () => {
+          finish();
+          this._mealEdit(entry, full, accent, edit);
+        });
+      }
     };
     let done = false;
     const onKey = (event) => {
@@ -10561,6 +11222,7 @@ class SpectraCard extends HTMLElement {
     })).then((result) => {
       if (done) return;
       const r = (result && result.response && result.response.recipe) || {};
+      full = r;
       const facts = [mealTime(r), Number(r.recipe_servings) > 0 ? `serves ${Math.round(Number(r.recipe_servings))}` : ""]
         .filter((x) => !isBlank(x)).join(" \u00b7 ");
       const ingredients = (Array.isArray(r.ingredients) ? r.ingredients : [])
@@ -10580,6 +11242,221 @@ class SpectraCard extends HTMLElement {
       LOGGER_WARN("spectra-card: could not open the recipe", error);
       if (!done) fill(`<p class="confirmtext">Could not open the recipe.</p>`);
     });
+  }
+
+  /* The whole recipe box, not only what is planned. Each name opens its
+     recipe; New starts an empty one. */
+  _mealBox(entry, accent, edit) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); finish(); }
+    };
+    const fill = (inner, recipes) => {
+      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Recipes">`
+        + `<div class="confirmhead"><ha-icon icon="mdi:book-open-variant"></ha-icon><span>Recipes</span></div>`
+        + `<div class="mlrecipe">${inner}</div>`
+        + `<div class="confirmbtns">`
+        + (edit && !isBlank(edit.save) ? `<button type="button" class="confirmno" data-new>New recipe</button>` : "")
+        + `<button type="button" class="confirmyes" data-no>Close</button></div></div>`;
+      wrap.querySelector("[data-no]").addEventListener("click", finish);
+      const n = wrap.querySelector("[data-new]");
+      if (n) n.addEventListener("click", () => { finish(); this._mealEdit(entry, null, accent, edit); });
+      wrap.querySelectorAll("[data-recipe]").forEach((el) => {
+        el.addEventListener("click", () => {
+          const r = recipes[Number(el.getAttribute("data-recipe"))];
+          finish();
+          this._mealRecipe(entry, r, accent, edit);
+        });
+      });
+    };
+    wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
+    document.addEventListener("keydown", onKey, true);
+    fill(`<p class="confirmtext">Opening the recipe box\u2026</p>`, []);
+    this._holder.appendChild(wrap);
+
+    Promise.resolve(this._hass.callWS({
+      type: "call_service", domain: "mealie", service: "get_recipes",
+      service_data: { config_entry_id: entry, result_limit: 100 },
+      return_response: true,
+    })).then((result) => {
+      if (done) return;
+      const box = result && result.response && result.response.recipes;
+      const recipes = (Array.isArray(box && box.items) ? box.items : [])
+        .filter((r) => r && !isBlank(r.name) && !isBlank(r.recipe_id))
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      fill(recipes.length
+        ? `<ul class="mlbox">${recipes.map((r, i) => `<li><button type="button" data-recipe="${i}">`
+          + `<span>${esc(r.name)}</span>`
+          + (mealTime(r) ? `<span class="mltime">${esc(mealTime(r))}</span>` : "")
+          + `</button></li>`).join("")}</ul>`
+        : `<p class="confirmtext">The recipe box is empty.</p>`, recipes);
+    }, (error) => {
+      LOGGER_WARN("spectra-card: could not open the recipe box", error);
+      if (!done) fill(`<p class="confirmtext">Could not open the recipe box.</p>`, []);
+    });
+  }
+
+  /* A recipe as a form: new when `recipe` is null. Ingredients and method
+     are one per line, which is how a recipe is written on paper and all a
+     textarea can do without becoming an app. The card paints nothing while
+     this is open -- see `_editing` in _update.
+
+     Dictation fills the form rather than saving it. A model's reading of a
+     recipe read aloud is two guesses deep, like the shopping list's mic,
+     and the form is the sheet a person checks before anything is kept. */
+  _mealEdit(entry, recipe, accent, edit) {
+    if (!edit || isBlank(edit.save)) return;
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    const r = recipe || {};
+    const lines = (list, key) => (Array.isArray(list) ? list : [])
+      .map((x) => (x && !isBlank(x[key]) ? String(x[key]) : (x && x.note) || ""))
+      .filter((x) => !isBlank(x)).join("\n");
+    const servings = Number(r.recipe_servings) > 0 ? String(Math.round(Number(r.recipe_servings))) : "";
+    const dictate = !isBlank(edit.dictate);
+    wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Edit recipe">`
+      + `<div class="confirmhead"><ha-icon icon="mdi:pencil"></ha-icon>`
+      + `<span>${esc(recipe ? "Edit recipe" : "New recipe")}</span></div>`
+      + `<div class="mlrecipe mlform">`
+      + (dictate ? `<div class="mldictate"><button type="button" class="tdmic" data-dictate aria-label="Read the recipe out">`
+        + `${iconMarkup("mdi:microphone")}</button><span class="tdvoicesay" data-said>`
+        + `${esc(recipe ? "Or read it out" : "Read the recipe out, or type it")}</span></div>` : "")
+      + `<label for="mlname">Name</label><input id="mlname" data-f="name" value="${esc(r.name || "")}">`
+      + `<div class="mlpair"><div><label for="mltime">Time</label>`
+      + `<input id="mltime" data-f="total_time" placeholder="45 minutes" value="${esc(r.total_time || "")}"></div>`
+      + `<div><label for="mlserves">Serves</label>`
+      + `<input id="mlserves" data-f="servings" inputmode="numeric" value="${esc(servings)}"></div></div>`
+      + `<label for="mling">Ingredients, one per line</label>`
+      + `<textarea id="mling" data-f="ingredients">${esc(lines(r.ingredients, "display"))}</textarea>`
+      + `<label for="mlmethod">Method, one step per line</label>`
+      + `<textarea id="mlmethod" data-f="method">${esc(lines(r.instructions, "text"))}</textarea>`
+      + `<p class="confirmtext quiet" data-status></p>`
+      + `</div><div class="confirmbtns">`
+      + (recipe && !isBlank(edit.delete) ? `<button type="button" class="mldelete" data-del>Delete</button>` : "")
+      + `<button type="button" class="confirmno" data-no>Cancel</button>`
+      + `<button type="button" class="confirmyes" data-yes>Save</button></div></div>`;
+
+    const field = (name) => wrap.querySelector(`[data-f="${name}"]`);
+    const status = (text) => { wrap.querySelector("[data-status]").textContent = text; };
+    const call = (name, data, respond) => {
+      const [domain, service] = String(name).split(".");
+      const msg = { type: "call_service", domain, service, service_data: data };
+      if (respond) msg.return_response = true;
+      return Promise.resolve(this._hass.callWS(msg));
+    };
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (this._voiceStop) { const stop = this._voiceStop; this._voiceStop = null; stop(); }
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      this._editing = false;
+      this._signature = null;
+      this._update();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); finish(); }
+    };
+    wrap.querySelector("[data-no]").addEventListener("click", finish);
+
+    wrap.querySelector("[data-yes]").addEventListener("click", (event) => {
+      const yes = event.currentTarget;
+      const name = field("name").value.trim();
+      if (!recipe && !name) { status("A new recipe needs a name."); return; }
+      const data = {
+        ingredients: field("ingredients").value,
+        method: field("method").value,
+        total_time: field("total_time").value.trim(),
+      };
+      if (name) data.name = name;
+      const serves = Number(field("servings").value);
+      if (serves > 0) data.servings = serves;
+      if (recipe) data.recipe = String(firstOf(recipe.slug, recipe.recipe_id));
+      data.config_entry_id = entry;
+      yes.disabled = true;
+      status("Saving\u2026");
+      call(edit.save, data, true).then((result) => {
+        const saved = (result && result.response) || {};
+        finish();
+        this._voiceSay("idle", `${firstOf(saved.name, name, "Recipe")} saved`);
+        this._refetchMeals();
+      }, (error) => {
+        yes.disabled = false;
+        status(`Not saved: ${(error && error.message) || "Mealie did not answer."}`);
+      });
+    });
+
+    const del = wrap.querySelector("[data-del]");
+    if (del) {
+      del.addEventListener("click", () => {
+        this._confirm({
+          title: `Delete ${firstOf(recipe.name, "this recipe")}?`,
+          text: "It goes from the recipe box for good. A meal already planned with it loses its recipe.",
+          icon: "mdi:delete-outline", ok: "Delete", accent,
+        }).then((yes) => {
+          if (!yes) return;
+          status("Deleting\u2026");
+          call(edit.delete, {
+            recipe: String(firstOf(recipe.slug, recipe.recipe_id)), config_entry_id: entry,
+          }, false).then(() => {
+            finish();
+            this._voiceSay("idle", `${firstOf(recipe.name, "Recipe")} deleted`);
+            this._refetchMeals();
+          }, (error) => status(`Not deleted: ${(error && error.message) || "Mealie did not answer."}`));
+        });
+      });
+    }
+
+    const mic = wrap.querySelector("[data-dictate]");
+    if (mic) {
+      const said = wrap.querySelector("[data-said]");
+      mic.addEventListener("click", () => {
+        if (this._voiceStop) { const stop = this._voiceStop; this._voiceStop = null; stop(); return; }
+        if (mic.classList.contains("thinking")) return;
+        mic.classList.add("live");
+        said.textContent = "Listening\u2026 press again when you have finished.";
+        /* A recipe is longer than a shopping list. */
+        Promise.resolve().then(() => this._listen({ max_seconds: 120 })).then((heard) => {
+          mic.classList.remove("live");
+          if (isBlank(heard)) { said.textContent = "Nothing was heard."; return null; }
+          mic.classList.add("thinking");
+          said.textContent = `\u201c${heard}\u201d`;
+          return call(edit.dictate, { transcript: heard }, true).then((result) => {
+            mic.classList.remove("thinking");
+            const got = (result && result.response) || {};
+            const put = (key, value) => {
+              if (!isBlank(value)) field(key).value = Array.isArray(value) ? value.join("\n") : String(value);
+            };
+            put("name", got.name);
+            put("total_time", got.total_time);
+            if (Number(got.servings) > 0) put("servings", Math.round(Number(got.servings)));
+            put("ingredients", got.ingredients);
+            put("method", got.method);
+            said.textContent = "Check it, then Save.";
+          });
+        }).catch((error) => {
+          mic.classList.remove("live", "thinking");
+          said.textContent = (error && error.say) || "That did not work.";
+        });
+      });
+    }
+
+    document.addEventListener("keydown", onKey, true);
+    this._editing = true;
+    this._holder.appendChild(wrap);
+    const first = field("name");
+    if (first && !recipe && first.focus) first.focus({ preventScroll: true });
   }
 
   _guard(spec, go) {

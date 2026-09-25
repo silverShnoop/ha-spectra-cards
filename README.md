@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1615,7 +1615,7 @@ A missed reading is a fact and not a job, so it never takes ochre. **The
 card's outline is the dashboard's to set** through `outline`, and only while
 the salt row is in Needs you. The body paints no level of its own.
 
-### `meals` — what is for dinner this week?
+### `meals` — what are we eating this week?
 
 A row per day, a slot per meal, read from and written to
 [Mealie](https://mealie.io) through Home Assistant's Mealie integration.
@@ -1632,12 +1632,75 @@ body:
   move: {script: script.meal_plan_move}
   week: {script: script.meal_plan_week}
   shop_week: {script: script.meal_week_to_items, list: todo.phoenix}
+  recipes:
+    save: home_signals.save_recipe
+    delete: home_signals.delete_recipe
+    dictate: script.meal_recipe_from_speech
 ```
 
 **Days run down, not across.** A calendar app lays a week out in seven
 columns. On a card a third of the panel wide, that leaves each dinner about
 fifty pixels, enough for "Sea". One row per day keeps the whole name, and
 the name is the only thing on the card anybody reads.
+
+### The grid: a column per day, a row per meal
+
+`layout: grid` lays the plan out the way a calendar does. It suits two
+shapes, a card on Home for today and tomorrow and a card on a tab of its
+own for the whole week:
+
+```yaml
+# Home: today and tomorrow, every meal
+body:
+  type: meals
+  layout: grid
+  days: 2
+  types: [breakfast, lunch, dinner, snack]
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 2}
+
+# Kitchen: Monday to Sunday, this week or next
+body:
+  type: meals
+  layout: grid
+  start: monday
+  types: [breakfast, lunch, dinner, snack]
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}   # this week and next
+  pick: {script: script.meal_plan_pick, types: [lunch, dinner]}
+  week: {script: script.meal_plan_week, types: [dinner]}
+  # ...and say, shop, move, shop_week and recipes as above
+```
+
+- **The rows come from `types`, in the order given.** Each has its own icon.
+  Mealie's `side`, `dessert` and `drink` work too.
+- **An empty cell is a faint plus, not words.** On a Monday morning most of
+  the week is empty, and twenty-eight "Nothing planned"s would be the
+  loudest thing on the card.
+- **Today's column is tinted.** The meal due next today wears the accent
+  and says **Up next**, by the clock: breakfast until 10:30, lunch until
+  14:30, snack until 17:00, dinner until 21:00.
+- **A meal with no recipe behind it is set in italics.** It is still a
+  meal, but it has nothing to open or shop for.
+- **A tapped cell opens its controls under the grid**, headed with the
+  day, the meal and its name. A tray inside a cell a seventh of the card
+  wide would be all wrapping.
+- **`start: monday` shows Monday to Sunday**, with a **This week / Next
+  week** switch and a count of how full the week shown is. Days that have
+  gone are faded. They can be opened to read the recipe, but not planned.
+  A move onto one is ignored. `plan` needs `start: monday` too, and
+  `days: 14` so that next week is already there when the switch is
+  pressed.
+- **A narrow card shows one day at a time.** Seven columns on a phone
+  would leave each meal forty pixels, so under 700px the week becomes a
+  strip of days, each with a dot per meal planned, above that day's meals
+  as rows. The card's own width decides, through a container query,
+  because a card cannot know how wide it is until it has been laid out.
+- **Fill empty days asks which meals**, starting with those in
+  `week.types` (dinner when that is not set), and plans one kind at a
+  time. It covers the days shown that have not gone, and sends them to the
+  script as `start_date` and `days`. **Shop for the week** covers the same
+  days.
+- **`pick.types` limits Pick one** to the meals it makes sense for. A
+  random dinner is a fair suggestion for lunch, but not for breakfast.
 
 **The slots come from `days` and `types`, not from the plan.** A day with
 nothing planned still has its slot, greyed and saying `Nothing planned`.
@@ -1663,6 +1726,7 @@ Under the last day are the week's own controls:
 | --- | --- | --- |
 | **Fill empty days** | `week` is set | `week.script` plans every empty day in `days`, never a planned one, and says how many |
 | **Shop for the week** | `shop_week` is set | `shop_week.script` returns every planned recipe's items combined; they go on the review sheet |
+| **Recipes** | `recipes` is set | the whole recipe box, by name. Each opens its recipe; **New recipe** opens an empty form |
 
 A whole-week answer ("3 days planned") is written under the week rather
 than in a tray, because it belongs to no one day.
@@ -1671,6 +1735,28 @@ than in a tray, because it belongs to no one day.
 recipes is a lot to carry for the one that gets read, and the sheet is
 written for reading at the hob: bigger type than the card, and scrolled
 inside the sheet so a long method never pushes Close off the card.
+
+**Writing recipes.** With `recipes.save` set, the recipe sheet has an
+**Edit** button, and the recipe box a **New recipe** one. Both open the
+recipe as a form: name, time, serves, then ingredients and method as one
+line each, which is how a recipe is written on paper and all a textarea can
+do without becoming an app. Save calls `recipes.save` with `recipe` (the
+slug, omitted for a new one), `name`, `total_time`, `servings`,
+`ingredients`, `method` and `config_entry_id`. `recipes.delete`, when set,
+adds a Delete that asks first. The two actions ship in
+[`home_signals`](https://github.com/silverShnoop/ha-home-signals), because
+Home Assistant's own Mealie integration cannot write a recipe at all.
+
+`recipes.dictate` adds a mic to the form. What was read out goes to that
+script as `transcript`, and its answer (`name`, `total_time`, `servings`,
+`ingredients`, `method`) **fills the form, never saves it**: a model's
+reading of a recipe read aloud is two guesses deep, and the form is the
+sheet a person checks.
+
+**Nothing paints while the form is open.** A sheet survives a repaint
+(it is moved across the swap), but moving it takes the caret out of the
+field, and on a phone that also shuts the keyboard. So the card holds its
+paints until the form closes, then paints whatever was held back.
 
 **The mic writes straight to the plan. The ingredients go past the sheet.**
 That split is deliberate. A spoken dinner lands in the slot in front of the
@@ -1695,6 +1781,43 @@ card makes itself.
 `days` is local days starting today. At twenty past midnight in summer the
 UTC date is still yesterday, and a card working in UTC would plan tonight's
 dinner on the wrong day.
+
+### `recipes` — what is in the recipe box?
+
+The whole box on a card of its own, with search along the top. The meals
+card also opens the box, as a sheet. That size suits choosing a dinner, but
+not looking after a box that keeps growing.
+
+```yaml
+type: custom:spectra-card
+accent: 6
+icon: mdi:book-open-variant
+title: Recipes
+body:
+  type: recipes
+  box: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, recipes: true}
+  edit:                                    # optional; without it the box is read-only
+    save: home_signals.save_recipe
+    delete: home_signals.delete_recipe
+    dictate: script.meal_recipe_from_speech
+  import: {script: script.meal_import_recipe}   # optional: "From a link"
+```
+
+A name opens its recipe on the same sheet the meals card uses, with Edit and
+Delete in the same places. **New recipe** opens an empty form. **From a
+link** takes a pasted address. The whole message can be pasted, because the
+first link in it is the one sent. The card expects the script to answer
+`{recipe}`, and when the page has no recipe on it the sheet says so and
+stays open.
+
+**Search filters the list without repainting it.** A repaint would take the
+keyboard away after every letter. What is typed is kept on the card, so the
+five-minute reread leaves the filter as it was. Every word has to appear in
+the name, in any order, so "pie fish" finds the fish pie.
+
+`box` is the plan source with `recipes: true`. It calls
+`mealie.get_recipes` and is refetched on the same timer as the plan. It is
+also refetched straight after anything the card saves, deletes or imports.
 
 ## Confirming an action
 
