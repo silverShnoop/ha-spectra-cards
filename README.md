@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1614,6 +1614,65 @@ every other day on a softener that was working.
 A missed reading is a fact and not a job, so it never takes ochre. **The
 card's outline is the dashboard's to set** through `outline`, and only while
 the salt row is in Needs you. The body paints no level of its own.
+
+### `meals` — what is for dinner this week?
+
+A row per day, a slot per meal, read from and written to
+[Mealie](https://mealie.io) through Home Assistant's Mealie integration.
+
+```yaml
+body:
+  type: meals
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 7}   # Mealie's config entry id
+  days: 7
+  types: [dinner]                                     # or [breakfast, lunch, dinner]
+  say: {script: script.meal_plan_say}
+  shop: {script: script.meal_ingredients_to_items, list: todo.phoenix}
+```
+
+**Days run down, not across.** A calendar app lays a week out in seven
+columns. On a card a third of the panel wide, that leaves each dinner about
+fifty pixels, enough for "Sea". One row per day keeps the whole name, and
+the name is the only thing on the card anybody reads.
+
+**The slots come from `days` and `types`, not from the plan.** A day with
+nothing planned still has its slot, greyed and saying `Nothing planned`.
+That is the fact that sends somebody to the mic, so the card never hides
+itself just because the week is empty. It stands down only while the plan
+has not arrived yet.
+
+**Tap a slot to open it.** Its controls are all optional, and each appears
+only when it has something to do:
+
+| Control | Shown when | Does |
+| --- | --- | --- |
+| mic | `say` is set | records, hands the words to `say.script` with the day and meal, and says back what was planned |
+| **Ingredients to list** | the meal is a recipe and `shop` is set | `shop.script` reads the recipe and returns items, which go on the list's own review sheet |
+| **Clear** | the slot holds anything | asks, then deletes that entry |
+
+**The mic writes straight to the plan. The ingredients go past the sheet.**
+That split is deliberate. A spoken dinner lands in the slot in front of the
+person who said it, and "Say something else" or Clear undoes it in one press.
+A shopping list is on three phones a second later, and it is where the salt
+and the oil already in the cupboard get dropped.
+
+**Both parses belong to scripts, not to this file**, for the same reason the
+list's does. The card sends `transcript`, `date` and `entry_type` to `say`,
+and expects `{planned}` back. It sends `recipe` and `list` to `shop`, and
+expects `{items: [{name, specification}], recipe, already}` back: the same
+item shape as the list's mic, so both use one sheet and one writer.
+
+**The plan is fetched, not read off an entity.** Mealie's calendars carry a
+summary and a date, but not the entry id or the recipe, and the card needs
+both to clear a slot or shop for it. So `plan` calls `mealie.get_mealplan`
+directly. Nothing the card can watch moves when the plan changes, because a
+meal planned on a phone changes no state until the day it is eaten. So the
+plan is fetched again every five minutes, and at once after every change the
+card makes itself.
+
+`days` is local days starting today. At twenty past midnight in summer the
+UTC date is still yesterday, and a card working in UTC would plan tonight's
+dinner on the wrong day.
 
 ## Confirming an action
 

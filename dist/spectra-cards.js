@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.112.0";
+const VERSION = "0.113.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1537,6 +1537,63 @@ img.avatar { object-fit:cover; display:block; }
 .saltread .dot { width:7px; height:7px; background:var(--accent); }
 .saltread.stale .dot { background:none; box-shadow:inset 0 0 0 1.5px var(--sp-ink-3); }
 
+/* meals -- the week's plan: a row per day, a slot per meal.
+
+   Days run down rather than across. Seven columns is how a calendar app
+   draws a week, and on a card a third of the panel wide it leaves each
+   dinner about fifty pixels -- enough for "Sea". A row per day keeps the
+   whole name, which is the only thing on the card anybody reads.
+
+   A slot is a button because it is the way in to that meal's controls,
+   and an empty one says so in grey rather than disappearing: "nothing
+   planned for Thursday" is the fact that sends somebody to the mic. */
+.meals { display:flex; flex-direction:column; }
+.mlday {
+  display:grid; grid-template-columns:84px minmax(0,1fr); column-gap:8px;
+  align-items:start; padding:2px 0; border-top:1px solid var(--sp-sink);
+}
+.mlday:first-child { border-top:none; }
+.mlwhen { padding:13px 0 0; min-width:0; }
+.mlword {
+  display:block; font-size:11px; font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--sp-ink-2);
+}
+.mlday.today .mlword { color:var(--accent-on); }
+.mldate { display:block; font-size:11px; color:var(--sp-ink-3); margin-top:1px; }
+.mlslots { display:flex; flex-direction:column; min-width:0; }
+.mlslot {
+  display:flex; align-items:baseline; gap:8px; width:100%; min-height:44px;
+  box-sizing:border-box; padding:11px 8px; margin:0; border:none;
+  border-radius:4px; background:none; font:inherit; text-align:left;
+  color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent;
+}
+.mlslot.picked { background:var(--accent-soft); }
+.mltype {
+  flex:none; width:62px; font-size:10px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--sp-ink-3);
+}
+.mlname { font-size:14px; line-height:1.3; color:var(--sp-ink); min-width:0; }
+.mlslot.empty .mlname { color:var(--sp-ink-3); }
+.mltime { margin-left:auto; flex:none; font-size:11px; color:var(--sp-ink-2); white-space:nowrap; }
+/* The picked slot's controls. Optional, all of them: the card is a fact
+   about the week, and nothing here is a job. */
+.mltray {
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
+  padding:4px 8px 10px;
+}
+.mltray .tdvoicesay { flex:1 1 140px; }
+.mlbtn {
+  position:relative; font:inherit; font-size:12px; font-weight:500;
+  padding:6px 11px; border:2px solid var(--accent); border-radius:4px;
+  background:none; color:var(--accent-on); cursor:pointer; white-space:nowrap;
+  -webkit-tap-highlight-color:transparent;
+}
+.mlbtn::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
+}
+.mlbtn.quiet { border-color:var(--sp-edge); color:var(--sp-ink-2); }
+
 /* ---- additions to the reference sheet ---- */
 
 /* An empty cell takes no grid space. :host carries display:block above, which
@@ -2627,6 +2684,8 @@ const RAW_KEYS = new Set([
      key called `agent`, which the resolver would be entitled to walk.
      Raw, for the same reason an action is. */
   "scenes", "voice",
+  /* The meal card's two scripts, raw for the same reason as `voice`. */
+  "say", "shop",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -2815,6 +2874,7 @@ function resolveValue(hass, spec, forecasts) {
   if (typeof spec.forecast === "string") return readForecast(forecasts, spec);
   if (typeof spec.todo === "string") return readTodo(forecasts && forecasts.__todo, spec);
   if (typeof spec.calendar === "string") return readCalendar(forecasts && forecasts.__cal, spec);
+  if (typeof spec.mealie === "string") return readMeals(forecasts && forecasts.__meal, spec);
   if (typeof spec.count === "string" || Array.isArray(spec.count)) {
     return readCount(hass, spec);
   }
@@ -3008,6 +3068,44 @@ function readCalendar(store, spec) {
   return events.slice(0, limit);
 }
 
+/* A Mealie meal plan, by config entry. Mealie's calendars would do for
+   reading a plan, but not for changing one: an event carries a summary
+   and a date and nothing that says WHICH entry it is or which recipe, and
+   the card needs both to clear a slot or shop for it. So the plan is
+   fetched the way a calendar's events are, from mealie.get_mealplan. */
+function mealKey(spec) {
+  return `${spec.mealie}|${Number(spec.days) || 7}`;
+}
+
+function readMeals(store, spec) {
+  const plan = store ? store[mealKey(spec)] : null;
+  return Array.isArray(plan) ? plan : null;
+}
+
+/* A local calendar day as YYYY-MM-DD, `ahead` days from now. Local, not
+   toISOString(): at twenty past midnight in summer the UTC date is still
+   yesterday, and the card would plan tonight's dinner on the wrong day. */
+function localDay(ahead) {
+  const d = new Date();
+  d.setDate(d.getDate() + (Number(ahead) || 0));
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/* What a plan entry is called: its recipe's name, or the note it is. */
+function mealName(entry) {
+  if (!entry || typeof entry !== "object") return "";
+  const recipe = entry.recipe && typeof entry.recipe === "object" ? entry.recipe : null;
+  return String(firstOf(recipe && recipe.name, entry.title, "")).trim();
+}
+
+/* Mealie says "25 minutes"; a row has room for "25 min". */
+function mealTime(recipe) {
+  if (!recipe || isBlank(recipe.total_time)) return "";
+  return String(recipe.total_time).replace(/\bminutes?\b/g, "min")
+    .replace(/\bhours?\b/g, "h").trim();
+}
+
 /* A to-do list's items are not in its attributes — the state is a count and
    the items come from todo.get_items. Same shape of problem as a forecast:
    fetched, not read, so the card fetches and the body still gets an array. */
@@ -3174,6 +3272,16 @@ function collectSources(spec, found) {
       entity: spec.calendar,
       days: Number(spec.days) || 7,
     });
+    return found;
+  }
+  if (typeof spec.mealie === "string") {
+    /* The dock collects too, and has no use for a meal plan. */
+    if (found.meals) {
+      found.meals.set(mealKey(spec), {
+        entry: spec.mealie,
+        days: Number(spec.days) || 7,
+      });
+    }
     return found;
   }
   for (const [key, value] of Object.entries(spec)) {
@@ -4063,6 +4171,50 @@ const BODIES = {
       }
     }
     return out;
+  },
+
+  /* What is for dinner this week, and what to do about a day that has none.
+
+     `plan` is Mealie's list of entries; the slots are drawn from `days`
+     and `types`, not from the entries, so a day with nothing planned is
+     still there to be planned. One meal per slot, which is what the
+     planning script keeps it to. */
+  meals(b) {
+    const days = Math.max(1, Math.min(14, Number(b.days) || 7));
+    const types = (Array.isArray(b.types) && b.types.length ? b.types : ["dinner"])
+      .map((t) => String(t).toLowerCase());
+    const plan = (Array.isArray(b.plan) ? b.plan : [])
+      .filter((e) => e && typeof e === "object" && !isBlank(e.mealplan_date));
+    const picked = isBlank(b.picked) ? "" : String(b.picked);
+    const labelled = types.length > 1;
+
+    let out = `<div class="meals">`;
+    for (let i = 0; i < days; i += 1) {
+      const day = localDay(i);
+      const noon = `${day}T12:00:00`;
+      out += `<div class="mlday${i === 0 ? " today" : ""}">`
+        + `<div class="mlwhen"><span class="mlword">${esc(weekdayLabel(noon) || day)}</span>`
+        + `<span class="mldate">${esc(dayDateLabel(noon) || "")}</span></div>`
+        + `<div class="mlslots">`;
+      for (const type of types) {
+        const slot = `${day}|${type}`;
+        const entry = plan.find((e) => String(e.mealplan_date).slice(0, 10) === day
+          && String(e.entry_type).toLowerCase() === type);
+        const name = mealName(entry);
+        const time = entry ? mealTime(entry.recipe) : "";
+        const open = picked === slot;
+        const word = type.charAt(0).toUpperCase() + type.slice(1);
+        out += `<button type="button" class="mlslot${name ? "" : " empty"}${open ? " picked" : ""}"`
+          + ` data-meal="${esc(slot)}" aria-expanded="${open ? "true" : "false"}">`
+          + (labelled ? `<span class="mltype">${esc(word)}</span>` : "")
+          + `<span class="mlname">${esc(name || "Nothing planned")}</span>`
+          + (time ? `<span class="mltime">${esc(time)}</span>` : "")
+          + `</button>`;
+        if (open) out += mealTray(b, entry, type);
+      }
+      out += `</div></div>`;
+    }
+    return out + `</div>`;
   },
 
   washer(b) {
@@ -5762,6 +5914,10 @@ function bodyIsEmpty(type, b) {
         && isBlank(b.read_at);
     case "agenda":
       return !Array.isArray(b.events) || b.events.length === 0;
+    /* An unplanned week is not empty: its empty days are what the card is
+       for. Only a plan that has not arrived yet is nothing to show. */
+    case "meals":
+      return !Array.isArray(b.plan);
     /* One point is not a shape. A fortnight chart drawn on the house's
        first day put a single dot in an empty box, because a length of one
        counted as data -- so the threshold is two, which is the fewest that
@@ -6312,6 +6468,43 @@ function dimmerMarkup(key, light, raw, lit) {
    one that must never be a guess. Leaking outranks everything -- it is the
    only state where what the machine is doing matters less than what is on
    the floor. */
+/* ---- meals ---- */
+
+/* The picked slot's controls: say what it is, shop for it, clear it.
+   Each only when there is something for it to do -- a note has no
+   ingredients, an empty slot has nothing to clear. */
+function mealTray(b, entry, type) {
+  const say = b.say && !isBlank(b.say.script);
+  const shop = b.shop && !isBlank(b.shop.script) && !isBlank(b.shop.list)
+    && entry && entry.recipe && !isBlank(entry.recipe.recipe_id);
+  const phase = isBlank(b.voice_phase) ? "idle" : String(b.voice_phase);
+  const busy = phase === "thinking" || phase === "adding";
+  const idle = entry ? "Say something else" : `Say what's for ${type}`;
+  const WORDS = {
+    idle,
+    listening: "Listening\u2026",
+    thinking: "Working that out\u2026",
+    adding: "Adding\u2026",
+  };
+  const line = isBlank(b.voice_note) ? (WORDS[phase] || idle) : String(b.voice_note);
+  let out = `<div class="mltray">`;
+  if (say) {
+    out += `<button type="button" class="tdmic${phase === "listening" ? " live" : ""}`
+      + `${busy ? " thinking" : ""}" data-meal-say`
+      + ` aria-pressed="${phase === "listening" ? "true" : "false"}"`
+      + ` aria-label="${esc(phase === "listening" ? "Stop listening" : idle)}">`
+      + iconMarkup(busy ? "mdi:loading" : "mdi:microphone")
+      + `</button><span class="tdvoicesay">${esc(line)}</span>`;
+  } else if (!isBlank(b.voice_note)) {
+    out += `<span class="tdvoicesay">${esc(line)}</span>`;
+  }
+  if (shop) out += `<button type="button" class="mlbtn" data-meal-shop>Ingredients to list</button>`;
+  if (entry && !isBlank(entry.mealplan_id)) {
+    out += `<button type="button" class="mlbtn quiet" data-meal-clear>Clear</button>`;
+  }
+  return out + `</div>`;
+}
+
 /* ---- softener ---- */
 
 /* A side's level as a number from 0 to 100, or null where there is no
@@ -6812,6 +7005,10 @@ const VOICE_GRACE_SECONDS = 10;
    read what happened, short enough that it is not still there tomorrow. */
 const VOICE_NOTE_MS = 12000;
 
+/* How often a meal card rereads the plan. Five minutes: a meal planned on
+   a phone should reach the kitchen before anybody walks there to look. */
+const MEAL_REFRESH_MS = 5 * 60 * 1000;
+
 /* An error carrying the sentence a person is meant to read.
 
    Every failure on this path ends in the same 12px line under the list,
@@ -6935,6 +7132,11 @@ class SpectraCard extends HTMLElement {
     this._todos = {};
     this._calendarSources = new Map();
     this._calendars = {};
+    this._mealSources = new Map();
+    this._meals = {};
+    this._mealTimer = null;
+    /* Which meal slot is open, "YYYY-MM-DD|dinner", at most one. */
+    this._mealPick = null;
     this._failed = {};
     this._optimistic = {};
     /* Which note is open, at most one. Per card rather than per row,
@@ -6979,12 +7181,13 @@ class SpectraCard extends HTMLElement {
     this._config = config;
     const found = collectSources(config, {
       entities: new Set(), forecasts: new Map(), todos: new Map(),
-      calendars: new Map(), live: false,
+      calendars: new Map(), meals: new Map(), live: false,
     });
     this._sources = [...found.entities, ...[...found.todos.values()].map((t) => t.entity)];
     this._forecastSources = found.forecasts;
     this._todoSources = found.todos;
     this._calendarSources = found.calendars;
+    this._mealSources = found.meals;
     this._live = found.live;
     this._watched = {};
     this._signature = null;
@@ -7044,6 +7247,7 @@ class SpectraCard extends HTMLElement {
     if (this._dimGiveUp) { clearTimeout(this._dimGiveUp); this._dimGiveUp = null; }
     if (this._pressTimer) { clearTimeout(this._pressTimer); this._pressTimer = null; }
     if (this._keyPick) { clearTimeout(this._keyPick); this._keyPick = null; }
+    if (this._mealTimer) { clearTimeout(this._mealTimer); this._mealTimer = null; }
     for (const pending of this._subscriptions.values()) {
       Promise.resolve(pending).then(
         (unsubscribe) => { if (typeof unsubscribe === "function") unsubscribe(); },
@@ -7120,6 +7324,7 @@ class SpectraCard extends HTMLElement {
     const asked = [
       [this._forecastSources, this._forecasts, "the forecast"],
       [this._calendarSources, this._calendars, "the calendar"],
+      [this._mealSources, this._meals, "the meal plan"],
       [this._todoSources, this._todos, "the list"],
     ];
     for (const [sources] of asked) {
@@ -7225,10 +7430,67 @@ class SpectraCard extends HTMLElement {
     });
   }
 
+  /* The plan is fetched, and then fetched again every few minutes, because
+     nothing this card can watch moves when it changes. A meal planned from
+     a phone changes no entity state until the day it is eaten, so without
+     the timer a panel would go on showing last night's plan all week.
+     The card's own changes do not wait for it: each one refetches. */
+  _fetchMeals(key, source) {
+    if (this._fetched.has(key)) return;
+    this._fetched.add(key);
+    Promise.resolve(
+      this._hass.callWS({
+        type: "call_service",
+        domain: "mealie",
+        service: "get_mealplan",
+        service_data: {
+          config_entry_id: source.entry,
+          start_date: localDay(0),
+          end_date: localDay(source.days - 1),
+        },
+        return_response: true,
+      }),
+    ).then((result) => {
+      const plan = result && result.response && result.response.mealplan;
+      if (!Array.isArray(plan)) throw new Error("no mealplan in the response");
+      this._meals[key] = plan;
+      delete this._failed[key];
+      this._signature = null;
+      this._update();
+    }).catch((error) => {
+      this._failed[key] = "Could not read the meal plan.";
+      this._signature = null;
+      LOGGER_WARN("spectra-card: could not fetch the meal plan", error);
+      this._update();
+    }).then(() => {
+      /* Refetch on a timer either way: a failure is retried, a success
+         goes stale. One timer per card, however many plans it reads. */
+      if (this._mealTimer || !this.isConnected) return;
+      this._mealTimer = setTimeout(() => {
+        this._mealTimer = null;
+        this._refetchMeals();
+      }, MEAL_REFRESH_MS);
+    });
+  }
+
+  /* The stale plan stays on screen until the new one replaces it, for the
+     same reason a to-do list's does: a blank card between the two reads
+     as the plan having been wiped. */
+  _refetchMeals() {
+    /* Forgotten before the connection is checked, not after. The timer can
+       fire while the card is off the page -- a tab switch -- and a key left
+       marked as fetched would stop connectedCallback from ever asking
+       again, so the card would come back showing the plan it left with. */
+    for (const key of this._mealSources.keys()) this._fetched.delete(key);
+    if (!this._hass || !this.isConnected) return;
+    for (const [key, source] of this._mealSources) this._fetchMeals(key, source);
+  }
+
   _subscribeForecasts() {
     if (!this._hass || !this.isConnected) return;
     if (this._todoSources.size) this._refreshTodos();
     for (const [key, source] of this._calendarSources) this._fetchCalendar(key, source);
+    for (const [key, source] of this._mealSources) this._fetchMeals(key, source);
     /* Fetching only needs callService. Subscribing needs a live connection,
        and if that is missing the card should still paint rather than hide
        itself over a websocket it never got. */
@@ -7286,7 +7548,10 @@ class SpectraCard extends HTMLElement {
 
   _update() {
     const config = this._config;
-    const f = Object.assign({ __todo: this._todos, __cal: this._calendars }, this._forecasts);
+    const f = Object.assign(
+      { __todo: this._todos, __cal: this._calendars, __meal: this._meals },
+      this._forecasts,
+    );
     const model = {
       accent: resolveValue(this._hass, config.accent, f),
       icon: resolveValue(this._hass, config.icon, f),
@@ -7473,6 +7738,12 @@ class SpectraCard extends HTMLElement {
        several times a minute. Without the claim the button would drop
        back to "Say what to add" the first time the clock moved. */
     if (model.body && model.body.type === "todo" && model.body.voice) {
+      model.body.voice_phase = this._voice ? this._voice.phase : "idle";
+      model.body.voice_note = (this._voice && this._voice.note) || "";
+    }
+    /* The open slot and what its mic is doing, by the same route. */
+    if (model.body && model.body.type === "meals") {
+      model.body.picked = this._mealPick || "";
       model.body.voice_phase = this._voice ? this._voice.phase : "idle";
       model.body.voice_note = (this._voice && this._voice.note) || "";
     }
@@ -8594,7 +8865,7 @@ class SpectraCard extends HTMLElement {
      A row can be dropped instead of the take being cancelled, because
      the usual failure is four right and one wrong -- and if that costs
      the other four, the mic is not worth pressing. */
-  _voiceReview(items, said) {
+  _voiceReview(items, said, about) {
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     /* The card's own accent: this sheet belongs to the list it is
@@ -8613,6 +8884,9 @@ class SpectraCard extends HTMLElement {
       + `<span>${esc(items.length === 1 ? "One thing to add" : `${items.length} things to add`)}</span>`
       + `</div>`
       + (isBlank(said) ? "" : `<p class="confirmtext quiet">“${esc(said)}”</p>`)
+      /* What the rows came from when it was not somebody speaking: the
+         meal card's recipe, which is a name and not a quote. */
+      + (isBlank(about) ? "" : `<p class="confirmtext quiet">For ${esc(about)}</p>`)
       + `<ul class="voicelist">${items.map(row).join("")}</ul>`
       + `<div class="confirmbtns">`
       + `<button type="button" class="confirmno" data-no>Cancel</button>`
@@ -9414,6 +9688,8 @@ class SpectraCard extends HTMLElement {
       });
     });
 
+    this._bindMeals(model);
+
     this._holder.querySelectorAll("[data-estop]").forEach((el) => {
       const body = model.body || {};
       const action = body.action || {};
@@ -9919,6 +10195,172 @@ class SpectraCard extends HTMLElement {
      instead cost nothing visible but made every existing button fire a
      microtask late, which the floor-summary checks caught immediately --
      they press and assert in the same tick, as a finger does. */
+  /* The meal card's four presses. A slot opens and shuts its tray; the
+     tray's buttons act on that slot. The entry is looked up again from the
+     model rather than carried on the button, because the plan can be
+     refetched between the paint and the press. */
+  _bindMeals(model) {
+    const body = model.body || {};
+    if (body.type !== "meals") return;
+    const plan = Array.isArray(body.plan) ? body.plan : [];
+    const slot = this._mealPick ? this._mealPick.split("|") : null;
+    const entry = slot ? plan.find((e) => e
+      && String(e.mealplan_date).slice(0, 10) === slot[0]
+      && String(e.entry_type).toLowerCase() === slot[1]) : null;
+    const press = (el, run) => {
+      const go = (event) => {
+        event.stopPropagation();
+        run();
+      };
+      el.addEventListener("click", go);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          go(event);
+        }
+      });
+    };
+
+    this._holder.querySelectorAll("[data-meal]").forEach((el) => {
+      press(el, () => {
+        const key = el.getAttribute("data-meal");
+        /* A take in flight belongs to the slot it was started on. Moving
+           the tray away would leave it answering into a slot nobody is
+           looking at. */
+        if (this._voice && this._voice.phase !== "idle") return;
+        this._mealPick = this._mealPick === key ? null : key;
+        this._voiceSay("idle", "");
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-say]").forEach((el) => {
+      if (!slot || !body.say || isBlank(body.say.script)) return;
+      press(el, () => {
+        flashPress(el);
+        this._mealSay(body.say, slot[0], slot[1]);
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-shop]").forEach((el) => {
+      const shop = body.shop;
+      if (!entry || !entry.recipe || !shop || isBlank(shop.script) || isBlank(shop.list)) return;
+      press(el, () => {
+        flashPress(el);
+        this._mealShop(shop, entry.recipe);
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-clear]").forEach((el) => {
+      if (!entry || isBlank(entry.mealplan_id) || !this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      press(el, () => {
+        /* Asked, because a note is gone for good once cleared -- there is
+           nothing to say it back from. */
+        this._guard({
+          title: `Clear ${weekdayLabel(`${slot[0]}T12:00:00`) || slot[0]}?`,
+          text: mealName(entry),
+          icon: "mdi:silverware-fork-knife",
+          ok: "Clear",
+          accent: accentNumber(model.accent) || 4,
+        }, () => onPress(el, () => this._work(() => this._callAction({
+          service: "mealie.delete_mealplan",
+          /* A string, which is what the service's schema takes. */
+          data: { config_entry_id: source.entry, mealplan_id: String(entry.mealplan_id) },
+        }).then(() => this._refetchMeals()))));
+      });
+    });
+  }
+
+  /* A press to a planned meal. Same take as the list's mic, but what was
+     said goes straight onto the plan rather than past a sheet: it lands in
+     the slot in front of the person who said it, and "Say something else"
+     or Clear undoes it in one press. A shopping list is on three phones a
+     second later; a dinner slot is not. */
+  _mealSay(spec, day, type) {
+    if (this._voiceStop) {
+      const stop = this._voiceStop;
+      this._voiceStop = null;
+      stop();
+      return;
+    }
+    if (this._voice && this._voice.phase !== "idle") return;
+    const name = String(spec.script);
+    if (!name.includes(".")) return;
+    const [domain, service] = name.split(".");
+    this._voiceSay("listening", "");
+    Promise.resolve()
+      .then(() => this._listen(spec))
+      .then((said) => {
+        if (isBlank(said)) {
+          this._voiceSay("idle", "Nothing was heard.");
+          return;
+        }
+        this._voiceSay("thinking", `“${said}”`);
+        const data = { transcript: said, date: day, entry_type: type };
+        if (!isBlank(spec.agent)) data.agent = String(spec.agent);
+        return Promise.resolve(this._hass.callWS({
+          type: "call_service", domain, service, service_data: data, return_response: true,
+        })).catch((error) => {
+          throw voiceError("Could not plan that.", error && error.message);
+        }).then((result) => {
+          const planned = result && result.response && result.response.planned;
+          this._voiceSay("idle", isBlank(planned) ? "Nothing was planned." : `${planned} planned`);
+          this._refetchMeals();
+        });
+      })
+      .catch((error) => {
+        LOGGER_WARN("spectra-card: the meal mic stopped", error);
+        this._voiceSay("idle", (error && error.say) || "That did not work.");
+      });
+  }
+
+  /* A recipe's ingredients onto the shopping list, past the same sheet the
+     list's own mic uses -- a model read the recipe, so a person says yes,
+     and it is where the salt and oil already in the cupboard get dropped. */
+  _mealShop(spec, recipe) {
+    if (this._voice && this._voice.phase !== "idle") return;
+    const name = String(spec.script);
+    if (!name.includes(".")) return;
+    const [domain, service] = name.split(".");
+    const list = String(spec.list);
+    this._voiceSay("thinking", "Reading the recipe\u2026");
+    const data = { recipe: String(recipe.recipe_id), list };
+    if (!isBlank(spec.agent)) data.agent = String(spec.agent);
+    Promise.resolve(this._hass.callWS({
+      type: "call_service", domain, service, service_data: data, return_response: true,
+    })).catch((error) => {
+      throw voiceError("Could not read the recipe.", error && error.message);
+    }).then((result) => {
+      const response = (result && result.response) || {};
+      const items = (Array.isArray(response.items) ? response.items : [])
+        .filter((row) => row && typeof row === "object" && !isBlank(row.name))
+        .map((row) => ({
+          name: String(row.name).trim(),
+          specification: isBlank(row.specification) ? "" : String(row.specification).trim(),
+        }));
+      if (!items.length) {
+        this._voiceSay("idle", Number(response.already) > 0
+          ? "It is all on the list already." : "Found nothing to buy.");
+        return null;
+      }
+      this._voiceSay("idle", "");
+      return this._voiceReview(items, "", firstOf(response.recipe, recipe.name)).then((keep) => {
+        if (!keep.length) return null;
+        this._voiceSay("adding", "");
+        this._work(() => this._addItems(list, keep).then(() => {
+          this._voiceSay("idle", keep.length === 1
+            ? `${keep[0].name} added` : `${keep.length} added to the list`);
+        }, (error) => {
+          this._voiceSay("idle", (error && error.say) || "That did not work.");
+        }));
+        return null;
+      });
+    }).catch((error) => {
+      LOGGER_WARN("spectra-card: could not shop for the recipe", error);
+      this._voiceSay("idle", (error && error.say) || "That did not work.");
+    });
+  }
+
   _guard(spec, go) {
     if (!spec) {
       go();
