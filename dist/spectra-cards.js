@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.114.0";
+const VERSION = "0.115.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1615,6 +1615,31 @@ img.avatar { object-fit:cover; display:block; }
 .mlrecipe ul, .mlrecipe ol { margin:0; padding-left:20px; }
 .mlrecipe li { font-size:14px; line-height:1.45; color:var(--sp-ink); margin:0 0 6px; }
 .mlrecipe .confirmtext { font-size:12px; }
+/* The recipe box: a list of names, each a way into its recipe. */
+.mlbox { list-style:none; margin:0; padding:0; }
+.mlbox li { border-bottom:1px solid var(--sp-edge); }
+.mlbox li:last-child { border-bottom:none; }
+.mlbox button {
+  display:flex; align-items:baseline; gap:8px; width:100%; min-height:44px;
+  padding:10px 2px; font:inherit; font-size:14px; text-align:left;
+  background:none; border:none; color:var(--sp-ink); cursor:pointer;
+}
+.mlbox .mltime { margin-left:auto; }
+/* Editing a recipe. Labels above fields, because on a phone the field is
+   full width and a label beside it would leave the name no room. */
+.mlform label {
+  display:block; margin:10px 0 4px; font-size:11px; font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--sp-ink-2);
+}
+.mlform input, .mlform textarea {
+  width:100%; box-sizing:border-box; font:inherit; font-size:14px;
+  color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge);
+  border-radius:4px; padding:8px 10px;
+}
+.mlform textarea { min-height:110px; resize:vertical; line-height:1.45; }
+.mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
+.mlform .mldictate { display:flex; align-items:center; gap:10px; margin-top:10px; }
+.confirmbtns .mldelete { margin-right:auto; border:1px solid var(--sp-edge); background:none; color:var(--sp-ink-2); }
 
 /* ---- additions to the reference sheet ---- */
 
@@ -2707,7 +2732,7 @@ const RAW_KEYS = new Set([
      Raw, for the same reason an action is. */
   "scenes", "voice",
   /* The meal card's two scripts, raw for the same reason as `voice`. */
-  "say", "shop", "pick", "move", "week", "shop_week",
+  "say", "shop", "pick", "move", "week", "shop_week", "recipes",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -6555,9 +6580,11 @@ function mealFoot(b, picked, moving) {
   const note = picked ? "" : (isBlank(b.voice_note)
     ? (phase === "thinking" ? "Working that out\u2026" : (phase === "adding" ? "Adding\u2026" : ""))
     : String(b.voice_note));
-  if (!week && !shop && !note) return "";
+  const box = b.recipes && typeof b.recipes === "object";
+  if (!week && !shop && !box && !note) return "";
   return `<div class="mlfoot">`
     + (note ? `<span class="tdvoicesay">${esc(note)}</span>` : "")
+    + (box ? `<button type="button" class="mlbtn quiet" data-meal-box>Recipes</button>` : "")
     + (week ? `<button type="button" class="mlbtn" data-meal-week>Fill empty days</button>` : "")
     + (shop ? `<button type="button" class="mlbtn" data-meal-shopweek>Shop for the week</button>` : "")
     + `</div>`;
@@ -7624,6 +7651,11 @@ class SpectraCard extends HTMLElement {
     /* A finger is on the bar. Rebuilding it now would take the element the
        pointer is captured on out from under the gesture. */
     if (this._dragging) return;
+    /* Someone is typing into a recipe. Moving the sheet across a repaint
+       keeps it on screen but takes the caret out of the field, which on a
+       phone also shuts the keyboard -- so nothing paints until it closes,
+       and closing it paints whatever was held back. */
+    if (this._editing) return;
     /* A press mid-answer: the switch's knob part-way through its travel, a
        button still flashing. Replacing the node now would teleport the one
        and swallow the other. */
@@ -8061,7 +8093,15 @@ class SpectraCard extends HTMLElement {
     const wasFocused = active ? pressables().indexOf(active) : -1;
 
     const shot = had ? motionSnapshot(holder) : null;
+    /* A sheet open over the card -- a confirmation, the review sheet, a
+       recipe -- is appended to the holder beside the card, so replacing
+       the holder's markup deleted it. Nothing noticed while sheets were
+       answered in seconds; a recipe read at the hob for ten minutes,
+       across a plan refetch or a note expiring, vanished mid-read. */
+    const sheets = Array.from(holder.children)
+      .filter((el) => el.classList && el.classList.contains("confirmwrap"));
     holder.innerHTML = html;
+    for (const sheet of sheets) holder.appendChild(sheet);
     motionFrom(holder, shot);
 
     if (wasFocused >= 0) {
@@ -10367,7 +10407,16 @@ class SpectraCard extends HTMLElement {
       const [source] = this._mealSources.values();
       press(el, () => {
         flashPress(el);
-        this._mealRecipe(source.entry, entry.recipe, model.accent);
+        this._mealRecipe(source.entry, entry.recipe, model.accent, body.recipes);
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-box]").forEach((el) => {
+      if (!body.recipes || !this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      press(el, () => {
+        flashPress(el);
+        this._mealBox(source.entry, model.accent, body.recipes);
       });
     });
 
@@ -10526,18 +10575,29 @@ class SpectraCard extends HTMLElement {
   /* The recipe, on a sheet over the card, for reading at the hob. Fetched
      when asked for rather than with the plan: a week of recipes is a lot to
      carry for the one that gets opened. */
-  _mealRecipe(entry, recipe, accent) {
+  _mealRecipe(entry, recipe, accent, edit) {
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
     const title = String(firstOf(recipe.name, "Recipe"));
+    let full = null;
     const fill = (inner) => {
+      const canEdit = Boolean(full && edit && !isBlank(edit.save));
       wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${esc(title)}">`
         + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
         + `<div class="mlrecipe">${inner}</div>`
-        + `<div class="confirmbtns"><button type="button" class="confirmyes" data-no>Close</button></div>`
+        + `<div class="confirmbtns">`
+        + (canEdit ? `<button type="button" class="confirmno" data-edit>Edit</button>` : "")
+        + `<button type="button" class="confirmyes" data-no>Close</button></div>`
         + `</div>`;
       wrap.querySelector("[data-no]").addEventListener("click", finish);
+      const e = wrap.querySelector("[data-edit]");
+      if (e) {
+        e.addEventListener("click", () => {
+          finish();
+          this._mealEdit(entry, full, accent, edit);
+        });
+      }
     };
     let done = false;
     const onKey = (event) => {
@@ -10561,6 +10621,7 @@ class SpectraCard extends HTMLElement {
     })).then((result) => {
       if (done) return;
       const r = (result && result.response && result.response.recipe) || {};
+      full = r;
       const facts = [mealTime(r), Number(r.recipe_servings) > 0 ? `serves ${Math.round(Number(r.recipe_servings))}` : ""]
         .filter((x) => !isBlank(x)).join(" \u00b7 ");
       const ingredients = (Array.isArray(r.ingredients) ? r.ingredients : [])
@@ -10580,6 +10641,221 @@ class SpectraCard extends HTMLElement {
       LOGGER_WARN("spectra-card: could not open the recipe", error);
       if (!done) fill(`<p class="confirmtext">Could not open the recipe.</p>`);
     });
+  }
+
+  /* The whole recipe box, not only what is planned. Each name opens its
+     recipe; New starts an empty one. */
+  _mealBox(entry, accent, edit) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); finish(); }
+    };
+    const fill = (inner, recipes) => {
+      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Recipes">`
+        + `<div class="confirmhead"><ha-icon icon="mdi:book-open-variant"></ha-icon><span>Recipes</span></div>`
+        + `<div class="mlrecipe">${inner}</div>`
+        + `<div class="confirmbtns">`
+        + (edit && !isBlank(edit.save) ? `<button type="button" class="confirmno" data-new>New recipe</button>` : "")
+        + `<button type="button" class="confirmyes" data-no>Close</button></div></div>`;
+      wrap.querySelector("[data-no]").addEventListener("click", finish);
+      const n = wrap.querySelector("[data-new]");
+      if (n) n.addEventListener("click", () => { finish(); this._mealEdit(entry, null, accent, edit); });
+      wrap.querySelectorAll("[data-recipe]").forEach((el) => {
+        el.addEventListener("click", () => {
+          const r = recipes[Number(el.getAttribute("data-recipe"))];
+          finish();
+          this._mealRecipe(entry, r, accent, edit);
+        });
+      });
+    };
+    wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
+    document.addEventListener("keydown", onKey, true);
+    fill(`<p class="confirmtext">Opening the recipe box\u2026</p>`, []);
+    this._holder.appendChild(wrap);
+
+    Promise.resolve(this._hass.callWS({
+      type: "call_service", domain: "mealie", service: "get_recipes",
+      service_data: { config_entry_id: entry, result_limit: 100 },
+      return_response: true,
+    })).then((result) => {
+      if (done) return;
+      const box = result && result.response && result.response.recipes;
+      const recipes = (Array.isArray(box && box.items) ? box.items : [])
+        .filter((r) => r && !isBlank(r.name) && !isBlank(r.recipe_id))
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      fill(recipes.length
+        ? `<ul class="mlbox">${recipes.map((r, i) => `<li><button type="button" data-recipe="${i}">`
+          + `<span>${esc(r.name)}</span>`
+          + (mealTime(r) ? `<span class="mltime">${esc(mealTime(r))}</span>` : "")
+          + `</button></li>`).join("")}</ul>`
+        : `<p class="confirmtext">The recipe box is empty.</p>`, recipes);
+    }, (error) => {
+      LOGGER_WARN("spectra-card: could not open the recipe box", error);
+      if (!done) fill(`<p class="confirmtext">Could not open the recipe box.</p>`, []);
+    });
+  }
+
+  /* A recipe as a form: new when `recipe` is null. Ingredients and method
+     are one per line, which is how a recipe is written on paper and all a
+     textarea can do without becoming an app. The card paints nothing while
+     this is open -- see `_editing` in _update.
+
+     Dictation fills the form rather than saving it. A model's reading of a
+     recipe read aloud is two guesses deep, like the shopping list's mic,
+     and the form is the sheet a person checks before anything is kept. */
+  _mealEdit(entry, recipe, accent, edit) {
+    if (!edit || isBlank(edit.save)) return;
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    const r = recipe || {};
+    const lines = (list, key) => (Array.isArray(list) ? list : [])
+      .map((x) => (x && !isBlank(x[key]) ? String(x[key]) : (x && x.note) || ""))
+      .filter((x) => !isBlank(x)).join("\n");
+    const servings = Number(r.recipe_servings) > 0 ? String(Math.round(Number(r.recipe_servings))) : "";
+    const dictate = !isBlank(edit.dictate);
+    wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Edit recipe">`
+      + `<div class="confirmhead"><ha-icon icon="mdi:pencil"></ha-icon>`
+      + `<span>${esc(recipe ? "Edit recipe" : "New recipe")}</span></div>`
+      + `<div class="mlrecipe mlform">`
+      + (dictate ? `<div class="mldictate"><button type="button" class="tdmic" data-dictate aria-label="Read the recipe out">`
+        + `${iconMarkup("mdi:microphone")}</button><span class="tdvoicesay" data-said>`
+        + `${esc(recipe ? "Or read it out" : "Read the recipe out, or type it")}</span></div>` : "")
+      + `<label for="mlname">Name</label><input id="mlname" data-f="name" value="${esc(r.name || "")}">`
+      + `<div class="mlpair"><div><label for="mltime">Time</label>`
+      + `<input id="mltime" data-f="total_time" placeholder="45 minutes" value="${esc(r.total_time || "")}"></div>`
+      + `<div><label for="mlserves">Serves</label>`
+      + `<input id="mlserves" data-f="servings" inputmode="numeric" value="${esc(servings)}"></div></div>`
+      + `<label for="mling">Ingredients, one per line</label>`
+      + `<textarea id="mling" data-f="ingredients">${esc(lines(r.ingredients, "display"))}</textarea>`
+      + `<label for="mlmethod">Method, one step per line</label>`
+      + `<textarea id="mlmethod" data-f="method">${esc(lines(r.instructions, "text"))}</textarea>`
+      + `<p class="confirmtext quiet" data-status></p>`
+      + `</div><div class="confirmbtns">`
+      + (recipe && !isBlank(edit.delete) ? `<button type="button" class="mldelete" data-del>Delete</button>` : "")
+      + `<button type="button" class="confirmno" data-no>Cancel</button>`
+      + `<button type="button" class="confirmyes" data-yes>Save</button></div></div>`;
+
+    const field = (name) => wrap.querySelector(`[data-f="${name}"]`);
+    const status = (text) => { wrap.querySelector("[data-status]").textContent = text; };
+    const call = (name, data, respond) => {
+      const [domain, service] = String(name).split(".");
+      const msg = { type: "call_service", domain, service, service_data: data };
+      if (respond) msg.return_response = true;
+      return Promise.resolve(this._hass.callWS(msg));
+    };
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (this._voiceStop) { const stop = this._voiceStop; this._voiceStop = null; stop(); }
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      this._editing = false;
+      this._signature = null;
+      this._update();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); finish(); }
+    };
+    wrap.querySelector("[data-no]").addEventListener("click", finish);
+
+    wrap.querySelector("[data-yes]").addEventListener("click", (event) => {
+      const yes = event.currentTarget;
+      const name = field("name").value.trim();
+      if (!recipe && !name) { status("A new recipe needs a name."); return; }
+      const data = {
+        ingredients: field("ingredients").value,
+        method: field("method").value,
+        total_time: field("total_time").value.trim(),
+      };
+      if (name) data.name = name;
+      const serves = Number(field("servings").value);
+      if (serves > 0) data.servings = serves;
+      if (recipe) data.recipe = String(firstOf(recipe.slug, recipe.recipe_id));
+      data.config_entry_id = entry;
+      yes.disabled = true;
+      status("Saving\u2026");
+      call(edit.save, data, true).then((result) => {
+        const saved = (result && result.response) || {};
+        finish();
+        this._voiceSay("idle", `${firstOf(saved.name, name, "Recipe")} saved`);
+        this._refetchMeals();
+      }, (error) => {
+        yes.disabled = false;
+        status(`Not saved: ${(error && error.message) || "Mealie did not answer."}`);
+      });
+    });
+
+    const del = wrap.querySelector("[data-del]");
+    if (del) {
+      del.addEventListener("click", () => {
+        this._confirm({
+          title: `Delete ${firstOf(recipe.name, "this recipe")}?`,
+          text: "It goes from the recipe box for good. A meal already planned with it loses its recipe.",
+          icon: "mdi:delete-outline", ok: "Delete", accent,
+        }).then((yes) => {
+          if (!yes) return;
+          status("Deleting\u2026");
+          call(edit.delete, {
+            recipe: String(firstOf(recipe.slug, recipe.recipe_id)), config_entry_id: entry,
+          }, false).then(() => {
+            finish();
+            this._voiceSay("idle", `${firstOf(recipe.name, "Recipe")} deleted`);
+            this._refetchMeals();
+          }, (error) => status(`Not deleted: ${(error && error.message) || "Mealie did not answer."}`));
+        });
+      });
+    }
+
+    const mic = wrap.querySelector("[data-dictate]");
+    if (mic) {
+      const said = wrap.querySelector("[data-said]");
+      mic.addEventListener("click", () => {
+        if (this._voiceStop) { const stop = this._voiceStop; this._voiceStop = null; stop(); return; }
+        if (mic.classList.contains("thinking")) return;
+        mic.classList.add("live");
+        said.textContent = "Listening\u2026 press again when you have finished.";
+        /* A recipe is longer than a shopping list. */
+        Promise.resolve().then(() => this._listen({ max_seconds: 120 })).then((heard) => {
+          mic.classList.remove("live");
+          if (isBlank(heard)) { said.textContent = "Nothing was heard."; return null; }
+          mic.classList.add("thinking");
+          said.textContent = `\u201c${heard}\u201d`;
+          return call(edit.dictate, { transcript: heard }, true).then((result) => {
+            mic.classList.remove("thinking");
+            const got = (result && result.response) || {};
+            const put = (key, value) => {
+              if (!isBlank(value)) field(key).value = Array.isArray(value) ? value.join("\n") : String(value);
+            };
+            put("name", got.name);
+            put("total_time", got.total_time);
+            if (Number(got.servings) > 0) put("servings", Math.round(Number(got.servings)));
+            put("ingredients", got.ingredients);
+            put("method", got.method);
+            said.textContent = "Check it, then Save.";
+          });
+        }).catch((error) => {
+          mic.classList.remove("live", "thinking");
+          said.textContent = (error && error.say) || "That did not work.";
+        });
+      });
+    }
+
+    document.addEventListener("keydown", onKey, true);
+    this._editing = true;
+    this._holder.appendChild(wrap);
+    const first = field("name");
+    if (first && !recipe && first.focus) first.focus({ preventScroll: true });
   }
 
   _guard(spec, go) {

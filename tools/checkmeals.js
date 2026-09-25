@@ -88,8 +88,27 @@ const js = fs.readFileSync(file);
       },
       callWS: (msg) => {
         asked.push(msg);
+        if (msg.domain === "mealie" && msg.service === "get_recipes") {
+          return Promise.resolve({ response: { recipes: { items: [
+            { recipe_id: "b2", slug: "bolognese", name: "Spaghetti bolognese", total_time: "2 hours" },
+            { recipe_id: "fa4a", slug: "sea-bass", name: "Sea bass with ginger", total_time: "25 minutes" },
+          ] } } });
+        }
+        if (msg.domain === "home_signals" && msg.service === "save_recipe") {
+          return Promise.resolve({ response: { slug: "x", recipe_id: "y", name: msg.service_data.name || "Sea bass with ginger" } });
+        }
+        if (msg.domain === "home_signals" && msg.service === "delete_recipe") {
+          return Promise.resolve({});
+        }
+        if (msg.service === "meal_recipe_from_speech") {
+          return Promise.resolve({ response: {
+            name: "Nana's curry", total_time: "1 hour", servings: 4,
+            ingredients: ["2 onions", "4 chicken thighs"], method: ["Fry the onions.", "Add the chicken."],
+          } });
+        }
         if (msg.domain === "mealie" && msg.service === "get_recipe") {
           return Promise.resolve({ response: { recipe: {
+            recipe_id: "fa4a", slug: "sea-bass",
             name: "Sea bass with ginger", total_time: "25 minutes", recipe_servings: 6,
             ingredients: [{ display: "6 sea bass fillets" }, { display: "1 bunch spring onions" }],
             instructions: [{ text: "Season the fish." }, { text: "Fry it skin-side down." }],
@@ -437,6 +456,122 @@ const js = fs.readFileSync(file);
     check("only after a yes are they added",
       calls.filter((c) => c.service === "todo.add_item").length === addsBefore + 2,
       calls.filter((c) => c.service === "todo.add_item").length);
+
+    /* ---- the recipe box, and writing recipes ---- */
+    await show({
+      recipes: {
+        save: "home_signals.save_recipe", delete: "home_signals.delete_recipe",
+        dictate: "script.meal_recipe_from_speech",
+      },
+    });
+    el._mealPick = null;
+    el._signature = null;
+    el._update();
+    await settle();
+    const top = () => root().querySelector(".confirmwrap:last-of-type");
+    const sheets = () => root().querySelectorAll(".confirmwrap").length;
+
+    q("[data-meal-box]").click();
+    await settle();
+    const names = Array.from(top().querySelectorAll(".mlbox button")).map((b) => text(b));
+    check("Recipes lists the whole box, by name",
+      names.length === 2 && names[0].startsWith("Sea bass") && names[1].startsWith("Spaghetti"),
+      JSON.stringify(names));
+    check("from the right Mealie", asked.filter((m) => m.service === "get_recipes").pop()
+      .service_data.config_entry_id === "entry1", "wrong entry");
+
+    top().querySelector('[data-recipe="0"]').click();
+    await settle();
+    check("a name opens its recipe, and the box shuts", sheets() === 1
+      && text(top()).includes("Season the fish."), text(top()));
+
+    /* The sheet has to outlive the card repainting under it. */
+    el._voiceSay("idle", "Something else happened");
+    el._signature = null;
+    el._update();
+    await settle();
+    check("an open recipe survives the card repainting", sheets() === 1
+      && text(top()).includes("Season the fish."), sheets());
+    el._voiceSay("idle", "");
+
+    top().querySelector("[data-edit]").click();
+    await settle();
+    const f = (name) => top().querySelector(`[data-f="${name}"]`);
+    check("Edit opens the recipe as a form", f("name") && f("name").value === "Sea bass with ginger"
+      && f("ingredients").value === "6 sea bass fillets\n1 bunch spring onions"
+      && f("method").value === "Season the fish.\nFry it skin-side down."
+      && f("servings").value === "6", f("name") && f("ingredients").value);
+    check("and holds the card still while it is open", el._editing === true, el._editing);
+
+        el._signature = null;
+    el._update();
+    check("nothing paints while someone is typing", el._signature === null, "it painted");
+
+    f("ingredients").value = "6 sea bass fillets\n2 bunches spring onions";
+    top().querySelector("[data-yes]").click();
+    await settle();
+    const saved = asked.filter((m) => m.service === "save_recipe").pop();
+    check("Save sends the recipe's slug, its fields and the Mealie",
+      saved && saved.service_data.recipe === "sea-bass"
+        && saved.service_data.ingredients === "6 sea bass fillets\n2 bunches spring onions"
+        && saved.service_data.servings === 6 && saved.service_data.config_entry_id === "entry1",
+      saved && JSON.stringify(saved.service_data));
+    check("and asks for the answer", saved && saved.return_response === true, saved && saved.return_response);
+    check("then shuts, lets the card paint again, and says so",
+      sheets() === 0 && el._editing === false && text(q(".mlfoot .tdvoicesay")) === "Sea bass with ginger saved",
+      `${sheets()} ${el._editing} ${text(q(".mlfoot"))}`);
+    el._voiceSay("idle", "");
+
+    q("[data-meal-box]").click();
+    await settle();
+    top().querySelector("[data-new]").click();
+    await settle();
+    check("New recipe is an empty form", f("name").value === "" && f("ingredients").value === "",
+      f("name").value);
+    check("with nothing to delete", !top().querySelector("[data-del]"), "a delete button");
+    const saves = asked.filter((m) => m.service === "save_recipe").length;
+    top().querySelector("[data-yes]").click();
+    await settle();
+    check("a new recipe with no name is not saved",
+      asked.filter((m) => m.service === "save_recipe").length === saves
+        && text(top().querySelector("[data-status]")).includes("needs a name"),
+      text(top().querySelector("[data-status]")));
+
+    el._listen = () => Promise.resolve("this is nanas curry it serves four");
+    top().querySelector("[data-dictate]").click();
+    await settle();
+    const told = asked.filter((m) => m.service === "meal_recipe_from_speech").pop();
+    check("reading it out sends what was heard to the script",
+      told && told.service_data.transcript === "this is nanas curry it serves four",
+      told && JSON.stringify(told.service_data));
+    check("and fills the form rather than saving it",
+      f("name").value === "Nana's curry" && f("servings").value === "4"
+        && f("ingredients").value === "2 onions\n4 chicken thighs"
+        && asked.filter((m) => m.service === "save_recipe").length === saves,
+      f("name").value);
+    top().querySelector("[data-yes]").click();
+    await settle();
+    const created = asked.filter((m) => m.service === "save_recipe").pop();
+    check("a new recipe is saved without a slug", created && !("recipe" in created.service_data)
+      && created.service_data.name === "Nana's curry", created && JSON.stringify(created.service_data));
+    el._voiceSay("idle", "");
+
+    q("[data-meal-box]").click();
+    await settle();
+    top().querySelector('[data-recipe="0"]').click();
+    await settle();
+    top().querySelector("[data-edit]").click();
+    await settle();
+    top().querySelector("[data-del]").click();
+    await settle();
+    check("Delete asks first", text(top()).includes("Delete Sea bass with ginger?")
+      && !asked.some((m) => m.service === "delete_recipe"), text(top()));
+    top().querySelector("[data-yes]").click();
+    await settle();
+    const gone = asked.filter((m) => m.service === "delete_recipe").pop();
+    check("and deletes that recipe after a yes", gone && gone.service_data.recipe === "sea-bass"
+      && sheets() === 0 && el._editing === false, gone && JSON.stringify(gone.service_data));
+    el._voiceSay("idle", "");
 
     /* ---- the timer ---- */
     check("a reread is scheduled", Boolean(el._mealTimer), "no timer");

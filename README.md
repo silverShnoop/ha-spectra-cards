@@ -1632,6 +1632,10 @@ body:
   move: {script: script.meal_plan_move}
   week: {script: script.meal_plan_week}
   shop_week: {script: script.meal_week_to_items, list: todo.phoenix}
+  recipes:
+    save: home_signals.save_recipe
+    delete: home_signals.delete_recipe
+    dictate: script.meal_recipe_from_speech
 ```
 
 **Days run down, not across.** A calendar app lays a week out in seven
@@ -1663,6 +1667,7 @@ Under the last day are the week's own controls:
 | --- | --- | --- |
 | **Fill empty days** | `week` is set | `week.script` plans every empty day in `days`, never a planned one, and says how many |
 | **Shop for the week** | `shop_week` is set | `shop_week.script` returns every planned recipe's items combined; they go on the review sheet |
+| **Recipes** | `recipes` is set | the whole recipe box, by name. Each opens its recipe; **New recipe** opens an empty form |
 
 A whole-week answer ("3 days planned") is written under the week rather
 than in a tray, because it belongs to no one day.
@@ -1671,6 +1676,28 @@ than in a tray, because it belongs to no one day.
 recipes is a lot to carry for the one that gets read, and the sheet is
 written for reading at the hob: bigger type than the card, and scrolled
 inside the sheet so a long method never pushes Close off the card.
+
+**Writing recipes.** With `recipes.save` set, the recipe sheet has an
+**Edit** button, and the recipe box a **New recipe** one. Both open the
+recipe as a form: name, time, serves, then ingredients and method as one
+line each, which is how a recipe is written on paper and all a textarea can
+do without becoming an app. Save calls `recipes.save` with `recipe` (the
+slug, omitted for a new one), `name`, `total_time`, `servings`,
+`ingredients`, `method` and `config_entry_id`. `recipes.delete`, when set,
+adds a Delete that asks first. The two actions ship in
+[`home_signals`](https://github.com/silverShnoop/ha-home-signals), because
+Home Assistant's own Mealie integration cannot write a recipe at all.
+
+`recipes.dictate` adds a mic to the form. What was read out goes to that
+script as `transcript`, and its answer (`name`, `total_time`, `servings`,
+`ingredients`, `method`) **fills the form, never saves it**: a model's
+reading of a recipe read aloud is two guesses deep, and the form is the
+sheet a person checks.
+
+**Nothing paints while the form is open.** A sheet survives a repaint
+(it is moved across the swap), but moving it takes the caret out of the
+field, and on a phone that also shuts the keyboard. So the card holds its
+paints until the form closes, then paints whatever was held back.
 
 **The mic writes straight to the plan. The ingredients go past the sheet.**
 That split is deliberate. A spoken dinner lands in the slot in front of the
