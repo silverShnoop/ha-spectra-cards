@@ -826,6 +826,23 @@ ha-icon { display:inline-flex; line-height:0; }
   font-size:11px; margin-left:6px; padding:1px 7px; border-radius:8px;
   white-space:nowrap; background:var(--accent-soft); color:var(--accent-on);
 }
+/* A board's columns. The first sits flush under the title; each after
+   it is set off by space rather than a rule, because they are parts of
+   one list and a rule is what separates the list from what got done. */
+.tdstage + .tdstage { margin-top:12px; }
+/* On to the next column. Worded, not an arrow alone: a bare chevron on
+   a wall panel reads as "open", and this does not open anything. 30px
+   tall like the box, since it is pressed by the same thumb. */
+.tdmove {
+  flex:none; align-self:center; display:inline-flex; align-items:center;
+  gap:1px; min-height:30px; margin:-4px 0; padding:0 2px 0 9px;
+  border:none; border-radius:15px; cursor:pointer; font:inherit;
+  font-size:11px; font-weight:500; color:var(--accent-on);
+  background:var(--accent-soft); white-space:nowrap;
+  -webkit-tap-highlight-color:transparent;
+}
+.tdmove .mdi, .tdmove ha-icon { width:16px; height:16px; --mdc-icon-size:16px; }
+.tdmove:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .tdmore { font-size:12px; color:var(--sp-ink-2); padding:8px 0 0; }
 /* Done today. Separated by a rule rather than a gap, because on a long
    list the two sections have to be told apart from across the room and
@@ -4633,6 +4650,50 @@ const BODIES = {
     const drawable = (item) => Boolean(item) && typeof item === "object"
       && !isBlank(item.uid) && !isBlank(item.summary);
 
+    /* A board: the list is a Trello board, and a job on it is not only
+       done or not done but somewhere in between -- To do, Doing.
+
+       What todo.get_items hands over cannot say where: a to-do item has
+       a status and nothing else. The trello_todo integration publishes
+       the board beside it as one attribute, and this joins the two by
+       uid -- which column each card sits in, and who it is assigned to.
+       Joined here rather than in the card, because it is a pure function
+       of two things the model already holds.
+
+       The Done column is not a group. It is what the tick means, so its
+       cards are the ones this list is not showing. */
+    const board = b.board && typeof b.board === "object"
+      && Array.isArray(b.board.lists) ? b.board : null;
+    const stages = board
+      ? board.lists.filter((l) => l && !isBlank(l.id) && l.id !== board.done) : [];
+    const cardOf = new Map();
+    const firstName = new Map();
+    if (board) {
+      (Array.isArray(board.cards) ? board.cards : [])
+        .forEach((c) => { if (c && !isBlank(c.id)) cardOf.set(String(c.id), c); });
+      (Array.isArray(board.members) ? board.members : []).forEach((m) => {
+        if (m && !isBlank(m.id)) {
+          firstName.set(m.id, String(firstOf(m.name, m.initials, "")).split(" ")[0]);
+        }
+      });
+    }
+    /* A move is claimed until the board agrees, like a tick: the call
+       returns before Trello has moved the card, and a row that jumped
+       back under the finger would be moved again. */
+    const moved = b.moved && typeof b.moved === "object" ? b.moved : {};
+    const stageOf = (item) => {
+      const uid = String(item.uid);
+      if (!isBlank(moved[uid])) return String(moved[uid]);
+      const card = cardOf.get(uid);
+      return card && !isBlank(card.list) ? String(card.list) : "";
+    };
+    const whoOf = (item) => {
+      if (!isBlank(item.who)) return String(item.who);
+      const card = cardOf.get(String(item.uid));
+      if (!card || !Array.isArray(card.members)) return "";
+      return card.members.map((id) => firstName.get(id)).filter(Boolean).join(" & ");
+    };
+
     const row = (item, keyPrefix, endsColumn) => {
       const uid = String(item.uid);
       const name = String(item.summary);
@@ -4659,7 +4720,23 @@ const BODIES = {
       const open = Boolean(full) && detail === "below" && b.open_note === uid;
       const sub = full && detail === "below"
         ? `<span class="tdsub">${esc(full)}</span>` : "";
-      const who = isBlank(item.who) ? "" : `<span class="tdwho">${esc(item.who)}</span>`;
+      const whom = board ? whoOf(item) : (isBlank(item.who) ? "" : String(item.who));
+      const who = whom ? `<span class="tdwho">${esc(whom)}</span>` : "";
+      /* On to the next column, named. Not a menu of every column: a
+         job moves forward, and a press that says where it goes is one
+         press with nothing to read first. The last column before Done
+         has none, because what comes next there is the tick. */
+      let move = "";
+      if (board && !done && keyPrefix === "") {
+        const at = stages.findIndex((s) => s.id === stageOf(item));
+        const next = at >= 0 ? stages[at + 1] : null;
+        if (next) {
+          move = `<button type="button" class="tdmove" data-todo-move="${esc(uid)}"`
+            + ` data-todo-to="${esc(next.id)}"`
+            + ` aria-label="${esc(`Move ${name} to ${next.name}`)}">`
+            + `<span>${esc(next.name)}</span>${iconMarkup("mdi:chevron-right")}</button>`;
+        }
+      }
       return `<div class="tditem${done ? " ticked" : ""}${open ? " open" : ""}`
         + `${endsColumn ? " colend" : ""}"`
         + ` data-key="${esc(keyPrefix + uid)}">`
@@ -4671,6 +4748,7 @@ const BODIES = {
         + `</button>`
         + `<span class="tdtext"${sub ? ` data-note="${esc(uid)}"` : ""}>`
         + `<span class="tdname">${esc(name)}${extra}${who}</span>${sub}</span>`
+        + move
         + `</div>`;
     };
 
@@ -4696,7 +4774,32 @@ const BODIES = {
       return `<div class="todolist${two ? " two" : ""}"${style}>${markup}</div>`;
     };
 
-    const cells = section(shown, "");
+    /* On a board the outstanding rows are grouped by column, in the
+       board's own order, each under its name and count -- the same
+       heading the done section wears, because it is the same kind of
+       fact. A column with nothing in it draws nothing, heading
+       included. A card the board has not reported yet (it was added a
+       moment ago) waits in the first column rather than vanishing. */
+    let cells;
+    if (board && stages.length) {
+      const known = new Set(stages.map((s) => s.id));
+      cells = stages.map((stage, i) => {
+        const mine = shown.filter((item) => drawable(item)
+          && (stageOf(item) === stage.id || (i === 0 && !known.has(stageOf(item)))));
+        const rows = section(mine, "");
+        if (!rows) return "";
+        /* Not keyed. The rows inside are, and the motion is measured
+           in page coordinates: a keyed group sliding would carry its
+           rows with it AND have them slide by themselves, twice over. */
+        return `<div class="tdstage">`
+          + `<p class="tddonehead">${esc(stage.name)}`
+          + `<span class="tddonecount">${mine.length}</span></p>`
+          + rows
+          + `</div>`;
+      }).join("");
+    } else {
+      cells = section(shown, "");
+    }
     const doneItems = Array.isArray(b.done) ? b.done : [];
     const doneCells = section(doneItems, "done:");
 
@@ -9070,13 +9173,28 @@ class SpectraCard extends HTMLElement {
       }
       model.body.ticked = [...this._ticked];
     }
+    /* A moved card keeps its new column until the board agrees, by the
+       same rule as a tick: dropped per uid the moment the board shows
+       it there, abandoned after twelve seconds either way. */
+    if (this._moved && this._moved.size && model.body
+        && model.body.type === "todo") {
+      const bd = model.body.board;
+      const cards = bd && Array.isArray(bd.cards) ? bd.cards : [];
+      for (const [uid, to] of [...this._moved]) {
+        const card = cards.find((c) => c && String(c.id) === uid);
+        if (card && String(card.list) === to) this._moved.delete(uid);
+      }
+      model.body.moved = Object.fromEntries(this._moved);
+    }
     if (model.body && model.body.type === "todo" && this._undo) {
       model.body.undo = true;
       /* Outranks whatever the card was configured to say down there.
          The configured line is ambient -- who last touched the list --
          and this one is about the press that just happened and expires
          on its own twelve seconds later. */
-      model.body.foot = `${this._undo.name} ticked off`;
+      model.body.foot = this._undo.to
+        ? `${this._undo.name} moved to ${this._undo.toName}`
+        : `${this._undo.name} ticked off`;
     }
     /* Which note is open, carried on the model rather than read off
        the card, because a body is called as a method of BODIES and has
@@ -9947,7 +10065,30 @@ class SpectraCard extends HTMLElement {
 
   _forgetTick(uid) {
     if (this._ticked) this._ticked.delete(uid);
-    if (this._undo && this._undo.uid === uid) this._undo = null;
+    if (this._undo && this._undo.uid === uid && !this._undo.to) this._undo = null;
+  }
+
+  /* A card moved to the next column on a board. Claimed like a tick,
+     and for the same reason -- trello_todo.move_card returns before
+     Trello has moved it.
+
+     The undo outlives the claim, where a tick's does not. The board
+     agrees within a second or so of a move, and an undo that went the
+     moment it did would be gone before anybody who brushed the button
+     had noticed. It is a different press from a tick, too: the row
+     does not leave the list, it changes heading, which is easy to
+     miss from across the room. */
+  _wantMoved(uid, name, from, to, toName) {
+    if (!this._moved) this._moved = new Map();
+    this._moved.set(uid, to);
+    this._undo = { uid, name, from, to, toName };
+    if (this._moveGiveUp) clearTimeout(this._moveGiveUp);
+    this._moveGiveUp = setTimeout(() => {
+      this._moved = new Map();
+      if (this._undo && this._undo.to) this._undo = null;
+      this._signature = null;
+      this._update();
+    }, 12000);
   }
 
   /* What the mic is doing, in the one line beside it.
@@ -11141,12 +11282,63 @@ class SpectraCard extends HTMLElement {
       if (!entity || !undo) return;
       el.addEventListener("click", (event) => {
         event.stopPropagation();
+        if (undo.to) {
+          /* Back to the column it came from, claimed the same way so
+             the row does not bounce forward again while Trello catches
+             up. The undo is spent: undoing an undo is just the button
+             on the row. */
+          if (!this._moved) this._moved = new Map();
+          this._moved.set(undo.uid, undo.from);
+          this._undo = null;
+          onPress(el, () => this._work(() => this._callAction({
+            service: "trello_todo.move_card",
+            target: { entity_id: entity },
+            data: { card_id: undo.uid, list: undo.from },
+          })));
+          return;
+        }
         this._forgetTick(undo.uid);
         onPress(el, () => this._work(() => this._callAction({
           service: "todo.update_item",
           target: { entity_id: entity },
           data: { item: undo.uid, status: "needs_action" },
         })));
+      });
+    });
+
+    /* On to the next column of a board. The service is trello_todo's:
+       a to-do item has no column, so no todo.* service can say where a
+       card goes, and a `board` body only exists because that
+       integration publishes one. */
+    this._holder.querySelectorAll("[data-todo-move]").forEach((el) => {
+      const body = model.body || {};
+      const entity = body.list;
+      const bd = body.board;
+      const uid = el.getAttribute("data-todo-move");
+      const to = el.getAttribute("data-todo-to");
+      if (!entity || !uid || !to || !bd || !Array.isArray(bd.lists)) return;
+      const run = (event) => {
+        event.stopPropagation();
+        const item = (Array.isArray(body.items) ? body.items : [])
+          .find((row) => row && String(row.uid) === uid);
+        const card = (Array.isArray(bd.cards) ? bd.cards : [])
+          .find((c) => c && String(c.id) === uid);
+        const from = (body.moved && body.moved[uid]) || (card ? String(card.list) : "");
+        const target = bd.lists.find((l) => l && l.id === to);
+        this._wantMoved(uid, item ? String(item.summary || "") : "", from, to,
+          target ? String(target.name) : "");
+        onPress(el, () => this._work(() => this._callAction({
+          service: "trello_todo.move_card",
+          target: { entity_id: entity },
+          data: { card_id: uid, list: to },
+        })));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          run(event);
+        }
       });
     });
 

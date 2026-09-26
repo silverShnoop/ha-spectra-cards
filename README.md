@@ -1060,6 +1060,7 @@ body:
   done: {entity: sensor.phoenix_done_today, attribute: items}
   done_label: "Bought"               # optional; default "Done today"
   tick_icon: mdi:shopping            # optional; default mdi:check-bold
+  board: {entity: todo.chores, attribute: board}   # optional; a Trello board. See below
   voice:                             # optional; the mic. See below
     script: script.list_speech_to_items
     about: "a shopping list"         # optional; wording passed to the script
@@ -1212,6 +1213,66 @@ The open note is a **claim carried on the model**, like `ticked` and
 `undo`, so it survives the re-render the press provokes. Without that it
 would shut itself the moment anything else on the card moved, which on a
 wall panel is constantly.
+
+#### `board` — a Trello board, where a job can be half done
+
+```yaml
+body:
+  type: todo
+  list: todo.chores
+  items: {todo: todo.chores, status: needs_action}
+  board: {entity: todo.chores, attribute: board}
+  detail: below
+```
+
+For a list that is a Trello board, through the
+[`trello_todo`](https://github.com/silverShnoop/ha-trello-todo) integration.
+A job on a board is not only done or not done — it is in **To do** or
+**Doing** — and a to-do item cannot say which: `todo.get_items` hands over
+a status and nothing else. So the integration publishes the board beside
+the list as one attribute, and the body joins the two by uid. A card's id
+*is* the item's uid.
+
+Three things change when `board` is there, and nothing else does:
+
+- **Rows are grouped by column**, in the board's own order, under the
+  same small heading and count the done section wears — because it is the
+  same kind of fact. An empty column draws nothing, heading included. A
+  card the board has not reported yet (added a second ago) waits in the
+  first column rather than vanishing until it has.
+- **Who has it** rides on the name's line, by first name — `James & Sam`
+  — from the card's Trello members. An unassigned card draws no chip.
+- **One press moves a card on**, to the next column, and the button says
+  which: `Doing ›`. Not a menu of every column: a job moves forward, and a
+  press that names where it goes has nothing to read first. The last
+  column before Done has no button, because what comes next there is the
+  tick.
+
+**Done is not a group.** It is what the tick means: `todo.update_item`
+is unchanged, and `trello_todo` turns *completed* into *moved to the Done
+column*. So Trello's Done column is exactly the cards this list is not
+showing, and the `done` section below still works the way it does for any
+other list.
+
+**The move is claimed until the board agrees**, like a tick, and for the
+same reason: `trello_todo.move_card` returns before Trello has moved the
+card, and a row that jumped back under the finger would be moved again.
+It is dropped per uid when the board shows the card in its new column, and
+abandoned after twelve seconds either way.
+
+**The undo outlives the claim**, where a tick's does not. Trello agrees
+with a move in about a second — the integration takes a webhook — and an
+undo gone that fast is gone before anybody who brushed the button noticed
+they had. A moved row also does not *leave*; it changes heading, which is
+easy to miss from across the room. So `Fix gate moved to Doing · Undo`
+stays for the full twelve seconds, and pressing it sends the card back to
+the column it came from.
+
+**The service is `trello_todo`'s**, named in the bundle rather than in the
+config. No `todo.*` service can say where a card goes, because a to-do
+item has no column — and a `board` only exists because that integration
+publishes one. A board that is not one (no `lists` array) is ignored, and
+the list draws as it would without it.
 
 #### `voice` — saying what to add
 

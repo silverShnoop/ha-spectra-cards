@@ -675,6 +675,138 @@ const js = fs.readFileSync(file);
     check("with no list to write to, a tick calls nothing",
       calls.length === 0, JSON.stringify(calls));
 
+    /* ---- A Trello board -------------------------------------------
+       The to-do items say only done or not done. The board attribute
+       trello_todo publishes says which column each card is in and who
+       has it -- joined by uid, the item's uid being the card's id. */
+    await show({});
+    await rest();
+    const CHORES = [
+      { uid: "c1", summary: "Bins out", status: "needs_action" },
+      { uid: "c2", summary: "Fix gate", status: "needs_action" },
+      { uid: "c4", summary: "Paint fence", status: "needs_action" },
+      { uid: "c9", summary: "Just added", status: "needs_action" },
+    ];
+    const BOARD = {
+      done: "l_done", default: "l_todo",
+      lists: [
+        { id: "l_todo", name: "To do" },
+        { id: "l_doing", name: "Doing" },
+        { id: "l_done", name: "Done" },
+      ],
+      members: [
+        { id: "m_j", name: "James Barker", initials: "JB" },
+        { id: "m_s", name: "Sam Barker", initials: "SB" },
+      ],
+      cards: [
+        { id: "c1", list: "l_todo", members: ["m_j"] },
+        { id: "c2", list: "l_doing", members: ["m_j", "m_s"] },
+        { id: "c4", list: "l_todo", members: [] },
+        { id: "c3", list: "l_done", members: [] },
+      ],
+    };
+    const board = (over) => ({ list: "todo.chores", items: CHORES, columns: 1,
+      board: JSON.parse(JSON.stringify(BOARD)), ...over });
+    await show(board({}));
+    const heads = () => all(".tdstage .tddonehead").map((h) => h.textContent.trim());
+    check("a board groups its rows by column, in the board's order",
+      JSON.stringify(heads()) === JSON.stringify(["To do3", "Doing1"]), JSON.stringify(heads()));
+    check("and Done is not a group -- it is what the tick means",
+      !heads().some((h) => /^done/i.test(h)), JSON.stringify(heads()));
+    const inStage = (i) => Array.from(all(".tdstage")[i].querySelectorAll(".tdname"))
+      .map((n) => n.firstChild.textContent);
+    check("a card the board has not reported yet waits in the first column",
+      inStage(0).includes("Just added"), JSON.stringify(inStage(0)));
+    const whoIn = (name) => {
+      const n = all(".tdname").find((x) => x.firstChild.textContent === name);
+      const w = n && n.querySelector(".tdwho");
+      return w ? w.textContent : "";
+    };
+    check("an assignee is shown by first name",
+      whoIn("Bins out") === "James", whoIn("Bins out"));
+    check("and two of them together",
+      whoIn("Fix gate") === "James & Sam", whoIn("Fix gate"));
+    check("and an unassigned card shows no empty chip",
+      whoIn("Paint fence") === "", whoIn("Paint fence"));
+
+    const moveOf = (name) => {
+      const n = all(".tditem").find((x) => x.querySelector(".tdname").firstChild.textContent === name);
+      return n ? n.querySelector(".tdmove") : null;
+    };
+    check("a card in To do offers the next column, by name",
+      moveOf("Bins out") && moveOf("Bins out").textContent.trim() === "Doing",
+      moveOf("Bins out") && moveOf("Bins out").textContent);
+    check("the last column before Done offers nothing -- the tick is next",
+      moveOf("Fix gate") === null, "has a move button");
+    check("the move button is big enough for a thumb",
+      /* offsetHeight, not the bounding box: a row that has just
+         arrived is still scaling in, and a box measured mid-animation
+         is the animation's size rather than the button's. */
+      moveOf("Bins out").offsetHeight >= 30, moveOf("Bins out").offsetHeight);
+
+    calls.length = 0;
+    moveOf("Bins out").click();
+    await painted();
+    check("moving calls trello_todo.move_card on the same list, once",
+      calls.length === 1 && calls[0].service === "trello_todo.move_card"
+        && calls[0].target.entity_id === "todo.chores"
+        && calls[0].data.card_id === "c1" && calls[0].data.list === "l_doing",
+      JSON.stringify(calls));
+    check("and the row is under Doing straight away, before Trello answers",
+      inStage(1).includes("Bins out") && !inStage(0).includes("Bins out"),
+      JSON.stringify([inStage(0), inStage(1)]));
+    check("with an undo that says where it went",
+      /Bins out moved to Doing/.test(text(".tdfoot") || "") && !!q(".tdundo"),
+      text(".tdfoot"));
+
+    /* The board agrees. The claim goes -- but the undo stays, because a
+       move is agreed with in about a second and an undo gone that fast
+       would be gone before anybody noticed they needed it. */
+    await rest();
+    const agreed = JSON.parse(JSON.stringify(BOARD));
+    agreed.cards[0].list = "l_doing";
+    await show(board({ board: agreed }));
+    check("when the board agrees, the row stays put",
+      inStage(1).includes("Bins out"), JSON.stringify(inStage(1)));
+    check("and the undo is still there",
+      !!q(".tdundo"), text(".tdfoot"));
+    calls.length = 0;
+    q(".tdundo").click();
+    await painted();
+    check("undo moves it back to the column it came from",
+      calls.length === 1 && calls[0].service === "trello_todo.move_card"
+        && calls[0].data.card_id === "c1" && calls[0].data.list === "l_todo",
+      JSON.stringify(calls));
+    check("and draws it there before Trello answers",
+      inStage(0).includes("Bins out"), JSON.stringify(inStage(0)));
+    check("and the undo is spent",
+      !q(".tdundo"), text(".tdfoot"));
+
+    /* The tick is unchanged on a board: it is still todo.update_item,
+       and trello_todo turns completed into "moved to Done". */
+    await rest();
+    await show(board({}));
+    calls.length = 0;
+    const box = all(".tditem").find((x) => x.querySelector(".tdname").firstChild.textContent === "Fix gate")
+      .querySelector(".tdbox");
+    box.click();
+    await settle();
+    check("ticking a card on a board is still todo.update_item",
+      calls.length === 1 && calls[0].service === "todo.update_item"
+        && calls[0].data.item === "c2" && calls[0].data.status === "completed",
+      JSON.stringify(calls));
+    await rest();
+
+    /* No board, no columns: the lists this card already draws must not
+       change because a board was taught to it. */
+    await show({ items: SHOP, columns: 2 });
+    check("a list without a board draws no columns and no move buttons",
+      all(".tdstage").length === 0 && all(".tdmove").length === 0,
+      `${all(".tdstage").length} stages, ${all(".tdmove").length} moves`);
+    await show({ items: SHOP, board: { lists: "nonsense" } });
+    check("and a board that is not one is ignored rather than breaking the list",
+      all(".tditem").length === 5 && all(".tdstage").length === 0, all(".tditem").length);
+
     return problems;
   });
 
