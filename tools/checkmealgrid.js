@@ -134,6 +134,9 @@ const shots = process.env.SHOTS || "";
     check("an empty cell is a plus, not words",
       all(home, ".mlcell.empty").every((c) => c.querySelector(".mladd") && text(c) === ""),
       all(home, ".mlcell.empty").map(text).join("|"));
+    check("the plus and each meal's icon are drawn inline, not left to ha-icon",
+      all(home, ".mlcell.empty .mladd svg.mdi path").length === all(home, ".mlcell.empty").length
+        && all(home, ".mlrow svg.mdi path").length === 4, `${all(home, ".mladd svg.mdi").length} ${all(home, ".mlrow svg.mdi").length}`);
     check("a meal with no recipe is marked as a note",
       q(home, `[data-meal="${day(0)}|breakfast"]`).classList.contains("note"), "not a note");
     check("no one-day view for two days", !q(home, ".mldayview"), "drawn");

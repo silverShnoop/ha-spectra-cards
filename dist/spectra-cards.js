@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.116.0";
+const VERSION = "0.116.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1617,7 +1617,7 @@ img.avatar { object-fit:cover; display:block; }
    Days gone are faded rather than hidden: the week keeps its shape. */
 .mlg { container-type:inline-size; container-name:meals; }
 .mlgrid {
-  display:grid; grid-template-columns:minmax(70px, 88px) repeat(var(--mldays), minmax(0, 1fr));
+  display:grid; grid-template-columns:minmax(62px, 80px) repeat(var(--mldays), minmax(0, 1fr));
   gap:6px; align-items:stretch;
 }
 .mlcorner { min-height:1px; }
@@ -1633,13 +1633,18 @@ img.avatar { object-fit:cover; display:block; }
 .mlhead.today { background:var(--accent-soft); }
 .mlhead.today .mlword { color:var(--accent-on); }
 .mlhead.past { opacity:.55; }
+/* The meal's name under its icon rather than beside it: "Breakfast" beside
+   an icon needs ninety pixels, and on Home's narrow card that came out as
+   "BREAKFA...". Stacked, the column is the width of the word. */
 .mlrow {
-  display:flex; align-items:center; gap:7px; min-width:0; padding:0 2px;
-  font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+  display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
+  gap:4px; min-width:0; padding:0 2px;
+  font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
   color:var(--sp-ink-2);
 }
-.mlrow ha-icon { --mdc-icon-size:18px; color:var(--accent); flex:none; }
-.mlrow span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mlrow ha-icon { --mdc-icon-size:20px; color:var(--accent); flex:none; }
+.mlrow .mdi { width:20px; height:20px; color:var(--accent); flex:none; }
+.mlrow span { overflow-wrap:anywhere; }
 .mlcell {
   position:relative; display:flex; flex-direction:column; justify-content:center; gap:3px;
   min-height:62px; min-width:0; box-sizing:border-box; padding:8px 9px; margin:0;
@@ -1658,6 +1663,10 @@ img.avatar { object-fit:cover; display:block; }
 .mlcell.note .mlname { font-style:italic; font-weight:400; color:var(--sp-ink-2); }
 .mlcell.empty { align-items:center; background:none; border:1px dashed var(--sp-edge); }
 .mladd ha-icon { --mdc-icon-size:18px; color:var(--sp-ink-3); opacity:.7; }
+.mladd .mdi { width:18px; height:18px; color:var(--sp-ink-3); opacity:.7; display:block; }
+.mlcell.today.empty .mladd .mdi, .mlcell.next.empty .mladd .mdi { color:var(--accent); opacity:1; }
+/* Every inline glyph, whatever it sits in: sized like ha-icon's default. */
+svg.mdi { width:24px; height:24px; flex:none; }
 .mlcell.today:not(.empty) { background:var(--accent-soft); }
 .mlcell.today.empty { border-color:var(--accent); opacity:.8; }
 .mlcell.past { opacity:.5; }
@@ -1745,10 +1754,12 @@ img.avatar { object-fit:cover; display:block; }
   color:var(--sp-surface); display:grid; place-items:center; cursor:pointer; padding:0;
 }
 .mlptick ha-icon { --mdc-icon-size:18px; }
+.mlptick .mdi { width:18px; height:18px; }
 .mlprow.off .mlptick { background:none; color:var(--accent-on); }
 .mlptype { display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
   letter-spacing:.04em; text-transform:uppercase; color:var(--sp-ink-2); }
 .mlptype ha-icon { --mdc-icon-size:16px; color:var(--accent); }
+.mlptype .mdi { width:16px; height:16px; color:var(--accent); }
 .mlpname { font-size:15px; color:var(--sp-ink); min-width:0; }
 .mlpkind {
   font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
@@ -1757,13 +1768,15 @@ img.avatar { object-fit:cover; display:block; }
 .mlpkind.recipe { color:var(--accent-on); background:var(--accent-soft); }
 .mlpagain { padding:6px; display:grid; place-items:center; }
 .mlpagain ha-icon { --mdc-icon-size:18px; }
-.mlpagain.spinning ha-icon { animation:mlspin 1s linear infinite; }
+.mlpagain .mdi { width:18px; height:18px; }
+.mlpagain.spinning ha-icon, .mlpagain.spinning .mdi { animation:mlspin 1s linear infinite; }
 @keyframes mlspin { to { transform:rotate(360deg); } }
 @media (max-width: 480px) {
   .mlprow { grid-template-columns:36px minmax(0,1fr) auto 40px; }
   .mlptype { display:none; }
 }
 .mlbtn ha-icon { --mdc-icon-size:16px; vertical-align:-3px; }
+.mlbtn .mdi { width:16px; height:16px; vertical-align:-3px; }
 /* Which meals a Fill should plan. */
 .mlchoose { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 4px; }
 .mlchip {
@@ -1772,6 +1785,7 @@ img.avatar { object-fit:cover; display:block; }
   background:none; color:var(--sp-ink-2); cursor:pointer;
 }
 .mlchip ha-icon { --mdc-icon-size:18px; }
+.mlchip .mdi { width:18px; height:18px; }
 .mlchip[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-on); }
 /* The recipe, read at the hob. Bigger than the card's own type, because it
    is read from a step back with something in the other hand, and scrolled
@@ -2665,6 +2679,35 @@ const WEATHER_ICONS = {
  * editing this block by hand; it asserts the shape of what it finds, so a
  * future mdi redraw stops the script instead of miscolouring a piece.
  * ------------------------------------------------------------------ */
+/* The meal cards' own glyphs, as path data from @mdi/js 7.4.47 (Apache
+   2.0, Pictogrammers). ha-icon draws the rest, but it fetches its glyphs
+   lazily, and on the kitchen panel the plus in an empty cell and the icon
+   beside each meal came up blank -- which, for a plus that is the whole of
+   an empty cell, reads as a card that has not loaded. Inline, they are there
+   with the first paint. */
+const MDI_INLINE = {
+  "mdi:book-open-variant": "M12 21.5C10.65 20.65 8.2 20 6.5 20C4.85 20 3.15 20.3 1.75 21.05C1.65 21.1 1.6 21.1 1.5 21.1C1.25 21.1 1 20.85 1 20.6V6C1.6 5.55 2.25 5.25 3 5C4.11 4.65 5.33 4.5 6.5 4.5C8.45 4.5 10.55 4.9 12 6C13.45 4.9 15.55 4.5 17.5 4.5C18.67 4.5 19.89 4.65 21 5C21.75 5.25 22.4 5.55 23 6V20.6C23 20.85 22.75 21.1 22.5 21.1C22.4 21.1 22.35 21.1 22.25 21.05C20.85 20.3 19.15 20 17.5 20C15.8 20 13.35 20.65 12 21.5M12 8V19.5C13.35 18.65 15.8 18 17.5 18C18.7 18 19.9 18.15 21 18.5V7C19.9 6.65 18.7 6.5 17.5 6.5C15.8 6.5 13.35 7.15 12 8M13 11.5C14.11 10.82 15.6 10.5 17.5 10.5C18.41 10.5 19.26 10.59 20 10.78V9.23C19.13 9.08 18.29 9 17.5 9C15.73 9 14.23 9.28 13 9.84V11.5M17.5 11.67C15.79 11.67 14.29 11.93 13 12.46V14.15C14.11 13.5 15.6 13.16 17.5 13.16C18.54 13.16 19.38 13.24 20 13.4V11.9C19.13 11.74 18.29 11.67 17.5 11.67M20 14.57C19.13 14.41 18.29 14.33 17.5 14.33C15.67 14.33 14.17 14.6 13 15.13V16.82C14.11 16.16 15.6 15.83 17.5 15.83C18.54 15.83 19.38 15.91 20 16.07V14.57Z",
+  "mdi:bowl-mix-outline": "M15.6 12H2V15C2 18.9 5.1 22 9 22H15C18.9 22 22 18.9 22 15V12H15.6M20 15C20 17.8 17.8 20 15 20H9C6.2 20 4 17.8 4 15V14H20V15M16.2 11L20.3 4.4L22 5.5L18.6 11H16.2Z",
+  "mdi:bowl-outline": "M2 12V15C2 18.9 5.1 22 9 22H15C18.9 22 22 18.9 22 15V12H2M4 14H20V15C20 17.8 17.8 20 15 20H9C6.2 20 4 17.8 4 15V14Z",
+  "mdi:calendar-plus": "M19 19V8H5V19H19M16 1H18V3H19C20.11 3 21 3.9 21 5V19C21 20.11 20.11 21 19 21H5C3.89 21 3 20.1 3 19V5C3 3.89 3.89 3 5 3H6V1H8V3H16V1M11 9.5H13V12.5H16V14.5H13V17.5H11V14.5H8V12.5H11V9.5Z",
+  "mdi:calendar-star": "M19 19H5V8H19M16 1V3H8V1H6V3H5C3.9 3 3 3.9 3 5V19C3 20.11 3.9 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.9 20.11 3 19 3H18V1M10.88 12H7.27L10.19 14.11L9.08 17.56L12 15.43L14.92 17.56L13.8 14.12L16.72 12H13.12L12 8.56L10.88 12Z",
+  "mdi:camera-outline": "M20,4H16.83L15,2H9L7.17,4H4A2,2 0 0,0 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6A2,2 0 0,0 20,4M20,18H4V6H8.05L9.88,4H14.12L15.95,6H20V18M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15Z",
+  "mdi:check": "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z",
+  "mdi:chef-hat": "M12.5,1.5C10.73,1.5 9.17,2.67 8.67,4.37C8.14,4.13 7.58,4 7,4A4,4 0 0,0 3,8C3,9.82 4.24,11.41 6,11.87V19H19V11.87C20.76,11.41 22,9.82 22,8A4,4 0 0,0 18,4C17.42,4 16.86,4.13 16.33,4.37C15.83,2.67 14.27,1.5 12.5,1.5M12,10.5H13V17.5H12V10.5M9,12.5H10V17.5H9V12.5M15,12.5H16V17.5H15V12.5M6,20V21A1,1 0 0,0 7,22H18A1,1 0 0,0 19,21V20H6Z",
+  "mdi:coffee-outline": "M2,21V19H20V21H2M20,8V5H18V8H20M20,3A2,2 0 0,1 22,5V8A2,2 0 0,1 20,10H18V13A4,4 0 0,1 14,17H8A4,4 0 0,1 4,13V3H20M16,5H6V13A2,2 0 0,0 8,15H14A2,2 0 0,0 16,13V5Z",
+  "mdi:cupcake": "M12,1.5A2.5,2.5 0 0,1 14.5,4A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 9.5,4A2.5,2.5 0 0,1 12,1.5M15.87,5C18,5 20,7 20,9C22.7,9 22.7,13 20,13H4C1.3,13 1.3,9 4,9C4,7 6,5 8.13,5C8.57,6.73 10.14,8 12,8C13.86,8 15.43,6.73 15.87,5M5,15H8L9,22H7L5,15M10,15H14L13,22H11L10,15M16,15H19L17,22H15L16,15Z",
+  "mdi:delete-outline": "M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z",
+  "mdi:food-apple-outline": "M20,10C18.58,7.57 15.5,6.69 13,8V3H11V8C8.5,6.69 5.42,7.57 4,10C2,13 7,22 9,22C11,22 11,21 12,21C13,21 13,22 15,22C17,22 22,13 20,10M18.25,13.38C17.63,15.85 16.41,18.12 14.7,20C14.5,20 14.27,19.9 14.1,19.75C12.87,18.76 11.13,18.76 9.9,19.75C9.73,19.9 9.5,20 9.3,20C7.59,18.13 6.36,15.85 5.75,13.39C5.5,12.66 5.45,11.87 5.66,11.12C6.24,10.09 7.32,9.43 8.5,9.4C9.06,9.41 9.61,9.54 10.11,9.79L11,10.24H13L13.89,9.79C14.39,9.54 14.94,9.41 15.5,9.4C16.68,9.43 17.76,10.08 18.34,11.11C18.55,11.86 18.5,12.65 18.25,13.38M11,5C5.38,8.07 4.11,3.78 4.11,3.78C4.11,3.78 6.77,0.19 11,5Z",
+  "mdi:fridge-outline": "M9,21V22H7V21A2,2 0 0,1 5,19V4A2,2 0 0,1 7,2H17A2,2 0 0,1 19,4V19A2,2 0 0,1 17,21V22H15V21H9M7,4V9H17V4H7M7,19H17V11H7V19M8,12H10V15H8V12M8,6H10V8H8V6Z",
+  "mdi:glass-cocktail": "M7.5,7L5.5,5H18.5L16.5,7M11,13V19H6V21H18V19H13V13L21,5V3H3V5L11,13Z",
+  "mdi:link-plus": "M7,7H11V9H7A3,3 0 0,0 4,12A3,3 0 0,0 7,15H11V17H7A5,5 0 0,1 2,12A5,5 0 0,1 7,7M17,7A5,5 0 0,1 22,12H20A3,3 0 0,0 17,9H13V7H17M8,11H16V13H8V11M17,12H19V15H22V17H19V20H17V17H14V15H17V12Z",
+  "mdi:pencil": "M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z",
+  "mdi:plus": "M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z",
+  "mdi:refresh": "M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z",
+  "mdi:silverware-fork-knife": "M11,9H9V2H7V9H5V2H3V9C3,11.12 4.66,12.84 6.75,12.97V22H9.25V12.97C11.34,12.84 13,11.12 13,9V2H11V9M16,6V14H18.5V22H21V2C18.24,2 16,4.24 16,6Z",
+  "mdi:silverware-variant": "M8.1,13.34L3.91,9.16C2.35,7.59 2.35,5.06 3.91,3.5L10.93,10.5L8.1,13.34M13.41,13L20.29,19.88L18.88,21.29L12,14.41L5.12,21.29L3.71,19.88L13.36,10.22L13.16,10C12.38,9.23 12.38,7.97 13.16,7.19L17.5,2.82L18.43,3.74L15.19,7L16.15,7.94L19.39,4.69L20.31,5.61L17.06,8.85L18,9.81L21.26,6.56L22.18,7.5L17.81,11.84C17.03,12.62 15.77,12.62 15,11.84L14.78,11.64L13.41,13Z",
+};
+
 const WEATHER_ART = {
   "clear-night": `<path d="M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09" class="ws"/><path d="M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11" class="ws"/><path d="M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.64 6.35,17.66C9.37,20.67 14.19,20.78 17.33,17.97Z" class="wc"/>`,
   cloudy: `<path d="M6,19A5,5 0 0,1 1,14A5,5 0 0,1 6,9C7,6.65 9.3,5 12,5C15.43,5 18.24,7.66 18.5,11.03L19,11A4,4 0 0,1 23,15A4,4 0 0,1 19,19H6M19,13H17V12A5,5 0 0,0 12,7C9.5,7 7.45,8.82 7.06,11.19C6.73,11.07 6.37,11 6,11A3,3 0 0,0 3,14A3,3 0 0,0 6,17H19A2,2 0 0,0 21,15A2,2 0 0,0 19,13Z" class="wc"/>`,
@@ -2929,6 +2972,11 @@ function iconMarkup(name, cls) {
   const key = String(name).startsWith("spectra:") ? String(name).slice(8) : null;
   const art = key ? WEATHER_ART[key] : null;
   const klass = isBlank(cls) ? "" : ` ${cls}`;
+  const inline = !art ? MDI_INLINE[String(name)] : null;
+  if (inline) {
+    return `<svg class="mdi${klass}" viewBox="0 0 24 24" aria-hidden="true">`
+      + `<path fill="currentColor" d="${inline}"/></svg>`;
+  }
   if (!art) return `<ha-icon${klass ? ` class="${cls}"` : ""} icon="${esc(name)}"></ha-icon>`;
   return `<svg class="wicon${klass}" viewBox="0 0 24 24"`
     + ` aria-hidden="true">${art}</svg>`;
