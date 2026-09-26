@@ -83,7 +83,7 @@ const shots = process.env.SHOTS || "";
       E(day(-1), "dinner", R("d", "Easy fish pie", "1 hour")),
       E(day(2), "lunch", null, "Soup"),
       E(day(3), "dinner", R("e", "Chicken fajitas", "30 minutes")),
-      E(day(-back + 8), "dinner", R("f", "Mushroom risotto", "40 minutes")),
+      E(day(-back + 13), "dinner", R("f", "Mushroom risotto", "40 minutes")),
     ];
     const asked = [];
     const hass = {
@@ -238,8 +238,8 @@ const shots = process.env.SHOTS || "";
       q(week, ".mlgridview .mlcell").getAttribute("data-meal") === `${monday(1)}|breakfast`,
       q(week, ".mlgridview .mlcell").getAttribute("data-meal"));
     check("with nothing faded", !q(week, ".mlgridview .mlhead.past") && !q(week, ".mlhead.today"), "faded");
-    check("and its meals", text(q(week, `.mlgridview [data-meal="${day(-back + 8)}|dinner"]`)).includes("Mushroom risotto"),
-      text(q(week, `.mlgridview [data-meal="${day(-back + 8)}|dinner"]`)));
+    check("and its meals", text(q(week, `.mlgridview [data-meal="${day(-back + 13)}|dinner"]`)).includes("Mushroom risotto"),
+      text(q(week, `.mlgridview [data-meal="${day(-back + 13)}|dinner"]`)));
     q(week, "[data-meal-shopweek]").click();
     await settle();
     const shop = asked.filter((m) => m.service === "meal_week_to_items").pop();

@@ -1702,6 +1702,47 @@ body:
 - **`pick.types` limits Pick one** to the meals it makes sense for. A
   random dinner is a fair suggestion for lunch, but not for breakfast.
 
+### Planning with the card, not at it
+
+Four optional keys turn the card from a view of the plan into a way to
+make one. Each needs a script that answers in a fixed shape:
+
+```yaml
+  place: {script: script.meal_plan_set}          # puts one meal in one slot
+  write: {script: script.meal_recipe_from_name}  # drafts a recipe for a name
+  fridge:
+    save: home_signals.save_photo                # keeps the photo for the AI
+    script: script.meal_fridge_ideas             # suggests meals from it
+```
+
+- **With `place`, Fill empty suggests before it writes.** It asks `week`
+  for each meal chosen with `suggest: true`, and lists the answers by day.
+  Each row says whether it is a saved **Recipe** or only an **Idea**. Untick
+  what isn't wanted. **Another** (the circular arrow) asks again for that
+  one slot, sending `avoid` with everything already listed. Nothing is
+  written until **Plan N meals**, and then each row goes to `place` with
+  `only_if_empty: true`, because the plan may have changed while the list
+  was being read. This is Skylight's Sidekick, with the review the house
+  asked for.
+- **Make it a recipe**, in the tray of a meal that is only a name. `write`
+  drafts a recipe (`{name, total_time, servings, ingredients[],
+  method[]}`), the edit form opens with it under **Check the recipe, then
+  save**, and once it is saved the slot is pointed at the new recipe.
+- **Choose a recipe**, in any open slot's tray. The box opens headed with
+  the slot ("Tomorrow's lunch: choose a recipe"), and a name goes straight
+  in.
+- **Plan it**, on a recipe sheet opened from the week. It offers the
+  card's meals and the coming seven days as buttons.
+- **What's in the fridge?** takes a photo, sends it to `fridge.save`, and
+  hands the photo's media id to `fridge.script`. That script answers
+  `{seen, planned: [{date, entry_type, meal, recipe_id}]}`, and the
+  suggestions open on the same sheet as Fill empty, headed with what was
+  seen.
+
+A photo is shrunk to 1600px on its long edge and sent as a JPEG before
+anything else happens. A websocket message is limited to a few
+megabytes, and a model reads a fridge no better at twelve megapixels.
+
 **The slots come from `days` and `types`, not from the plan.** A day with
 nothing planned still has its slot, greyed and saying `Nothing planned`.
 That is the fact that sends somebody to the mic, so the card never hides
@@ -1801,6 +1842,8 @@ body:
     delete: home_signals.delete_recipe
     dictate: script.meal_recipe_from_speech
   import: {script: script.meal_import_recipe}   # optional: "From a link"
+  schedule: {script: script.meal_plan_set, types: [breakfast, lunch, dinner, snack]}  # optional: "Plan it"
+  photo: {save: home_signals.save_photo, script: script.meal_recipe_from_photo}      # optional: "From a photo"
 ```
 
 A name opens its recipe on the same sheet the meals card uses, with Edit and
@@ -1809,6 +1852,10 @@ link** takes a pasted address. The whole message can be pasted, because the
 first link in it is the one sent. The card expects the script to answer
 `{recipe}`, and when the page has no recipe on it the sheet says so and
 stays open.
+
+**From a photo** reads a cookbook page or a handwritten card into the
+new-recipe form, for checking before it is saved. **Plan it** on a recipe
+puts it on a day and a meal.
 
 **Search filters the list without repainting it.** A repaint would take the
 keyboard away after every letter. What is typed is kept on the card, so the

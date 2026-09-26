@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.115.0";
+const VERSION = "0.116.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1725,6 +1725,45 @@ img.avatar { object-fit:cover; display:block; }
 }
 .mlweek.on { background:var(--sp-surface); color:var(--sp-ink); box-shadow:0 1px 2px rgba(0,0,0,.12); }
 .mlcount { flex:1 1 auto; font-size:12px; color:var(--sp-ink-3); font-variant-numeric:tabular-nums; }
+/* The suggestions to tick. A row per slot under its day, the kind of meal
+   and whether it is a saved recipe or only an idea, and a way to ask
+   again. Unticked rows stay, faded, in case of a change of mind. */
+.mlpropose { max-width:560px; }
+.mlplist { list-style:none; margin:6px 0 0; padding:0; max-height:min(56vh, 480px); overflow-y:auto; }
+.mlpday {
+  margin:12px 0 4px; font-size:11px; font-weight:700; letter-spacing:.07em;
+  text-transform:uppercase; color:var(--accent-on);
+}
+.mlpday span { font-weight:500; letter-spacing:0; text-transform:none; color:var(--sp-ink-3); }
+.mlprow {
+  display:grid; grid-template-columns:40px 92px minmax(0,1fr) auto 44px; align-items:center;
+  gap:8px; padding:4px 0; border-bottom:1px solid var(--sp-sink);
+}
+.mlprow.off .mlpname, .mlprow.off .mlptype { opacity:.45; text-decoration:line-through; }
+.mlptick {
+  width:34px; height:34px; border-radius:50%; border:2px solid var(--accent); background:var(--accent);
+  color:var(--sp-surface); display:grid; place-items:center; cursor:pointer; padding:0;
+}
+.mlptick ha-icon { --mdc-icon-size:18px; }
+.mlprow.off .mlptick { background:none; color:var(--accent-on); }
+.mlptype { display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
+  letter-spacing:.04em; text-transform:uppercase; color:var(--sp-ink-2); }
+.mlptype ha-icon { --mdc-icon-size:16px; color:var(--accent); }
+.mlpname { font-size:15px; color:var(--sp-ink); min-width:0; }
+.mlpkind {
+  font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  padding:2px 7px; border-radius:999px; color:var(--sp-ink-2); background:var(--sp-sink);
+}
+.mlpkind.recipe { color:var(--accent-on); background:var(--accent-soft); }
+.mlpagain { padding:6px; display:grid; place-items:center; }
+.mlpagain ha-icon { --mdc-icon-size:18px; }
+.mlpagain.spinning ha-icon { animation:mlspin 1s linear infinite; }
+@keyframes mlspin { to { transform:rotate(360deg); } }
+@media (max-width: 480px) {
+  .mlprow { grid-template-columns:36px minmax(0,1fr) auto 40px; }
+  .mlptype { display:none; }
+}
+.mlbtn ha-icon { --mdc-icon-size:16px; vertical-align:-3px; }
 /* Which meals a Fill should plan. */
 .mlchoose { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 4px; }
 .mlchip {
@@ -2874,6 +2913,9 @@ const RAW_KEYS = new Set([
   "scenes", "voice",
   /* The meal card's two scripts, raw for the same reason as `voice`. */
   "say", "shop", "pick", "move", "week", "shop_week", "recipes",
+  /* ...and the ones that came after: planning a meal into a slot, writing
+     a recipe for a meal that is only a name, and the two cameras. */
+  "place", "write", "schedule", "photo", "fridge", "edit", "import",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -4465,6 +4507,8 @@ const BODIES = {
       + `<input type="search" class="rcfind" data-recipe-find placeholder="Find a recipe"`
       + ` aria-label="Find a recipe" autocomplete="off" value="${esc(find)}">`
       + (link ? `<button type="button" class="mlbtn quiet" data-recipe-link>From a link</button>` : "")
+      + (b.photo && typeof b.photo === "object" && !isBlank(b.photo.save) && !isBlank(b.photo.script) && add
+        ? `<button type="button" class="mlbtn quiet" data-recipe-photo>From a photo</button>` : "")
       + (add ? `<button type="button" class="mlbtn" data-recipe-new>New recipe</button>` : "")
       + `</div>`;
     if (!box.length) return out + `<p class="rcnone">The recipe box is empty.</p></div>`;
@@ -6743,6 +6787,41 @@ function mealAt(plan, day, type) {
     && String(e.entry_type).toLowerCase() === type) || null;
 }
 
+/* "Tuesday dinner", "Today's lunch": a slot in words, for a heading. */
+function mealSlotWords(day, type) {
+  const word = mealType(type).word.toLowerCase();
+  if (day === localDay(0)) return `Today's ${word}`;
+  if (day === localDay(1)) return `Tomorrow's ${word}`;
+  const name = new Date(Date.parse(`${day}T12:00:00`)).toLocaleDateString([], { weekday: "long" });
+  return `${name} ${word}`;
+}
+
+/* A photo, shrunk to at most `side` pixels on its long edge and sent as a
+   JPEG data URL. A websocket message is limited to a few megabytes, and a
+   model reads a cookbook page no better at twelve megapixels than at two. */
+function shrinkPhoto(file, side) {
+  const max = side || 1600;
+  const draw = (source, w, h) => {
+    const scale = Math.min(1, max / Math.max(w, h));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    canvas.getContext("2d").drawImage(source, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  };
+  if (typeof createImageBitmap === "function") {
+    return createImageBitmap(file, { imageOrientation: "from-image" })
+      .then((bitmap) => draw(bitmap, bitmap.width, bitmap.height));
+  }
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(draw(img, img.naturalWidth, img.naturalHeight)); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("not an image")); };
+    img.src = url;
+  });
+}
+
 /* What a Fill or a Shop should cover: the days shown that have not gone,
    as the scripts' `start_date` and `days`. Null when every day shown is
    past, which is a Sunday night looking at this week. */
@@ -6906,6 +6985,17 @@ function mealTray(b, entry, type, past) {
   if (shop) out += `<button type="button" class="mlbtn" data-meal-shop>Ingredients to list</button>`;
   /* A day that has gone can be read, not planned. */
   if (past) return out + `</div>`;
+  /* A meal that is only a name can become a recipe, and an empty slot can
+     be filled from the box by tapping, with no mic and no dice. */
+  const saves = b.recipes && typeof b.recipes === "object" && !isBlank(b.recipes.save);
+  const sets = b.place && !isBlank(b.place.script);
+  if (entry && !entry.recipe && saves && sets && b.write && !isBlank(b.write.script)) {
+    out += `<button type="button" class="mlbtn" data-meal-make>Make it a recipe</button>`;
+  }
+  if (sets) {
+    out += `<button type="button" class="mlbtn${entry ? " quiet" : ""}" data-meal-choose>`
+      + `${entry ? "Choose another" : "Choose a recipe"}</button>`;
+  }
   const pickable = b.pick && !isBlank(b.pick.script)
     && (!Array.isArray(b.pick.types) || b.pick.types.map((t) => String(t).toLowerCase()).includes(type));
   if (pickable) {
@@ -6971,6 +7061,8 @@ function mealFoot(b, picked, moving, dates, plan, types) {
   return `<div class="mlfoot">` + lead
     + (note ? `<span class="tdvoicesay">${esc(note)}</span>` : "")
     + (box ? `<button type="button" class="mlbtn quiet" data-meal-box>Recipes</button>` : "")
+    + (b.fridge && !isBlank(b.fridge.script) && !isBlank(b.fridge.save)
+      ? `<button type="button" class="mlbtn quiet" data-meal-fridge>${iconMarkup("mdi:fridge-outline")} What's in the fridge?</button>` : "")
     + (week ? `<button type="button" class="mlbtn" data-meal-week>Fill empty days</button>` : "")
     + (shop ? `<button type="button" class="mlbtn" data-meal-shopweek>Shop for the week</button>` : "")
     + `</div>`;
@@ -10808,13 +10900,45 @@ class SpectraCard extends HTMLElement {
           .map((t) => String(t).toLowerCase());
         const span = mealSpan(body);
         if (!span) { this._voiceSay("idle", "This week is over. Look at next week."); return; }
-        /* One kind of meal: straight in, as before. Several: ask which. */
-        if (types.length === 1) {
-          this._mealFill(body.week, types, span);
-          return;
-        }
-        this._mealChoose(types, body.week.types, model.accent)
-          .then((chosen) => { if (chosen.length) this._mealFill(body.week, chosen, span); });
+        /* With somewhere to write proposals to, Fill suggests and a person
+           approves. Without, it writes straight in, as it used to. */
+        const go = (chosen) => {
+          if (!chosen.length) return;
+          if (body.place && !isBlank(body.place.script)) this._mealPropose(body, chosen, span, model.accent);
+          else this._mealFill(body.week, chosen, span);
+        };
+        if (types.length === 1) { go(types); return; }
+        this._mealChoose(types, body.week.types, model.accent).then(go);
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-make]").forEach((el) => {
+      if (!slot || !entry || entry.recipe || !this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      press(el, () => {
+        flashPress(el);
+        this._mealMake(body, source.entry, slot, entry, model.accent);
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-choose]").forEach((el) => {
+      if (!slot || !body.place || isBlank(body.place.script) || !this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      press(el, () => {
+        flashPress(el);
+        this._mealBox(source.entry, model.accent, body.recipes, { pick: { slot, spec: body.place } });
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-fridge]").forEach((el) => {
+      const fridge = body.fridge;
+      if (!fridge || isBlank(fridge.script) || isBlank(fridge.save)) return;
+      press(el, () => {
+        flashPress(el);
+        this._mealPick = null;
+        const span = mealSpan(body);
+        if (!span) { this._voiceSay("idle", "This week is over. Look at next week."); return; }
+        this._mealFridge(body, span, model.accent);
       });
     });
 
@@ -10836,7 +10960,8 @@ class SpectraCard extends HTMLElement {
       const [source] = this._mealSources.values();
       press(el, () => {
         flashPress(el);
-        this._mealRecipe(source.entry, entry.recipe, model.accent, body.recipes);
+        this._mealRecipe(source.entry, entry.recipe, model.accent, body.recipes,
+          { schedule: body.place ? Object.assign({ types: body.types }, body.place) : null });
       });
     });
 
@@ -10845,7 +10970,8 @@ class SpectraCard extends HTMLElement {
       const [source] = this._mealSources.values();
       press(el, () => {
         flashPress(el);
-        this._mealBox(source.entry, model.accent, body.recipes);
+        this._mealBox(source.entry, model.accent, body.recipes,
+          { schedule: body.place ? Object.assign({ types: body.types }, body.place) : null });
       });
     });
 
@@ -11064,6 +11190,333 @@ class SpectraCard extends HTMLElement {
     });
   }
 
+  /* Call a script and hand back its answer: the one shape every meal
+     script here shares. */
+  _mealCall(name, data) {
+    const [domain, service] = String(name).split(".");
+    return Promise.resolve(this._hass.callWS({
+      type: "call_service", domain, service, service_data: data, return_response: true,
+    })).then((result) => (result && result.response) || {});
+  }
+
+  /* Put one meal into one slot, and say so under the week. */
+  _mealSetRun(spec, data, said) {
+    this._voiceSay("thinking", "Planning…");
+    return this._mealCall(spec.script, data).then((r) => {
+      this._voiceSay("idle", r.error ? String(r.error) : said);
+    }, (error) => {
+      LOGGER_WARN(`spectra-card: ${spec.script} failed`, error);
+      this._voiceSay("idle", "That did not work.");
+    }).then(() => this._refetchMeals());
+  }
+
+  /* "Plan it" on a recipe: which meal, which day, then done. The days are
+     the coming week from today, as words, because on a panel a date is a
+     position in the week rather than a number. */
+  _mealSchedule(recipe, accent, spec) {
+    const types = (Array.isArray(spec.types) && spec.types.length ? spec.types : ["dinner"])
+      .map((t) => String(t).toLowerCase());
+    let type = types.includes("dinner") ? "dinner" : types[0];
+    let day = localDay(0);
+    const days = Array.from({ length: 7 }, (_, i) => localDay(i));
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Plan it">`
+      + `<div class="confirmhead"><ha-icon icon="mdi:calendar-plus"></ha-icon><span>Plan ${esc(recipe.name)}</span></div>`
+      + `<div class="mlchoose" data-types>${types.map((t) => `<button type="button" class="mlchip" data-type="${esc(t)}"`
+        + ` aria-pressed="${t === type}">${iconMarkup(mealType(t).icon)}<span>${esc(mealType(t).word)}</span></button>`).join("")}</div>`
+      + `<div class="mlchoose" data-days>${days.map((d, i) => `<button type="button" class="mlchip" data-day="${d}"`
+        + ` aria-pressed="${d === day}">${esc(i === 0 ? "Today" : (weekdayLabel(`${d}T12:00:00`) || d))}</button>`).join("")}</div>`
+      + `<p class="confirmtext quiet" data-status>Anything already planned there is replaced.</p>`
+      + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button>`
+      + `<button type="button" class="confirmyes" data-yes>Plan it</button></div></div>`;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    };
+    const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(); } };
+    const choose = (attr, value) => wrap.querySelectorAll(`[data-${attr}]`).forEach((c) => {
+      if (c.hasAttribute(`data-${attr}`) && c.getAttribute(`data-${attr}`) !== null) {
+        c.setAttribute("aria-pressed", String(c.getAttribute(`data-${attr}`) === value));
+      }
+    });
+    wrap.querySelectorAll("[data-type]").forEach((c) => c.addEventListener("click", () => {
+      type = c.getAttribute("data-type"); choose("type", type);
+    }));
+    wrap.querySelectorAll("[data-day]").forEach((c) => c.addEventListener("click", () => {
+      day = c.getAttribute("data-day"); choose("day", day);
+    }));
+    wrap.querySelector("[data-no]").addEventListener("click", finish);
+    wrap.querySelector("[data-yes]").addEventListener("click", (event) => {
+      const yes = event.currentTarget;
+      yes.disabled = true;
+      wrap.querySelector("[data-status]").textContent = "Planning…";
+      this._mealCall(spec.script, { date: day, entry_type: type, recipe_id: String(recipe.recipe_id) })
+        .then((r) => {
+          wrap.querySelector("[data-status]").textContent = r.error ? String(r.error)
+            : `Planned for ${mealSlotWords(day, type).replace(/^Today's|^Tomorrow's/, (w) => w.toLowerCase())}.`;
+          this._refetchMeals();
+          if (!r.error) setTimeout(finish, 1200); else yes.disabled = false;
+        }, () => {
+          yes.disabled = false;
+          wrap.querySelector("[data-status]").textContent = "That did not work.";
+        });
+    });
+    wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
+    document.addEventListener("keydown", onKey, true);
+    this._holder.appendChild(wrap);
+  }
+
+  /* Fill empty, the Sidekick way: suggest, then let a person choose.
+     Each kind of meal is asked for in turn, without writing anything, and
+     the answers come back as a list to tick. "Another" asks again for
+     that one row. Only "Plan these" writes, one slot at a time, and only
+     into slots still empty -- the plan may have moved while the list was
+     being read. */
+  _mealPropose(body, types, span, accent, preset) {
+    if (this._voice && this._voice.phase !== "idle") return;
+    const week = body.week;
+    const place = body.place;
+    const rows = [];
+    let chain = Promise.resolve();
+    const ask = (type, from, days, avoid) => {
+      const data = Object.assign({ entry_type: type, start_date: from, days, suggest: true });
+      if (avoid && avoid.length) data.avoid = avoid;
+      if (!isBlank(week.agent)) data.agent = String(week.agent);
+      return this._mealCall(week.script, data).then((r) => (Array.isArray(r.planned) ? r.planned : [])
+        .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
+        .map((p) => ({ date: String(p.date), type, name: String(p.meal),
+          recipe_id: isBlank(p.recipe_id) ? "" : String(p.recipe_id), on: true })));
+    };
+    if (preset) {
+      rows.push(...preset);
+    } else {
+      types.forEach((type) => {
+        chain = chain.then(() => {
+          this._voiceSay("thinking", `Thinking about ${mealType(type).word.toLowerCase()}…`);
+          return ask(type, span.start_date, span.days).then((got) => { rows.push(...got); });
+        });
+      });
+    }
+    chain.then(() => {
+      this._voiceSay("idle", "");
+      if (!rows.length) { this._voiceSay("idle", "Everything is already planned."); return; }
+      rows.sort((a, b) => (a.date === b.date
+        ? Object.keys(MEAL_TYPES).indexOf(a.type) - Object.keys(MEAL_TYPES).indexOf(b.type)
+        : (a.date < b.date ? -1 : 1)));
+      this._mealProposals(rows, place, accent, ask, preset ? body.fridge_seen : "");
+    }, (error) => {
+      LOGGER_WARN(`spectra-card: ${week.script} failed`, error);
+      this._voiceSay("idle", "That did not work.");
+    });
+  }
+
+  _mealProposals(rows, place, accent, ask, seen) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    };
+    const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(); } };
+    const paint = () => {
+      const count = rows.filter((r) => r.on).length;
+      let last = "";
+      let list = "";
+      rows.forEach((r, i) => {
+        if (r.date !== last) {
+          last = r.date;
+          list += `<li class="mlpday">${esc(weekdayLabel(`${r.date}T12:00:00`) || r.date)}`
+            + ` <span>${esc(dayDateLabel(`${r.date}T12:00:00`) || "")}</span></li>`;
+        }
+        list += `<li class="mlprow${r.on ? "" : " off"}">`
+          + `<button type="button" class="mlptick" data-tick="${i}" aria-pressed="${r.on}"`
+          + ` aria-label="${esc(r.on ? `Leave out ${r.name}` : `Plan ${r.name}`)}">${iconMarkup(r.on ? "mdi:check" : "mdi:plus")}</button>`
+          + `<span class="mlptype">${iconMarkup(mealType(r.type).icon)}${esc(mealType(r.type).word)}</span>`
+          + `<span class="mlpname">${esc(r.name)}</span>`
+          + `<span class="mlpkind${r.recipe_id ? " recipe" : ""}">${r.recipe_id ? "Recipe" : "Idea"}</span>`
+          + `<button type="button" class="mlbtn quiet mlpagain" data-again="${i}" aria-label="Something else for ${esc(mealSlotWords(r.date, r.type))}">`
+          + `${iconMarkup("mdi:refresh")}</button></li>`;
+      });
+      wrap.innerHTML = `<div class="confirmbox mlpropose" role="dialog" aria-modal="true" aria-label="Suggested meals">`
+        + `<div class="confirmhead"><ha-icon icon="mdi:calendar-star"></ha-icon><span>Suggested meals</span></div>`
+        + (seen ? `<p class="confirmtext">In the fridge: ${esc(seen)}</p>` : "")
+        + `<p class="confirmtext quiet">Untick what you don't want, or ask for something else. Only empty slots are filled.</p>`
+        + `<ul class="mlplist">${list}</ul>`
+        + `<p class="confirmtext quiet" data-status></p>`
+        + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button>`
+        + `<button type="button" class="confirmyes" data-yes${count ? "" : " disabled"}>`
+        + `${count === 1 ? "Plan 1 meal" : `Plan ${count} meals`}</button></div></div>`;
+      wrap.querySelector("[data-no]").addEventListener("click", finish);
+      wrap.querySelectorAll("[data-tick]").forEach((b) => b.addEventListener("click", () => {
+        const r = rows[Number(b.getAttribute("data-tick"))];
+        r.on = !r.on;
+        paint();
+      }));
+      wrap.querySelectorAll("[data-again]").forEach((b) => b.addEventListener("click", () => {
+        const r = rows[Number(b.getAttribute("data-again"))];
+        b.disabled = true;
+        b.classList.add("spinning");
+        const avoid = rows.filter((x) => x.type === r.type).map((x) => x.name);
+        (r.tried || []).forEach((t) => avoid.push(t));
+        ask(r.type, r.date, 1, avoid).then((got) => {
+          const next = got.find((g) => g.date === r.date);
+          if (next) {
+            r.tried = (r.tried || []).concat([r.name]);
+            Object.assign(r, { name: next.name, recipe_id: next.recipe_id, on: true });
+          }
+          paint();
+        }, () => paint());
+      }));
+      wrap.querySelector("[data-yes]").addEventListener("click", (event) => {
+        event.currentTarget.disabled = true;
+        const chosen = rows.filter((r) => r.on);
+        const status = wrap.querySelector("[data-status]");
+        let n = 0;
+        let chain = Promise.resolve();
+        chosen.forEach((r) => {
+          chain = chain.then(() => {
+            status.textContent = `Planning ${r.name}…`;
+            const data = { date: r.date, entry_type: r.type, only_if_empty: true };
+            if (r.recipe_id) data.recipe_id = r.recipe_id; else data.title = r.name;
+            return this._mealCall(place.script, data).then((a) => { if (!a.error && !a.skipped) n += 1; });
+          });
+        });
+        chain.then(() => {
+          finish();
+          this._voiceSay("idle", n === 1 ? "1 meal planned" : `${n} meals planned`);
+          this._refetchMeals();
+        }, (error) => {
+          LOGGER_WARN(`spectra-card: ${place.script} failed`, error);
+          finish();
+          this._voiceSay("idle", n ? `${n} planned, then it stopped.` : "That did not work.");
+          this._refetchMeals();
+        });
+      });
+    };
+    wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
+    document.addEventListener("keydown", onKey, true);
+    paint();
+    this._holder.appendChild(wrap);
+  }
+
+  /* A meal that is only a name ("Fish pie") becomes a recipe: AI writes
+     one, the form opens with it for a person to check, and once saved the
+     slot is pointed at the new recipe. */
+  _mealMake(body, entry, slot, planned, accent) {
+    const name = mealName(planned);
+    this._voiceSay("thinking", `Writing a recipe for ${name}…`);
+    this._mealCall(body.write.script, { title: name, entry_type: slot[1] }).then((got) => {
+      this._voiceSay("idle", "");
+      const draft = {
+        name: firstOf(got.name, name),
+        total_time: got.total_time || "",
+        recipe_servings: got.servings || "",
+        ingredients: (Array.isArray(got.ingredients) ? got.ingredients : []).map((x) => ({ display: String(x) })),
+        instructions: (Array.isArray(got.method) ? got.method : []).map((x) => ({ text: String(x) })),
+      };
+      this._mealEdit(entry, null, accent, body.recipes, {
+        draft,
+        heading: "Check the recipe, then save",
+        onSaved: (saved) => {
+          if (isBlank(saved.recipe_id)) return;
+          this._mealSetRun(body.place, { date: slot[0], entry_type: slot[1], recipe_id: String(saved.recipe_id) },
+            `${firstOf(saved.name, name)} is now a recipe`);
+        },
+      });
+    }, (error) => {
+      LOGGER_WARN(`spectra-card: ${body.write.script} failed`, error);
+      this._voiceSay("idle", "That did not work.");
+    });
+  }
+
+  /* Take or choose a photo, shrink it, and keep it where an AI task can
+     see it. Resolves the saved photo's media id, or null when nothing was
+     chosen. The file input is made on the press, because a browser only
+     opens a camera from inside a tap. */
+  _mealPhoto(save, folder) {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.style.display = "none";
+      input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (input.parentNode) input.parentNode.removeChild(input);
+        if (!file) { resolve(null); return; }
+        this._voiceSay("thinking", "Looking at the photo…");
+        shrinkPhoto(file).then((image) => this._mealCall(save, { image, folder }))
+          .then((r) => resolve(r.media_content_id ? r : null), reject);
+      });
+      this._holder.appendChild(input);
+      input.click();
+    });
+  }
+
+  /* A cookbook page, or a handwritten card, into the new-recipe form. */
+  _recipeFromPhoto(spec, entry, accent, edit) {
+    this._mealPhoto(spec.save, "cookbook").then((photo) => {
+      if (!photo) return null;
+      this._voiceSay("thinking", "Reading the recipe…");
+      return this._mealCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type })
+        .then((got) => {
+          this._voiceSay("idle", "");
+          if (isBlank(got.name) && !(Array.isArray(got.ingredients) && got.ingredients.length)) {
+            this._voiceSay("idle", "No recipe could be read from that photo.");
+            return;
+          }
+          this._mealEdit(entry, null, accent, edit, {
+            heading: "Check the recipe, then save",
+            draft: {
+              name: got.name || "",
+              total_time: got.total_time || "",
+              recipe_servings: got.servings || "",
+              ingredients: (got.ingredients || []).map((x) => ({ display: String(x) })),
+              instructions: (got.method || []).map((x) => ({ text: String(x) })),
+            },
+          });
+        });
+    }).catch((error) => {
+      LOGGER_WARN("spectra-card: could not read the photo", error);
+      this._voiceSay("idle", "That photo could not be read.");
+    });
+  }
+
+  /* What's in the fridge: a photo, and meals that use it, as suggestions
+     on the same sheet as Fill empty. */
+  _mealFridge(body, span, accent) {
+    this._mealPhoto(body.fridge.save, "fridge").then((photo) => {
+      if (!photo) return null;
+      this._voiceSay("thinking", "Seeing what's in there…");
+      return this._mealCall(body.fridge.script, {
+        photo: photo.media_content_id, photo_type: photo.media_content_type,
+        start_date: span.start_date, days: Math.min(span.days, 3),
+      }).then((got) => {
+        const rows = (Array.isArray(got.planned) ? got.planned : [])
+          .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
+          .map((p) => ({ date: String(p.date), type: String(p.entry_type || "dinner").toLowerCase(),
+            name: String(p.meal), recipe_id: isBlank(p.recipe_id) ? "" : String(p.recipe_id), on: true }));
+        this._voiceSay("idle", "");
+        if (!rows.length) {
+          this._voiceSay("idle", isBlank(got.note) ? "No meals came to mind for that." : String(got.note));
+          return;
+        }
+        this._mealPropose(Object.assign({}, body, { fridge_seen: got.seen || "" }), [], span, accent, rows);
+      });
+    }).catch((error) => {
+      LOGGER_WARN("spectra-card: could not use the fridge photo", error);
+      this._voiceSay("idle", "That photo could not be read.");
+    });
+  }
+
   _mealRun(spec, data, while_, say) {
     if (!spec || isBlank(spec.script)) return;
     if (this._voice && this._voice.phase !== "idle") return;
@@ -11107,11 +11560,13 @@ class SpectraCard extends HTMLElement {
     this._holder.querySelectorAll("[data-recipe-open]").forEach((el) => {
       el.addEventListener("click", () => {
         const r = box[Number(el.getAttribute("data-recipe-open"))];
-        if (r) this._mealRecipe(source.entry, r, model.accent, edit);
+        if (r) this._mealRecipe(source.entry, r, model.accent, edit, { schedule: body.schedule });
       });
     });
     const add = this._holder.querySelector("[data-recipe-new]");
     if (add) add.addEventListener("click", () => this._mealEdit(source.entry, null, model.accent, edit));
+    const photo = this._holder.querySelector("[data-recipe-photo]");
+    if (photo) photo.addEventListener("click", () => this._recipeFromPhoto(body.photo, source.entry, model.accent, edit));
     const link = this._holder.querySelector("[data-recipe-link]");
     if (link) link.addEventListener("click", () => this._mealImport(body.import, model.accent));
   }
@@ -11176,7 +11631,8 @@ class SpectraCard extends HTMLElement {
   /* The recipe, on a sheet over the card, for reading at the hob. Fetched
      when asked for rather than with the plan: a week of recipes is a lot to
      carry for the one that gets opened. */
-  _mealRecipe(entry, recipe, accent, edit) {
+  _mealRecipe(entry, recipe, accent, edit, opts) {
+    const schedule = opts && opts.schedule && !isBlank(opts.schedule.script) ? opts.schedule : null;
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
@@ -11189,9 +11645,12 @@ class SpectraCard extends HTMLElement {
         + `<div class="mlrecipe">${inner}</div>`
         + `<div class="confirmbtns">`
         + (canEdit ? `<button type="button" class="confirmno" data-edit>Edit</button>` : "")
+        + (schedule ? `<button type="button" class="confirmno" data-plan>Plan it</button>` : "")
         + `<button type="button" class="confirmyes" data-no>Close</button></div>`
         + `</div>`;
       wrap.querySelector("[data-no]").addEventListener("click", finish);
+      const pl = wrap.querySelector("[data-plan]");
+      if (pl) pl.addEventListener("click", () => { finish(); this._mealSchedule(recipe, accent, schedule); });
       const e = wrap.querySelector("[data-edit]");
       if (e) {
         e.addEventListener("click", () => {
@@ -11246,7 +11705,9 @@ class SpectraCard extends HTMLElement {
 
   /* The whole recipe box, not only what is planned. Each name opens its
      recipe; New starts an empty one. */
-  _mealBox(entry, accent, edit) {
+  _mealBox(entry, accent, edit, opts) {
+    const pick = opts && opts.pick ? opts.pick : null;
+    const schedule = opts && opts.schedule ? opts.schedule : null;
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
@@ -11261,11 +11722,12 @@ class SpectraCard extends HTMLElement {
       if (event.key === "Escape") { event.preventDefault(); finish(); }
     };
     const fill = (inner, recipes) => {
-      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Recipes">`
-        + `<div class="confirmhead"><ha-icon icon="mdi:book-open-variant"></ha-icon><span>Recipes</span></div>`
+      const head = pick ? `${mealSlotWords(pick.slot[0], pick.slot[1])}: choose a recipe` : "Recipes";
+      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${esc(head)}">`
+        + `<div class="confirmhead"><ha-icon icon="mdi:book-open-variant"></ha-icon><span>${esc(head)}</span></div>`
         + `<div class="mlrecipe">${inner}</div>`
         + `<div class="confirmbtns">`
-        + (edit && !isBlank(edit.save) ? `<button type="button" class="confirmno" data-new>New recipe</button>` : "")
+        + (edit && !isBlank(edit.save) && !pick ? `<button type="button" class="confirmno" data-new>New recipe</button>` : "")
         + `<button type="button" class="confirmyes" data-no>Close</button></div></div>`;
       wrap.querySelector("[data-no]").addEventListener("click", finish);
       const n = wrap.querySelector("[data-new]");
@@ -11274,7 +11736,12 @@ class SpectraCard extends HTMLElement {
         el.addEventListener("click", () => {
           const r = recipes[Number(el.getAttribute("data-recipe"))];
           finish();
-          this._mealRecipe(entry, r, accent, edit);
+          if (pick) {
+            this._mealSetRun(pick.spec, { date: pick.slot[0], entry_type: pick.slot[1], recipe_id: String(r.recipe_id) },
+              `${r.name} planned`);
+            return;
+          }
+          this._mealRecipe(entry, r, accent, edit, { schedule });
         });
       });
     };
@@ -11313,12 +11780,16 @@ class SpectraCard extends HTMLElement {
      Dictation fills the form rather than saving it. A model's reading of a
      recipe read aloud is two guesses deep, like the shopping list's mic,
      and the form is the sheet a person checks before anything is kept. */
-  _mealEdit(entry, recipe, accent, edit) {
+  _mealEdit(entry, recipe, accent, edit, opts) {
     if (!edit || isBlank(edit.save)) return;
+    const onSaved = opts && typeof opts.onSaved === "function" ? opts.onSaved : null;
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
-    const r = recipe || {};
+    /* A draft fills a NEW recipe's form: one written by AI for a meal that
+       was only a name, or read off a photo of a cookbook page. It is
+       still new, so Save creates rather than overwrites. */
+    const r = recipe || (opts && opts.draft) || {};
     const lines = (list, key) => (Array.isArray(list) ? list : [])
       .map((x) => (x && !isBlank(x[key]) ? String(x[key]) : (x && x.note) || ""))
       .filter((x) => !isBlank(x)).join("\n");
@@ -11326,7 +11797,7 @@ class SpectraCard extends HTMLElement {
     const dictate = !isBlank(edit.dictate);
     wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Edit recipe">`
       + `<div class="confirmhead"><ha-icon icon="mdi:pencil"></ha-icon>`
-      + `<span>${esc(recipe ? "Edit recipe" : "New recipe")}</span></div>`
+      + `<span>${esc(recipe ? "Edit recipe" : ((opts && opts.heading) || "New recipe"))}</span></div>`
       + `<div class="mlrecipe mlform">`
       + (dictate ? `<div class="mldictate"><button type="button" class="tdmic" data-dictate aria-label="Read the recipe out">`
         + `${iconMarkup("mdi:microphone")}</button><span class="tdvoicesay" data-said>`
@@ -11391,6 +11862,7 @@ class SpectraCard extends HTMLElement {
         finish();
         this._voiceSay("idle", `${firstOf(saved.name, name, "Recipe")} saved`);
         this._refetchMeals();
+        if (onSaved) onSaved(saved);
       }, (error) => {
         yes.disabled = false;
         status(`Not saved: ${(error && error.message) || "Mealie did not answer."}`);
