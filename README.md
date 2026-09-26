@@ -1488,8 +1488,10 @@ claim the machine is off while somebody is standing in front of it.
 **A wet pad is an alarm only until somebody acts on it.** `leak` is the
 pad; `leak_alarm` is whether that is still news. Switching the plug back on
 over a wet pad is a person who has looked at the floor deciding to finish
-the wash, so from then on the card says `Sensor wet` in ink and otherwise
-shows the cycle — no "Leaking", no water drum, no red. Leave `leak_alarm`
+the wash, so from then on the card shows the cycle — no "Leaking", no water
+drum, no red. The `Sensor wet` chip stays, at **attention**: the cutoff
+fires only on the pad *going* wet, so until it dries a second leak would cut
+nothing. `home_signals` raises a matching attention row. Leave `leak_alarm`
 out and every wet pad is an alarm, as before.
 
 **Colour says which machine; the glyph says what is happening.** It was
@@ -1541,7 +1543,7 @@ identity the first time.
 | full drum | `mdi:basket-unfill` | **attention** |
 | **no power** | `machine_off` | **waiting, on every machine** |
 | **leak** (`leak_alarm`) | `mdi:water` | **critical, on every machine** |
-| wet, power restored since | whatever the cycle is | the card's accent |
+| wet, power restored since | whatever the cycle is | the card's accent; `Sensor wet` chip at attention |
 
 **Two exceptions, and only two.** A leak and a dead plug have to catch the
 eye *before* anybody reads a word, so they keep their roles everywhere.

@@ -448,7 +448,7 @@ const js = fs.readFileSync(file);
       !q(".leakband"), "the leak band is back");
 
     /* Somebody put the power back on over a wet pad. They have looked at
-       the floor; the pad staying damp is a fact now, not an alarm. */
+       the floor; the pad staying damp is attention now, not an alarm. */
     await show({ leak: true, leak_alarm: false, powered: true, state: "running", power: 300 });
     check("a leak somebody restored power over is not the hero word",
       text(".washstate") === "Running", text(".washstate"));
@@ -458,8 +458,9 @@ const js = fs.readFileSync(file);
     const wetChip = all(".pill").find((p) => p.textContent.includes("Sensor wet"));
     check("but the chip still says the pad is wet",
       Boolean(wetChip), all(".pill").map((p) => p.textContent.trim()).join(" | "));
-    check("as ink, not as the critical level",
-      wetChip && getComputedStyle(wetChip).color !== tokenColour("--sp-critical-on"),
+    /* Still a job: the cutoff cannot fire again until the pad dries. */
+    check("at attention, not critical",
+      wetChip && getComputedStyle(wetChip).color === tokenColour("--sp-attention-on"),
       wetChip && getComputedStyle(wetChip).color);
     await show({ leak: true, leak_alarm: true, powered: true });
     check("while a leak nobody has acted on is still red",
