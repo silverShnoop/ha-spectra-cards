@@ -268,11 +268,10 @@ const js = fs.readFileSync(file);
     const rr = rc.shadowRoot;
     const rows = Array.from(rr.querySelectorAll(".rclist li"));
     const row = (name) => rows.find((li) => text(li).includes(name));
-    check("a recipe planned today says so", text(row("Sea bass").querySelector(".rcplanned")) === "Today",
-      text(row("Sea bass")));
-    check("and one planned tomorrow", text(row("risotto").querySelector(".rcplanned")) === "Tomorrow",
-      text(row("risotto")));
-    check("one not planned says nothing", !row("Chilli").querySelector(".rcplanned"), text(row("Chilli")));
+    const when = (name) => text(row(name).querySelector("small"));
+    check("a recipe planned today says so", when("Sea bass").includes("planned today"), when("Sea bass"));
+    check("and one planned tomorrow", when("risotto").includes("planned tomorrow"), when("risotto"));
+    check("one not planned says nothing of a plan", !when("Chilli").includes("planned"), when("Chilli"));
     check("recipes with photos show them", !!row("Chilli").querySelector("img.rcthumb")
       && !row("risotto").querySelector("img"), rows.map((li) => li.innerHTML.includes("<img")).join(","));
 

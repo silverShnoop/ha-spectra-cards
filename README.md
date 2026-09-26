@@ -1894,9 +1894,9 @@ dinner on the wrong day.
 
 ### `recipes` — what is in the recipe box?
 
-The whole box on a card of its own, with search along the top. The meals
-card also opens the box, as a sheet. That size suits choosing a dinner, but
-not looking after a box that keeps growing.
+The whole box on a card of its own. The meals card opens the same list as
+a sheet, for choosing a recipe for a slot or just browsing. It is one
+picker in every place, so an improvement to one is an improvement to all.
 
 ```yaml
 type: custom:spectra-card
@@ -1910,6 +1910,8 @@ body:
     save: home_signals.save_recipe
     delete: home_signals.delete_recipe
     dictate: script.meal_recipe_from_speech
+    tag: script.meal_recipe_tag            # optional: AI tags a new recipe nobody tagged
+  ask: {script: script.meal_recipe_ask}    # optional: "Ask" the box, and suggestions for a slot
   import: {script: script.meal_import_recipe}   # optional: "From a link"
   schedule: {script: script.meal_plan_set, types: [breakfast, lunch, dinner, snack]}  # optional: "Plan it"
   photo: {save: home_signals.save_photo, script: script.meal_recipe_from_photo}      # optional: "From a photo"
@@ -1937,15 +1939,57 @@ puts it on a day and a meal.
 a panel has no clipboard to paste from, and the phone's share sheet is how
 a link arrives there.
 
-**Search filters the list without repainting it.** A repaint would take the
-keyboard away after every letter. Enter closes the keyboard, and the cross
-clears the search. What is typed is kept on the card, so the
-five-minute reread leaves the filter as it was. Every word has to appear in
-the name, in any order, so "pie fish" finds the fish pie.
+### The picker
 
-`box` is the plan source with `recipes: true`. It calls
-`mealie.get_recipes` and is refetched on the same timer as the plan. It is
-also refetched straight after anything the card saves, deletes or imports.
+Each row has the photo, the name (with a heart for a favourite), the time,
+and when it was last had: *planned tomorrow*, *last had 3 weeks ago*,
+*never made*.
+
+**Search reads the name, the ingredients and the tags.** Every word has to
+appear somewhere, in any order: "chicken" finds the fajitas, and the row says
+*with 500g chicken thighs* so it is clear why it is there. Search, chips and
+sort move and hide the rows already drawn and never repaint, because a
+repaint would take the keyboard away after every letter. Enter closes the
+keyboard; the cross clears. On the Recipes card the search, chips and sort
+survive the five-minute reread.
+
+**Filter chips**: the four meals (or, opened for a slot, *Suits dinner*,
+already on), **Quick** (tagged Quick, or 30 minutes or less), **Favourites**,
+**Not had lately** (never made, or not for three weeks, and not already
+planned), then the diets and main ingredients the box actually has. Chips of
+different kinds narrow together; the meal chips widen each other. A recipe
+with no meal tags counts as suiting every meal, so a new recipe never
+vanishes from the list just for being new.
+
+**Sort**: A to Z, quickest, longest since we had it, newest. Remembered per
+device.
+
+**A long press** (or a right click) shows the first few ingredients in the
+row, to tell two similar recipes apart.
+
+**Ask the box.** With `ask` set, a search of three words or more, or one that
+finds nothing, offers *Ask: "…"*. `ask.script` gets `question` and answers
+`{picks: [{recipe_id, reason}]}`; the picks move to the top with their reason.
+It chooses from the box only. Opened for a slot, the picker asks the same
+script with no question and that slot's `date` and `entry_type`, and pins a
+few suggestions under *Suggested for Wednesday dinner* while the list is
+already there to choose from.
+
+**Favourites and tags.** A recipe sheet has a heart that saves `favourite`
+through `edit.save`. The edit form shows the recipe's tags as chips: meals,
+effort and diet always, main ingredient and cuisine folded away unless one is
+chosen. Tags are sent only when they changed. A new recipe saved with none is
+handed to `edit.tag`, which tags it in the background.
+
+**The tray shows the first ingredients** of a planned recipe, under its name.
+
+`box` is the plan source with `recipes: true`. With
+[`home_signals`](https://github.com/silverShnoop/ha-home-signals) 0.13 or
+later it reads `home_signals.recipe_index`, which carries tags, ingredients,
+last made and favourites; otherwise `mealie.get_recipes`, and the picker
+still works on names. The box is kept once per Mealie for every card on the
+page, reread on the same timer as the plan and straight after anything the
+card saves, deletes or imports.
 
 ## Confirming an action
 
