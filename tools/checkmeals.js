@@ -497,7 +497,7 @@ const js = fs.readFileSync(file);
     check("from the right Mealie", asked.filter((m) => m.service === "get_recipes").pop()
       .service_data.config_entry_id === "entry1", "wrong entry");
 
-    top().querySelector('[data-recipe="0"]').click();
+    top().querySelector('[data-recipe-open="0"]').click();
     await settle();
     check("a name opens its recipe, and the box shuts", sheets() === 1
       && text(top()).includes("Season the fish."), text(top()));
@@ -575,7 +575,7 @@ const js = fs.readFileSync(file);
 
     q("[data-meal-box]").click();
     await settle();
-    top().querySelector('[data-recipe="0"]').click();
+    top().querySelector('[data-recipe-open="0"]').click();
     await settle();
     top().querySelector("[data-edit]").click();
     await settle();
@@ -611,7 +611,7 @@ const js = fs.readFileSync(file);
     const boxAsk = asked.filter((m) => m.service === "get_recipes").pop();
     check("the recipe card reads the box, not the plan",
       boxAsk && boxAsk.service_data.config_entry_id === "entry1", JSON.stringify(boxAsk));
-    const listed = () => rall("[data-recipe-open]").filter((b) => !b.parentNode.hidden).map((b) => text(b.querySelector("span")));
+    const listed = () => rall("[data-recipe-open]").filter((b) => !b.parentNode.hidden).map((b) => text(b.querySelector(".rcname")));
     check("every recipe, by name", listed().join("|") === "Sea bass with ginger|Spaghetti bolognese"
       || listed().join("|") === "Spaghetti bolognese|Sea bass with ginger", listed().join("|"));
     check("in name order", listed()[0] === "Sea bass with ginger", listed().join("|"));

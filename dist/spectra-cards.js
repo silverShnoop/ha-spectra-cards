@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.117.0";
+const VERSION = "0.118.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1973,6 +1973,55 @@ svg.mdi { width:24px; height:24px; flex:none; }
 .confirmbtns .mdi { width:20px; height:20px; vertical-align:-5px; }
 .tdadd { margin-top:10px; }
 .tdaddsay { margin:6px 2px 0; min-height:1.3em; font-size:13px; line-height:1.35; color:var(--sp-ink-2); }
+/* The picker: search, filter chips, sort, then the rows. */
+.rp { display:grid; gap:8px; }
+/* The Ask row and the clear cross are laid out as flex and grid, which
+   would otherwise beat the browser's own rule for [hidden]. */
+.rp [hidden] { display:none !important; }
+.rpchips { display:flex; flex-wrap:wrap; gap:6px; }
+/* One row that scrolls on a phone, rather than three rows of chips
+   between the search and the first recipe. */
+@media (max-width: 600px) {
+  .rpchips { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:0 -2px; padding:2px; }
+  .rpchips::-webkit-scrollbar { display:none; }
+  .rpchips > * { flex:none; }
+}
+.rpsort { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; color:var(--sp-ink-2); }
+.rpsort select {
+  font:inherit; font-size:14px; color:var(--sp-ink); background:var(--sp-paper);
+  border:1px solid var(--sp-edge); border-radius:8px; padding:6px 8px; margin-left:6px; min-height:36px;
+}
+.rpcount { font-variant-numeric:tabular-nums; color:var(--sp-ink-3); }
+.rpask {
+  display:flex; align-items:center; gap:8px; width:100%; min-height:44px; padding:8px 12px;
+  font:inherit; font-size:14px; text-align:left; border:1px dashed var(--accent); border-radius:10px;
+  background:var(--accent-soft); color:var(--accent-on); cursor:pointer;
+}
+.rpask .mdi { width:18px; height:18px; }
+.rpnote { margin:0; font-size:13px; font-weight:600; color:var(--accent-on); display:flex; align-items:center; gap:10px; }
+.rpunpin { font:inherit; font-size:12px; border:none; background:none; color:var(--sp-ink-3); text-decoration:underline; cursor:pointer; padding:4px; }
+.rp .mlbox button { align-items:center; }
+.rpthumb { width:44px; height:44px; flex:none; border-radius:8px; background:var(--sp-sink); overflow:hidden; display:block; }
+.rpthumb.none { background:none; width:0; margin-right:-8px; }
+.rpthumb img.rcthumb { width:100%; height:100%; object-fit:cover; display:block; border-radius:0; }
+.rpname { display:grid; gap:1px; flex:1 1 auto; min-width:0; }
+.rpname small { font-size:12px; color:var(--sp-ink-3); }
+.rpwhy { font-size:12.5px; color:var(--accent-on); }
+.rping { font-size:12.5px; color:var(--sp-ink-2); }
+.rpfav { color:var(--accent); font-size:13px; }
+.rp li.pinned { background:var(--accent-soft); border-radius:8px; border-bottom-color:transparent; }
+.rp li.pinned + li:not(.pinned) { border-top:1px solid var(--sp-edge); margin-top:4px; }
+.rpbox { max-width:620px; }
+.rpbox .rclist { max-height:none; overflow:visible; }
+.mlglance { flex:1 1 100%; margin:0 0 2px; font-size:13px; line-height:1.4; color:var(--sp-ink-2); }
+.mlfav {
+  margin-left:auto; width:40px; height:40px; border:none; background:none; border-radius:50%;
+  color:var(--accent); display:grid; place-items:center; cursor:pointer; padding:0;
+}
+.mlfav .mdi { width:24px; height:24px; }
+.mltags { display:flex; flex-wrap:wrap; gap:6px; }
+.mlmoretags { margin-top:8px; }
+.mlmoretags summary { font-size:13px; color:var(--sp-ink-2); cursor:pointer; padding:6px 0; }
 .confirmbtns .mldelete { margin-right:auto; border:1px solid var(--sp-edge); background:none; color:var(--sp-ink-2); }
 
 /* ---- additions to the reference sheet ---- */
@@ -2833,6 +2882,8 @@ const MDI_INLINE = {
   "mdi:close": "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z",
   "mdi:dots-horizontal": "M16,12A2,2 0 0,1 18,10A2,2 0 0,1 20,12A2,2 0 0,1 18,14A2,2 0 0,1 16,12M10,12A2,2 0 0,1 12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12M4,12A2,2 0 0,1 6,10A2,2 0 0,1 8,12A2,2 0 0,1 6,14A2,2 0 0,1 4,12Z",
   "mdi:keyboard-outline": "M4,5A2,2 0 0,0 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7A2,2 0 0,0 20,5H4M4,7H20V17H4V7M5,8V10H7V8H5M8,8V10H10V8H8M11,8V10H13V8H11M14,8V10H16V8H14M17,8V10H19V8H17M5,11V13H7V11H5M8,11V13H10V11H8M11,11V13H13V11H11M14,11V13H16V11H14M17,11V13H19V11H17M8,14V16H16V14H8Z",
+  "mdi:heart": "M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z",
+  "mdi:heart-outline": "M12.1,18.55L12,18.65L11.89,18.55C7.14,14.24 4,11.39 4,8.5C4,6.5 5.5,5 7.5,5C9.04,5 10.54,6 11.07,7.36H12.93C13.46,6 14.96,5 16.5,5C18.5,5 20,6.5 20,8.5C20,11.39 16.86,14.24 12.1,18.55M16.5,3C14.76,3 13.09,3.81 12,5.08C10.91,3.81 9.24,3 7.5,3C4.42,3 2,5.41 2,8.5C2,12.27 5.4,15.36 10.55,20.03L12,21.35L13.45,20.03C18.6,15.36 22,12.27 22,8.5C22,5.41 19.58,3 16.5,3Z",
   "mdi:magnify": "M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z",
   "mdi:play": "M8,5.14V19.14L19,12.14L8,5.14Z",
   "mdi:send": "M2,21L23,12L2,3V10L17,12L2,14V21Z",
@@ -3110,7 +3161,7 @@ const RAW_KEYS = new Set([
   "say", "shop", "pick", "move", "week", "shop_week", "recipes",
   /* ...and the ones that came after: planning a meal into a slot, writing
      a recipe for a meal that is only a name, and the two cameras. */
-  "place", "write", "schedule", "photo", "fridge", "edit", "import",
+  "place", "write", "schedule", "photo", "fridge", "edit", "import", "ask",
   /* The to-do list's typed row: a placeholder and a preview name. */
   "add",
 ]);
@@ -4717,33 +4768,16 @@ const BODIES = {
      typed, on the page rather than by repainting, so the keyboard stays up. */
   recipes(b) {
     const box = recipeList(b.box);
-    const planned = recipePlanned(b.planned);
-    const find = isBlank(b.find) ? "" : String(b.find);
     const add = b.edit && typeof b.edit === "object" && !isBlank(b.edit.save);
     const link = b.import && typeof b.import === "object" && !isBlank(b.import.script);
-    let out = `<div class="rcbox"><div class="rchead">`
-      + `<span class="rcsearch"><input type="search" class="rcfind" data-recipe-find placeholder="Find a recipe"`
-      + ` aria-label="Find a recipe" autocomplete="off" enterkeyhint="search" value="${esc(find)}">`
-      + `<button type="button" class="rcclear" data-recipe-clear aria-label="Clear the search"${find ? "" : " hidden"}>`
-      + `${iconMarkup("mdi:close")}</button></span>`
-      + (link ? `<button type="button" class="mlbtn quiet" data-recipe-link>From a link</button>` : "")
+    const head = (link ? `<button type="button" class="mlbtn quiet" data-recipe-link>From a link</button>` : "")
       + (b.photo && typeof b.photo === "object" && !isBlank(b.photo.save) && !isBlank(b.photo.script) && add
         ? `<button type="button" class="mlbtn quiet" data-recipe-photo>From a photo</button>` : "")
-      + (add ? `<button type="button" class="mlbtn" data-recipe-new>New recipe</button>` : "")
-      + `</div>`;
-    if (!box.length) return out + `<p class="rcnone">The recipe box is empty.</p></div>`;
-    let shown = 0;
-    out += `<ul class="mlbox rclist">`;
-    box.forEach((r, i) => {
-      const hide = !recipeMatches(r, find);
-      if (!hide) shown += 1;
-      out += `<li data-recipe-name="${esc(String(r.name).toLowerCase())}"${hide ? " hidden" : ""}>`
-        + `<button type="button" data-recipe-open="${i}">${recipeThumb(b, r, "rcthumb")}<span class="rcname">${esc(r.name)}</span>`
-        + (planned[String(r.recipe_id)] ? `<span class="rcplanned">${esc(planned[String(r.recipe_id)])}</span>` : "")
-        + (mealTime(r) ? `<span class="mltime">${esc(mealTime(r))}</span>` : "")
-        + `</button></li>`;
-    });
-    return out + `</ul><p class="rcnone" data-recipe-none${shown ? " hidden" : ""}>No recipe matches.</p></div>`;
+      + (add ? `<button type="button" class="mlbtn" data-recipe-new>New recipe</button>` : "");
+    return `<div class="rcbox">` + pickerMarkup(box, {
+      find: b.find, planned: recipePlanned(b.planned), images: Boolean(b.images),
+      ask: Boolean(b.ask && typeof b.ask === "object" && !isBlank(b.ask.script)), head,
+    }) + `</div>`;
   },
 
   washer(b) {
@@ -7266,6 +7300,8 @@ function mealTray(b, entry, type, past) {
   };
   const line = isBlank(b.voice_note) ? (WORDS[phase] || idle) : String(b.voice_note);
   let out = `<div class="mltray">`;
+  const glance = entry && entry.recipe && b.glance ? b.glance[String(entry.recipe.recipe_id)] : "";
+  if (glance) out += `<p class="mlglance">${esc(glance)}</p>`;
   if (say && !past) {
     out += `<button type="button" class="tdmic${phase === "listening" ? " live" : ""}`
       + `${busy ? " thinking" : ""}" data-meal-say`
@@ -7342,6 +7378,212 @@ function recipeMatches(recipe, find) {
   const name = String(recipe.name).toLowerCase();
   return String(find || "").toLowerCase().split(/\s+/).filter(Boolean)
     .every((word) => name.includes(word));
+}
+
+/* ---- the recipe picker ----
+
+   One list for every place a recipe is chosen: the Recipes card, the box
+   opened from the week, Choose a recipe for a slot. It filters without
+   repainting -- rows are hidden and moved, never redrawn -- because a
+   repaint takes the keyboard away after every letter. */
+
+/* The tags the meal scripts give a recipe, by what they say about it.
+   Kept here because the picker needs to know that "Dinner" is a meal and
+   "Chicken" is an ingredient to lay the chips out; Mealie's tags are flat. */
+const RECIPE_TAGS = {
+  meal: ["Breakfast", "Lunch", "Dinner", "Snack"],
+  effort: ["Quick", "Weekend"],
+  diet: ["Vegetarian", "Vegan", "Dairy-free", "Gluten-free"],
+  main: ["Chicken", "Beef", "Pork", "Lamb", "Fish", "Seafood", "Eggs", "Pasta", "Rice",
+    "Vegetables", "Beans", "Cheese"],
+  cuisine: ["British", "Italian", "French", "Spanish", "Mediterranean", "Greek", "Middle Eastern",
+    "Indian", "Chinese", "Japanese", "Thai", "Korean", "Mexican", "American"],
+};
+/* Three weeks is how long before a dinner feels like it is due again. */
+const RECIPE_LATELY_DAYS = 21;
+const RECIPE_SORTS = [["az", "A to Z"], ["quick", "Quickest"], ["lately", "Longest since we had it"],
+  ["new", "Newest"]];
+
+function recipeTagsOf(r) {
+  return (Array.isArray(r && r.tags) ? r.tags : [])
+    .map((t) => (t && typeof t === "object" ? t.name : t))
+    .filter((t) => !isBlank(t)).map(String);
+}
+
+/* "1 hour 30 minutes", "45 mins", "2 h 15 min", "PT45M" as minutes. */
+function recipeMinutes(r) {
+  const text = String((r && r.total_time) || "").toLowerCase();
+  if (!text) return null;
+  const iso = text.match(/^pt(?:(\d+)h)?(?:(\d+)m)?/);
+  if (iso && (iso[1] || iso[2])) return Number(iso[1] || 0) * 60 + Number(iso[2] || 0);
+  const h = text.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/);
+  const m = text.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/);
+  if (!h && !m) return null;
+  return Math.round((h ? Number(h[1]) * 60 : 0) + (m ? Number(m[1]) : 0));
+}
+
+function recipeDaysSince(day) {
+  if (isBlank(day)) return null;
+  const then = Date.parse(`${String(day).slice(0, 10)}T12:00:00`);
+  const now = Date.parse(`${localDay(0)}T12:00:00`);
+  return Number.isFinite(then) ? Math.round((now - then) / 86400000) : null;
+}
+
+function recipeSuits(r, meal) {
+  const meals = recipeTagsOf(r).map((t) => t.toLowerCase())
+    .filter((t) => RECIPE_TAGS.meal.some((m) => m.toLowerCase() === t));
+  /* A recipe nobody has tagged yet suits everything: it must not vanish
+     from the list just for being new. */
+  return !meals.length || meals.includes(String(meal).toLowerCase());
+}
+
+function recipeIsQuick(r) {
+  if (recipeTagsOf(r).some((t) => t.toLowerCase() === "quick")) return true;
+  const min = recipeMinutes(r);
+  return min !== null && min <= 30;
+}
+
+function recipeDue(r, planned) {
+  if (planned && planned[String(r.recipe_id)]) return false;
+  const days = recipeDaysSince(r.last_made);
+  return days === null || days >= RECIPE_LATELY_DAYS;
+}
+
+/* The edit form's tags: what the meal scripts use as chips, pressed where
+   the recipe has them. Meals, effort and diet are always shown; the main
+   ingredient and cuisine fold away unless one is already chosen, because
+   twenty-six chips would bury the ingredients box on a phone. */
+function recipeTagChips(current) {
+  const have = new Set(current.map((t) => t.toLowerCase()));
+  const known = new Set(Object.values(RECIPE_TAGS).flat().map((t) => t.toLowerCase()));
+  const chip = (t) => `<button type="button" class="mlhint" data-tag="${esc(t)}"`
+    + ` aria-pressed="${have.has(t.toLowerCase()) ? "true" : "false"}">${esc(t)}</button>`;
+  const first = [...RECIPE_TAGS.meal, ...RECIPE_TAGS.effort, ...RECIPE_TAGS.diet,
+    ...current.filter((t) => !known.has(t.toLowerCase()))];
+  const more = [...RECIPE_TAGS.main, ...RECIPE_TAGS.cuisine];
+  const open = more.some((t) => have.has(t.toLowerCase()));
+  return `<label>Tags</label><div class="mltags" data-tags>${first.map(chip).join("")}</div>`
+    + `<details class="mlmoretags"${open ? " open" : ""}><summary>Main ingredient and cuisine</summary>`
+    + `<div class="mltags">${more.map(chip).join("")}</div></details>`;
+}
+
+/* What a row says under the name: when it is next planned, else when it
+   was last eaten. "Never made" only once the index has been read -- a
+   plain Mealie listing does not know. */
+function recipeWhen(r, planned) {
+  const next = planned && planned[String(r.recipe_id)];
+  if (next) return `planned ${next === "Today" || next === "Tomorrow" ? next.toLowerCase() : next}`;
+  const days = recipeDaysSince(r.last_made);
+  if (days === null) return "indexed" in r && r.indexed ? "never made" : "";
+  if (days <= 0) return "had today";
+  if (days === 1) return "had yesterday";
+  if (days < 14) return `last had ${days} days ago`;
+  if (days < 60) return `last had ${Math.round(days / 7)} weeks ago`;
+  return `last had ${Math.round(days / 30)} months ago`;
+}
+
+/* Every word typed has to appear in the name, an ingredient or a tag. */
+function recipeFound(r, find) {
+  const hay = [r.name, ...recipeTagsOf(r), ...(Array.isArray(r.ingredients) ? r.ingredients : [])]
+    .join(" \u0001 ").toLowerCase();
+  return String(find || "").toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+}
+
+/* The first ingredient the search matched, to say why a row is there. */
+function recipeFoundIn(r, find) {
+  const words = String(find || "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length || words.every((w) => String(r.name).toLowerCase().includes(w))) return "";
+  const hit = (Array.isArray(r.ingredients) ? r.ingredients : [])
+    .find((line) => words.some((w) => String(line).toLowerCase().includes(w)));
+  return hit ? String(hit) : "";
+}
+
+function recipeGlance(r, n) {
+  const list = Array.isArray(r && r.ingredients) ? r.ingredients.filter((x) => !isBlank(x)) : [];
+  if (!list.length) return "";
+  const shown = list.slice(0, n || 4).map((x) => String(x));
+  return shown.join(" · ") + (list.length > shown.length ? ` · +${list.length - shown.length}` : "");
+}
+
+/* The chips a list can use: meals, then the always-useful three, then
+   the diets and main ingredients this box actually has. A chip that
+   would match nothing is not offered. */
+function recipeChips(list, meal) {
+  const chips = [];
+  if (meal) chips.push([`meal:${meal}`, `Suits ${mealType(meal).word.toLowerCase()}`]);
+  else RECIPE_TAGS.meal.forEach((m) => chips.push([`meal:${m.toLowerCase()}`, m]));
+  chips.push(["quick", "Quick"]);
+  if (list.some((r) => r.favourite)) chips.push(["fav", "Favourites"]);
+  if (list.some((r) => "indexed" in r)) chips.push(["lately", "Not had lately"]);
+  const count = {};
+  list.forEach((r) => recipeTagsOf(r).forEach((t) => { count[t.toLowerCase()] = (count[t.toLowerCase()] || 0) + 1; }));
+  [...RECIPE_TAGS.diet, ...RECIPE_TAGS.main].forEach((t) => {
+    if (count[t.toLowerCase()]) chips.push([`tag:${t.toLowerCase()}`, t]);
+  });
+  return chips;
+}
+
+function recipePasses(r, chips, planned) {
+  const meals = [...chips].filter((c) => c.startsWith("meal:")).map((c) => c.slice(5));
+  if (meals.length && !meals.some((m) => recipeSuits(r, m))) return false;
+  for (const c of chips) {
+    if (c === "quick" && !recipeIsQuick(r)) return false;
+    if (c === "fav" && !r.favourite) return false;
+    if (c === "lately" && !recipeDue(r, planned)) return false;
+    if (c.startsWith("tag:") && !recipeTagsOf(r).some((t) => t.toLowerCase() === c.slice(4))) return false;
+  }
+  return true;
+}
+
+function recipeOrder(list, sort) {
+  const by = {
+    az: (a, b) => String(a.name).localeCompare(String(b.name)),
+    quick: (a, b) => (recipeMinutes(a) ?? 1e9) - (recipeMinutes(b) ?? 1e9),
+    lately: (a, b) => (recipeDaysSince(b.last_made) ?? 1e9) - (recipeDaysSince(a.last_made) ?? 1e9),
+    new: (a, b) => String(b.date_added || "").localeCompare(String(a.date_added || "")),
+  }[sort] || null;
+  const az = (a, b) => String(a.name).localeCompare(String(b.name));
+  return list.map((r, i) => [r, i]).sort((x, y) => (by ? by(x[0], y[0]) : 0) || az(x[0], y[0])).map((x) => x[1]);
+}
+
+/* The picker's markup. `list` is the box in name order; each row keeps
+   its index into it, so a press finds the recipe however the rows have
+   been moved about since. */
+function pickerMarkup(list, o) {
+  const opt = o || {};
+  const planned = opt.planned || {};
+  const find = isBlank(opt.find) ? "" : String(opt.find);
+  let out = `<div class="rp" data-picker>`
+    + `<div class="rchead"><span class="rcsearch"><input type="search" class="rcfind" data-recipe-find`
+    + ` placeholder="${esc(opt.ask ? "Search, or ask for something" : "Find a recipe")}"`
+    + ` aria-label="Find a recipe" autocomplete="off" enterkeyhint="search" value="${esc(find)}">`
+    + `<button type="button" class="rcclear" data-recipe-clear aria-label="Clear the search"${find ? "" : " hidden"}>`
+    + `${iconMarkup("mdi:close")}</button></span>${opt.head || ""}</div>`;
+  if (!list.length) return out + `<p class="rcnone">The recipe box is empty.</p></div>`;
+  out += `<div class="rpchips" role="group" aria-label="Filters">`
+    + recipeChips(list, opt.meal).map(([k, word]) => `<button type="button" class="mlhint" data-rp-chip="${esc(k)}"`
+      + ` aria-pressed="false">${esc(word)}</button>`).join("")
+    + `</div><div class="rpsort"><label>Sort <select data-rp-sort>`
+    + RECIPE_SORTS.map(([k, word]) => `<option value="${k}">${esc(word)}</option>`).join("")
+    + `</select></label><span class="rpcount" data-rp-count></span></div>`
+    + (opt.ask ? `<button type="button" class="rpask" data-rp-ask hidden>${iconMarkup("mdi:magnify")}<span></span></button>` : "")
+    + `<p class="rpnote" data-rp-note hidden></p>`
+    + `<ul class="mlbox rclist" data-rp-list>`;
+  list.forEach((r, i) => {
+    const when = recipeWhen(r, planned);
+    const time = mealTime(r);
+    const bits = [time, when].filter(Boolean);
+    out += `<li data-rp-row="${i}" data-recipe-name="${esc(String(r.name).toLowerCase())}">`
+      + `<button type="button" data-recipe-open="${i}">`
+      + (opt.images && !isBlank(r.image) && !isBlank(r.recipe_id)
+        ? `<span class="rpthumb" data-rp-img="${esc(String(r.recipe_id))}"></span>` : `<span class="rpthumb none"></span>`)
+      + `<span class="rpname"><span class="rcname">${esc(r.name)}${r.favourite ? ` <span class="rpfav" aria-label="favourite">♥</span>` : ""}</span>`
+      + (bits.length ? `<small>${esc(bits.join(" · "))}</small>` : "")
+      + `<span class="rpwhy" hidden></span>`
+      + (recipeGlance(r) ? `<span class="rping" hidden>${esc(recipeGlance(r, 6))}</span>` : "")
+      + `</span></button></li>`;
+  });
+  return out + `</ul><p class="rcnone" data-recipe-none hidden>No recipe matches.</p></div>`;
 }
 
 function mealFoot(b, picked, moving, dates, plan, types) {
@@ -7892,6 +8134,8 @@ const VOICE_NOTE_MS = 12000;
 /* How often a meal card rereads the plan. Five minutes: a meal planned on
    a phone should reach the kitchen before anybody walks there to look. */
 const MEAL_REFRESH_MS = 5 * 60 * 1000;
+/* The recipe box as a picker reads it, per Mealie, shared by every card. */
+const RECIPE_INDEX = new Map();
 const MEAL_IDLE_MS = 2 * 60 * 1000;
 
 /* An error carrying the sentence a person is meant to read.
@@ -8346,9 +8590,7 @@ class SpectraCard extends HTMLElement {
   _fetchMeals(key, source) {
     if (this._fetched.has(key)) return;
     this._fetched.add(key);
-    const ask = source.recipes
-      ? { service: "get_recipes", service_data: { config_entry_id: source.entry, result_limit: 500 } }
-      : {
+    const ask = {
         service: "get_mealplan",
         service_data: {
           config_entry_id: source.entry,
@@ -8356,12 +8598,16 @@ class SpectraCard extends HTMLElement {
           end_date: localDay((source.monday ? -daysSinceMonday() : 0) + source.days - 1),
         },
       };
-    Promise.resolve(
+    /* The box goes through the shared index, so every card reading the
+       same Mealie reads it once. */
+    const read = source.recipes ? this._recipeIndex(source.entry, true) : Promise.resolve(
       this._hass.callWS(Object.assign({ type: "call_service", domain: "mealie", return_response: true }, ask)),
     ).then((result) => {
-      const response = (result && result.response) || {};
-      const got = source.recipes ? response.recipes && response.recipes.items : response.mealplan;
-      if (!Array.isArray(got)) throw new Error(`no ${source.recipes ? "recipes" : "mealplan"} in the response`);
+      const got = ((result && result.response) || {}).mealplan;
+      if (!Array.isArray(got)) throw new Error("no mealplan in the response");
+      return got;
+    });
+    read.then((got) => {
       this._meals[key] = got;
       delete this._failed[key];
       this._signature = null;
@@ -8685,13 +8931,11 @@ class SpectraCard extends HTMLElement {
       if (model.body.images && Array.isArray(model.body.plan)) {
         model.body.thumbs = this._recipeImages(model.body.plan.map((e) => e && e.recipe), "tiny");
       }
-    }
-    if (model.body && model.body.type === "recipes" && model.body.images && Array.isArray(model.body.box)) {
-      model.body.thumbs = this._recipeImages(model.body.box, "tiny");
+      model.body.glance = this._mealGlance(model.body);
     }
     /* What is typed in the recipe box's search, so a repaint keeps it. */
     if (model.body && model.body.type === "recipes") {
-      model.body.find = this._recipeFind || "";
+      model.body.find = (this._rpState && this._rpState.find) || "";
     }
 
     const mode = this._mode;
@@ -11409,7 +11653,9 @@ class SpectraCard extends HTMLElement {
       const [source] = this._mealSources.values();
       press(el, () => {
         flashPress(el);
-        this._mealBox(source.entry, model.accent, body.recipes, { pick: { slot, spec: body.place } });
+        this._mealBox(source.entry, model.accent, body.recipes, {
+          pick: { slot, spec: body.place }, ask: body.ask, planned: recipePlanned(body.plan),
+        });
       });
     });
 
@@ -11453,8 +11699,10 @@ class SpectraCard extends HTMLElement {
       const [source] = this._mealSources.values();
       press(el, () => {
         flashPress(el);
-        this._mealBox(source.entry, model.accent, body.recipes,
-          { schedule: body.place ? Object.assign({ types: body.types }, body.place) : null });
+        this._mealBox(source.entry, model.accent, body.recipes, {
+          schedule: body.place ? Object.assign({ types: body.types }, body.place) : null,
+          ask: body.ask, planned: recipePlanned(body.plan),
+        });
       });
     });
 
@@ -11495,6 +11743,28 @@ class SpectraCard extends HTMLElement {
         }).then(() => this._refetchMeals()))));
       });
     });
+  }
+
+  /* The first few ingredients of each planned recipe, from the shared
+     index, for the tray. Asked for once, in the background, the first
+     time a card with a recipe box is drawn; until then there is none. */
+  _mealGlance(body) {
+    if (!body.recipes || !this._mealSources.size) return {};
+    const [source] = this._mealSources.values();
+    const hit = RECIPE_INDEX.get(source.entry);
+    if (!hit || !Array.isArray(hit.list)) {
+      if (!this._glanceAsked && this._hass) {
+        this._glanceAsked = true;
+        this._recipeIndex(source.entry).then(() => { this._signature = null; this._update(); }, () => {});
+      }
+      return {};
+    }
+    const out = {};
+    hit.list.forEach((r) => {
+      const g = recipeGlance(r);
+      if (g) out[String(r.recipe_id)] = g;
+    });
+    return out;
   }
 
   /* Whether this card shows recipe photos: `images: true` on its body. */
@@ -12160,40 +12430,13 @@ class SpectraCard extends HTMLElement {
     const [source] = this._mealSources.values();
     const box = recipeList(body.box);
     const edit = body.edit && typeof body.edit === "object" ? body.edit : null;
-
-    const find = this._holder.querySelector("[data-recipe-find]");
-    const clear = this._holder.querySelector("[data-recipe-clear]");
-    if (find) {
-      /* Enter is "done": it puts the keyboard away and leaves the list
-         filtered, which is all a search on a phone needs. */
-      find.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") { event.preventDefault(); find.blur(); }
-      });
-      if (clear) {
-        clear.addEventListener("click", () => {
-          find.value = "";
-          find.dispatchEvent(new Event("input"));
-          clear.hidden = true;
-        });
-      }
-      find.addEventListener("input", () => {
-        if (clear) clear.hidden = !find.value;
-        this._recipeFind = find.value;
-        let shown = 0;
-        this._holder.querySelectorAll("[data-recipe-open]").forEach((el) => {
-          const hide = !recipeMatches(box[Number(el.getAttribute("data-recipe-open"))] || { name: "" }, find.value);
-          el.parentNode.hidden = hide;
-          if (!hide) shown += 1;
-        });
-        const none = this._holder.querySelector("[data-recipe-none]");
-        if (none) none.hidden = shown > 0;
-      });
-    }
-    this._holder.querySelectorAll("[data-recipe-open]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const r = box[Number(el.getAttribute("data-recipe-open"))];
-        if (r) this._mealRecipe(source.entry, r, model.accent, edit, { schedule: body.schedule });
-      });
+    if (!this._rpState) this._rpState = {};
+    this._bindPicker(this._holder, box, {
+      state: this._rpState,
+      planned: recipePlanned(body.planned),
+      askSpec: body.ask && !isBlank(body.ask.script) ? body.ask : null,
+      images: Boolean(body.images),
+      onOpen: (r) => this._mealRecipe(source.entry, r, model.accent, edit, { schedule: body.schedule }),
     });
     const add = this._holder.querySelector("[data-recipe-new]");
     if (add) add.addEventListener("click", () => this._mealEdit(source.entry, null, model.accent, edit));
@@ -12269,6 +12512,13 @@ class SpectraCard extends HTMLElement {
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
     const title = String(firstOf(recipe.name, "Recipe"));
+    /* This recipe in the shared index, which is what knows it is a
+       favourite. Looked up each time, as the heart changes it in place. */
+    const indexed = () => {
+      const hit = RECIPE_INDEX.get(entry);
+      return hit && Array.isArray(hit.list) && hit.list.some((x) => "indexed" in x)
+        ? hit.list.find((x) => String(x.recipe_id) === String(recipe.recipe_id)) || null : null;
+    };
     let full = null;
     let steps = [];
     let ingredients = [];
@@ -12330,8 +12580,13 @@ class SpectraCard extends HTMLElement {
     };
     const fill = (inner) => {
       const canEdit = Boolean(full && edit && !isBlank(edit.save));
+      const known = indexed();
+      const heart = known && edit && !isBlank(edit.save)
+        ? `<button type="button" class="mlfav" data-fav aria-pressed="${known.favourite ? "true" : "false"}"`
+          + ` aria-label="${known.favourite ? "Remove from favourites" : "Add to favourites"}">`
+          + `${iconMarkup(known.favourite ? "mdi:heart" : "mdi:heart-outline")}</button>` : "";
       wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${esc(title)}">`
-        + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
+        + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span>${heart}</div>`
         + `<div class="mlrecipe">${hero}${inner}</div>`
         + `<div class="confirmbtns">`
         + (canEdit ? `<button type="button" class="confirmno" data-edit>Edit</button>` : "")
@@ -12341,6 +12596,26 @@ class SpectraCard extends HTMLElement {
         + `</div>`;
       const img = wrap.querySelector(".mlhero");
       if (img) img.addEventListener("error", () => { hero = ""; img.remove(); });
+      const fav = wrap.querySelector("[data-fav]");
+      if (fav) {
+        fav.addEventListener("click", () => {
+          const r = indexed();
+          if (!r || fav.disabled) return;
+          const want = !r.favourite;
+          fav.disabled = true;
+          this._mealCall(edit.save, {
+            recipe: String(firstOf(r.slug, r.recipe_id)), favourite: want, config_entry_id: entry,
+          }).then(() => {
+            r.favourite = want;
+            fav.disabled = false;
+            fav.setAttribute("aria-pressed", String(want));
+            fav.setAttribute("aria-label", want ? "Remove from favourites" : "Add to favourites");
+            fav.innerHTML = iconMarkup(want ? "mdi:heart" : "mdi:heart-outline");
+            this._signature = null;
+            this._update();
+          }, () => { fav.disabled = false; });
+        });
+      }
       const c = wrap.querySelector("[data-cook]");
       if (c) c.addEventListener("click", () => cook(0, false));
       wrap.querySelector("[data-no]").addEventListener("click", finish);
@@ -12412,6 +12687,8 @@ class SpectraCard extends HTMLElement {
   _mealBox(entry, accent, edit, opts) {
     const pick = opts && opts.pick ? opts.pick : null;
     const schedule = opts && opts.schedule ? opts.schedule : null;
+    const askSpec = opts && opts.ask && !isBlank(opts.ask.script) ? opts.ask : null;
+    const planned = (opts && opts.planned) || {};
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
@@ -12425,9 +12702,9 @@ class SpectraCard extends HTMLElement {
     const onKey = (event) => {
       if (event.key === "Escape") { event.preventDefault(); finish(); }
     };
-    const fill = (inner, recipes) => {
-      const head = pick ? `${mealSlotWords(pick.slot[0], pick.slot[1])}: choose a recipe` : "Recipes";
-      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${esc(head)}">`
+    const head = pick ? `${mealSlotWords(pick.slot[0], pick.slot[1])}: choose a recipe` : "Recipes";
+    const fill = (inner) => {
+      wrap.innerHTML = `<div class="confirmbox rpbox" role="dialog" aria-modal="true" aria-label="${esc(head)}">`
         + `<div class="confirmhead"><ha-icon icon="mdi:book-open-variant"></ha-icon><span>${esc(head)}</span></div>`
         + `<div class="mlrecipe">${inner}</div>`
         + `<div class="confirmbtns">`
@@ -12436,9 +12713,16 @@ class SpectraCard extends HTMLElement {
       wrap.querySelector("[data-no]").addEventListener("click", finish);
       const n = wrap.querySelector("[data-new]");
       if (n) n.addEventListener("click", () => { finish(); this._mealEdit(entry, null, accent, edit); });
-      wrap.querySelectorAll("[data-recipe]").forEach((el) => {
-        el.addEventListener("click", () => {
-          const r = recipes[Number(el.getAttribute("data-recipe"))];
+    };
+    const show = (got) => {
+      if (done) return;
+      const box = recipeList(got);
+      const images = this._imagesOn();
+      const meal = pick ? pick.slot[1] : "";
+      fill(pickerMarkup(box, { meal, planned, images, ask: !!askSpec }));
+      this._bindPicker(wrap, box, {
+        state: {}, meal, date: pick ? pick.slot[0] : "", planned, askSpec, images,
+        onOpen: (r) => {
           finish();
           if (pick) {
             this._mealSetRun(pick.spec, { date: pick.slot[0], entry_type: pick.slot[1], recipe_id: String(r.recipe_id) },
@@ -12446,34 +12730,242 @@ class SpectraCard extends HTMLElement {
             return;
           }
           this._mealRecipe(entry, r, accent, edit, { schedule });
-        });
+        },
       });
     };
     wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
     document.addEventListener("keydown", onKey, true);
-    fill(`<p class="confirmtext">Opening the recipe box\u2026</p>`, []);
+    const hit = RECIPE_INDEX.get(entry);
+    if (hit && Array.isArray(hit.list)) {
+      fill("");
+      this._holder.appendChild(wrap);
+      show(hit.list);
+      return;
+    }
+    fill(`<p class="confirmtext">Opening the recipe box…</p>`);
     this._holder.appendChild(wrap);
-
-    Promise.resolve(this._hass.callWS({
-      type: "call_service", domain: "mealie", service: "get_recipes",
-      service_data: { config_entry_id: entry, result_limit: 100 },
-      return_response: true,
-    })).then((result) => {
-      if (done) return;
-      const box = result && result.response && result.response.recipes;
-      const recipes = (Array.isArray(box && box.items) ? box.items : [])
-        .filter((r) => r && !isBlank(r.name) && !isBlank(r.recipe_id))
-        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
-      fill(recipes.length
-        ? `<ul class="mlbox">${recipes.map((r, i) => `<li><button type="button" data-recipe="${i}">`
-          + `<span>${esc(r.name)}</span>`
-          + (mealTime(r) ? `<span class="mltime">${esc(mealTime(r))}</span>` : "")
-          + `</button></li>`).join("")}</ul>`
-        : `<p class="confirmtext">The recipe box is empty.</p>`, recipes);
-    }, (error) => {
+    this._recipeIndex(entry).then(show, (error) => {
       LOGGER_WARN("spectra-card: could not open the recipe box", error);
-      if (!done) fill(`<p class="confirmtext">Could not open the recipe box.</p>`, []);
+      if (!done) fill(`<p class="confirmtext">Could not open the recipe box.</p>`);
     });
+  }
+
+  /* The recipe box with what a picker needs, from home_signals when it is
+     installed and from Mealie's own listing when not. Kept per Mealie for
+     every card on the page, so the box opened from the week is instant
+     once the Recipes card has read it. */
+  _recipeIndex(entry, fresh) {
+    const hit = RECIPE_INDEX.get(entry);
+    if (hit && hit.promise) return hit.promise;
+    if (hit && Array.isArray(hit.list) && !fresh && Date.now() - hit.at < MEAL_REFRESH_MS) {
+      return Promise.resolve(hit.list);
+    }
+    const services = (this._hass && this._hass.services) || {};
+    const indexed = Boolean(services.home_signals && services.home_signals.recipe_index);
+    const msg = indexed
+      ? { domain: "home_signals", service: "recipe_index", service_data: { config_entry_id: entry } }
+      : { domain: "mealie", service: "get_recipes", service_data: { config_entry_id: entry, result_limit: 500 } };
+    const promise = Promise.resolve(this._hass.callWS(Object.assign({ type: "call_service", return_response: true }, msg)))
+      .then((result) => {
+        const response = (result && result.response) || {};
+        const got = indexed ? response.recipes : response.recipes && response.recipes.items;
+        if (!Array.isArray(got)) throw new Error("no recipes in the response");
+        const list = indexed ? got.map((r) => Object.assign({ indexed: true }, r)) : got;
+        RECIPE_INDEX.set(entry, { list, at: Date.now() });
+        return list;
+      }, (error) => {
+        if (hit && hit.list) RECIPE_INDEX.set(entry, { list: hit.list, at: hit.at });
+        else RECIPE_INDEX.delete(entry);
+        throw error;
+      });
+    RECIPE_INDEX.set(entry, Object.assign({}, hit, { promise }));
+    return promise;
+  }
+
+  /* A picker, once its markup is on the page. Filters, sort and search
+     move and hide the rows already there; nothing is redrawn. `o.state`
+     is the caller's, so a Recipes card keeps its filters across a
+     repaint while a sheet starts afresh each time it opens. */
+  _bindPicker(root, list, o) {
+    const box = root.querySelector("[data-picker]");
+    if (!box) return;
+    const st = o.state;
+    if (!(st.chips instanceof Set)) st.chips = new Set(st.chips || (o.meal ? [`meal:${o.meal}`] : []));
+    if (!st.sort) {
+      try { st.sort = localStorage.getItem("spectra-cards:recipe-sort") || "az"; } catch (e) { st.sort = "az"; }
+    }
+    const $ = (sel) => box.querySelector(sel);
+    const find = $("[data-recipe-find]");
+    const clear = $("[data-recipe-clear]");
+    const ul = $("[data-rp-list]");
+    if (find) {
+      find.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); find.blur(); }
+      });
+    }
+    if (clear && find) {
+      clear.addEventListener("click", () => {
+        find.value = "";
+        find.dispatchEvent(new Event("input"));
+      });
+    }
+    if (!ul) {
+      if (find) find.addEventListener("input", () => { if (clear) clear.hidden = !find.value; });
+      return;
+    }
+    const rows = new Map([...ul.querySelectorAll("[data-rp-row]")].map((li) => [Number(li.getAttribute("data-rp-row")), li]));
+    const count = $("[data-rp-count]");
+    const none = $("[data-recipe-none]");
+    const ask = $("[data-rp-ask]");
+    const note = $("[data-rp-note]");
+    const sort = $("[data-rp-sort]");
+    const byId = new Map(list.map((r, i) => [String(r.recipe_id), i]));
+    if (sort) sort.value = st.sort;
+
+    const apply = () => {
+      const text = find ? find.value : "";
+      if (st.asked && st.asked.q !== text.trim()) st.asked = null;
+      const pinned = st.asked || st.ideas || null;
+      const reasons = new Map(((pinned && pinned.picks) || [])
+        .filter((p) => byId.has(String(p.recipe_id))).map((p) => [byId.get(String(p.recipe_id)), p.reason || ""]));
+      const asking = Boolean(st.asked);
+      const order = recipeOrder(list, st.sort);
+      const ordered = [...reasons.keys(), ...order.filter((i) => !reasons.has(i))];
+      let shown = 0;
+      ordered.forEach((i) => {
+        const r = list[i];
+        const li = rows.get(i);
+        if (!li) return;
+        const pin = reasons.has(i);
+        const pass = recipePasses(r, st.chips, o.planned) && (pin || asking || recipeFound(r, text));
+        li.hidden = !pass;
+        if (pass) shown += 1;
+        li.classList.toggle("pinned", pin && pass);
+        const why = li.querySelector(".rpwhy");
+        if (why) {
+          const found = !pin && !asking ? recipeFoundIn(r, text) : "";
+          why.textContent = pin ? reasons.get(i) : (found ? `with ${found}` : "");
+          why.hidden = !why.textContent;
+        }
+        ul.appendChild(li);
+      });
+      box.querySelectorAll("[data-rp-chip]").forEach((c) => {
+        c.setAttribute("aria-pressed", String(st.chips.has(c.getAttribute("data-rp-chip"))));
+      });
+      if (count) count.textContent = shown === list.length ? `${list.length} recipes` : `${shown} of ${list.length}`;
+      if (none) none.hidden = shown > 0;
+      if (clear) clear.hidden = !text;
+      if (note) {
+        const busy = st.busy || "";
+        note.hidden = !busy && !pinned;
+        note.innerHTML = busy ? esc(busy)
+          : (pinned ? `${esc(pinned.title)}${pinned === st.asked ? ` <button type="button" class="rpunpin" data-rp-unpin>Clear</button>` : ""}` : "");
+        const unpin = note.querySelector("[data-rp-unpin]");
+        if (unpin) {
+          unpin.addEventListener("click", () => {
+            st.asked = null;
+            if (find) find.value = "";
+            apply();
+          });
+        }
+      }
+      if (ask) {
+        const words = text.trim().split(/\s+/).filter(Boolean);
+        ask.hidden = !o.askSpec || !words.length || asking || (words.length < 3 && shown > 0);
+        ask.querySelector("span").textContent = `Ask: “${text.trim()}”`;
+      }
+      st.find = text;
+      if (typeof o.onState === "function") o.onState(st);
+    };
+
+    const askFor = (question, limit) => this._mealCall(o.askSpec.script, {
+      question, entry_type: o.meal || "", date: o.date || "", limit,
+    }).then((r) => (Array.isArray(r.picks) ? r.picks : [])
+      .filter((p) => p && byId.has(String(p.recipe_id))));
+
+    if (find) find.addEventListener("input", apply);
+    box.querySelectorAll("[data-rp-chip]").forEach((c) => c.addEventListener("click", () => {
+      const k = c.getAttribute("data-rp-chip");
+      if (st.chips.has(k)) st.chips.delete(k); else st.chips.add(k);
+      apply();
+    }));
+    if (sort) {
+      sort.addEventListener("change", () => {
+        st.sort = sort.value;
+        try { localStorage.setItem("spectra-cards:recipe-sort", st.sort); } catch (e) { /* a private window */ }
+        apply();
+      });
+    }
+    if (ask) {
+      ask.addEventListener("click", () => {
+        const q = (find ? find.value : "").trim();
+        if (!q) return;
+        ask.hidden = true;
+        st.busy = "Looking through the box…";
+        apply();
+        askFor(q, 6).then((picks) => {
+          st.busy = "";
+          st.asked = { q, picks, title: picks.length ? `Asked: “${q}”` : `Nothing in the box fits “${q}”` };
+          apply();
+        }, (error) => {
+          LOGGER_WARN("spectra-card: could not ask the recipe box", error);
+          st.busy = "That did not work.";
+          apply();
+          st.busy = "";
+        });
+      });
+    }
+    /* Opened for a slot: a few good ones, found while the list is already
+       there to choose from, so the picker is never held up by it. */
+    if (o.askSpec && o.meal && o.date && !st.ideas && !st.ideasAsked) {
+      st.ideasAsked = true;
+      st.busy = `Finding good ones for ${mealSlotWords(o.date, o.meal).replace(/^Today's|^Tomorrow's/, (w) => w.toLowerCase())}…`;
+      askFor("", 3).then((picks) => {
+        st.busy = "";
+        if (picks.length) {
+          st.ideas = { picks, title: `Suggested for ${mealSlotWords(o.date, o.meal).replace(/^Today's|^Tomorrow's/, (w) => w.toLowerCase())}` };
+        }
+        if (box.isConnected) apply();
+      }, () => { st.busy = ""; if (box.isConnected) apply(); });
+    }
+
+    /* A press opens; a long press (or a right click) shows the first few
+       ingredients in place, to tell two similar recipes apart. */
+    rows.forEach((li, i) => {
+      const btn = li.querySelector("[data-recipe-open]");
+      const ing = li.querySelector(".rping");
+      let timer = null;
+      let held = false;
+      const peek = () => { if (ing) ing.hidden = !ing.hidden; };
+      if (ing) {
+        btn.addEventListener("pointerdown", () => {
+          held = false;
+          timer = setTimeout(() => { held = true; peek(); }, 450);
+        });
+        ["pointerup", "pointerleave", "pointercancel"].forEach((t) => btn.addEventListener(t, () => clearTimeout(timer)));
+        btn.addEventListener("contextmenu", (event) => { event.preventDefault(); clearTimeout(timer); held = true; peek(); });
+      }
+      btn.addEventListener("click", () => {
+        if (held) { held = false; return; }
+        const r = list[i];
+        if (r && typeof o.onOpen === "function") o.onOpen(r);
+      });
+    });
+    if (o.images) {
+      box.querySelectorAll("[data-rp-img]").forEach((slot) => {
+        this._signImage(slot.getAttribute("data-rp-img"), "tiny").then((url) => {
+          if (!url || slot.querySelector("img")) return;
+          const img = document.createElement("img");
+          img.className = "rcthumb";
+          img.alt = "";
+          img.loading = "lazy";
+          img.addEventListener("error", () => { img.remove(); slot.classList.add("none"); });
+          img.src = url;
+          slot.appendChild(img);
+        });
+      });
+    }
+    apply();
   }
 
   /* A recipe as a form: new when `recipe` is null. Ingredients and method
@@ -12499,6 +12991,7 @@ class SpectraCard extends HTMLElement {
       .filter((x) => !isBlank(x)).join("\n");
     const servings = Number(r.recipe_servings) > 0 ? String(Math.round(Number(r.recipe_servings))) : "";
     const dictate = !isBlank(edit.dictate);
+    const tagsBefore = recipeTagsOf(r);
     wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Edit recipe">`
       + `<div class="confirmhead"><ha-icon icon="mdi:pencil"></ha-icon>`
       + `<span>${esc(recipe ? "Edit recipe" : ((opts && opts.heading) || "New recipe"))}</span></div>`
@@ -12507,6 +13000,7 @@ class SpectraCard extends HTMLElement {
         + `${iconMarkup("mdi:microphone")}</button><span class="tdvoicesay" data-said>`
         + `${esc(recipe ? "Or read it out" : "Read the recipe out, or type it")}</span></div>` : "")
       + `<label for="mlname">Name</label><input id="mlname" data-f="name" value="${esc(r.name || "")}">`
+      + recipeTagChips(tagsBefore)
       + `<div class="mlpair"><div><label for="mltime">Time</label>`
       + `<input id="mltime" data-f="total_time" placeholder="45 minutes" value="${esc(r.total_time || "")}"></div>`
       + `<div><label for="mlserves">Serves</label>`
@@ -12523,6 +13017,12 @@ class SpectraCard extends HTMLElement {
 
     const field = (name) => wrap.querySelector(`[data-f="${name}"]`);
     const status = (text) => { wrap.querySelector("[data-status]").textContent = text; };
+    wrap.querySelectorAll("[data-tag]").forEach((chip) => chip.addEventListener("click", () => {
+      chip.setAttribute("aria-pressed", String(chip.getAttribute("aria-pressed") !== "true"));
+    }));
+    const tagsNow = () => [...wrap.querySelectorAll('[data-tag][aria-pressed="true"]')]
+      .map((c) => c.getAttribute("data-tag"));
+    const same = (a, b) => a.map((t) => t.toLowerCase()).sort().join("|") === b.map((t) => t.toLowerCase()).sort().join("|");
     const call = (name, data, respond) => {
       const [domain, service] = String(name).split(".");
       const msg = { type: "call_service", domain, service, service_data: data };
@@ -12558,6 +13058,8 @@ class SpectraCard extends HTMLElement {
       const serves = Number(field("servings").value);
       if (serves > 0) data.servings = serves;
       if (recipe) data.recipe = String(firstOf(recipe.slug, recipe.recipe_id));
+      const tags = tagsNow();
+      if (!same(tags, tagsBefore)) data.tags = tags;
       data.config_entry_id = entry;
       yes.disabled = true;
       status("Saving\u2026");
@@ -12567,6 +13069,12 @@ class SpectraCard extends HTMLElement {
         this._voiceSay("idle", `${firstOf(saved.name, name, "Recipe")} saved`);
         this._refetchMeals();
         if (onSaved) onSaved(saved);
+        /* A new recipe nobody tagged is tagged by AI, in the background:
+           the box then knows which meals it suits the next time it opens. */
+        if (!recipe && !tags.length && !isBlank(edit.tag) && !isBlank(saved.slug)) {
+          this._mealCall(edit.tag, { recipe: String(saved.slug) })
+            .then(() => this._refetchMeals(), (error) => LOGGER_WARN("spectra-card: could not tag the recipe", error));
+        }
       }, (error) => {
         yes.disabled = false;
         status(`Not saved: ${(error && error.message) || "Mealie did not answer."}`);

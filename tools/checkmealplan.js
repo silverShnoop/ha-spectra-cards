@@ -213,7 +213,7 @@ const js = fs.readFileSync(file);
     await settle();
     check("the box opens to choose from", text(top().querySelector(".confirmhead")) === "Tomorrow's lunch: choose a recipe"
       && !top().querySelector("[data-new]"), text(top().querySelector(".confirmhead")));
-    top().querySelector('[data-recipe="1"]').click();
+    top().querySelector('[data-recipe-open="1"]').click();
     await settle();
     const chose = calls("meal_plan_set").pop();
     check("a name goes straight into the slot", chose.service_data.recipe_id === "r1"
