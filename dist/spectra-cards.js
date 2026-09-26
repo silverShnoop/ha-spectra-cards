@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.116.1";
+const VERSION = "0.117.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1028,19 +1028,51 @@ ha-icon { display:inline-flex; line-height:0; }
 .washfinrow.hanging .ran,
 .washfinrow.hanging .used { color:var(--sp-attention-on); }
 
-/* A confirmation is a modal over the card it belongs to, not a browser
-   dialog: the panel has no keyboard and no window chrome, and a native
-   confirm() cannot be styled, cannot be dismissed with a thumb, and stops
-   the whole frontend while it is open. */
+/* A confirmation is a modal drawn by the card, not a browser dialog: the
+   panel has no keyboard and no window chrome, and a native confirm() cannot
+   be styled, cannot be dismissed with a thumb, and stops the whole
+   frontend while it is open.
+
+   It covers the SCREEN, not the card. It used to cover the card, which was
+   fine for "Cut the power?" on a tall washer card and wrong for everything
+   that came after it: a recipe opened from Home's short meals card spilled
+   two hundred pixels over the cards above and below. It is sized to the
+   visual viewport, the part of the screen the on-screen keyboard leaves,
+   so a form's Save stays above the keyboard instead of underneath it
+   (--sp-vvh and --sp-vvtop are kept up to date at the bottom of this
+   file). On a phone it is a sheet from the bottom edge, where a thumb is. */
 .confirmwrap {
-  position:absolute; inset:0; z-index:5; border-radius:4px;
+  position:fixed; left:0; right:0; top:var(--sp-vvtop, 0px);
+  height:var(--sp-vvh, 100dvh); z-index:1000;
   background:rgba(0,0,0,.62); display:flex; align-items:center;
-  justify-content:center; padding:10px;
+  justify-content:center; padding:12px; box-sizing:border-box;
+  animation:sheetfade .16s ease-out;
 }
 .confirmbox {
-  max-width:430px; width:100%; background:var(--sp-surface);
-  border:2px solid var(--accent); border-radius:6px; padding:14px 16px 12px;
+  max-width:460px; width:100%; background:var(--sp-surface);
+  border:2px solid var(--accent); border-radius:10px; padding:14px 16px 0;
+  box-sizing:border-box; display:flex; flex-direction:column;
+  max-height:100%; overflow-y:auto; overscroll-behavior:contain;
+  box-shadow:0 12px 40px rgba(0,0,0,.28);
 }
+/* The body scrolls and the buttons do not: a long method or a long list
+   of suggestions never pushes Save off the sheet or under the keyboard. */
+.confirmbox > .mlrecipe { flex:1 1 auto; min-height:0; max-height:none; }
+.confirmbox > .confirmbtns {
+  position:sticky; bottom:0; flex:none; background:var(--sp-surface);
+  padding:10px 0 12px; margin-top:6px; border-top:1px solid var(--sp-sink);
+}
+@keyframes sheetfade { from { opacity:0; } to { opacity:1; } }
+@keyframes sheetrise { from { transform:translateY(24px); opacity:.6; } to { transform:none; opacity:1; } }
+@media (max-width: 600px) {
+  .confirmwrap { align-items:flex-end; padding:0; }
+  .confirmbox {
+    max-width:none; border-width:2px 0 0; border-radius:16px 16px 0 0;
+    padding:16px 16px 0; animation:sheetrise .2s ease-out;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+}
+@media (prefers-reduced-motion: reduce) { .confirmwrap, .confirmbox { animation:none; } }
 .confirmhead {
   display:flex; align-items:center; gap:8px; margin-bottom:8px;
   font-size:14px; font-weight:600; color:var(--accent-on);
@@ -1048,7 +1080,7 @@ ha-icon { display:inline-flex; line-height:0; }
 .confirmhead ha-icon { --mdc-icon-size:18px; color:var(--accent); }
 .confirmtext { margin:0 0 6px; font-size:12px; color:var(--sp-ink-2); line-height:1.5; }
 .confirmtext.quiet { color:var(--sp-ink-3); }
-.confirmbtns { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+.confirmbtns { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; margin-top:12px; }
 .confirmbtns button {
   font:inherit; font-size:13px; border-radius:4px; padding:9px 16px;
   min-height:44px; cursor:pointer;
@@ -1791,7 +1823,7 @@ svg.mdi { width:24px; height:24px; flex:none; }
    is read from a step back with something in the other hand, and scrolled
    inside the sheet so a long method never pushes the Close button off the
    card. */
-.mlrecipe { max-height:min(62vh, 520px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.mlrecipe { overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
 .mlrecipe h4 {
   margin:12px 0 6px; font-size:11px; font-weight:600; letter-spacing:.06em;
   text-transform:uppercase; color:var(--sp-ink-2);
@@ -1812,11 +1844,24 @@ svg.mdi { width:24px; height:24px; flex:none; }
 /* The recipe box as a card of its own: search and the two ways in along
    the top, then the names. */
 .rchead { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:6px; }
+.rcsearch { position:relative; flex:1 1 160px; display:flex; min-width:0; }
+/* 16px, not 14: a phone zooms the page in on any field set smaller, and
+   the page then stays zoomed when the keyboard goes away. */
 .rcfind {
-  flex:1 1 160px; min-height:40px; box-sizing:border-box; font:inherit; font-size:14px;
+  flex:1 1 auto; min-width:0; min-height:44px; box-sizing:border-box; font:inherit; font-size:16px;
   color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge);
-  border-radius:4px; padding:8px 10px;
+  border-radius:8px; padding:8px 40px 8px 12px;
 }
+.rcfind::-webkit-search-cancel-button { display:none; }
+.rcclear {
+  position:absolute; right:2px; top:50%; transform:translateY(-50%);
+  width:40px; height:40px; border:none; background:none; color:var(--sp-ink-3);
+  display:grid; place-items:center; cursor:pointer; padding:0;
+}
+.rcclear .mdi { width:20px; height:20px; }
+/* A wall panel has no clipboard to paste a link from -- the share sheet on
+   a phone is how a link arrives there. Touch and wide is the panel. */
+@media (pointer: coarse) and (min-width: 900px) { [data-recipe-link] { display:none; } }
 .rclist { max-height:min(70vh, 640px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
 .rcnone { margin:10px 2px; font-size:13px; color:var(--sp-ink-2); }
 /* Editing a recipe. Labels above fields, because on a phone the field is
@@ -1826,13 +1871,108 @@ svg.mdi { width:24px; height:24px; flex:none; }
   letter-spacing:.06em; text-transform:uppercase; color:var(--sp-ink-2);
 }
 .mlform input, .mlform textarea {
-  width:100%; box-sizing:border-box; font:inherit; font-size:14px;
+  width:100%; box-sizing:border-box; font:inherit; font-size:16px;
   color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge);
   border-radius:4px; padding:8px 10px;
 }
 .mlform textarea { min-height:110px; resize:vertical; line-height:1.45; }
 .mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
 .mlform .mldictate { display:flex; align-items:center; gap:10px; margin-top:10px; }
+.mlbear > span {
+  display:block; margin:14px 0 4px; font-size:11px; font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--sp-ink-2);
+}
+/* Words to add to the line with one tap, for a panel with no keyboard up. */
+.mlhints { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px; }
+.mlhint {
+  min-height:36px; padding:0 12px; font:inherit; font-size:13px; border-radius:999px;
+  border:1px solid var(--sp-edge); background:none; color:var(--sp-ink-2); cursor:pointer;
+}
+.mlhint[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-on); }
+/* A meal typed rather than said. 16px so a phone does not zoom to it. */
+.mltype-in { display:flex; gap:6px; flex:1 1 100%; min-width:0; }
+.mltype-in input {
+  flex:1 1 auto; min-width:0; min-height:44px; box-sizing:border-box; font:inherit; font-size:16px;
+  color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge);
+  border-radius:8px; padding:8px 12px;
+}
+.mltype-in button {
+  width:44px; min-height:44px; border:none; border-radius:8px; background:var(--accent);
+  color:var(--sp-surface); display:grid; place-items:center; cursor:pointer; padding:0;
+}
+.mltype-in button:disabled { opacity:.4; cursor:default; }
+.mltype-in .mdi { width:20px; height:20px; }
+.mlmore { display:contents; }
+.mlmore[hidden] { display:none; }
+/* On a narrow card the week's buttons shed their words and share one row
+   that scrolls, rather than stacking four deep under the plan. */
+.mlacts { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
+.mlbtn .mlshort { display:none; }
+@container meals (max-width: 520px) {
+  .mlacts {
+    flex:1 1 100%; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
+    -webkit-overflow-scrolling:touch; margin:0 -2px; padding:2px;
+  }
+  .mlacts::-webkit-scrollbar { display:none; }
+  .mlacts > * { flex:none; }
+  .mlacts .mlbtn .mllong { display:none; }
+  .mlacts .mlbtn .mlshort { display:inline; }
+}
+/* An answer to a press, near where the press was, for a moment. */
+.mltoast {
+  position:fixed; left:50%; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); z-index:1001;
+  transform:translateX(-50%); max-width:min(92vw, 480px); padding:12px 18px; border-radius:12px;
+  background:var(--sp-ink); color:var(--sp-surface); font-size:14px; line-height:1.35;
+  box-shadow:0 6px 24px rgba(0,0,0,.25); animation:mlrise .18s ease-out; pointer-events:none;
+}
+@media (prefers-reduced-motion: reduce) { .mltoast { animation:none; } }
+/* Recipe photos. Small and square beside a name; across the top of a
+   grid cell, where a picture is quicker to find from across the room
+   than a word. */
+.mlthumb, .rcthumb {
+  width:40px; height:40px; flex:none; border-radius:8px; object-fit:cover;
+  background:var(--sp-sink); align-self:center;
+}
+.rclist button { align-items:center; }
+.rcname { flex:1 1 auto; min-width:0; }
+.rcplanned {
+  flex:none; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  padding:2px 8px; border-radius:999px; color:var(--accent-on); background:var(--accent-soft);
+}
+.mlcellimg {
+  display:block; width:calc(100% + 18px); height:44px; margin:-8px -9px 2px; object-fit:cover;
+  border-radius:8px 8px 0 0;
+}
+.mlcell.past .mlcellimg { filter:grayscale(.6); }
+.mlcell:has(.mlcellimg) { justify-content:flex-start; }
+.mldetail { display:flex; flex-wrap:wrap; align-items:flex-start; gap:0 10px; }
+.mldetail > .mltray { flex:1 1 100%; }
+.mldetailhead { flex:1 1 0; min-width:0; }
+.mldetailimg { width:64px; height:64px; border-radius:10px; object-fit:cover; flex:none; margin-left:8px; }
+.mlhero {
+  display:block; width:100%; max-height:220px; object-fit:cover; border-radius:10px; margin:4px 0 8px;
+}
+/* Cooking: one step, large, from a step back with something in the
+   other hand. The next step is a swipe or the biggest button. */
+.mlcookbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0 6px; }
+.mlcookof { font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--accent-on); }
+.mlcookdots { display:flex; gap:4px; margin-bottom:10px; }
+.mlcookdots i { flex:1 1 0; height:4px; border-radius:2px; background:var(--sp-edge); }
+.mlcookdots i.done { background:var(--accent-soft); }
+.mlcookdots i.on { background:var(--accent); }
+.mlcookstep {
+  font-size:clamp(20px, 3.2vw, 30px); line-height:1.45; color:var(--sp-ink);
+  min-height:30vh; padding:6px 2px 12px;
+}
+.mlcooking {
+  margin:0 0 10px; padding:10px 12px 10px 28px; border-radius:10px; background:var(--sp-sink);
+  max-height:30vh; overflow-y:auto;
+}
+.mlcooking li { font-size:15px; line-height:1.45; color:var(--sp-ink); margin:0 0 4px; }
+.mlcook { max-width:760px; }
+.confirmbtns .mdi { width:20px; height:20px; vertical-align:-5px; }
+.tdadd { margin-top:10px; }
+.tdaddsay { margin:6px 2px 0; min-height:1.3em; font-size:13px; line-height:1.35; color:var(--sp-ink-2); }
 .confirmbtns .mldelete { margin-right:auto; border:1px solid var(--sp-edge); background:none; color:var(--sp-ink-2); }
 
 /* ---- additions to the reference sheet ---- */
@@ -2686,6 +2826,18 @@ const WEATHER_ICONS = {
    an empty cell, reads as a card that has not loaded. Inline, they are there
    with the first paint. */
 const MDI_INLINE = {
+  "mdi:account-group-outline": "M12,5A3.5,3.5 0 0,0 8.5,8.5A3.5,3.5 0 0,0 12,12A3.5,3.5 0 0,0 15.5,8.5A3.5,3.5 0 0,0 12,5M12,7A1.5,1.5 0 0,1 13.5,8.5A1.5,1.5 0 0,1 12,10A1.5,1.5 0 0,1 10.5,8.5A1.5,1.5 0 0,1 12,7M5.5,8A2.5,2.5 0 0,0 3,10.5C3,11.44 3.53,12.25 4.29,12.68C4.65,12.88 5.06,13 5.5,13C5.94,13 6.35,12.88 6.71,12.68C7.08,12.47 7.39,12.17 7.62,11.81C6.89,10.86 6.5,9.7 6.5,8.5C6.5,8.41 6.5,8.31 6.5,8.22C6.2,8.08 5.86,8 5.5,8M18.5,8C18.14,8 17.8,8.08 17.5,8.22C17.5,8.31 17.5,8.41 17.5,8.5C17.5,9.7 17.11,10.86 16.38,11.81C16.5,12 16.63,12.15 16.78,12.3C16.94,12.45 17.1,12.58 17.29,12.68C17.65,12.88 18.06,13 18.5,13C18.94,13 19.35,12.88 19.71,12.68C20.47,12.25 21,11.44 21,10.5A2.5,2.5 0 0,0 18.5,8M12,14C9.66,14 5,15.17 5,17.5V19H19V17.5C19,15.17 14.34,14 12,14M4.71,14.55C2.78,14.78 0,15.76 0,17.5V19H3V17.07C3,16.06 3.69,15.22 4.71,14.55M19.29,14.55C20.31,15.22 21,16.06 21,17.07V19H24V17.5C24,15.76 21.22,14.78 19.29,14.55M12,16C13.53,16 15.24,16.5 16.23,17H7.77C8.76,16.5 10.47,16 12,16Z",
+  "mdi:cart-outline": "M17,18A2,2 0 0,1 19,20A2,2 0 0,1 17,22C15.89,22 15,21.1 15,20C15,18.89 15.89,18 17,18M1,2H4.27L5.21,4H20A1,1 0 0,1 21,5C21,5.17 20.95,5.34 20.88,5.5L17.3,11.97C16.96,12.58 16.3,13 15.55,13H8.1L7.2,14.63L7.17,14.75A0.25,0.25 0 0,0 7.42,15H19V17H7C5.89,17 5,16.1 5,15C5,14.65 5.09,14.32 5.24,14.04L6.6,11.59L3,4H1V2M7,18A2,2 0 0,1 9,20A2,2 0 0,1 7,22C5.89,22 5,21.1 5,20C5,18.89 5.89,18 7,18M16,11L18.78,6H6.14L8.5,11H16Z",
+  "mdi:chevron-left": "M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z",
+  "mdi:chevron-right": "M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z",
+  "mdi:close": "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z",
+  "mdi:dots-horizontal": "M16,12A2,2 0 0,1 18,10A2,2 0 0,1 20,12A2,2 0 0,1 18,14A2,2 0 0,1 16,12M10,12A2,2 0 0,1 12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12M4,12A2,2 0 0,1 6,10A2,2 0 0,1 8,12A2,2 0 0,1 6,14A2,2 0 0,1 4,12Z",
+  "mdi:keyboard-outline": "M4,5A2,2 0 0,0 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7A2,2 0 0,0 20,5H4M4,7H20V17H4V7M5,8V10H7V8H5M8,8V10H10V8H8M11,8V10H13V8H11M14,8V10H16V8H14M17,8V10H19V8H17M5,11V13H7V11H5M8,11V13H10V11H8M11,11V13H13V11H11M14,11V13H16V11H14M17,11V13H19V11H17M8,14V16H16V14H8Z",
+  "mdi:magnify": "M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z",
+  "mdi:play": "M8,5.14V19.14L19,12.14L8,5.14Z",
+  "mdi:send": "M2,21L23,12L2,3V10L17,12L2,14V21Z",
+  "mdi:silverware-clean": "M15 0L14.38 1.37L13 2L14.38 2.63L15 4L15.63 2.63L17 2L15.63 1.37L15 0M10.5 2L9.41 4.41L7 5.5L9.41 6.59L10.5 9L11.6 6.59L14 5.5L11.6 4.41L10.5 2M18.89 5.14C17.56 5.06 16.04 5.65 14.84 6.84C13.25 8.43 12.75 10.58 13.46 12.11L3.7 21.87L5.11 23.28L12 16.41L18.88 23.29L20.29 21.88L13.41 15L14.88 13.53C16.41 14.24 18.56 13.74 20.15 12.15C22.06 10.24 22.43 7.5 20.96 6.03C20.41 5.5 19.68 5.19 18.89 5.14M3.91 5.5C2.35 7.06 2.35 9.59 3.91 11.16L8.1 15.34L10.93 12.5L3.91 5.5Z",
+  "mdi:timer-outline": "M12,20A7,7 0 0,1 5,13A7,7 0 0,1 12,6A7,7 0 0,1 19,13A7,7 0 0,1 12,20M19.03,7.39L20.45,5.97C20,5.46 19.55,5 19.04,4.56L17.62,6C16.07,4.74 14.12,4 12,4A9,9 0 0,0 3,13A9,9 0 0,0 12,22C17,22 21,17.97 21,13C21,10.88 20.26,8.93 19.03,7.39M11,14H13V8H11M15,1H9V3H15V1Z",
   "mdi:book-open-variant": "M12 21.5C10.65 20.65 8.2 20 6.5 20C4.85 20 3.15 20.3 1.75 21.05C1.65 21.1 1.6 21.1 1.5 21.1C1.25 21.1 1 20.85 1 20.6V6C1.6 5.55 2.25 5.25 3 5C4.11 4.65 5.33 4.5 6.5 4.5C8.45 4.5 10.55 4.9 12 6C13.45 4.9 15.55 4.5 17.5 4.5C18.67 4.5 19.89 4.65 21 5C21.75 5.25 22.4 5.55 23 6V20.6C23 20.85 22.75 21.1 22.5 21.1C22.4 21.1 22.35 21.1 22.25 21.05C20.85 20.3 19.15 20 17.5 20C15.8 20 13.35 20.65 12 21.5M12 8V19.5C13.35 18.65 15.8 18 17.5 18C18.7 18 19.9 18.15 21 18.5V7C19.9 6.65 18.7 6.5 17.5 6.5C15.8 6.5 13.35 7.15 12 8M13 11.5C14.11 10.82 15.6 10.5 17.5 10.5C18.41 10.5 19.26 10.59 20 10.78V9.23C19.13 9.08 18.29 9 17.5 9C15.73 9 14.23 9.28 13 9.84V11.5M17.5 11.67C15.79 11.67 14.29 11.93 13 12.46V14.15C14.11 13.5 15.6 13.16 17.5 13.16C18.54 13.16 19.38 13.24 20 13.4V11.9C19.13 11.74 18.29 11.67 17.5 11.67M20 14.57C19.13 14.41 18.29 14.33 17.5 14.33C15.67 14.33 14.17 14.6 13 15.13V16.82C14.11 16.16 15.6 15.83 17.5 15.83C18.54 15.83 19.38 15.91 20 16.07V14.57Z",
   "mdi:bowl-mix-outline": "M15.6 12H2V15C2 18.9 5.1 22 9 22H15C18.9 22 22 18.9 22 15V12H15.6M20 15C20 17.8 17.8 20 15 20H9C6.2 20 4 17.8 4 15V14H20V15M16.2 11L20.3 4.4L22 5.5L18.6 11H16.2Z",
   "mdi:bowl-outline": "M2 12V15C2 18.9 5.1 22 9 22H15C18.9 22 22 18.9 22 15V12H2M4 14H20V15C20 17.8 17.8 20 15 20H9C6.2 20 4 17.8 4 15V14Z",
@@ -2959,6 +3111,8 @@ const RAW_KEYS = new Set([
   /* ...and the ones that came after: planning a meal into a slot, writing
      a recipe for a meal that is only a name, and the two cameras. */
   "place", "write", "schedule", "photo", "fridge", "edit", "import",
+  /* The to-do list's typed row: a placeholder and a preview name. */
+  "add",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -4413,6 +4567,21 @@ const BODIES = {
        any other now, and whatever is configured below it still draws. */
     let out = cells
       || `<p class="sub">${esc(firstOf(b.empty, "Nothing on the list"))}</p>`;
+    /* Something typed onto the list, for a list that is written rather
+       than said -- a routine's rules. `preview: meal_routine` reads each
+       line back as it is typed, as the script that uses them will. */
+    if (b.add && typeof b.add === "object" && !isBlank(b.list)) {
+      const draft = isBlank(b.add_draft) ? "" : String(b.add_draft);
+      const preview = b.add.preview === "meal_routine";
+      out += `<div class="tdadd"><div class="mltype-in">`
+        + `<input type="text" data-todo-add enterkeyhint="done" autocomplete="off" value="${esc(draft)}"`
+        + ` aria-label="${esc(firstOf(b.add.label, "Add to the list"))}"`
+        + ` placeholder="${esc(firstOf(b.add.placeholder, "Add to the list"))}">`
+        + `<button type="button" data-todo-addgo aria-label="Add"${draft.trim() ? "" : " disabled"}>`
+        + `${iconMarkup("mdi:plus")}</button></div>`
+        + (preview ? `<p class="tdaddsay" data-todo-addsay aria-live="polite">${esc(routinePreview(draft))}</p>` : "")
+        + `</div>`;
+    }
     if (all.length > shown.length) {
       out += `<div class="tdmore">+ ${all.length - shown.length} more</div>`;
     }
@@ -4548,12 +4717,15 @@ const BODIES = {
      typed, on the page rather than by repainting, so the keyboard stays up. */
   recipes(b) {
     const box = recipeList(b.box);
+    const planned = recipePlanned(b.planned);
     const find = isBlank(b.find) ? "" : String(b.find);
     const add = b.edit && typeof b.edit === "object" && !isBlank(b.edit.save);
     const link = b.import && typeof b.import === "object" && !isBlank(b.import.script);
     let out = `<div class="rcbox"><div class="rchead">`
-      + `<input type="search" class="rcfind" data-recipe-find placeholder="Find a recipe"`
-      + ` aria-label="Find a recipe" autocomplete="off" value="${esc(find)}">`
+      + `<span class="rcsearch"><input type="search" class="rcfind" data-recipe-find placeholder="Find a recipe"`
+      + ` aria-label="Find a recipe" autocomplete="off" enterkeyhint="search" value="${esc(find)}">`
+      + `<button type="button" class="rcclear" data-recipe-clear aria-label="Clear the search"${find ? "" : " hidden"}>`
+      + `${iconMarkup("mdi:close")}</button></span>`
       + (link ? `<button type="button" class="mlbtn quiet" data-recipe-link>From a link</button>` : "")
       + (b.photo && typeof b.photo === "object" && !isBlank(b.photo.save) && !isBlank(b.photo.script) && add
         ? `<button type="button" class="mlbtn quiet" data-recipe-photo>From a photo</button>` : "")
@@ -4566,7 +4738,8 @@ const BODIES = {
       const hide = !recipeMatches(r, find);
       if (!hide) shown += 1;
       out += `<li data-recipe-name="${esc(String(r.name).toLowerCase())}"${hide ? " hidden" : ""}>`
-        + `<button type="button" data-recipe-open="${i}"><span>${esc(r.name)}</span>`
+        + `<button type="button" data-recipe-open="${i}">${recipeThumb(b, r, "rcthumb")}<span class="rcname">${esc(r.name)}</span>`
+        + (planned[String(r.recipe_id)] ? `<span class="rcplanned">${esc(planned[String(r.recipe_id)])}</span>` : "")
         + (mealTime(r) ? `<span class="mltime">${esc(mealTime(r))}</span>` : "")
         + `</button></li>`;
     });
@@ -6835,6 +7008,81 @@ function mealAt(plan, day, type) {
     && String(e.entry_type).toLowerCase() === type) || null;
 }
 
+/* A recipe's photo, when the card shows photos and its address is signed.
+   Empty otherwise, so a recipe without one simply has no picture rather
+   than a grey box saying so. */
+function recipeThumb(b, recipe, cls) {
+  const id = recipe && !isBlank(recipe.recipe_id) ? String(recipe.recipe_id) : "";
+  const url = id && b && b.thumbs && typeof b.thumbs === "object" ? b.thumbs[id] : "";
+  return url ? `<img class="${cls}" data-thumb src="${esc(url)}" alt="" loading="lazy" decoding="async">` : "";
+}
+
+/* When a recipe is next on the plan, from today on: "Today", "Tomorrow",
+   "Tue". Only the first time -- the box says whether a recipe is coming
+   up, not the whole fortnight. */
+function recipePlanned(plan) {
+  const today = localDay(0);
+  const out = {};
+  (Array.isArray(plan) ? plan : [])
+    .filter((e) => e && e.recipe && !isBlank(e.recipe.recipe_id) && String(e.mealplan_date).slice(0, 10) >= today)
+    .sort((a, b) => (String(a.mealplan_date) < String(b.mealplan_date) ? -1 : 1))
+    .forEach((e) => {
+      const id = String(e.recipe.recipe_id);
+      if (out[id]) return;
+      const day = String(e.mealplan_date).slice(0, 10);
+      out[id] = day === today ? "Today" : (day === localDay(1) ? "Tomorrow"
+        : new Date(Date.parse(`${day}T12:00:00`)).toLocaleDateString([], { weekday: "short" }));
+    });
+  return out;
+}
+
+/* A routine rule read the way script.meal_routine_apply reads it, so the
+   preview under the box says what the script will actually do: "Friday:
+   Pizza", "Sunday lunch: Roast", "Weekdays breakfast: Porridge". The meal
+   is dinner unless one is named. Returns null for a line that is not a
+   rule, and {days: []} for one that names no day. Kept in step with the
+   script by hand -- the two must read a line the same way. */
+function routineRule(text) {
+  const line = String(text || "");
+  const at = line.indexOf(":");
+  if (at < 0) return null;
+  const head = line.slice(0, at).toLowerCase().trim();
+  const dish = line.slice(at + 1).trim();
+  const NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+  const KINDS = ["breakfast", "lunch", "dinner", "snack", "side", "dessert", "drink"];
+  let meal = "dinner";
+  const days = new Set();
+  head.replace(/,/g, " ").split(/\s+/).filter(Boolean).forEach((w) => {
+    if (KINDS.includes(w)) meal = w;
+    else if (w.slice(0, 7) === "weekday") [0, 1, 2, 3, 4].forEach((d) => days.add(d));
+    else if (w.slice(0, 7) === "weekend") [5, 6].forEach((d) => days.add(d));
+    else if (["every", "daily", "everyday"].includes(w)) [0, 1, 2, 3, 4, 5, 6].forEach((d) => days.add(d));
+    else if (NAMES.includes(w.slice(0, 3))) days.add(NAMES.indexOf(w.slice(0, 3)));
+  });
+  return { meal, dish, days: [...days].sort() };
+}
+
+/* What a routine line will do, in words, for under the box as it is typed. */
+function routinePreview(text) {
+  if (isBlank(text)) return "";
+  const rule = routineRule(text);
+  if (!rule) return "Start with the day and a colon, like \u201cFriday: Pizza\u201d.";
+  if (!rule.days.length) return "Which day? Try \u201cFriday\u201d, \u201cWeekdays\u201d or \u201cEvery day\u201d.";
+  if (!rule.dish) return "And what to eat, after the colon.";
+  const FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const d = rule.days.join(",");
+  const when = d === "0,1,2,3,4,5,6" ? "every day"
+    : (d === "0,1,2,3,4" ? "weekdays" : (d === "5,6" ? "weekends"
+      : rule.days.map((n) => FULL[n]).join(", ").replace(/, ([^,]*)$/, " and $1")));
+  return `Fills ${mealType(rule.meal).word.toLowerCase()} on ${when} with ${rule.dish}, when nothing else is planned.`;
+}
+
+/* A mouse, a trackpad: somewhere a field can be focused for the person
+   without a keyboard sliding up over what they were looking at. */
+function finePointer() {
+  return typeof matchMedia === "function" && matchMedia("(pointer: fine)").matches;
+}
+
 /* "Tuesday dinner", "Today's lunch": a slot in words, for a heading. */
 function mealSlotWords(day, type) {
   const word = mealType(type).word.toLowerCase();
@@ -6897,6 +7145,7 @@ function mealSlot(b, plan, day, type, picked, moving, labelled) {
   let out = `<button type="button" class="mlslot${name ? "" : " empty"}${state}"`
     + ` data-meal="${esc(slot)}" aria-expanded="${open ? "true" : "false"}">`
     + (labelled ? `<span class="mltype">${esc(kind.word)}</span>` : "")
+    + recipeThumb(b, entry && entry.recipe, "mlthumb")
     + `<span class="mlname">${esc(name || (past ? "Nothing" : "Nothing planned"))}</span>`
     + (time ? `<span class="mltime">${esc(time)}</span>` : "")
     + `</button>`;
@@ -6931,7 +7180,7 @@ function mealGrid(b, dates, types, plan, picked, moving) {
   for (const type of types) {
     const kind = mealType(type);
     out += `<div class="mlrow">${iconMarkup(kind.icon)}<span>${esc(kind.word)}</span></div>`;
-    for (const day of dates) out += mealCell(plan, day, type, picked, moving, next);
+    for (const day of dates) out += mealCell(plan, day, type, picked, moving, next, b);
   }
   out += `</div>`;
   const open = picked && !moving ? picked.split("|") : null;
@@ -6940,7 +7189,7 @@ function mealGrid(b, dates, types, plan, picked, moving) {
     const noon = `${open[0]}T12:00:00`;
     const when = open[0] === today ? "Today"
       : new Date(Date.parse(noon)).toLocaleDateString([], { weekday: "long" });
-    out += `<div class="mldetail"><div class="mldetailhead">`
+    out += `<div class="mldetail">${recipeThumb(b, entry && entry.recipe, "mldetailimg")}<div class="mldetailhead">`
       + `<span class="mlword">${esc(when)} \u00b7 ${esc(mealType(open[1]).word)}</span>`
       + `<span class="mldetailname${entry ? "" : " empty"}">${esc(mealName(entry) || "Nothing planned")}</span>`
       + `</div>${mealTray(b, entry, open[1], open[0] < today)}</div>`;
@@ -6973,7 +7222,7 @@ function mealGrid(b, dates, types, plan, picked, moving) {
 
 /* One cell of the grid. An empty one is a faint plus rather than words:
    twenty-eight "Nothing planned"s would be the loudest thing on the card. */
-function mealCell(plan, day, type, picked, moving, next) {
+function mealCell(plan, day, type, picked, moving, next, b) {
   const slot = `${day}|${type}`;
   const today = localDay(0);
   const past = day < today;
@@ -6994,6 +7243,7 @@ function mealCell(plan, day, type, picked, moving, next) {
   const label = `${weekdayLabel(noon) || day} ${mealType(type).word.toLowerCase()}: ${name || "nothing planned"}`;
   return `<button type="button" class="${classes.join(" ")}" data-meal="${esc(slot)}"`
     + ` aria-label="${esc(label)}" aria-pressed="${picked === slot ? "true" : "false"}">`
+    + recipeThumb(b, entry && entry.recipe, "mlcellimg")
     + (upNext ? `<span class="mlnext">Up next</span>` : "")
     + (name ? `<span class="mlname">${esc(name)}</span>`
       : (past ? "" : `<span class="mladd" aria-hidden="true">${iconMarkup("mdi:plus")}</span>`))
@@ -7028,6 +7278,14 @@ function mealTray(b, entry, type, past) {
   } else if (past && !entry) {
     out += `<span class="tdvoicesay">Nothing was planned.</span>`;
   }
+  /* The same take, typed: for a phone in a quiet room, or a panel with
+     the tap running. Written onto the plan exactly as a spoken one is. */
+  if (say && !past && !busy && phase !== "listening") {
+    out += `<div class="mltype-in"><input type="text" data-meal-typed enterkeyhint="send" autocomplete="off"`
+      + ` aria-label="${esc(entry ? "Type something else" : `Type what's for ${type}`)}"`
+      + ` placeholder="${esc(entry ? "Or type something else" : "Or type it, e.g. fish pie")}">`
+      + `<button type="button" data-meal-send aria-label="Plan it" disabled>${iconMarkup("mdi:send")}</button></div>`;
+  }
   const recipe = entry && entry.recipe && !isBlank(entry.recipe.recipe_id) && b.recipe !== false;
   if (recipe) out += `<button type="button" class="mlbtn" data-meal-recipe>Recipe</button>`;
   if (shop) out += `<button type="button" class="mlbtn" data-meal-shop>Ingredients to list</button>`;
@@ -7040,20 +7298,29 @@ function mealTray(b, entry, type, past) {
   if (entry && !entry.recipe && saves && sets && b.write && !isBlank(b.write.script)) {
     out += `<button type="button" class="mlbtn" data-meal-make>Make it a recipe</button>`;
   }
-  if (sets) {
-    out += `<button type="button" class="mlbtn${entry ? " quiet" : ""}" data-meal-choose>`
-      + `${entry ? "Choose another" : "Choose a recipe"}</button>`;
+  if (sets && !entry) {
+    out += `<button type="button" class="mlbtn" data-meal-choose>Choose a recipe</button>`;
   }
+  /* The rest are for changing a plan, not reading it, and wait behind
+     More so the tray leads with the one or two things usually wanted. */
+  let more = "";
+  if (sets && entry) more += `<button type="button" class="mlbtn quiet" data-meal-choose>Choose another</button>`;
   const pickable = b.pick && !isBlank(b.pick.script)
     && (!Array.isArray(b.pick.types) || b.pick.types.map((t) => String(t).toLowerCase()).includes(type));
   if (pickable) {
-    out += `<button type="button" class="mlbtn quiet" data-meal-pick>${entry ? "Pick another" : "Pick one"}</button>`;
+    more += `<button type="button" class="mlbtn quiet" data-meal-pick>${entry ? "Pick another" : "Pick one"}</button>`;
   }
   if (entry && b.move && !isBlank(b.move.script)) {
-    out += `<button type="button" class="mlbtn quiet" data-meal-move>Move</button>`;
+    more += `<button type="button" class="mlbtn quiet" data-meal-move>Move</button>`;
   }
   if (entry && !isBlank(entry.mealplan_id)) {
-    out += `<button type="button" class="mlbtn quiet" data-meal-clear>Clear</button>`;
+    more += `<button type="button" class="mlbtn quiet" data-meal-clear>Clear</button>`;
+  }
+  if (more) {
+    const shown = !!b.more_open;
+    out += `<button type="button" class="mlbtn quiet" data-meal-more aria-expanded="${shown}">`
+      + `${iconMarkup("mdi:dots-horizontal")} ${shown ? "Less" : "More"}</button>`
+      + `<span class="mlmore"${shown ? "" : " hidden"}>${more}</span>`;
   }
   return out + `</div>`;
 }
@@ -7106,13 +7373,19 @@ function mealFoot(b, picked, moving, dates, plan, types) {
       + (note ? "" : `<span class="mlcount">${filled} of ${slots} planned</span>`);
   }
   if (!week && !shop && !box && !note && !lead) return "";
+  /* Each button has a long and a short name; a narrow card shows the
+     short one, and the row scrolls rather than stacking. */
+  const act = (attr, icon, long, short, quiet) => `<button type="button" class="mlbtn${quiet ? " quiet" : ""}" ${attr}`
+    + ` aria-label="${esc(long)}">${iconMarkup(icon)} <span class="mllong">${esc(long)}</span>`
+    + `<span class="mlshort">${esc(short)}</span></button>`;
+  const fridge = b.fridge && !isBlank(b.fridge.script) && !isBlank(b.fridge.save);
+  const acts = (week ? act("data-meal-week", "mdi:calendar-star", "Fill empty days", "Fill") : "")
+    + (shop ? act("data-meal-shopweek", "mdi:cart-outline", "Shop for the week", "Shop") : "")
+    + (fridge ? act("data-meal-fridge", "mdi:fridge-outline", "What's in the fridge?", "Fridge", true) : "")
+    + (box ? act("data-meal-box", "mdi:book-open-variant", "Recipes", "Recipes", true) : "");
   return `<div class="mlfoot">` + lead
     + (note ? `<span class="tdvoicesay">${esc(note)}</span>` : "")
-    + (box ? `<button type="button" class="mlbtn quiet" data-meal-box>Recipes</button>` : "")
-    + (b.fridge && !isBlank(b.fridge.script) && !isBlank(b.fridge.save)
-      ? `<button type="button" class="mlbtn quiet" data-meal-fridge>${iconMarkup("mdi:fridge-outline")} What's in the fridge?</button>` : "")
-    + (week ? `<button type="button" class="mlbtn" data-meal-week>Fill empty days</button>` : "")
-    + (shop ? `<button type="button" class="mlbtn" data-meal-shopweek>Shop for the week</button>` : "")
+    + (acts ? `<div class="mlacts">${acts}</div>` : "")
     + `</div>`;
 }
 
@@ -7619,6 +7892,7 @@ const VOICE_NOTE_MS = 12000;
 /* How often a meal card rereads the plan. Five minutes: a meal planned on
    a phone should reach the kitchen before anybody walks there to look. */
 const MEAL_REFRESH_MS = 5 * 60 * 1000;
+const MEAL_IDLE_MS = 2 * 60 * 1000;
 
 /* An error carrying the sentence a person is meant to read.
 
@@ -7729,6 +8003,21 @@ class SpectraCard extends HTMLElement {
     root.appendChild(style);
     this._holder = document.createElement("div");
     root.appendChild(this._holder);
+    /* A repaint held back while somebody typed in the card is made the
+       moment they stop. See _typing in _update. */
+    this._holder.addEventListener("focusout", () => {
+      if (!this._heldForTyping) return;
+      this._heldForTyping = false;
+      setTimeout(() => { this._signature = null; this._update(); }, 0);
+    });
+    /* When the card was last touched, for putting a wall panel back to
+       today after somebody walks away. See _settleIdle. */
+    this._touchedAt = Date.now();
+    this._holder.addEventListener("pointerdown", () => {
+      this._touchedAt = Date.now();
+      this._armIdle();
+    }, true);
+    this._idleMs = MEAL_IDLE_MS;
     this._signature = null;
     this._sources = [];
     this._watched = {};
@@ -8189,6 +8478,11 @@ class SpectraCard extends HTMLElement {
        phone also shuts the keyboard -- so nothing paints until it closes,
        and closing it paints whatever was held back. */
     if (this._editing) return;
+    /* The same for a field on the card itself -- the recipe search, a meal
+       typed into a slot. Every refetch and every state change in the house
+       would otherwise rebuild the field under the caret and shut the
+       phone's keyboard mid-word. */
+    if (this._typing()) { this._heldForTyping = true; return; }
     /* A press mid-answer: the switch's knob part-way through its travel, a
        button still flashing. Replacing the node now would teleport the one
        and swallow the other. */
@@ -8222,6 +8516,12 @@ class SpectraCard extends HTMLElement {
     this._signature = signature;
     this._model = model;
     this._render(model);
+  }
+
+  _typing() {
+    const active = this.shadowRoot && this.shadowRoot.activeElement;
+    return Boolean(active && /^(INPUT|TEXTAREA)$/.test(active.tagName)
+      && this._holder.contains(active) && !active.closest(".confirmwrap"));
   }
 
   /* A thermostat's mode, claimed from the press until Tado says it.
@@ -8355,6 +8655,9 @@ class SpectraCard extends HTMLElement {
        no idea the card exists. Same route as `ticked` and `undo`, and
        the same reason: it has to survive the re-render the press
        provokes, or the note shuts itself the moment the list moves. */
+    if (model.body && model.body.type === "todo" && model.body.add) {
+      model.body.add_draft = this._addDraft || "";
+    }
     if (model.body && model.body.type === "todo" && this._openNote) {
       model.body.open_note = this._openNote;
     }
@@ -8368,7 +8671,9 @@ class SpectraCard extends HTMLElement {
     }
     /* The open slot and what its mic is doing, by the same route. */
     if (model.body && model.body.type === "meals") {
+      this._settleIdle();
       model.body.picked = this._mealPick || "";
+      model.body.more_open = !!this._mealMore;
       model.body.moving = this._mealMoving || "";
       model.body.week_offset = this._mealWeek || 0;
       model.body.day_index = this._mealDay;
@@ -8377,6 +8682,12 @@ class SpectraCard extends HTMLElement {
       model.body.hour = new Date().getHours() + (new Date().getMinutes() >= 30 ? 0.5 : 0);
       model.body.voice_phase = this._voice ? this._voice.phase : "idle";
       model.body.voice_note = (this._voice && this._voice.note) || "";
+      if (model.body.images && Array.isArray(model.body.plan)) {
+        model.body.thumbs = this._recipeImages(model.body.plan.map((e) => e && e.recipe), "tiny");
+      }
+    }
+    if (model.body && model.body.type === "recipes" && model.body.images && Array.isArray(model.body.box)) {
+      model.body.thumbs = this._recipeImages(model.body.box, "tiny");
     }
     /* What is typed in the recipe box's search, so a repaint keeps it. */
     if (model.body && model.body.type === "recipes") {
@@ -8641,7 +8952,8 @@ class SpectraCard extends HTMLElement {
        answered in seconds; a recipe read at the hob for ten minutes,
        across a plan refetch or a note expiring, vanished mid-read. */
     const sheets = Array.from(holder.children)
-      .filter((el) => el.classList && el.classList.contains("confirmwrap"));
+      .filter((el) => el.classList && (el.classList.contains("confirmwrap")
+        || el.classList.contains("mltoast")));
     holder.innerHTML = html;
     for (const sheet of sheets) holder.appendChild(sheet);
     motionFrom(holder, shot);
@@ -9221,6 +9533,31 @@ class SpectraCard extends HTMLElement {
     }
     this._signature = null;
     this._update();
+    if (phase === "idle" && !isBlank(note)) this._mealToast(String(note));
+  }
+
+  /* On a phone the line that answers a press can be a screen away from the
+     press -- Fill is under the week, the week is taller than the phone. The
+     answer is then also shown where the eye already is, for a moment. Only
+     for the meal card, and only when its own line is out of sight. */
+  _mealToast(note) {
+    if (!this._holder || !this._holder.querySelector(".meals")) return;
+    const lines = [...this._holder.querySelectorAll(".tdvoicesay")]
+      .filter((el) => el.textContent.trim() === note.trim());
+    const height = (typeof window !== "undefined" && window.innerHeight) || 0;
+    const seen = lines.some((el) => {
+      const r = el.getBoundingClientRect();
+      return r.height > 0 && r.top >= 0 && r.bottom <= height;
+    });
+    if (seen || this._holder.querySelector(".confirmwrap")) return;
+    const old = this._holder.querySelector(".mltoast");
+    if (old) old.remove();
+    const toast = document.createElement("div");
+    toast.className = "mltoast";
+    toast.setAttribute("role", "status");
+    toast.textContent = note;
+    this._holder.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
   }
 
   /* One button, and three things a press can mean.
@@ -10179,6 +10516,13 @@ class SpectraCard extends HTMLElement {
   _bind(model) {
     this._bindDrawer();
 
+    /* A photo that will not load -- Mealie down, a recipe whose picture
+       was removed -- takes itself away rather than leaving a broken frame. */
+    this._holder.querySelectorAll("img[data-thumb]").forEach((img) => {
+      if (img.complete && img.naturalWidth === 0 && img.getAttribute("src")) { img.remove(); return; }
+      img.addEventListener("error", () => img.remove(), { once: true });
+    });
+
     /* The one-way switch. A dark floor does not draw one at all, so there
        is normally nothing here to bind -- but the guard stays, because a
        bound control that answers a press with a spinner and no change is
@@ -10329,6 +10673,41 @@ class SpectraCard extends HTMLElement {
           run(event);
         }
       });
+    });
+
+    this._holder.querySelectorAll("[data-todo-add]").forEach((input) => {
+      const body = model.body || {};
+      if (!body.add || isBlank(body.list)) return;
+      const box = input.closest(".tdadd");
+      const go = box.querySelector("[data-todo-addgo]");
+      const say = box.querySelector("[data-todo-addsay]");
+      const preview = body.add.preview === "meal_routine";
+      const add = () => {
+        const text = input.value.trim();
+        if (!text) return;
+        if (preview) {
+          const rule = routineRule(text);
+          if (!rule || !rule.days.length || !rule.dish) { if (say) say.textContent = routinePreview(text); return; }
+        }
+        go.disabled = true;
+        onPress(go, () => this._addItems(String(body.list), [{ name: text }]).then(() => {
+          this._addDraft = "";
+          input.value = "";
+          if (say) say.textContent = preview ? "Added. Empty slots fill in a moment." : "";
+        }, (error) => {
+          go.disabled = false;
+          if (say) say.textContent = (error && error.say) || "That did not work.";
+        }));
+      };
+      input.addEventListener("input", () => {
+        this._addDraft = input.value;
+        go.disabled = !input.value.trim();
+        if (say) say.textContent = preview ? routinePreview(input.value) : "";
+      });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); add(); }
+      });
+      go.addEventListener("click", (event) => { event.stopPropagation(); add(); });
     });
 
     this._bindMeals(model);
@@ -10890,8 +11269,34 @@ class SpectraCard extends HTMLElement {
           return;
         }
         this._mealPick = this._mealPick === key ? null : key;
+        this._mealMore = false;
         this._voiceSay("idle", "");
       });
+    });
+
+    this._holder.querySelectorAll("[data-meal-more]").forEach((el) => {
+      press(el, () => {
+        this._mealMore = !this._mealMore;
+        this._signature = null;
+        this._update();
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-typed]").forEach((input) => {
+      if (!slot || !body.say || isBlank(body.say.script)) return;
+      const send = input.parentNode.querySelector("[data-meal-send]");
+      const go = () => {
+        const said = input.value.trim();
+        if (!said) return;
+        input.value = "";
+        input.blur();
+        this._mealSayText(body.say, slot[0], slot[1], said);
+      };
+      input.addEventListener("input", () => { if (send) send.disabled = !input.value.trim(); });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); go(); }
+      });
+      if (send) send.addEventListener("click", (event) => { event.stopPropagation(); go(); });
     });
 
     this._holder.querySelectorAll("[data-meal-weekto]").forEach((el) => {
@@ -10911,6 +11316,34 @@ class SpectraCard extends HTMLElement {
         this._mealPick = null;
         this._voiceSay("idle", "");
       });
+    });
+
+    /* A day at a time on a phone: a sideways swipe is the next or the
+       previous day, as a calendar app does. Mostly-sideways only, so a
+       scroll down the page that drifts is still a scroll. */
+    this._holder.querySelectorAll(".mlslots").forEach((el) => {
+      let from = null;
+      el.addEventListener("touchstart", (event) => {
+        const t = event.touches[0];
+        from = event.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+      }, { passive: true });
+      el.addEventListener("touchend", (event) => {
+        if (!from) return;
+        const t = event.changedTouches[0];
+        const dx = t.clientX - from.x;
+        const dy = t.clientY - from.y;
+        from = null;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+        const dates = mealDates(body);
+        const today = dates.indexOf(localDay(0));
+        const at = Number.isInteger(this._mealDay) ? this._mealDay : Math.max(0, today);
+        const to = Math.max(0, Math.min(dates.length - 1, at + (dx < 0 ? 1 : -1)));
+        if (to === at) return;
+        this._mealDay = to;
+        this._mealPick = null;
+        this._mealMore = false;
+        this._voiceSay("idle", "");
+      }, { passive: true });
     });
 
     this._holder.querySelectorAll("[data-meal-cancel]").forEach((el) => {
@@ -10950,12 +11383,14 @@ class SpectraCard extends HTMLElement {
         if (!span) { this._voiceSay("idle", "This week is over. Look at next week."); return; }
         /* With somewhere to write proposals to, Fill suggests and a person
            approves. Without, it writes straight in, as it used to. */
-        const go = (chosen) => {
-          if (!chosen.length) return;
-          if (body.place && !isBlank(body.place.script)) this._mealPropose(body, chosen, span, model.accent);
-          else this._mealFill(body.week, chosen, span);
+        const go = (answer) => {
+          if (!answer || !answer.types.length) return;
+          if (body.place && !isBlank(body.place.script)) {
+            this._mealPropose(body, answer.types, span, model.accent, null, answer.request);
+          } else this._mealFill(body.week, answer.types, span, answer.request);
         };
-        if (types.length === 1) { go(types); return; }
+        /* Asked every time, even with one kind of meal: it is also where
+           "no fish this week" gets said. */
         this._mealChoose(types, body.week.types, model.accent).then(go);
       });
     });
@@ -11062,6 +11497,101 @@ class SpectraCard extends HTMLElement {
     });
   }
 
+  /* Whether this card shows recipe photos: `images: true` on its body. */
+  _imagesOn() {
+    return Boolean(this._config && this._config.body && this._config.body.images);
+  }
+
+  /* A recipe photo's address, signed so an <img> can load it: Home
+     Assistant's own API wants a token, and an <img> cannot send one. The
+     photo is served by home_signals from Mealie. Signed for an hour and
+     kept for fifty minutes, so a panel left up all day re-signs quietly.
+     Resolves "" when it cannot be had. */
+  _signImage(id, size) {
+    if (!/^[0-9a-fA-F-]{8,64}$/.test(String(id))) return Promise.resolve("");
+    if (!this._imageCache) this._imageCache = new Map();
+    const path = `/api/home_signals/recipe_image/${id}/${size}`;
+    const hit = this._imageCache.get(path);
+    const now = Date.now();
+    if (hit && hit.until > now) return hit.promise;
+    const promise = (this._hass && typeof this._hass.callWS === "function"
+      ? Promise.resolve(this._hass.callWS({ type: "auth/sign_path", path, expires: 3600 }))
+        .then((r) => (r && r.path ? String(r.path) : ""), () => "")
+      : Promise.resolve(""));
+    const entry = { promise, until: now + 50 * 60 * 1000, url: hit ? hit.url : "" };
+    promise.then((url) => {
+      entry.url = url;
+      if (!url) entry.until = Date.now() + 10 * 60 * 1000;
+    });
+    this._imageCache.set(path, entry);
+    return promise;
+  }
+
+  /* The signed photos a body can draw now, by recipe id, and a repaint
+     once any still being signed arrive. Bodies stay pure: they only ever
+     see addresses that are already in hand. */
+  _recipeImages(recipes, size) {
+    const out = {};
+    let waiting = false;
+    for (const r of recipes) {
+      if (!r || typeof r !== "object" || isBlank(r.recipe_id) || isBlank(r.image)) continue;
+      const id = String(r.recipe_id);
+      if (out[id]) continue;
+      const path = `/api/home_signals/recipe_image/${id}/${size}`;
+      const hit = this._imageCache && this._imageCache.get(path);
+      if (hit && hit.url) out[id] = hit.url;
+      if (!hit || hit.until <= Date.now()) {
+        waiting = true;
+        this._signImage(id, size);
+      }
+    }
+    if (waiting && !this._imageWait) {
+      this._imageWait = setTimeout(() => {
+        this._imageWait = null;
+        Promise.all([...this._imageCache.values()].map((e) => e.promise)).then(() => {
+          this._signature = null;
+          this._update();
+        });
+      }, 0);
+    }
+    return out;
+  }
+
+  /* A meal card paints on its own plan, not on every state change in the
+     house, so nothing would come round to notice it had been left. Each
+     touch sets a timer for just after the idle time; if something was
+     still in progress then, it looks again later. */
+  _armIdle() {
+    if (this._idleTimer) clearTimeout(this._idleTimer);
+    if (!this._config || !this._config.body || this._config.body.type !== "meals") return;
+    this._idleTimer = setTimeout(() => {
+      this._idleTimer = null;
+      if (!this.isConnected) return;
+      this._signature = null;
+      this._update();
+      const moved = this._mealPick || this._mealMoving || this._mealMore
+        || (this._mealWeek || 0) !== 0 || this._mealDay !== null;
+      if (moved) this._armIdle();
+    }, this._idleMs + 1000);
+  }
+
+  /* A wall panel is walked away from mid-thought: a slot left open, next
+     week showing, Wednesday chosen. The next person to look expects today.
+     After two minutes untouched, with nothing in progress, it goes back. */
+  _settleIdle() {
+    const moved = this._mealPick || this._mealMoving || this._mealMore
+      || (this._mealWeek || 0) !== 0 || this._mealDay !== null;
+    if (!moved) return;
+    if (Date.now() - (this._touchedAt || 0) < this._idleMs) return;
+    if (this._voice && this._voice.phase !== "idle") return;
+    if (this._holder.querySelector(".confirmwrap") || this._typing()) return;
+    this._mealPick = null;
+    this._mealMoving = null;
+    this._mealMore = false;
+    this._mealDay = null;
+    this._mealWeek = 0;
+  }
+
   /* A press to a planned meal. Same take as the list's mic, but what was
      said goes straight onto the plan rather than past a sheet: it lands in
      the slot in front of the person who said it, and "Say something else"
@@ -11077,7 +11607,6 @@ class SpectraCard extends HTMLElement {
     if (this._voice && this._voice.phase !== "idle") return;
     const name = String(spec.script);
     if (!name.includes(".")) return;
-    const [domain, service] = name.split(".");
     this._voiceSay("listening", "");
     Promise.resolve()
       .then(() => this._listen(spec))
@@ -11086,23 +11615,38 @@ class SpectraCard extends HTMLElement {
           this._voiceSay("idle", "Nothing was heard.");
           return;
         }
-        this._voiceSay("thinking", `“${said}”`);
-        const data = { transcript: said, date: day, entry_type: type };
-        if (!isBlank(spec.agent)) data.agent = String(spec.agent);
-        return Promise.resolve(this._hass.callWS({
-          type: "call_service", domain, service, service_data: data, return_response: true,
-        })).catch((error) => {
-          throw voiceError("Could not plan that.", error && error.message);
-        }).then((result) => {
-          const planned = result && result.response && result.response.planned;
-          this._voiceSay("idle", isBlank(planned) ? "Nothing was planned." : `${planned} planned`);
-          this._refetchMeals();
-        });
+        return this._mealPlanSaid(spec, day, type, said);
       })
       .catch((error) => {
         LOGGER_WARN("spectra-card: the meal mic stopped", error);
         this._voiceSay("idle", (error && error.say) || "That did not work.");
       });
+  }
+
+  /* What was typed into a tray, planned as if it had been said. */
+  _mealSayText(spec, day, type, said) {
+    if (this._voice && this._voice.phase !== "idle") return;
+    if (!String(spec.script).includes(".")) return;
+    this._mealPlanSaid(spec, day, type, said).catch((error) => {
+      LOGGER_WARN("spectra-card: could not plan what was typed", error);
+      this._voiceSay("idle", (error && error.say) || "That did not work.");
+    });
+  }
+
+  _mealPlanSaid(spec, day, type, said) {
+    const [domain, service] = String(spec.script).split(".");
+    this._voiceSay("thinking", `“${said}”`);
+    const data = { transcript: said, date: day, entry_type: type };
+    if (!isBlank(spec.agent)) data.agent = String(spec.agent);
+    return Promise.resolve(this._hass.callWS({
+      type: "call_service", domain, service, service_data: data, return_response: true,
+    })).catch((error) => {
+      throw voiceError("Could not plan that.", error && error.message);
+    }).then((result) => {
+      const planned = result && result.response && result.response.planned;
+      this._voiceSay("idle", isBlank(planned) ? "Nothing was planned." : `${planned} planned`);
+      this._refetchMeals();
+    });
   }
 
   /* A recipe's ingredients onto the shopping list, past the same sheet the
@@ -11158,7 +11702,7 @@ class SpectraCard extends HTMLElement {
      planned some of it. */
   /* Fill the empty slots of each kind asked for, one kind at a time: the
      script plans one kind per call, and runs one call at a time. */
-  _mealFill(spec, types, span) {
+  _mealFill(spec, types, span, request) {
     if (this._voice && this._voice.phase !== "idle") return;
     const [domain, service] = String(spec.script).split(".");
     const plural = (t, n) => {
@@ -11171,6 +11715,7 @@ class SpectraCard extends HTMLElement {
       chain = chain.then(() => {
         this._voiceSay("thinking", `Planning ${mealType(type).word.toLowerCase()}\u2026`);
         const ask = Object.assign({ entry_type: type }, span);
+        if (!isBlank(request)) ask.request = String(request);
         if (!isBlank(spec.agent)) ask.agent = String(spec.agent);
         return Promise.resolve(this._hass.callWS({
           type: "call_service", domain, service, service_data: ask, return_response: true,
@@ -11195,6 +11740,7 @@ class SpectraCard extends HTMLElement {
      begin with (or whatever `week.types` says), because an empty
      breakfast is often not a gap anybody wants filled. */
   _mealChoose(types, preset, accent) {
+    const HINTS = ["Quick", "Vegetarian", "No fish", "Kid friendly", "Cheap", "Use what's in"];
     return new Promise((resolve) => {
       const on = new Set((Array.isArray(preset) && preset.length ? preset : ["dinner"])
         .map((t) => String(t).toLowerCase()).filter((t) => types.includes(t)));
@@ -11208,8 +11754,28 @@ class SpectraCard extends HTMLElement {
         + `<div class="mlchoose">${types.map((t) => `<button type="button" class="mlchip" data-type="${esc(t)}"`
           + ` aria-pressed="${on.has(t) ? "true" : "false"}">${iconMarkup(mealType(t).icon)}`
           + `<span>${esc(mealType(t).word)}</span></button>`).join("")}</div>`
+        + `<label class="mlform mlbear"><span>Anything to bear in mind?</span>`
+        + `<input type="text" data-request enterkeyhint="done" autocomplete="off"`
+        + ` placeholder="Optional, e.g. something light on Friday"></label>`
+        + `<div class="mlhints">${HINTS.map((h) => `<button type="button" class="mlhint" data-hint="${esc(h)}">${esc(h)}</button>`).join("")}</div>`
         + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button>`
         + `<button type="button" class="confirmyes" data-yes>Plan them</button></div></div>`;
+      const request = wrap.querySelector("[data-request]");
+      /* A hint is a word added to the line, not a mode: tapping it again
+         takes it back out, and whatever was typed stays. */
+      wrap.querySelectorAll("[data-hint]").forEach((hint) => {
+        hint.addEventListener("click", () => {
+          const word = hint.getAttribute("data-hint");
+          const parts = request.value.split(/\s*,\s*/).filter(Boolean);
+          const at = parts.findIndex((p) => p.toLowerCase() === word.toLowerCase());
+          if (at >= 0) parts.splice(at, 1); else parts.push(word);
+          request.value = parts.join(", ");
+          hint.setAttribute("aria-pressed", at >= 0 ? "false" : "true");
+        });
+      });
+      request.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); request.blur(); }
+      });
       let done = false;
       const finish = (answer) => {
         if (done) return;
@@ -11219,7 +11785,7 @@ class SpectraCard extends HTMLElement {
         resolve(answer);
       };
       const onKey = (event) => {
-        if (event.key === "Escape") { event.preventDefault(); finish([]); }
+        if (event.key === "Escape") { event.preventDefault(); finish(null); }
       };
       const yes = wrap.querySelector("[data-yes]");
       wrap.querySelectorAll("[data-type]").forEach((chip) => {
@@ -11230,9 +11796,12 @@ class SpectraCard extends HTMLElement {
           yes.disabled = !on.size;
         });
       });
-      wrap.querySelector("[data-no]").addEventListener("click", () => finish([]));
-      yes.addEventListener("click", () => finish(types.filter((t) => on.has(t))));
-      wrap.addEventListener("click", (event) => { if (event.target === wrap) finish([]); });
+      wrap.querySelector("[data-no]").addEventListener("click", () => finish(null));
+      yes.addEventListener("click", () => finish({
+        types: types.filter((t) => on.has(t)),
+        request: request.value.trim(),
+      }));
+      wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(null); });
       document.addEventListener("keydown", onKey, true);
       this._holder.appendChild(wrap);
     });
@@ -11325,7 +11894,7 @@ class SpectraCard extends HTMLElement {
      that one row. Only "Plan these" writes, one slot at a time, and only
      into slots still empty -- the plan may have moved while the list was
      being read. */
-  _mealPropose(body, types, span, accent, preset) {
+  _mealPropose(body, types, span, accent, preset, request) {
     if (this._voice && this._voice.phase !== "idle") return;
     const week = body.week;
     const place = body.place;
@@ -11334,6 +11903,7 @@ class SpectraCard extends HTMLElement {
     const ask = (type, from, days, avoid) => {
       const data = Object.assign({ entry_type: type, start_date: from, days, suggest: true });
       if (avoid && avoid.length) data.avoid = avoid;
+      if (!isBlank(request)) data.request = String(request);
       if (!isBlank(week.agent)) data.agent = String(week.agent);
       return this._mealCall(week.script, data).then((r) => (Array.isArray(r.planned) ? r.planned : [])
         .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
@@ -11592,8 +12162,22 @@ class SpectraCard extends HTMLElement {
     const edit = body.edit && typeof body.edit === "object" ? body.edit : null;
 
     const find = this._holder.querySelector("[data-recipe-find]");
+    const clear = this._holder.querySelector("[data-recipe-clear]");
     if (find) {
+      /* Enter is "done": it puts the keyboard away and leaves the list
+         filtered, which is all a search on a phone needs. */
+      find.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); find.blur(); }
+      });
+      if (clear) {
+        clear.addEventListener("click", () => {
+          find.value = "";
+          find.dispatchEvent(new Event("input"));
+          clear.hidden = true;
+        });
+      }
       find.addEventListener("input", () => {
+        if (clear) clear.hidden = !find.value;
         this._recipeFind = find.value;
         let shown = 0;
         this._holder.querySelectorAll("[data-recipe-open]").forEach((el) => {
@@ -11673,7 +12257,7 @@ class SpectraCard extends HTMLElement {
     document.addEventListener("keydown", onKey, true);
     this._editing = true;
     this._holder.appendChild(wrap);
-    if (input.focus) input.focus({ preventScroll: true });
+    if (input.focus && finePointer()) input.focus({ preventScroll: true });
   }
 
   /* The recipe, on a sheet over the card, for reading at the hob. Fetched
@@ -11686,16 +12270,79 @@ class SpectraCard extends HTMLElement {
     this._wearAccent(wrap, accent);
     const title = String(firstOf(recipe.name, "Recipe"));
     let full = null;
+    let steps = [];
+    let ingredients = [];
+    let hero = "";
+    let body = "";
+    let lock = null;
+    /* The screen stays on while cooking where the browser allows it: a
+       panel that dims mid-method is a panel touched with floury hands. */
+    const wake = () => {
+      if (lock || typeof navigator === "undefined" || !navigator.wakeLock) return;
+      navigator.wakeLock.request("screen").then((l) => { if (done) l.release(); else lock = l; }, () => {});
+    };
+    const sleep = () => { if (lock) { lock.release().catch(() => {}); lock = null; } };
+    /* One step at a time, big enough to read from the hob, with the
+       ingredients a tap away rather than a scroll away. */
+    const cook = (at, showing) => {
+      const i = Math.max(0, Math.min(steps.length - 1, at));
+      wrap.innerHTML = `<div class="confirmbox mlcook" role="dialog" aria-modal="true" aria-label="${esc(title)}: cooking">`
+        + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
+        + `<div class="mlcookbar"><span class="mlcookof">Step ${i + 1} of ${steps.length}</span>`
+        + (ingredients.length ? `<button type="button" class="mlbtn quiet" data-cook-ing aria-expanded="${!!showing}">`
+          + `${showing ? "Hide ingredients" : "Ingredients"}</button>` : "")
+        + `</div>`
+        + `<div class="mlcookdots" aria-hidden="true">${steps.map((_, n) => `<i${n === i ? " class=\"on\"" : (n < i ? " class=\"done\"" : "")}></i>`).join("")}</div>`
+        + (showing ? `<ul class="mlcooking">${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "")
+        + `<div class="mlrecipe mlcookstep" aria-live="polite">${esc(steps[i])}</div>`
+        + `<div class="confirmbtns">`
+        + `<button type="button" class="confirmno" data-cook-done>Done</button>`
+        + `<button type="button" class="confirmno" data-cook-prev${i === 0 ? " disabled" : ""}>`
+        + `${iconMarkup("mdi:chevron-left")} Back</button>`
+        + (i < steps.length - 1
+          ? `<button type="button" class="confirmyes" data-cook-next>Next ${iconMarkup("mdi:chevron-right")}</button>`
+          : `<button type="button" class="confirmyes" data-cook-done>Finished</button>`)
+        + `</div></div>`;
+      wrap.querySelectorAll("[data-cook-done]").forEach((b) => b.addEventListener("click", () => { sleep(); fill(body); }));
+      const prev = wrap.querySelector("[data-cook-prev]");
+      if (prev) prev.addEventListener("click", () => cook(i - 1, showing));
+      const next = wrap.querySelector("[data-cook-next]");
+      if (next) next.addEventListener("click", () => cook(i + 1, showing));
+      const ing = wrap.querySelector("[data-cook-ing]");
+      if (ing) ing.addEventListener("click", () => cook(i, !showing));
+      const box = wrap.querySelector(".mlcook");
+      let from = null;
+      box.addEventListener("touchstart", (event) => {
+        const t = event.touches[0];
+        from = event.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+      }, { passive: true });
+      box.addEventListener("touchend", (event) => {
+        if (!from) return;
+        const t = event.changedTouches[0];
+        const dx = t.clientX - from.x;
+        const dy = t.clientY - from.y;
+        from = null;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+        const to = i + (dx < 0 ? 1 : -1);
+        if (to >= 0 && to < steps.length) cook(to, showing);
+      }, { passive: true });
+      wake();
+    };
     const fill = (inner) => {
       const canEdit = Boolean(full && edit && !isBlank(edit.save));
       wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${esc(title)}">`
         + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
-        + `<div class="mlrecipe">${inner}</div>`
+        + `<div class="mlrecipe">${hero}${inner}</div>`
         + `<div class="confirmbtns">`
         + (canEdit ? `<button type="button" class="confirmno" data-edit>Edit</button>` : "")
         + (schedule ? `<button type="button" class="confirmno" data-plan>Plan it</button>` : "")
+        + (steps.length ? `<button type="button" class="confirmno" data-cook>${iconMarkup("mdi:play")} Cook</button>` : "")
         + `<button type="button" class="confirmyes" data-no>Close</button></div>`
         + `</div>`;
+      const img = wrap.querySelector(".mlhero");
+      if (img) img.addEventListener("error", () => { hero = ""; img.remove(); });
+      const c = wrap.querySelector("[data-cook]");
+      if (c) c.addEventListener("click", () => cook(0, false));
       wrap.querySelector("[data-no]").addEventListener("click", finish);
       const pl = wrap.querySelector("[data-plan]");
       if (pl) pl.addEventListener("click", () => { finish(); this._mealSchedule(recipe, accent, schedule); });
@@ -11714,6 +12361,7 @@ class SpectraCard extends HTMLElement {
     function finish() {
       if (done) return;
       done = true;
+      sleep();
       document.removeEventListener("keydown", onKey, true);
       if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
     }
@@ -11732,19 +12380,27 @@ class SpectraCard extends HTMLElement {
       full = r;
       const facts = [mealTime(r), Number(r.recipe_servings) > 0 ? `serves ${Math.round(Number(r.recipe_servings))}` : ""]
         .filter((x) => !isBlank(x)).join(" \u00b7 ");
-      const ingredients = (Array.isArray(r.ingredients) ? r.ingredients : [])
+      ingredients = (Array.isArray(r.ingredients) ? r.ingredients : [])
         .map((i) => (i && !isBlank(i.display) ? String(i.display) : (i && i.note) || ""))
         .filter((x) => !isBlank(x));
-      const steps = (Array.isArray(r.instructions) ? r.instructions : [])
+      steps = (Array.isArray(r.instructions) ? r.instructions : [])
         .map((i) => (i && !isBlank(i.text) ? String(i.text) : ""))
         .filter((x) => !isBlank(x));
-      fill((facts ? `<p class="confirmtext">${esc(facts)}</p>` : "")
+      if (this._imagesOn() && !isBlank(firstOf(r.image, recipe.image))) {
+        this._signImage(String(recipe.recipe_id), "min").then((url) => {
+          if (!url || done) return;
+          hero = `<img class="mlhero" src="${esc(url)}" alt="">`;
+          if (!wrap.querySelector(".mlcook")) fill(body);
+        });
+      }
+      body = (facts ? `<p class="confirmtext">${esc(facts)}</p>` : "")
         + (ingredients.length
           ? `<h4>Ingredients</h4><ul>${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "")
         + (steps.length
           ? `<h4>Method</h4><ol>${steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : "")
         + (!ingredients.length && !steps.length
-          ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : ""));
+          ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : "");
+      fill(body);
     }, (error) => {
       LOGGER_WARN("spectra-card: could not open the recipe", error);
       if (!done) fill(`<p class="confirmtext">Could not open the recipe.</p>`);
@@ -11976,7 +12632,12 @@ class SpectraCard extends HTMLElement {
     this._editing = true;
     this._holder.appendChild(wrap);
     const first = field("name");
-    if (first && !recipe && first.focus) first.focus({ preventScroll: true });
+    /* Straight into the name with a mouse and keyboard. Not on a touch
+       screen: on the wall panel the keyboard would cover the form before
+       anybody chose to type, and a draft or dictation may not need it. */
+    if (first && !recipe && !(opts && opts.draft) && first.focus && finePointer()) {
+      first.focus({ preventScroll: true });
+    }
   }
 
   _guard(spec, go) {
@@ -12073,7 +12734,25 @@ class SpectraCard extends HTMLElement {
 }
 
 if (!customElements.get("spectra-card")) {
-  customElements.define("spectra-card", SpectraCard);
+  /* The part of the screen the on-screen keyboard leaves, as two custom
+   properties every card's sheets inherit through their shadow roots. Set
+   once for the page, however many cards there are. */
+(function trackVisibleViewport() {
+  if (typeof window === "undefined" || window.__spectraViewport) return;
+  window.__spectraViewport = true;
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const set = () => {
+    const root = document.documentElement.style;
+    root.setProperty("--sp-vvh", `${Math.round(vv.height)}px`);
+    root.setProperty("--sp-vvtop", `${Math.round(vv.offsetTop)}px`);
+  };
+  vv.addEventListener("resize", set);
+  vv.addEventListener("scroll", set);
+  set();
+})();
+
+customElements.define("spectra-card", SpectraCard);
 }
 
 window.customCards = window.customCards || [];
