@@ -252,7 +252,7 @@ const js = fs.readFileSync(file);
     sheet().querySelector("[data-yes]").click();
     await settle();
     const changed = asked.filter((m) => m.service === "save_recipe").pop();
-    check("a changed tag is", changed && JSON.stringify(changed.service_data.tags) === JSON.stringify(["Dinner", "Quick", "Vegetarian", "Rice"]),
+    check("a changed tag is", changed && changed.service_data.tags === "Dinner, Quick, Vegetarian, Rice",
       JSON.stringify(changed && changed.service_data.tags));
 
     rc._mealEdit("e1", null, 6, { save: "home_signals.save_recipe", tag: "script.meal_recipe_tag" });

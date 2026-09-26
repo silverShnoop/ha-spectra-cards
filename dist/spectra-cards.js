@@ -13059,7 +13059,9 @@ class SpectraCard extends HTMLElement {
       if (serves > 0) data.servings = serves;
       if (recipe) data.recipe = String(firstOf(recipe.slug, recipe.recipe_id));
       const tags = tagsNow();
-      if (!same(tags, tagsBefore)) data.tags = tags;
+      /* As one comma-separated line: home_signals before 0.13.1 turned a
+         list into its own text and split that into mangled tags. */
+      if (!same(tags, tagsBefore)) data.tags = tags.join(", ");
       data.config_entry_id = entry;
       yes.disabled = true;
       status("Saving\u2026");
