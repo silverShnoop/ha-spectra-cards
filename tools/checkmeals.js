@@ -229,14 +229,14 @@ const js = fs.readFileSync(file);
     check("a recipe offers ingredients", Boolean(q("[data-meal-shop]")), "no shop button");
     check("and clear", Boolean(q("[data-meal-clear]")), "no clear button");
     check("and the mic", Boolean(q("[data-meal-say]")), "no mic");
-    check("which offers something else", text(q(".mltray .tdvoicesay")) === "Say something else",
-      text(q(".mltray .tdvoicesay")));
+    check("which offers something else", q("[data-meal-say]").getAttribute("aria-label") === "Say something else",
+      q("[data-meal-say]").getAttribute("aria-label"));
 
     all(".mlslot")[1].click();
     await settle();
     check("only one tray at a time", all(".mltray").length === 1, all(".mltray").length);
-    check("an empty slot offers the mic", text(q(".mltray .tdvoicesay")) === "Say what's for dinner",
-      text(q(".mltray .tdvoicesay")));
+    check("an empty slot offers the mic", q("[data-meal-say]").getAttribute("aria-label") === "Say what's for dinner",
+      q("[data-meal-say]").getAttribute("aria-label"));
     check("and nothing to clear or shop for", !q("[data-meal-clear]") && !q("[data-meal-shop]"),
       "clear or shop on an empty slot");
 
@@ -255,13 +255,7 @@ const js = fs.readFileSync(file);
     let before = fetches();
     q("[data-meal-clear]").click();
     await settle();
-    const dialog = root().querySelector(".confirmwrap");
-    check("clear asks first", Boolean(dialog), "no dialog");
-    check("naming what goes", dialog && text(dialog).includes("Takeaway"), dialog && text(dialog));
-    check("and has not cleared anything yet",
-      !calls.some((c) => c.service === "mealie.delete_mealplan"), JSON.stringify(calls));
-    dialog.querySelector("[data-yes]").click();
-    await settle();
+    check("clear does not ask: Undo puts it back instead", !root().querySelector(".confirmwrap"), "a dialog");
     const del = calls.find((c) => c.service === "mealie.delete_mealplan");
     check("a yes deletes that entry", Boolean(del), JSON.stringify(calls));
     check("with its id as a string", del && del.data.mealplan_id === "7",
@@ -284,8 +278,8 @@ const js = fs.readFileSync(file);
         && said.service_data.date === day(1) && said.service_data.entry_type === "dinner",
       said && JSON.stringify(said.service_data));
     check("and wants the answer back", said && said.return_response === true, said && said.return_response);
-    check("says back what was planned", text(q(".mltray .tdvoicesay")) === "Lasagne planned",
-      text(q(".mltray .tdvoicesay")));
+    check("says back what was planned", text(q(".mltray .mlsaid")) === "Lasagne planned",
+      text(q(".mltray .mlsaid")));
     check("and rereads the plan", fetches() > before, `${fetches()} vs ${before}`);
     check("the mic writes nothing itself", !calls.some((c) => c.service === "mealie.set_mealplan"),
       JSON.stringify(calls));
@@ -293,8 +287,8 @@ const js = fs.readFileSync(file);
     el._listen = () => Promise.resolve("");
     q("[data-meal-say]").click();
     await settle();
-    check("silence plans nothing", text(q(".mltray .tdvoicesay")) === "Nothing was heard.",
-      text(q(".mltray .tdvoicesay")));
+    check("silence plans nothing", text(q(".mltray .mlsaid")) === "Nothing was heard.",
+      text(q(".mltray .mlsaid")));
     el._voiceSay("idle", "");
 
     /* ---- shop ---- */
@@ -354,8 +348,8 @@ const js = fs.readFileSync(file);
     all(".mlslot")[0].click();
     await settle();
     check("a recipe can be opened", Boolean(q("[data-meal-recipe]")), "no recipe button");
-    check("a planned meal can be picked again, moved and cleared",
-      text(q("[data-meal-pick]")) === "Pick another" && Boolean(q("[data-meal-move]")),
+    check("a planned meal can be moved and cleared",
+      Boolean(q(".mltile[data-meal-move]")) && Boolean(q(".mltile[data-meal-clear]")),
       text(q(".mltray")));
 
     q("[data-meal-recipe]").click();
@@ -378,7 +372,7 @@ const js = fs.readFileSync(file);
 
     all(".mlslot")[1].click();
     await settle();
-    check("an empty slot offers Pick one, and no Move", text(q("[data-meal-pick]")) === "Pick one"
+    check("an empty slot offers Surprise me, and no Move", text(q("[data-meal-pick]")) === "Surprise me"
       && !q("[data-meal-move]") && !q("[data-meal-recipe]"), text(q(".mltray")));
     let before2 = fetches();
     q("[data-meal-pick]").click();
@@ -387,8 +381,8 @@ const js = fs.readFileSync(file);
     check("Pick one asks the script for that day and meal",
       picked && picked.service_data.date === day(1) && picked.service_data.entry_type === "dinner",
       picked && JSON.stringify(picked.service_data));
-    check("says what it picked", text(q(".mltray .tdvoicesay")) === "Sea bass with ginger planned",
-      text(q(".mltray .tdvoicesay")));
+    check("says what it picked", text(q(".mltray .mlsaid")) === "Sea bass with ginger planned",
+      text(q(".mltray .mlsaid")));
     check("and rereads the plan", fetches() > before2, `${fetches()} vs ${before2}`);
     el._voiceSay("idle", "");
 
@@ -397,14 +391,15 @@ const js = fs.readFileSync(file);
     await settle();
     q("[data-meal-move]").click();
     await settle();
-    check("Move shuts the tray and asks for a day", !q(".mltray")
-      && text(q(".mlfoot")).includes("Tap the day to move it to"), text(q(".mlfoot")));
+    check("Move shuts the tray and asks for a day, over the screen", !q(".mltray")
+      && text(q(".mlmoving")).includes("Tap the day to move Takeaway to"), text(q(".mlmoving")));
     check("the meal being moved is marked", all(".mlslot")[2].classList.contains("moving"),
       all(".mlslot")[2].className);
-    check("the week's buttons step aside while it waits", !q("[data-meal-week]"), "still there");
+    check("the week's buttons stay where they are, held, while it waits",
+      q(".mlfoot.held [data-meal-week]") && getComputedStyle(q(".mlfoot")).pointerEvents === "none", "gone or live");
     q("[data-meal-cancel]").click();
     await settle();
-    check("Cancel puts everything back", !q(".mlslot.moving") && Boolean(q("[data-meal-week]")),
+    check("Cancel puts everything back", !q(".mlslot.moving") && Boolean(q("[data-meal-week]")) && !q(".mlfoot.held"),
       text(q(".mlfoot")));
 
     all(".mlslot")[2].click();
@@ -419,8 +414,8 @@ const js = fs.readFileSync(file);
       moved && moved.service_data.from_date === day(2) && moved.service_data.to_date === day(5)
         && moved.service_data.entry_type === "dinner",
       moved && JSON.stringify(moved.service_data));
-    check("says so on the day it went to", text(q(".mltray .tdvoicesay")) === "Takeaway moved",
-      text(q(".mltray .tdvoicesay")));
+    check("says so on the day it went to", text(q(".mltray .mlsaid")) === "Takeaway moved",
+      text(q(".mltray .mlsaid")));
     check("and rereads the plan", fetches() > before2, `${fetches()} vs ${before2}`);
     el._voiceSay("idle", "");
     all(".mlslot")[5].click();
