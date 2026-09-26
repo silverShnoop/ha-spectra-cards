@@ -1068,7 +1068,17 @@ body:
     icon: mdi:microphone             # optional
     agent: ai_task.google_gemini_2_5_flash_lite   # optional; the script decides otherwise
     max_seconds: 15                  # optional; the cap on one take
+  add:                               # optional; a box to type onto the list
+    placeholder: "Friday: Pizza"
+    preview: meal_routine            # optional; reads each line back as the routine script will
 ```
+
+**`add` is a box to type onto the list**, for a list that is written
+rather than said. Enter or **+** calls `todo.add_item` on `list`. With
+`preview: meal_routine` each line is read back as it is typed, the way
+`script.meal_routine_apply` will read it: "Fills dinner on Friday with
+Pizza, when nothing else is planned." A line the script would ignore (no
+colon, or no day) says how to write one and is not added.
 
 **This is the one card control that finishes something, and it is allowed
 for a reason.** The house rule is that jobs live in `Needs you`, because a
@@ -1761,21 +1771,80 @@ only when it has something to do:
 | **Move** | the slot holds anything and `move` is set | the card asks for a day; tap one and `move.script` moves the meal there, swapping if that day was planned. Tap the same day, or Cancel, to leave it |
 | **Clear** | the slot holds anything | asks, then deletes that entry |
 
+**Typing is saying.** Beside the mic is a box for the same thing typed
+(16px, so a phone does not zoom in to it). What is typed goes to
+`say.script` exactly as a spoken take would, with `transcript`, `date` and
+`entry_type`. It is for a quiet room, or a panel with the tap running.
+
+**The tray leads with the one or two things usually wanted**: Recipe,
+Ingredients to list, Make it a recipe, or Choose a recipe for an empty slot.
+Choose another, Pick, Move and Clear change a plan rather than read it, so
+they wait behind **More**.
+
 Under the last day are the week's own controls:
 
 | Control | Shown when | Does |
 | --- | --- | --- |
-| **Fill empty days** | `week` is set | `week.script` plans every empty day in `days`, never a planned one, and says how many |
+| **Fill empty days** | `week` is set | asks which meals, and **Anything to bear in mind?** (typed, or from hint chips like *Quick* or *No fish*), sent as `request`. Then `week.script` plans every empty day in `days`, never a planned one, and says how many |
 | **Shop for the week** | `shop_week` is set | `shop_week.script` returns every planned recipe's items combined; they go on the review sheet |
 | **Recipes** | `recipes` is set | the whole recipe box, by name. Each opens its recipe; **New recipe** opens an empty form |
 
 A whole-week answer ("3 days planned") is written under the week rather
-than in a tray, because it belongs to no one day.
+than in a tray, because it belongs to no one day. On a phone that line
+can be a screen away from the button that asked, so when it is out of
+sight the answer is also shown for a moment at the bottom of the screen.
+
+**On a narrow card the week's buttons shed their words**: Fill, Shop,
+Fridge, Recipes, in one row that scrolls sideways rather than stacking
+four deep. Each keeps its full name for a screen reader.
+
+**On a phone, swipe between days.** The one-day view takes a sideways
+swipe as the next or previous day. Only a mostly-sideways one, so a
+scroll down the page that drifts is still a scroll.
+
+**A wall panel goes back to today.** Two minutes after the last touch,
+with no sheet open, nothing being typed and the mic idle, an open slot
+shuts, More folds, Next week goes back to This week and the chosen day
+goes back to today. The next person to look expects today.
+
+### Recipe photos
+
+```yaml
+  images: true      # on a meals or a recipes body
+```
+
+With `images: true`, a recipe that has a photo in Mealie shows it: across
+the top of its grid cell, beside its name in the one-day view and the
+recipe box, and at the top of the recipe sheet. A recipe with no photo has
+no picture rather than a grey box. The photos come through
+[`home_signals`](https://github.com/silverShnoop/ha-home-signals)
+(0.12.0 or later), which serves `/api/home_signals/recipe_image/{id}/{size}`
+from Mealie. The card signs each address with `auth/sign_path`, because an
+`<img>` cannot send a token. Signed for an hour and re-signed after fifty
+minutes, so a panel left up all day keeps its pictures. A photo that fails
+to load removes itself.
+
+### Cooking, a step at a time
+
+A recipe sheet with a method has **Cook**. It shows one step in large type,
+**Step 2 of 6** with a bar of progress, **Back** and **Next** (or a swipe),
+and **Ingredients** a tap away above the step rather than a scroll away.
+Where the browser allows it the screen is kept on while cooking. **Done**
+goes back to the whole recipe.
 
 **The recipe is fetched when it is opened**, not with the plan. A week of
 recipes is a lot to carry for the one that gets read, and the sheet is
 written for reading at the hob: bigger type than the card, and scrolled
 inside the sheet so a long method never pushes Close off the card.
+
+**Every sheet covers the screen, not the card.** A card on Home is a third
+of the panel wide, and a sheet the size of the card spilled over its
+neighbours. So sheets are laid over the whole screen, and on a phone they
+rise from the bottom. They are sized to what the keyboard leaves (the
+visual viewport), and Save and Cancel stay pinned at the bottom of the
+sheet, so a keyboard never hides the button that finishes the form. On a
+touch screen a form does not focus its first field by itself: a keyboard
+that jumps up over the thing just opened is not an invitation to type.
 
 **Writing recipes.** With `recipes.save` set, the recipe sheet has an
 **Edit** button, and the recipe box a **New recipe** one. Both open the
@@ -1844,7 +1913,14 @@ body:
   import: {script: script.meal_import_recipe}   # optional: "From a link"
   schedule: {script: script.meal_plan_set, types: [breakfast, lunch, dinner, snack]}  # optional: "Plan it"
   photo: {save: home_signals.save_photo, script: script.meal_recipe_from_photo}      # optional: "From a photo"
+  planned: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}             # optional: "Tue" beside a recipe
+  images: true                                                                       # optional: photos. See "Recipe photos"
 ```
+
+**`planned` says when a recipe is next on the plan**: *Today*, *Tomorrow*,
+*Tue*. Only the next time from today on, because the box answers "is this
+coming up?", not "list the fortnight". It is the same plan source as the
+meals card's `plan`.
 
 A name opens its recipe on the same sheet the meals card uses, with Edit and
 Delete in the same places. **New recipe** opens an empty form. **From a
@@ -1857,8 +1933,13 @@ stays open.
 new-recipe form, for checking before it is saved. **Plan it** on a recipe
 puts it on a day and a meal.
 
+**From a link is hidden on a wide touch screen**, which is the wall panel:
+a panel has no clipboard to paste from, and the phone's share sheet is how
+a link arrives there.
+
 **Search filters the list without repainting it.** A repaint would take the
-keyboard away after every letter. What is typed is kept on the card, so the
+keyboard away after every letter. Enter closes the keyboard, and the cross
+clears the search. What is typed is kept on the card, so the
 five-minute reread leaves the filter as it was. Every word has to appear in
 the name, in any order, so "pie fish" finds the fish pie.
 

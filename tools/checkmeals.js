@@ -438,10 +438,21 @@ const js = fs.readFileSync(file);
 
     q("[data-meal-week]").click();
     await settle();
+    const chooser = root().querySelector(".confirmwrap");
+    check("Fill asks first, even for one kind of meal", chooser && chooser.querySelector("[data-request]")
+      && !asked.some((m) => m.service === "meal_plan_week"), chooser && text(chooser));
+    chooser.querySelector("[data-request]").value = "something light";
+    chooser.querySelector('[data-hint="No fish"]').click();
+    check("a hint adds its words to the line", chooser.querySelector("[data-request]").value === "something light, No fish",
+      chooser.querySelector("[data-request]").value);
+    chooser.querySelector("[data-yes]").click();
+    await settle();
     const wk = asked.filter((m) => m.service === "meal_plan_week").pop();
     check("Fill empty days asks for the card's days and meal",
       wk && wk.service_data.days === 7 && wk.service_data.entry_type === "dinner"
       && wk.service_data.start_date === day(0),
+      wk && JSON.stringify(wk.service_data));
+    check("with what to bear in mind", wk && wk.service_data.request === "something light, No fish",
       wk && JSON.stringify(wk.service_data));
     check("and says how many it planned, under the week", text(q(".mlfoot .tdvoicesay")) === "3 dinners planned",
       text(q(".mlfoot")));
