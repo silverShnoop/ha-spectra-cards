@@ -4785,7 +4785,13 @@ const BODIES = {
 
   washer(b) {
     const cycle = String(firstOf(b.state, "idle")).toLowerCase();
-    const leak = Boolean(b.leak);
+    const wet = Boolean(b.leak);
+    /* Wet is a fact; the alarm is whether it is still news. Once somebody
+       switches the plug back on over a wet pad they have looked at the
+       floor and chosen to finish the wash -- so it gives up the hero word,
+       the drum and the red, and keeps only its chip, at attention. A dashboard that
+       passes no `leak_alarm` gets the old behaviour: every wet pad is one. */
+    const leak = wet && (b.leak_alarm === undefined || Boolean(b.leak_alarm));
     const powered = b.powered === undefined ? true : Boolean(b.powered);
     const waiting = Math.max(0, Number(firstOf(b.pending, 0)) || 0);
     const running = cycle === "running";
@@ -4813,7 +4819,10 @@ const BODIES = {
     chips.push(b.door_open
       ? chipOf("Door open", "mdi:door-open", null)
       : chipOf("Door closed", "mdi:door-closed", null));
-    if (leak) chips.push(chipOf("Sensor wet", "mdi:water", "critical"));
+    /* Stood down is not quiet: the cutoff fires only on the pad GOING wet,
+       so until it dries a second leak would cut nothing. Attention, with
+       its own Needs-you row, until it does. */
+    if (wet) chips.push(chipOf("Sensor wet", "mdi:water", leak ? "critical" : "attention"));
     if (!powered) chips.push(chipOf("Plug off", "mdi:power-plug-off", "waiting"));
     /* No wattage chip. The draw is already in the card's `meta`, top right,
        where every other measurement on this panel lives -- so the chip was

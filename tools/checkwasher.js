@@ -447,6 +447,26 @@ const js = fs.readFileSync(file);
     check("and does not shout it from a band as well",
       !q(".leakband"), "the leak band is back");
 
+    /* Somebody put the power back on over a wet pad. They have looked at
+       the floor; the pad staying damp is attention now, not an alarm. */
+    await show({ leak: true, leak_alarm: false, powered: true, state: "running", power: 300 });
+    check("a leak somebody restored power over is not the hero word",
+      text(".washstate") === "Running", text(".washstate"));
+    check("nor is it red on the drum",
+      getComputedStyle(q(".drumglyph")).color !== lvl("critical"),
+      getComputedStyle(q(".drumglyph")).color);
+    const wetChip = all(".pill").find((p) => p.textContent.includes("Sensor wet"));
+    check("but the chip still says the pad is wet",
+      Boolean(wetChip), all(".pill").map((p) => p.textContent.trim()).join(" | "));
+    /* Still a job: the cutoff cannot fire again until the pad dries. */
+    check("at attention, not critical",
+      wetChip && getComputedStyle(wetChip).color === tokenColour("--sp-attention-on"),
+      wetChip && getComputedStyle(wetChip).color);
+    await show({ leak: true, leak_alarm: true, powered: true });
+    check("while a leak nobody has acted on is still red",
+      getComputedStyle(q(".drumglyph")).color === lvl("critical"),
+      getComputedStyle(q(".drumglyph")).color);
+
     await show({ leak: true, powered: false });
     check("wet and off offers to restore",
       label("[data-estop]").toLowerCase().includes("restore"),
