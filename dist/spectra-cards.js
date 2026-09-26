@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.123.0";
+const VERSION = "0.124.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1998,6 +1998,20 @@ button.mlhead { text-align:center; }
 .mltype-in input:disabled { opacity:.6; }
 .mltype-in .mdi { width:20px; height:20px; }
 .mlideas { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.mlcell .mlalso { font-size:12.5px; color:var(--sp-ink-2); -webkit-line-clamp:1; }
+.mlcell.next .mlalso { color:var(--sp-surface); opacity:.85; }
+.mltwo { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
+.mltwo li { display:flex; align-items:center; gap:8px; min-height:40px; }
+.mltwo li > span { flex:1 1 auto; min-width:0; font-size:14px; color:var(--sp-ink); }
+.mltwo .mdi { width:16px; height:16px; }
+/* Dragging a meal on the panel: the meal follows the finger, and the day
+   it would land on is ringed. */
+.mldragghost {
+  position:fixed; z-index:1002; pointer-events:none; opacity:.92; transform:rotate(-2deg);
+  box-shadow:0 10px 30px rgba(0,0,0,.28); border-radius:8px; margin:0;
+}
+.mlcell.dragfrom { opacity:.35; }
+.mlcell.droptarget { box-shadow:0 0 0 2px var(--sp-surface), 0 0 0 4px var(--accent); }
 .mlidea {
   display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 10px; align-items:center; width:100%;
   min-height:56px; padding:10px 12px; border:1px solid var(--sp-edge); border-radius:10px;
@@ -3028,6 +3042,8 @@ const WEATHER_ICONS = {
    an empty cell, reads as a card that has not loaded. Inline, they are there
    with the first paint. */
 const MDI_INLINE = {
+  "mdi:eye-outline": "M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5M3.18,12C4.83,15.36 8.24,17.5 12,17.5C15.76,17.5 19.17,15.36 20.82,12C19.17,8.64 15.76,6.5 12,6.5C8.24,6.5 4.83,8.64 3.18,12Z",
+  "mdi:plus-box-multiple-outline": "M18 11H15V14H13V11H10V9H13V6H15V9H18M20 4V16H8V4H20M20 2H8C6.9 2 6 2.9 6 4V16C6 17.11 6.9 18 8 18H20C21.11 18 22 17.11 22 16V4C22 2.9 21.11 2 20 2M4 6H2V20C2 21.11 2.9 22 4 22H18V20H4V6Z",
   "mdi:checkbox-marked": "M10,17L5,12L6.41,10.58L10,14.17L17.59,6.58L19,8M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3Z",
   "mdi:checkbox-blank-outline": "M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19Z",
   "mdi:text-box-edit-outline": "M10 21H5C3.89 21 3 20.11 3 19V5C3 3.89 3.89 3 5 3H19C20.11 3 21 3.89 21 5V10.33C20.7 10.21 20.37 10.14 20.04 10.14C19.67 10.14 19.32 10.22 19 10.37V5H5V19H10.11L10 19.11V21M7 9H17V7H7V9M7 17H12.11L14 15.12V15H7V17M7 13H16.12L17 12.12V11H7V13M21.7 13.58L20.42 12.3C20.21 12.09 19.86 12.09 19.65 12.3L18.65 13.3L20.7 15.35L21.7 14.35C21.91 14.14 21.91 13.79 21.7 13.58M12 22H14.06L20.11 15.93L18.06 13.88L12 19.94V22Z",
@@ -7255,6 +7271,13 @@ function mealAt(plan, day, type) {
     && String(e.entry_type).toLowerCase() === type) || null;
 }
 
+/* Every meal in one slot: usually one, sometimes two -- the veggie option
+   beside the fajitas. */
+function mealsAt(plan, day, type) {
+  return (plan || []).filter((e) => e && String(e.mealplan_date).slice(0, 10) === day
+    && String(e.entry_type).toLowerCase() === type);
+}
+
 /* A recipe's photo, when the card shows photos and its address is signed.
    Empty otherwise, so a recipe without one simply has no picture rather
    than a grey box saying so. */
@@ -7541,8 +7564,8 @@ function mealDetail(b, plan, day, type) {
     : new Date(Date.parse(noon)).toLocaleDateString([], { weekday: "long" });
   return `<div class="mldetail">${recipeThumb(b, entry && entry.recipe, "mldetailimg")}<div class="mldetailhead">`
     + `<span class="mlword">${esc(when)} \u00b7 ${esc(mealType(type).word)}</span>`
-    + `<span class="mldetailname${entry ? "" : " empty"}">${esc(mealName(entry) || "Nothing planned")}</span>`
-    + `</div>${mealTray(b, entry, type, day < today)}</div>`;
+    + `<span class="mldetailname${entry ? "" : " empty"}">${esc(mealsAt(plan, day, type).map(mealName).join(" + ") || "Nothing planned")}</span>`
+    + `</div>${mealTray(b, entry, type, day < today, mealsAt(plan, day, type))}</div>`;
 }
 
 /* One cell of the grid. An empty one is a faint plus rather than words:
@@ -7578,11 +7601,12 @@ function mealCell(plan, day, type, picked, moving, next, b) {
     + (upNext ? `<span class="mlnext">Up next</span>` : "")
     + (name ? `<span class="mlname">${esc(name)}</span>`
       : (past || ro ? "" : `<span class="mladd" aria-hidden="true">${iconMarkup("mdi:plus")}</span>`))
+    + mealsAt(plan, day, type).slice(1).map((e) => `<span class="mlname mlalso">+ ${esc(mealName(e))}</span>`).join("")
     + (time ? `<span class="mltime">${esc(time)}</span>` : "")
     + (ro ? `</div>` : `</button>`);
 }
 
-function mealTray(b, entry, type, past) {
+function mealTray(b, entry, type, past, all) {
   const say = b.say && !isBlank(b.say.script);
   const shop = b.shop && !isBlank(b.shop.script) && !isBlank(b.shop.list)
     && entry && entry.recipe && !isBlank(entry.recipe.recipe_id);
@@ -7604,6 +7628,14 @@ function mealTray(b, entry, type, past) {
   let out = `<div class="mltray">`;
   const glance = entry && entry.recipe && b.glance ? b.glance[String(entry.recipe.recipe_id)] : "";
   if (glance) out += `<p class="mlglance">${esc(glance)}</p>`;
+  /* Two meals in the slot: each with its own recipe and its own clear. */
+  const both = Array.isArray(all) && all.length > 1 ? all : null;
+  if (both) {
+    out += `<ul class="mltwo">${both.map((e) => `<li><span>${esc(mealName(e))}</span>`
+      + (e.recipe && !isBlank(e.recipe.recipe_id) ? `<button type="button" class="mlbtn quiet" data-meal-recipeof="${esc(String(e.recipe.recipe_id))}">Recipe</button>` : "")
+      + (!past && !isBlank(e.mealplan_id) ? `<button type="button" class="mlbtn quiet" data-meal-clearone="${esc(String(e.mealplan_id))}" aria-label="Clear ${esc(mealName(e))}">${iconMarkup("mdi:close")}</button>` : "")
+      + `</li>`).join("")}</ul>`;
+  }
   if (say && !past) {
     const hold = busy || phase === "listening";
     out += `<div class="mltype-in">`
@@ -7642,6 +7674,7 @@ function mealTray(b, entry, type, past) {
     }
     if (sets && b.ideas && !isBlank(b.ideas.script)) tiles += tile("data-meal-ideas", "mdi:lightbulb-on-outline", "Ideas");
     if (sets) tiles += tile("data-meal-choose", "mdi:book-open-variant", entry ? "Change" : "Recipes");
+    if (sets && entry) tiles += tile("data-meal-another", "mdi:plus-box-multiple-outline", "Another");
     if (entry && b.move && !isBlank(b.move.script)) tiles += tile("data-meal-move", "mdi:calendar-arrow-right", "Move");
     if (entry && !isBlank(entry.mealplan_id)) tiles += tile("data-meal-clear", "mdi:close-circle-outline", "Clear");
   }
@@ -7945,7 +7978,8 @@ function mealFoot(b, picked, moving, dates, plan, types) {
     + (b.sentence && !isBlank(b.sentence.script) && sets ? act("data-meal-words", "mdi:text-box-edit-outline", "Plan in words", "Words") : "")
     + (shop ? act("data-meal-shopweek", "mdi:cart-outline", "Shop for the week", "Shop") : "")
     + (fridge ? act("data-meal-fridge", "mdi:fridge-outline", "What's in the fridge?", "Fridge", true) : "")
-    + (box ? act("data-meal-box", "mdi:book-open-variant", "Recipes", "Recipes", true) : "");
+    + (box ? act("data-meal-box", "mdi:book-open-variant", "Recipes", "Recipes", true) : "")
+    + (Array.isArray(b.all_types) && b.all_types.length > 1 ? act("data-meal-shown", "mdi:eye-outline", "Meals shown", "Shown", true) : "");
   /* Several meals at once: the choices float over the bottom of the
      screen, like Move's, so the week does not move while it is chosen. */
   const n = selecting ? b.selected.length : 0;
@@ -8686,6 +8720,7 @@ class SpectraCard extends HTMLElement {
     applyTheme(this, hass);
     publishTokens(hass);
     if (!this._config) return;
+    this._openRecipeLink();
     this._reconcile();
     this._subscribeForecasts();
     /* Only re-marshal when an entity this card actually reads has changed.
@@ -9254,6 +9289,14 @@ class SpectraCard extends HTMLElement {
       this._settleIdle();
       model.body.picked = this._mealPick || "";
       model.body.selected = this._mealSel ? [...this._mealSel] : null;
+      /* Which meals this device shows: the phone can show dinner only
+         while the panel shows all four. Kept in the browser, per card. */
+      const hidden = this._mealsHidden();
+      if (hidden.length && Array.isArray(model.body.types)) {
+        model.body.all_types = model.body.types.slice();
+        const left = model.body.types.filter((t) => !hidden.includes(String(t).toLowerCase()));
+        if (left.length) model.body.types = left;
+      } else if (Array.isArray(model.body.types)) model.body.all_types = model.body.types.slice();
       model.body.moving = this._mealMoving || "";
       model.body.week_offset = this._mealWeek || 0;
       model.body.day_index = this._mealDay;
@@ -10149,13 +10192,192 @@ class SpectraCard extends HTMLElement {
     setTimeout(() => toast.remove(), 3500);
   }
 
+  /* The meals this device leaves out, remembered in the browser: a
+     preference of the screen, not of the house. */
+  _mealsKey() {
+    const c = this._config || {};
+    const b = c.body || {};
+    return `spectra-cards:meals-hidden:${c.title || ""}:${(Array.isArray(b.types) ? b.types : []).join(",")}`;
+  }
+
+  _mealsHidden() {
+    try { return JSON.parse(localStorage.getItem(this._mealsKey()) || "[]"); } catch (e) { return []; }
+  }
+
+  _mealsShown(all, accent) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    const hidden = new Set(this._mealsHidden());
+    const types = all.map((t) => String(t).toLowerCase());
+    wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Meals shown">`
+      + `<div class="confirmhead">${iconMarkup("mdi:eye-outline")}<span>Meals shown on this screen</span></div>`
+      + `<p class="confirmtext">Only this device changes: the panel and the phones each keep their own.</p>`
+      + `<div class="mlchoose">${types.map((t) => `<button type="button" class="mlchip" data-show="${t}" aria-pressed="${!hidden.has(t)}">`
+        + `${iconMarkup(mealType(t).icon)}<span>${esc(mealType(t).word)}</span></button>`).join("")}</div>`
+      + `<div class="confirmbtns"><button type="button" class="confirmyes" data-no>Done</button></div></div>`;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      this._signature = null;
+      this._update();
+    };
+    const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(); } };
+    wrap.querySelectorAll("[data-show]").forEach((chip) => chip.addEventListener("click", () => {
+      const t = chip.getAttribute("data-show");
+      if (hidden.has(t)) hidden.delete(t);
+      else if (types.filter((x) => !hidden.has(x)).length > 1) hidden.add(t);
+      wrap.querySelectorAll("[data-show]").forEach((c) => c.setAttribute("aria-pressed", String(!hidden.has(c.getAttribute("data-show")))));
+      try { localStorage.setItem(this._mealsKey(), JSON.stringify([...hidden])); } catch (e) { /* a private window */ }
+    }));
+    wrap.querySelector("[data-no]").addEventListener("click", finish);
+    wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
+    document.addEventListener("keydown", onKey, true);
+    this._holder.appendChild(wrap);
+  }
+
+  /* A link to a recipe -- "Check it" on the phone's Saved notification,
+     ?recipe=<slug> -- opens that recipe's form over whatever tab is on
+     screen. Handled once, by the first card to see it, whichever card
+     that is: the tab showing may have no meal card on it at all. */
+  _openRecipeLink() {
+    if (typeof window === "undefined" || !window.location || window.__spectraRecipeLink) return;
+    let slug = "";
+    try { slug = new URLSearchParams(window.location.search).get("recipe") || ""; } catch (e) { return; }
+    if (!slug || !this._hass || !this._holder) return;
+    const services = this._hass.services || {};
+    if (!services.home_signals || !services.home_signals.save_recipe) return;
+    window.__spectraRecipeLink = slug;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("recipe");
+      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+    } catch (e) { /* the address stays; it is only opened once */ }
+    Promise.resolve(this._hass.callWS({ type: "config_entries/get", domain: "mealie" })).then((entries) => {
+      const entry = (Array.isArray(entries) ? entries : []).find((e) => e.state === "loaded") || (entries || [])[0];
+      if (!entry) return null;
+      return Promise.resolve(this._hass.callWS({
+        type: "call_service", domain: "mealie", service: "get_recipe",
+        service_data: { config_entry_id: entry.entry_id, recipe_id: slug }, return_response: true,
+      })).then((result) => {
+        const full = result && result.response && result.response.recipe;
+        if (!full) return;
+        this._mealEdit(entry.entry_id, full, (this._config && this._config.accent) || 6, {
+          save: "home_signals.save_recipe",
+          delete: services.home_signals.delete_recipe ? "home_signals.delete_recipe" : "",
+        }, { heading: "Check the recipe" });
+      });
+    }).catch((error) => LOGGER_WARN("spectra-card: could not open the recipe from the link", error));
+  }
+
+  /* Drag a meal to another day on the panel's grid; dropped on a planned
+     day, the two swap. A mouse drags as soon as it moves; a finger holds
+     for a moment first, so a scroll across the week is still a scroll.
+     Move stays, for phones and for anyone who would rather tap. */
+  _bindMealDrag(body, model) {
+    if (!body.move || isBlank(body.move.script) || this._mealSel || this._mealMoving) return;
+    const root = this.shadowRoot;
+    this._holder.querySelectorAll(".mlgridview .mlcell[data-meal]").forEach((cell) => {
+      if (cell.classList.contains("empty") || cell.classList.contains("past")) return;
+      const from = cell.getAttribute("data-meal");
+      let start = null;
+      let armed = false;
+      let timer = null;
+      let ghost = null;
+      let over = null;
+      const stopScroll = (e) => { if (armed) e.preventDefault(); };
+      const clear = () => {
+        clearTimeout(timer);
+        timer = null;
+        if (ghost) ghost.remove();
+        ghost = null;
+        if (over) over.classList.remove("droptarget");
+        over = null;
+        cell.classList.remove("dragfrom");
+        document.removeEventListener("touchmove", stopScroll, { passive: false });
+        armed = false;
+        start = null;
+        if (this._dragging) {
+          this._dragging = false;
+          this._signature = null;
+          this._update();
+        }
+      };
+      const arm = (x, y) => {
+        armed = true;
+        this._dragging = true;
+        const r = cell.getBoundingClientRect();
+        ghost = cell.cloneNode(true);
+        ghost.classList.add("mldragghost");
+        ghost.style.width = `${r.width}px`;
+        ghost.style.height = `${r.height}px`;
+        ghost.style.left = `${x - (start.x - r.left)}px`;
+        ghost.style.top = `${y - (start.y - r.top)}px`;
+        ghost.dataset.dx = String(start.x - r.left);
+        ghost.dataset.dy = String(start.y - r.top);
+        this._holder.appendChild(ghost);
+        cell.classList.add("dragfrom");
+      };
+      cell.addEventListener("pointerdown", (e) => {
+        if (e.button > 0) return;
+        start = { x: e.clientX, y: e.clientY, touch: e.pointerType !== "mouse" };
+        if (start.touch) {
+          document.addEventListener("touchmove", stopScroll, { passive: false });
+          timer = setTimeout(() => { if (start) { arm(start.x, start.y); try { cell.setPointerCapture(e.pointerId); } catch (x) { /* gone */ } } }, 380);
+        }
+      });
+      cell.addEventListener("pointermove", (e) => {
+        if (!start) return;
+        const far = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+        if (!armed) {
+          if (start.touch) { if (far > 8) clear(); return; }
+          if (far < 6) return;
+          arm(e.clientX, e.clientY);
+          try { cell.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
+        }
+        ghost.style.left = `${e.clientX - Number(ghost.dataset.dx)}px`;
+        ghost.style.top = `${e.clientY - Number(ghost.dataset.dy)}px`;
+        const hit = root && root.elementFromPoint ? root.elementFromPoint(e.clientX, e.clientY) : null;
+        const target = hit && hit.closest ? hit.closest(".mlgridview .mlcell[data-meal]") : null;
+        const ok = target && target !== cell && !target.classList.contains("past")
+          && target.getAttribute("data-meal").split("|")[1] === from.split("|")[1] ? target : null;
+        if (ok !== over) {
+          if (over) over.classList.remove("droptarget");
+          over = ok;
+          if (over) over.classList.add("droptarget");
+        }
+      });
+      const drop = () => {
+        if (!armed) { clear(); return; }
+        const to = over ? over.getAttribute("data-meal") : "";
+        this._dropAt = Date.now();
+        clear();
+        if (!to) return;
+        const [fromDay, type] = from.split("|");
+        const toDay = to.split("|")[0];
+        this._mealRun(body.move, { from_date: fromDay, to_date: toDay, entry_type: type },
+          "Moving\u2026", (r) => (isBlank(r.moved) ? "Nothing to move."
+            : (isBlank(r.swapped) ? `${r.moved} moved` : `Swapped with ${r.swapped}`)),
+          (r) => (isBlank(r.moved) ? null : () => this._mealCall(body.move.script,
+            { from_date: toDay, to_date: fromDay, entry_type: type })));
+      };
+      cell.addEventListener("pointerup", drop);
+      cell.addEventListener("pointercancel", clear);
+    });
+  }
+
   /* What a slot holds now, to put back: a recipe by id, a note by its
      name, or nothing. Read off the plan the card last drew. */
   _mealSnap(date, type) {
-    const e = mealAt(this._mealPlanNow || [], date, type);
-    if (!e) return { date, type, was: null };
-    const rid = e.recipe && !isBlank(e.recipe.recipe_id) ? String(e.recipe.recipe_id) : "";
-    return { date, type, was: rid ? { recipe_id: rid } : { title: mealName(e) } };
+    const all = mealsAt(this._mealPlanNow || [], date, type);
+    if (!all.length) return { date, type, was: null };
+    return { date, type, was: all.map((e) => {
+      const rid = e.recipe && !isBlank(e.recipe.recipe_id) ? String(e.recipe.recipe_id) : "";
+      return rid ? { recipe_id: rid } : { title: mealName(e) };
+    }) };
   }
 
   /* Put slots back as they were: re-plan what was there, or empty a slot
@@ -10168,7 +10390,10 @@ class SpectraCard extends HTMLElement {
     snaps.forEach((snap) => {
       chain = chain.then(() => {
         if (snap.was && place && !isBlank(place.script)) {
-          return this._mealCall(place.script, Object.assign({ date: snap.date, entry_type: snap.type }, snap.was));
+          /* The first replaces whatever is there now; any second joins it. */
+          const was = Array.isArray(snap.was) ? snap.was : [snap.was];
+          return was.reduce((c, w, i) => c.then(() => this._mealCall(place.script,
+            Object.assign({ date: snap.date, entry_type: snap.type }, w, i ? { add: true } : {}))), Promise.resolve());
         }
         return Promise.resolve(this._hass.callWS({
           type: "call_service", domain: "mealie", service: "get_mealplan",
@@ -11908,6 +12133,8 @@ class SpectraCard extends HTMLElement {
            the tray away would leave it answering into a slot nobody is
            looking at. */
         if (this._voice && this._voice.phase !== "idle") return;
+        /* The click that ends a drag is not a press. */
+        if (Date.now() - (this._dropAt || 0) < 400) return;
         /* Choosing several: a press ticks or unticks, and opens nothing. */
         if (this._mealSel) {
           if (key.split("|")[0] < localDay(0)) return;
@@ -12105,6 +12332,51 @@ class SpectraCard extends HTMLElement {
       this._mealPropose(body, types, { start_date: first, days }, model.accent, null, "",
         new Set(slots.map(([d, t]) => `${d}|${t}`)));
     }));
+
+    this._holder.querySelectorAll("[data-meal-shown]").forEach((el) => press(el, () => {
+      this._mealsShown(Array.isArray(body.all_types) ? body.all_types : body.types || [], model.accent);
+    }));
+    this._holder.querySelectorAll("[data-meal-another]").forEach((el) => {
+      if (!slot || !entry || !body.place || !this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      press(el, () => {
+        flashPress(el);
+        this._mealBox(source.entry, model.accent, body.recipes, {
+          pick: { slot, spec: body.place, add: true }, ask: body.ask, planned: recipePlanned(body.plan),
+        });
+      });
+    });
+    this._holder.querySelectorAll("[data-meal-clearone]").forEach((el) => {
+      if (!slot || !this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      const id = el.getAttribute("data-meal-clearone");
+      const e = plan.find((x) => String(x.mealplan_id) === id);
+      if (!e) return;
+      press(el, () => {
+        const name = mealName(e);
+        const was = e.recipe && !isBlank(e.recipe.recipe_id) ? { recipe_id: String(e.recipe.recipe_id) } : { title: name };
+        this._work(() => this._callAction({
+          service: "mealie.delete_mealplan", data: { config_entry_id: source.entry, mealplan_id: id },
+        }).then(() => {
+          this._voiceSay("idle", `${name} cleared`);
+          if (body.place && !isBlank(body.place.script)) {
+            this._mealOfferUndo(`${name} cleared`, () => this._mealCall(body.place.script,
+              Object.assign({ date: slot[0], entry_type: slot[1], add: true }, was)));
+          }
+          return this._refetchMeals();
+        }));
+      });
+    });
+    this._holder.querySelectorAll("[data-meal-recipeof]").forEach((el) => {
+      if (!this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      const rid = el.getAttribute("data-meal-recipeof");
+      const e = plan.find((x) => x.recipe && String(x.recipe.recipe_id) === rid);
+      if (!e) return;
+      press(el, () => this._mealRecipe(source.entry, e.recipe, model.accent, body.recipes,
+        { schedule: body.place ? Object.assign({ types: body.types }, body.place) : null }));
+    });
+    this._bindMealDrag(body, model);
 
     this._holder.querySelectorAll("[data-meal-quick]").forEach((el) => {
       if (!slot || !body.place || isBlank(body.place.script)) return;
@@ -13796,7 +14068,8 @@ class SpectraCard extends HTMLElement {
     const onKey = (event) => {
       if (event.key === "Escape") { event.preventDefault(); finish(); }
     };
-    const head = pick && pick.slots && pick.slots.length > 1 ? `One recipe for ${pick.slots.length} meals`
+    const head = pick && pick.add ? `${mealSlotWords(pick.slot[0], pick.slot[1])}: add another`
+      : pick && pick.slots && pick.slots.length > 1 ? `One recipe for ${pick.slots.length} meals`
       : (pick ? `${mealSlotWords(pick.slot[0], pick.slot[1])}: choose a recipe` : "Recipes");
     const fill = (inner) => {
       wrap.innerHTML = `<div class="confirmbox tall rpbox" role="dialog" aria-modal="true" aria-label="${esc(head)}">`
@@ -13861,8 +14134,8 @@ class SpectraCard extends HTMLElement {
             return;
           }
           if (pick) {
-            this._mealSetRun(pick.spec, { date: pick.slot[0], entry_type: pick.slot[1], recipe_id: String(r.recipe_id) },
-              `${r.name} planned`);
+            this._mealSetRun(pick.spec, Object.assign({ date: pick.slot[0], entry_type: pick.slot[1], recipe_id: String(r.recipe_id) },
+              pick.add ? { add: true } : {}), pick.add ? `${r.name} added` : `${r.name} planned`);
             return;
           }
           this._mealRecipe(entry, r, accent, edit, { schedule });
@@ -14222,21 +14495,51 @@ class SpectraCard extends HTMLElement {
     const del = wrap.querySelector("[data-del]");
     if (del) {
       del.addEventListener("click", () => {
-        this._confirm({
-          title: `Delete ${firstOf(recipe.name, "this recipe")}?`,
-          text: "It goes from the recipe box for good. A meal already planned with it loses its recipe.",
-          icon: "mdi:delete-outline", ok: "Delete", accent,
-        }).then((yes) => {
-          if (!yes) return;
-          status("Deleting\u2026");
-          call(edit.delete, {
-            recipe: String(firstOf(recipe.slug, recipe.recipe_id)), config_entry_id: entry,
-          }, false).then(() => {
-            finish();
-            this._voiceSay("idle", `${firstOf(recipe.name, "Recipe")} deleted`);
-            this._refetchMeals();
-          }, (error) => status(`Not deleted: ${(error && error.message) || "Mealie did not answer."}`));
-        });
+        const name = firstOf(recipe.name, "this recipe");
+        /* A recipe that is planned asks what becomes of those meals: kept
+           on the plan as a note with its name, or cleared too. Mealie on
+           its own would leave them as meals with no name at all. */
+        const from = localDay(0);
+        const until = (() => { const t = new Date(); t.setDate(t.getDate() + 28); const pad = (x) => String(x).padStart(2, "0");
+          return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`; })();
+        Promise.resolve(this._hass.callWS({
+          type: "call_service", domain: "mealie", service: "get_mealplan",
+          service_data: { config_entry_id: entry, start_date: from, end_date: until }, return_response: true,
+        })).then((r) => ((r && r.response && r.response.mealplan) || [])
+          .filter((e) => e.recipe && String(e.recipe.recipe_id) === String(recipe.recipe_id)), () => [])
+          .then((planned) => {
+            const days = planned.map((e) => weekdayLabel(`${String(e.mealplan_date).slice(0, 10)}T12:00:00`) || String(e.mealplan_date).slice(0, 10));
+            const when = days.length > 1 ? `${days.slice(0, -1).join(", ")} and ${days[days.length - 1]}` : days[0];
+            return this._confirm(planned.length ? {
+              title: `Delete ${name}?`,
+              text: `${name} is planned for ${when}. Keep ${planned.length === 1 ? "it" : "them"} on the plan as a note, or clear ${planned.length === 1 ? "it" : "them"} too?`,
+              icon: "mdi:delete-outline", ok: "Clear too", alt: "Keep as a note", accent,
+            } : {
+              title: `Delete ${name}?`,
+              text: "It goes from the recipe box for good.",
+              icon: "mdi:delete-outline", ok: "Delete", accent,
+            }).then((answer) => ({ answer, planned }));
+          })
+          .then(({ answer, planned }) => {
+            if (!answer) return;
+            status("Deleting\u2026");
+            const keep = answer === "alt";
+            const each = planned.reduce((c, e) => c.then(() => this._callAction({
+              service: "mealie.delete_mealplan", data: { config_entry_id: entry, mealplan_id: String(e.mealplan_id) },
+            })).then(() => (keep ? this._callAction({
+              service: "mealie.set_mealplan",
+              data: { config_entry_id: entry, date: String(e.mealplan_date).slice(0, 10), entry_type: e.entry_type, note_title: String(firstOf(recipe.name, "Meal")) },
+            }) : null)), Promise.resolve());
+            each.then(() => call(edit.delete, {
+              recipe: String(firstOf(recipe.slug, recipe.recipe_id)), config_entry_id: entry,
+            }, false)).then(() => {
+              finish();
+              this._voiceSay("idle", planned.length
+                ? `${firstOf(recipe.name, "Recipe")} deleted; ${keep ? "kept on the plan as a note" : "cleared from the plan"}`
+                : `${firstOf(recipe.name, "Recipe")} deleted`);
+              this._refetchMeals();
+            }, (error) => status(`Not deleted: ${(error && error.message) || "Mealie did not answer."}`));
+          });
       });
     }
 
@@ -14332,6 +14635,7 @@ class SpectraCard extends HTMLElement {
       + (isBlank(spec.note) ? "" : `<p class="confirmtext quiet">${esc(spec.note)}</p>`)
       + `<div class="confirmbtns">`
       + `<button type="button" class="confirmno" data-no>${esc(firstOf(spec.cancel, "Cancel"))}</button>`
+      + (isBlank(spec.alt) ? "" : `<button type="button" class="confirmno" data-alt>${esc(spec.alt)}</button>`)
       + `<button type="button" class="confirmyes" data-yes>${esc(firstOf(spec.ok, "Confirm"))}</button>`
       + `</div></div>`;
 
@@ -14349,6 +14653,8 @@ class SpectraCard extends HTMLElement {
       };
       wrap.querySelector("[data-no]").addEventListener("click", () => finish(false));
       wrap.querySelector("[data-yes]").addEventListener("click", () => finish(true));
+      const alt = wrap.querySelector("[data-alt]");
+      if (alt) alt.addEventListener("click", () => finish("alt"));
       /* Only the backdrop, never the box -- a mis-tap inside the dialog
          must not count as either answer. */
       wrap.addEventListener("click", (event) => {
