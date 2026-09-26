@@ -239,7 +239,7 @@ const js = fs.readFileSync(file);
       getComputedStyle(pr.querySelector(".mlacts")).flexWrap);
     check("keeping their names for a screen reader", fill.getAttribute("aria-label") === "Fill empty days",
       fill.getAttribute("aria-label"));
-    const slots = pr.querySelector(".mlslots");
+    const slots = pr.querySelector(".mldayview .mlgrid");
     const at = ph._mealDay;
     const swipe = (from, to) => {
       const t = (x) => new Touch({ identifier: 2, target: slots, clientX: x, clientY: 400 });
@@ -253,7 +253,7 @@ const js = fs.readFileSync(file);
     check("a swipe left is the next day", at === null && ph._mealDay === (expect === start ? null : expect),
       `${at} -> ${ph._mealDay}`);
     ph._mealDay = 3;
-    const sl2 = pr.querySelector(".mlslots");
+    const sl2 = pr.querySelector(".mldayview .mlgrid");
     const t2 = (x, y) => new Touch({ identifier: 3, target: sl2, clientX: x, clientY: y });
     sl2.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [t2(300, 100)], changedTouches: [t2(300, 100)] }));
     sl2.dispatchEvent(new TouchEvent("touchend", { bubbles: true, touches: [], changedTouches: [t2(200, 400)] }));

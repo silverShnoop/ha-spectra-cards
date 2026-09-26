@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.119.0";
+const VERSION = "0.120.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -7228,17 +7228,9 @@ function mealGrid(b, dates, types, plan, picked, moving) {
   }
   out += `</div>`;
   const open = picked && !moving ? picked.split("|") : null;
-  if (open && dates.includes(open[0]) && types.includes(open[1])) {
-    const entry = mealAt(plan, open[0], open[1]);
-    const noon = `${open[0]}T12:00:00`;
-    const when = open[0] === today ? "Today"
-      : new Date(Date.parse(noon)).toLocaleDateString([], { weekday: "long" });
-    out += `<div class="mldetail">${recipeThumb(b, entry && entry.recipe, "mldetailimg")}<div class="mldetailhead">`
-      + `<span class="mlword">${esc(when)} \u00b7 ${esc(mealType(open[1]).word)}</span>`
-      + `<span class="mldetailname${entry ? "" : " empty"}">${esc(mealName(entry) || "Nothing planned")}</span>`
-      + `</div>${mealTray(b, entry, open[1], open[0] < today)}</div>`;
-  }
-  out += `</div>`;
+  const detail = open && dates.includes(open[0]) && types.includes(open[1])
+    ? mealDetail(b, plan, open[0], open[1]) : "";
+  out += detail + `</div>`;
 
   if (wide) {
     /* The phone's view: a strip of days, and the chosen day's meals. */
@@ -7257,11 +7249,32 @@ function mealGrid(b, dates, types, plan, picked, moving) {
         + types.map((t) => `<i${mealAt(plan, day, t) ? " class=\"on\"" : ""}></i>`).join("")
         + `</span></button>`;
     });
-    out += `</div><div class="mlslots">`;
-    for (const type of types) out += mealSlot(b, plan, chosen, type, picked, moving, true);
-    out += `</div></div>`;
+    /* The chosen day in the same boxes as the grid, one column wide, so
+       the week on a phone is the card Home shows with fewer days in it. */
+    out += `</div><div class="mlgrid" style="--mldays:1">`;
+    for (const type of types) {
+      const kind = mealType(type);
+      out += `<div class="mlrow">${iconMarkup(kind.icon)}<span>${esc(kind.word)}</span></div>`
+        + mealCell(plan, chosen, type, picked, moving, chosen === today ? next : "", b);
+    }
+    out += `</div>`;
+    if (open && open[0] === chosen && types.includes(open[1])) out += mealDetail(b, plan, open[0], open[1]);
+    out += `</div>`;
   }
   return out + mealFoot(b, picked, moving, dates, plan, types) + `</div>`;
+}
+
+/* The open slot's name and controls, under the grid. */
+function mealDetail(b, plan, day, type) {
+  const today = localDay(0);
+  const entry = mealAt(plan, day, type);
+  const noon = `${day}T12:00:00`;
+  const when = day === today ? "Today"
+    : new Date(Date.parse(noon)).toLocaleDateString([], { weekday: "long" });
+  return `<div class="mldetail">${recipeThumb(b, entry && entry.recipe, "mldetailimg")}<div class="mldetailhead">`
+    + `<span class="mlword">${esc(when)} \u00b7 ${esc(mealType(type).word)}</span>`
+    + `<span class="mldetailname${entry ? "" : " empty"}">${esc(mealName(entry) || "Nothing planned")}</span>`
+    + `</div>${mealTray(b, entry, type, day < today)}</div>`;
 }
 
 /* One cell of the grid. An empty one is a faint plus rather than words:
@@ -11579,7 +11592,7 @@ class SpectraCard extends HTMLElement {
     /* A day at a time on a phone: a sideways swipe is the next or the
        previous day, as a calendar app does. Mostly-sideways only, so a
        scroll down the page that drifts is still a scroll. */
-    this._holder.querySelectorAll(".mlslots").forEach((el) => {
+    this._holder.querySelectorAll(".mldayview .mlgrid").forEach((el) => {
       let from = null;
       el.addEventListener("touchstart", (event) => {
         const t = event.touches[0];
