@@ -132,7 +132,8 @@ const shots = process.env.SHOTS || "";
       all(home, ".mlrow span").map(text).join("|"));
     check("eight cells", all(home, ".mlcell").length === 8, all(home, ".mlcell").length);
     check("an empty cell is a plus, not words",
-      all(home, ".mlcell.empty").every((c) => c.querySelector(".mladd") && text(c) === ""),
+      all(home, ".mlcell.empty").every((c) => c.querySelector(".mladd")
+        && text(c) === (c.classList.contains("next") ? "Up next" : "")),
       all(home, ".mlcell.empty").map(text).join("|"));
     check("the plus and each meal's icon are drawn inline, not left to ha-icon",
       all(home, ".mlcell.empty .mladd svg.mdi path").length === all(home, ".mlcell.empty").length
@@ -140,6 +141,20 @@ const shots = process.env.SHOTS || "";
     check("a meal with no recipe is marked as a note",
       q(home, `[data-meal="${day(0)}|breakfast"]`).classList.contains("note"), "not a note");
     check("no one-day view for two days", !q(home, ".mldayview"), "drawn");
+
+    /* ---- Home, view only: the plan, and nothing to press ---- */
+    const view = await make("home", {
+      type: "meals", layout: "grid", days: 2, types: TYPES, readonly: true,
+      plan: { mealie: "e1", days: 2 },
+      say: { script: "script.meal_plan_say" },
+    });
+    check("a view-only card has the same eight cells", all(view, ".mlcell").length === 8,
+      all(view, ".mlcell").length);
+    check("and none of them is a button", !q(view, "button") && !q(view, "[data-meal]"),
+      all(view, "button").length);
+    check("an empty cell is blank, not a plus", !q(view, ".mladd"), "a plus");
+    check("and there is no foot", !q(view, ".mlfoot"), "a foot");
+    view.remove();
 
     home._config.body.hour = 12;
     const upAt = async (hour) => {
