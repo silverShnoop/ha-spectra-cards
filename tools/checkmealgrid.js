@@ -277,8 +277,20 @@ const shots = process.env.SHOTS || "";
       `${shown(week, ".mlgridview")} ${shown(week, ".mldayview")}`);
     check("starting on today", q(phone, ".mlpill.on") === q(phone, ".mlpill.today"), "not today");
     check("the day's four meals, labelled",
-      all(phone, ".mldayview .mlslot .mltype").map(text).join("|") === "Breakfast|Lunch|Dinner|Snack",
-      all(phone, ".mldayview .mlslot .mltype").map(text).join("|"));
+      all(phone, ".mldayview .mlrow span").map(text).join("|") === "Breakfast|Lunch|Dinner|Snack",
+      all(phone, ".mldayview .mlrow span").map(text).join("|"));
+    check("in the same boxes as Home, not rows",
+      all(phone, ".mldayview .mlcell").length === 4 && !q(phone, ".mldayview .mlslot"),
+      `${all(phone, ".mldayview .mlcell").length} cells`);
+    check("an empty one is Home's plus",
+      all(phone, ".mldayview .mlcell.empty:not(.past)").every((c) => c.querySelector(".mladd")),
+      all(phone, ".mldayview .mlcell.empty").map(text).join("|"));
+    all(phone, ".mldayview .mlcell")[1].click();
+    await settle();
+    check("pressing one opens its controls under the day",
+      Boolean(q(phone, ".mldayview .mldetail .mltray")), "no tray");
+    all(phone, ".mldayview .mlcell")[1].click();
+    await settle();
     check("dots say how full each day is",
       q(phone, ".mlpill.today .mldots").querySelectorAll("i.on").length === 3,
       q(phone, ".mlpill.today .mldots").innerHTML);
@@ -286,8 +298,8 @@ const shots = process.env.SHOTS || "";
     q(phone, `[data-meal-day="${other}"]`).click();
     await settle();
     check("a pill shows its day", q(phone, ".mlpill.on") === all(phone, ".mlpill")[other]
-      && q(phone, ".mldayview .mlslot").getAttribute("data-meal") === `${day(-back + other)}|breakfast`,
-      q(phone, ".mldayview .mlslot").getAttribute("data-meal"));
+      && q(phone, ".mldayview .mlcell").getAttribute("data-meal") === `${day(-back + other)}|breakfast`,
+      q(phone, ".mldayview .mlcell").getAttribute("data-meal"));
     q(phone, `[data-meal-day="${back}"]`).click();
     await settle();
     return problems;
