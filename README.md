@@ -1226,7 +1226,7 @@ body:
 ```
 
 For a list that is a Trello board, through the
-[`trello_todo`](https://github.com/silverShnoop/trello_todo) integration.
+[`trello_todo`](https://github.com/silverShnoop/ha-trello-todo) integration.
 A job on a board is not only done or not done — it is in **To do** or
 **Doing** — and a to-do item cannot say which: `todo.get_items` hands over
 a status and nothing else. So the integration publishes the board beside
