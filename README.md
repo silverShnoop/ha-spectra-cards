@@ -1323,6 +1323,7 @@ body:
   state: {entity: sensor.washing_machine}          # off | idle | running
   powered: {entity: sensor.washing_machine, attribute: powered}
   leak: {entity: sensor.washing_machine, attribute: leak}
+  leak_alarm: {entity: sensor.washing_machine, attribute: leak_alarm}
   machine: mdi:washing-machine       # idle; a dryer sets mdi:tumble-dryer
   machine_off: mdi:washing-machine-off
   door_open: {entity: sensor.washing_machine, attribute: door_open}
@@ -1484,6 +1485,15 @@ other.** A leak pad stays damp long after the floor has been dealt with, and
 the cycle still has to be finished, so a wet sensor must never make the card
 claim the machine is off while somebody is standing in front of it.
 
+**A wet pad is an alarm only until somebody acts on it.** `leak` is the
+pad; `leak_alarm` is whether that is still news. Switching the plug back on
+over a wet pad is a person who has looked at the floor deciding to finish
+the wash, so from then on the card shows the cycle — no "Leaking", no water
+drum, no red. The `Sensor wet` chip stays, at **attention**: the cutoff
+fires only on the pad *going* wet, so until it dries a second leak would cut
+nothing. `home_signals` raises a matching attention row. Leave `leak_alarm`
+out and every wet pad is an alarm, as before.
+
 **Colour says which machine; the glyph says what is happening.** It was
 the other way round, and the cost was that a washer and a dryer sitting
 one above the other were tellable apart only while both were idle — the
@@ -1532,7 +1542,8 @@ identity the first time.
 | washing waiting | the count | **attention** |
 | full drum | `mdi:basket-unfill` | **attention** |
 | **no power** | `machine_off` | **waiting, on every machine** |
-| **leak** | `mdi:water` | **critical, on every machine** |
+| **leak** (`leak_alarm`) | `mdi:water` | **critical, on every machine** |
+| wet, power restored since | whatever the cycle is | the card's accent; `Sensor wet` chip at attention |
 
 **Two exceptions, and only two.** A leak and a dead plug have to catch the
 eye *before* anybody reads a word, so they keep their roles everywhere.
