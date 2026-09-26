@@ -181,8 +181,8 @@ const shots = process.env.SHOTS || "";
       detail && text(detail.querySelector(".mldetailhead .mlword")) === "Today · Dinner"
       && text(detail.querySelector(".mldetailname")) === "Sea bass with ginger",
       detail && text(detail.querySelector(".mldetailhead")));
-    check("with Pick another and Move, for dinner",
-      detail && detail.querySelector("[data-meal-pick]") && detail.querySelector("[data-meal-move]"), "missing");
+    check("with Move, as a tile",
+      detail && detail.querySelector(".mltile[data-meal-move]") && !detail.querySelector("[data-meal-more]"), "missing");
     q(home, `[data-meal="${day(0)}|breakfast"]`).click();
     await settle();
     check("but no Pick for breakfast, which pick.types leaves out",

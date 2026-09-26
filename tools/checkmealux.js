@@ -135,12 +135,9 @@ const js = fs.readFileSync(file);
     check("with a 16px field, so a phone does not zoom",
       getComputedStyle(q("[data-meal-typed]")).fontSize === "16px", getComputedStyle(q("[data-meal-typed]")).fontSize);
     check("Recipe leads the tray", !!q(".mldetail [data-meal-recipe]"), text(q(".mldetail")));
-    check("and Move and Clear wait behind More", q("[data-meal-more]") && q(".mlmore").hidden
-      && q(".mlmore [data-meal-move]"), text(q(".mldetail")));
-    q("[data-meal-more]").click();
-    await settle();
-    check("More shows them", !q(".mlmore").hidden && q("[data-meal-more]").getAttribute("aria-expanded") === "true",
-      q(".mlmore") && q(".mlmore").hidden);
+    check("and Move and Clear are tiles, with nothing hidden behind More",
+      q(".mldetail .mltile[data-meal-move]") && q(".mldetail .mltile[data-meal-clear]") && !q("[data-meal-more]"),
+      text(q(".mldetail")));
 
     const typed = q("[data-meal-typed]");
     typed.focus();
@@ -218,8 +215,8 @@ const js = fs.readFileSync(file);
     });
     box0.dispatchEvent(touch("touchstart", 400));
     box0.dispatchEvent(touch("touchend", 200));
-    check("a swipe is the next step", text(top().querySelector(".mlcookstep")) === "Fry it skin-side down."
-      && top().querySelector(".mlcooking"), text(top()));
+    check("a swipe is the next step, over the ingredients", text(top().querySelector(".mlcookstep")) === "Fry it skin-side down."
+      && !top().querySelector(".mlcooking"), text(top()));
     check("and the last step finishes", !top().querySelector("[data-cook-next]")
       && text(top()).includes("Finished"), text(top().querySelector(".confirmbtns")));
     top().querySelector("[data-cook-done]").click();
