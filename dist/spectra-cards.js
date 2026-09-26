@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.118.0";
+const VERSION = "0.119.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1606,6 +1606,9 @@ img.avatar { object-fit:cover; display:block; }
 }
 .mlname { font-size:14px; line-height:1.3; color:var(--sp-ink); min-width:0; }
 .mlslot.empty .mlname { color:var(--sp-ink-3); }
+.mlslot.empty .mladdrow { display:inline-flex; align-items:center; gap:4px; color:var(--accent-on); font-weight:500; }
+.mladdrow .mdi { width:18px; height:18px; }
+.mlslot.ro, .mlcell.ro { cursor:inherit; }
 .mltime { margin-left:auto; flex:none; font-size:11px; color:var(--sp-ink-2); white-space:nowrap; }
 /* The picked slot's controls. Optional, all of them: the card is a fact
    about the week, and nothing here is a job. */
@@ -7176,14 +7179,21 @@ function mealSlot(b, plan, day, type, picked, moving, labelled) {
   const state = moving === slot ? " moving"
     : (moving && moving.split("|")[1] === type && !past ? " target" : (open ? " picked" : ""));
   const kind = mealType(type);
-  let out = `<button type="button" class="mlslot${name ? "" : " empty"}${state}"`
-    + ` data-meal="${esc(slot)}" aria-expanded="${open ? "true" : "false"}">`
+  /* A view-only card shows the plan and nothing to press. An empty slot
+     on a card that can plan says what pressing it does: "Nothing planned"
+     read as a fact, and nobody guessed it was the way in. */
+  const ro = Boolean(b.readonly);
+  const blank = past || ro ? `<span class="mlname">${past ? "Nothing" : "Nothing planned"}</span>`
+    : `<span class="mlname mladdrow">${iconMarkup("mdi:plus")}Add ${esc(kind.word.toLowerCase())}</span>`;
+  let out = (ro ? `<div class="mlslot ro${name ? "" : " empty"}">`
+    : `<button type="button" class="mlslot${name ? "" : " empty"}${state}"`
+      + ` data-meal="${esc(slot)}" aria-expanded="${open ? "true" : "false"}">`)
     + (labelled ? `<span class="mltype">${esc(kind.word)}</span>` : "")
     + recipeThumb(b, entry && entry.recipe, "mlthumb")
-    + `<span class="mlname">${esc(name || (past ? "Nothing" : "Nothing planned"))}</span>`
+    + (name ? `<span class="mlname">${esc(name)}</span>` : blank)
     + (time ? `<span class="mltime">${esc(time)}</span>` : "")
-    + `</button>`;
-  if (open) out += mealTray(b, entry, type, past);
+    + (ro ? `</div>` : `</button>`);
+  if (open && !ro) out += mealTray(b, entry, type, past);
   return out;
 }
 
@@ -7275,14 +7285,17 @@ function mealCell(plan, day, type, picked, moving, next, b) {
   else if (picked === slot && !moving) classes.push("picked");
   const noon = `${day}T12:00:00`;
   const label = `${weekdayLabel(noon) || day} ${mealType(type).word.toLowerCase()}: ${name || "nothing planned"}`;
-  return `<button type="button" class="${classes.join(" ")}" data-meal="${esc(slot)}"`
-    + ` aria-label="${esc(label)}" aria-pressed="${picked === slot ? "true" : "false"}">`
+  const ro = Boolean(b.readonly);
+  if (ro) classes.push("ro");
+  return (ro ? `<div class="${classes.join(" ")}" role="img" aria-label="${esc(label)}">`
+    : `<button type="button" class="${classes.join(" ")}" data-meal="${esc(slot)}"`
+      + ` aria-label="${esc(label)}" aria-pressed="${picked === slot ? "true" : "false"}">`)
     + recipeThumb(b, entry && entry.recipe, "mlcellimg")
     + (upNext ? `<span class="mlnext">Up next</span>` : "")
     + (name ? `<span class="mlname">${esc(name)}</span>`
-      : (past ? "" : `<span class="mladd" aria-hidden="true">${iconMarkup("mdi:plus")}</span>`))
+      : (past || ro ? "" : `<span class="mladd" aria-hidden="true">${iconMarkup("mdi:plus")}</span>`))
     + (time ? `<span class="mltime">${esc(time)}</span>` : "")
-    + `</button>`;
+    + (ro ? `</div>` : `</button>`);
 }
 
 function mealTray(b, entry, type, past) {
@@ -7587,6 +7600,7 @@ function pickerMarkup(list, o) {
 }
 
 function mealFoot(b, picked, moving, dates, plan, types) {
+  if (b.readonly) return "";
   const week = b.week && !isBlank(b.week.script);
   const shop = b.shop_week && !isBlank(b.shop_week.script) && !isBlank(b.shop_week.list);
   if (moving) {

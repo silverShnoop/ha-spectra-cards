@@ -212,8 +212,9 @@ const js = fs.readFileSync(file);
     check("and its time, shortened", text(slots[0].querySelector(".mltime")) === "25 min",
       text(slots[0].querySelector(".mltime")));
     check("a note shows itself", text(slots[2].querySelector(".mlname")) === "Takeaway", text(slots[2]));
-    check("an unplanned day is drawn and says so",
-      slots[1].classList.contains("empty") && text(slots[1]) === "Nothing planned", text(slots[1]));
+    check("an unplanned day is drawn and offers to fill it",
+      slots[1].classList.contains("empty") && text(slots[1]) === "Add dinner"
+        && slots[1].querySelector(".mladdrow svg.mdi"), text(slots[1]));
     check("a lunch is not drawn on a dinner card", !text(root()).includes("Soup"), text(root()));
     check("one meal per slot means no type labels", !q(".mltype"), q(".mltype") && text(q(".mltype")));
 
