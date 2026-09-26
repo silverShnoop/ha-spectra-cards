@@ -172,6 +172,17 @@ const js = fs.readFileSync(file);
           const r = await fresh(); cellOf(r, `${day(0)}|breakfast`).click(); await wait(150);
           r.querySelector("[data-meal-ideas]").click(); await wait(500); return [r, ".confirmwrap"];
         }],
+        ["choosing several", async () => {
+          const r = await fresh(); r.querySelector("[data-meal-select]").click(); await wait(200);
+          r.querySelector(`[data-meal="${day(1)}|dinner"]`).click(); await wait(200); return [r, ".card"];
+        }],
+        ["the Fill question", async () => {
+          const r = await fresh(); r.querySelector("[data-meal-week]").click(); await wait(300); return [r, ".confirmwrap"];
+        }],
+        ["the box, choosing several", async () => {
+          const r = await fresh(); r.querySelector("[data-meal-box]").click(); await wait(500);
+          r.querySelector(".confirmwrap [data-several]").click(); await wait(200); return [r, ".confirmwrap"];
+        }],
         ["fill", async () => {
           const r = await fresh(); r.querySelector("[data-meal-week]").click(); await wait(300);
           const go = r.querySelector(".confirmwrap .confirmyes"); if (go) go.click(); await wait(600);
@@ -191,12 +202,15 @@ const js = fs.readFileSync(file);
           const twins = all.filter((b) => who(b) === id);
           const nth = twins.indexOf(btn);
           const before = btn.getBoundingClientRect();
+          /* A press that closes its sheet and opens the next is a new step,
+             not a jump: only a sheet still open is compared. */
+          const sheet = btn.closest(".confirmwrap");
           entrances.length = 0;
           btn.click();
           await wait(700);
           const again = within(root, scope).filter((b) => who(b) === id)[nth];
           n += 1;
-          if (again) {
+          if (again && (!sheet || sheet.isConnected)) {
             const after = again.getBoundingClientRect();
             const dx = Math.round(after.left - before.left);
             const dy = Math.round(after.top - before.top);

@@ -182,7 +182,7 @@ const js = fs.readFileSync(file);
     card._mealPropose(card._model ? card._model.body : { week: { script: "script.meal_plan_week" }, place: { script: "script.meal_plan_set" } },
       ["dinner"], { start_date: day(0), days: 4 }, 6);
     await settle();
-    const why = q(".confirmwrap .mlpwhy");
+    const why = q(".confirmwrap .mlpwhy small");
     check("each suggestion says why", why && text(why) === "Quick for a weeknight.", why && text(why));
     return problems;
   });
