@@ -113,6 +113,8 @@ const js = fs.readFileSync(file);
         move: { script: "script.meal_plan_move" },
         place: { script: "script.meal_plan_set" },
         write: { script: "script.meal_recipe_from_name" },
+        sentence: { script: "script.meal_plan_sentence" },
+        fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_ideas" },
         week: { script: "script.meal_plan_week" },
         shop: { script: "script.meal_ingredients_to_items", list: "todo.shop" },
         shop_week: { script: "script.meal_week_to_items", list: "todo.shop" },
@@ -182,6 +184,12 @@ const js = fs.readFileSync(file);
         ["the box, choosing several", async () => {
           const r = await fresh(); r.querySelector("[data-meal-box]").click(); await wait(500);
           r.querySelector(".confirmwrap [data-several]").click(); await wait(200); return [r, ".confirmwrap"];
+        }],
+        ["plan in words", async () => {
+          const r = await fresh(); r.querySelector("[data-meal-words]").click(); await wait(300); return [r, ".confirmwrap"];
+        }],
+        ["the fridge", async () => {
+          const r = await fresh(); r.querySelector("[data-meal-fridge]").click(); await wait(300); return [r, ".confirmwrap"];
         }],
         ["fill", async () => {
           const r = await fresh(); r.querySelector("[data-meal-week]").click(); await wait(300);

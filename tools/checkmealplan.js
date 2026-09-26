@@ -289,15 +289,14 @@ const js = fs.readFileSync(file);
     rtop().querySelector("[data-no]").click();
     await settle();
 
-    el._mealPhoto = () => Promise.resolve({ media_content_id: "media-source://x/fridge.jpg", media_content_type: "image/jpeg" });
+    /* The fridge opens its own sheet now (photos, meals, days); the
+       photos and the suggestions are checked in checksmart.js. */
     q("[data-meal-fridge]").click();
     await settle();
-    const fr = calls("meal_fridge_ideas").pop();
-    check("a fridge photo asks for ideas from today", fr && fr.service_data.photo === "media-source://x/fridge.jpg"
-      && fr.service_data.start_date === day(0), JSON.stringify(fr && fr.service_data));
-    check("and they come up as suggestions, with what was seen",
-      text(top()).includes("In the fridge: eggs, spinach, feta") && text(top().querySelector(".mlpname")) === "Spinach and feta omelette",
-      text(top()));
+    check("the fridge opens a sheet for up to four photos", top() && top().querySelectorAll("[data-shot]").length === 4,
+      top() && text(top()));
+    top().querySelector("[data-no]").click();
+    await settle();
     return problems;
   });
 
