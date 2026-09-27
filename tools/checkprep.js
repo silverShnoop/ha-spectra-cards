@@ -5,13 +5,15 @@
  *   - a split recipe reads as Prep ahead and To cook, with how far ahead
  *     each prep step can be done
  *   - the week tags each meal with prep as a fact: planned for when,
- *     prepped, or not planned; the bar offers the week's prep with a count
+ *     prepped, or not planned; the bar's ⋮ menu offers the week's prep
+ *     with a count, and a planned meal's tray has a Prep tile
  *   - one meal's prep joins a session already on Home Tasks before it
  *     makes a new one
  *   - the week's prep is packed into the fewest sittings, reusing a task
  *     that already has the time
  *   - a meal moved or cleared takes its prep with it
  *   - the form edits the split, saving prep steps first
+ *   - the recipe sheet's ⋮ menu has Plan prep
  *   - cooking skips prep that was done, and leads with prep that was not
  *   - a task with a deadline shows it; shopping says when it is needed by
  *
@@ -148,19 +150,30 @@ const js = fs.readFileSync(file);
     const all = (sel) => [...root.querySelectorAll(sel)];
     const tag = (d) => text(q(`.mlgridview [data-meal="${day(d)}|dinner"] .ppmark`));
     const saves = () => asked.filter((m) => m.service === "save_prep_session").map((m) => m.service_data);
+    /* The week's things live in the bar's ⋮ menu: open it, find the item. */
+    const menu = async (sel) => {
+      if (!card._mealMenu) { q("[data-meal-menu]").click(); await settle(); }
+      return q(`.mlfoot .mlmenu ${sel}`);
+    };
 
     /* ---- the week's tags ---- */
     check("a meal with prep and no sitting says so", tag(2) === "Prep not planned", tag(2));
     check("one in a sitting says when", /^Prep \w{3} 19:30$/.test(tag(3)), tag(3));
     check("one whose task is ticked says Prepped", tag(5) === "Prepped", tag(5));
     check("a meal with nothing to prep has no tag", !q(`.mlgridview [data-meal="${day(4)}|dinner"] .ppmark`), tag(4));
-    const bar = q("[data-meal-prepweek]");
-    check("the bar offers the week's prep, with how many", bar && text(bar).includes("Prep 1"), text(bar));
+    check("the week's prep is not on the bar itself", !q(".mlfoot > [data-meal-prepweek]") && !q("[data-meal-prepweek]"),
+      text(q("[data-meal-prepweek]")));
+    const bar = await menu("[data-meal-prepweek]");
+    check("the ⋮ menu offers the week's prep, with how many", bar && text(bar) === "Prep for the week (1 meal)", text(bar));
+    q("[data-meal-menushut]").click();
+    await settle();
+    check("and the overlay closes the menu", !q(".mlfoot .mlmenu") && !q("[data-meal-prepweek]"), text(q(".mlfoot .mlmenu")));
 
     /* ---- one meal ---- */
     q(`.mlgridview [data-meal="${day(2)}|dinner"]`).click();
     await settle();
     check("the tray says the prep is not planned", text(q(".mldetail .pptray")).includes("2 steps"), text(q(".mldetail .pptray")));
+    check("the tray's prep tile reads Prep", text(q(".mldetail [data-meal-prep]")) === "Prep", text(q(".mldetail [data-meal-prep]")));
     q(".mldetail [data-meal-prep]").click();
     await settle();
     const sheet = q(".confirmwrap");
@@ -180,8 +193,10 @@ const js = fs.readFileSync(file);
 
     /* ---- the week ---- */
     asked.length = 0;
-    q("[data-meal-prepweek]").click();
+    (await menu("[data-meal-prepweek]")).click();
     await settle();
+    check("choosing it closes the menu", !card._mealMenu && !q(".mlfoot .mlmenu"),
+      `_mealMenu=${card._mealMenu}, still drawn: ${text(q(".mlfoot .mlmenu"))}`);
     const week = q(".confirmwrap .ppweek");
     const sits = week ? [...week.querySelectorAll(".ppsess .h b")].map(text) : [];
     check("the week fits in one sitting", sits.length === 1 && /19:30$/.test(sits[0]), sits.join(" | "));
@@ -229,7 +244,14 @@ const js = fs.readFileSync(file);
       && text(r.querySelector(".ppkeep")).includes("Fridge"), text(r.querySelector(".ppkeep")));
     check("and how much of it can be done ahead", text(r.querySelector(".confirmtext")).includes("20 min of it can be done ahead"),
       text(r.querySelector(".confirmtext")));
-    check("with Plan prep", Boolean(r.querySelector("[data-planprep]")), "no button");
+    const more = r.querySelector(".mlrecmore .mlmenu");
+    check("Plan prep is in the ⋮ menu, not the footer", Boolean(r.querySelector(".mlrecmore .mlmenu [data-planprep]"))
+      && more.hidden && !r.querySelector(".mlrecbtns > [data-planprep]"), r.querySelector(".mlrecbtns") && r.querySelector(".mlrecbtns").innerHTML);
+    r.querySelector("[data-more]").click();
+    check("⋮ opens it, with Plan prep showing", !more.hidden && text(r.querySelector("[data-planprep]")) === "Plan prep"
+      && r.querySelector("[data-planprep]").getBoundingClientRect().height > 0, text(more));
+    r.querySelector("[data-more]").click();
+    check("and ⋮ again shuts it", more.hidden, "still open");
     r.querySelector("[data-cook]").click();
     await settle();
     check("not prepped: the prep comes first, and says so", text(q(".mlcook .ppbanner.no")).includes("Not prepped")
@@ -294,7 +316,7 @@ const js = fs.readFileSync(file);
 
     /* ---- the house's times ---- */
     acted.length = 0;
-    q("[data-meal-prepweek]").click();
+    (await menu("[data-meal-prepweek]")).click();
     await settle();
     q(".confirmwrap [data-pp-times]").click();
     await settle();
@@ -318,7 +340,7 @@ const js = fs.readFileSync(file);
     [...root.querySelectorAll(".confirmwrap")].forEach((w) => w.remove());
 
     /* ---- shopping is needed by the first sitting ---- */
-    q("[data-meal-shopweek]").click();
+    (await menu("[data-meal-shopweek]")).click();
     await settle();
     const review = [...root.querySelectorAll(".confirmwrap")].pop();
     check("shopping says it is needed by the first sitting", text(review).includes("needed by") && text(review).includes("for the prep"),

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /* The meal cards at the panel and on a phone.
  *
- *   - a meal can be typed into its slot as well as said
- *   - the tray leads with what is usually wanted; the rest wait behind More
+ *   - a planned meal's tray is facts and tiles only (Open recipe, Change,
+ *     Move, Clear), with no mic, typing or More in it
+ *   - Change opens the slot's Plan sheet; its Describe tab types (or says)
+ *     a meal into that slot, through the say script, with Undo
  *   - a wall panel goes back to today when it has been left alone
- *   - a phone swipes between days
+ *   - a phone keeps the week bar on one row, and swipes between days
  *   - recipe photos are signed and drawn, and only for recipes that have one
  *   - the recipe box says when a recipe is next planned
  *   - a recipe can be cooked a step at a time
@@ -120,7 +122,7 @@ const js = fs.readFileSync(file);
       recipes: { save: "home_signals.save_recipe" },
     };
 
-    /* ---- the tray: typed, and More ---- */
+    /* ---- the tray, and Change -> Describe ---- */
     const el = await make("a", { type: "custom:spectra-card", accent: 6, title: "Meals", body: meals });
     const root = el.shadowRoot;
     const q = (sel) => root.querySelector(sel);
@@ -130,27 +132,36 @@ const js = fs.readFileSync(file);
     const today = all(".mlgridview [data-meal]").find((c) => c.getAttribute("data-meal") === `${day(0)}|dinner`);
     today.click();
     await settle();
-    check("an open slot can be typed into", q(".mldetail [data-meal-typed]") && q(".mldetail [data-meal-send]").disabled,
-      text(q(".mldetail")));
-    check("with a 16px field, so a phone does not zoom",
-      getComputedStyle(q("[data-meal-typed]")).fontSize === "16px", getComputedStyle(q("[data-meal-typed]")).fontSize);
-    check("Recipe leads the tray", !!q(".mldetail [data-meal-recipe]"), text(q(".mldetail")));
-    check("and Move and Clear are tiles, with nothing hidden behind More",
-      q(".mldetail .mltile[data-meal-move]") && q(".mldetail .mltile[data-meal-clear]") && !q("[data-meal-more]"),
+    check("the tray has no mic or typing of its own", q(".mldetail") && !q(".mldetail [data-meal-typed]")
+      && !q(".mldetail [data-meal-say]") && !q(".mldetail [data-meal-send]"), text(q(".mldetail")));
+    check("Recipe leads the tray", !!q(".mldetail .mltile[data-meal-recipe]"), text(q(".mldetail")));
+    check("and Change, Move and Clear are tiles, with nothing hidden behind More",
+      q(".mldetail .mltile[data-meal-change]") && q(".mldetail .mltile[data-meal-move]")
+      && q(".mldetail .mltile[data-meal-clear]") && !q("[data-meal-more]"),
       text(q(".mldetail")));
 
-    const typed = q("[data-meal-typed]");
-    typed.focus();
+    q(".mldetail [data-meal-change]").click();
+    await settle();
+    check("Change opens the slot's Plan sheet", top() && text(top().querySelector(".confirmhead")).startsWith("Plan ")
+      && !!top().querySelector(".plantabs [data-plantab='describe']"), top() && text(top()));
+    top().querySelector("[data-plantab='describe']").click();
+    await settle();
+    const typed = top() && top().querySelector("[data-said]");
+    check("Describe gives a field to type the meal into", !!typed && !!top().querySelector("[data-said-mic]")
+      && text(top().querySelector("[data-yes]")) === "Plan it", top() && text(top()));
+    check("a 16px field, so a phone does not zoom",
+      typed && getComputedStyle(typed).fontSize === "16px", typed && getComputedStyle(typed).fontSize);
+    check("and says what it replaces", text(top()).includes("Replaces Sea bass with ginger"), text(top()));
     typed.value = "fish pie";
     typed.dispatchEvent(new Event("input"));
-    check("typing wakes the send button", !q("[data-meal-send]").disabled, "still disabled");
     typed.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await settle();
     const said = asked.filter((m) => m.service === "meal_plan_say").pop();
-    check("Enter plans what was typed, into that slot", said && said.service_data.transcript === "fish pie"
+    check("Enter plans what was typed, into that slot", !q(".confirmwrap") && said && said.service_data.transcript === "fish pie"
       && said.service_data.date === day(0) && said.service_data.entry_type === "dinner",
       said && JSON.stringify(said.service_data));
-    check("and says so", text(root).includes("Fish pie planned"), text(q(".mldetail")));
+    check("and says so, with Undo", text(root).includes("Fish pie planned") && !!q(".mltoast.undo [data-undo]"),
+      text(q(".mlfoot")));
 
     /* ---- photos ---- */
     const signed = asked.filter((m) => m.type === "auth/sign_path").map((m) => m.path);
@@ -179,7 +190,8 @@ const js = fs.readFileSync(file);
     await settle();
     check("left alone, the panel goes back to today", el._mealWeek === 0 && !el._mealPick
       && el._mealDay === null && !el._mealMore, `${el._mealWeek} ${el._mealPick} ${el._mealDay}`);
-    check("and draws this week again", text(q(".mlweek.on")) === "This week", text(q(".mlweek.on")));
+    check("and draws this week again", text(q(".mlweekname")) === "This week"
+      && q("[data-meal-weekto='0']").disabled && !q("[data-meal-weekto='1']").disabled, text(q(".mlweekname")));
     el._mealPick = `${day(0)}|dinner`;
     el._voice = { phase: "listening", note: "" };
     el._touchedAt = 0;
@@ -225,17 +237,19 @@ const js = fs.readFileSync(file);
     top().querySelector("[data-no]").click();
     await settle();
 
-    /* ---- a phone: short buttons, and a swipe between days ---- */
+    /* ---- a phone: one row for the week bar, and a swipe between days ---- */
     const ph = await make("b", { type: "custom:spectra-card", accent: 6, title: "Meals", body: meals });
     const pr = ph.shadowRoot;
-    const fill = pr.querySelector("[data-meal-week]");
-    check("on a phone the week's buttons shed their words",
-      getComputedStyle(fill.querySelector(".mllong")).display === "none"
-      && getComputedStyle(fill.querySelector(".mlshort")).display !== "none", text(fill));
-    check("and share one row that scrolls", getComputedStyle(pr.querySelector(".mlacts")).flexWrap === "nowrap",
-      getComputedStyle(pr.querySelector(".mlacts")).flexWrap);
-    check("keeping their names for a screen reader", fill.getAttribute("aria-label") === "Fill empty days",
-      fill.getAttribute("aria-label"));
+    const foot = pr.querySelector(".mlfoot");
+    const kids = foot ? Array.from(foot.querySelectorAll(".mlweeks, [data-meal-plan], [data-meal-menu]")) : [];
+    const tops = kids.map((k) => Math.round(k.getBoundingClientRect().top + k.getBoundingClientRect().height / 2));
+    check("on a phone the week, Plan and the menu share one row", kids.length === 3
+      && Math.max(...tops) - Math.min(...tops) <= 4, tops.join(","));
+    check("without spilling sideways", foot && foot.scrollWidth <= foot.clientWidth + 1,
+      foot && `${foot.scrollWidth} > ${foot.clientWidth}`);
+    check("the menu keeps its name for a screen reader",
+      pr.querySelector("[data-meal-menu]").getAttribute("aria-label") === "More",
+      pr.querySelector("[data-meal-menu]").getAttribute("aria-label"));
     const slots = pr.querySelector(".mldayview .mlgrid");
     const at = ph._mealDay;
     const swipe = (from, to) => {
@@ -311,5 +325,5 @@ const js = fs.readFileSync(file);
     console.log(`FAILED (${fails.length})`);
     process.exit(1);
   }
-  console.log("OK (meal cards: typed meals, More, idle reset, swipes, photos, cooking, routine preview)");
+  console.log("OK (meal cards: tray, Change -> Describe, idle reset, phone bar, swipes, photos, cooking, routine preview)");
 })();
