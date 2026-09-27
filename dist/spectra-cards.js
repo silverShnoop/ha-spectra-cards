@@ -1987,11 +1987,13 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .mlchip[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-on); }
 .mlsrc { margin-top:4px; }
 .mlwords { display:flex; gap:8px; align-items:flex-start; margin:8px 0; }
-.mlwords textarea {
+.mlwords textarea, .mlwords input {
   flex:1 1 auto; min-width:0; box-sizing:border-box; font:inherit; font-size:16px; line-height:1.4;
   color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge); border-radius:8px;
   padding:10px 12px; resize:none; height:5.4em;
 }
+.mlwords input { height:auto; min-height:44px; align-self:center; }
+.mlwords:has(input) { align-items:center; }
 .mlshots { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; margin:6px 0 10px; }
 .mlshot {
   position:relative; aspect-ratio:1; border:1px dashed var(--sp-edge); border-radius:10px; padding:0;
@@ -13949,7 +13951,7 @@ class SpectraCard extends HTMLElement {
     if (!open.some((t) => t[0] === at)) at = open[0][0];
     this._planTab[kind] = at;
     const words = one ? mealSlotWords(one[0], one[1]) : "";
-    const title = one ? `Plan ${words.charAt(0).toLowerCase()}${words.slice(1)}`
+    const title = one ? `Plan ${/^(Today|Tomorrow)'s/.test(words) ? words.charAt(0).toLowerCase() + words.slice(1) : words}`
       : (slots ? `Plan ${slots.length} meals` : `Plan ${(Number(body.week_offset) || 0) ? "next week" : "this week"}`);
     const note = one ? "" : (slots
       ? `${slots.filter(([d, t]) => !mealAt(body.plan || [], d, t)).length} of them empty; only empty meals are filled`
