@@ -245,6 +245,7 @@ const js = fs.readFileSync(file);
     const tops = kids.map((k) => Math.round(k.getBoundingClientRect().top + k.getBoundingClientRect().height / 2));
     check("on a phone the week, Plan and the menu share one row", kids.length === 3
       && Math.max(...tops) - Math.min(...tops) <= 4, tops.join(","));
+    console.log("DEBUG " + Array.from(foot.querySelectorAll("*")).map((c) => [c.tagName + "." + c.className, Math.round(c.getBoundingClientRect().right)]).filter((x) => x[1] > 376).map((x) => x.join("@")).join(" "));
     check("without spilling sideways", foot && foot.scrollWidth <= foot.clientWidth + 1,
       foot && `${foot.scrollWidth} > ${foot.clientWidth}`);
     check("the menu keeps its name for a screen reader",
