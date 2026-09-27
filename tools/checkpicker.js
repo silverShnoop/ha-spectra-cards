@@ -9,9 +9,14 @@
  *   - search reads ingredients and tags, and says which ingredient matched
  *   - sort, remembered per device
  *   - Ask the box, and suggestions for the slot, pinned with a reason
- *   - a long press shows the first ingredients
+ *   - on the Recipes card a long press (a real mouse hold) or a right-click
+ *     selects a recipe, taps then tick, and the selection bar replaces the
+ *     search row; one + opens Add a recipe with a tab for each way in
+ *     (the tab last used is remembered), and Type it tags a new recipe
  *   - the tray shows a planned recipe's first ingredients
- *   - the heart, and tags in the edit form
+ *   - an empty day ahead opens the Plan sheet's box, with quick picks
+ *   - in the box a long press shows the first ingredients
+ *   - the heart, and tags in the edit form (Edit is in the recipe's ⋮)
  *
  *   node tools/checkpicker.js [path/to/spectra-cards.js]
  */
@@ -45,6 +50,20 @@ const js = fs.readFileSync(file);
   page.on("console", (m) => {
     const t = m.text();
     if (!t.includes("SPECTRA-CARDS") && !t.includes("spectra-card:")) console.log("  " + t);
+  });
+  /* A real mouse hold: down, wait past the 450 ms long press, up. */
+  await page.exposeFunction("holdPoint", async (x, y) => {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.waitForTimeout(600);
+    await page.mouse.up();
+  });
+  await page.addInitScript(() => {
+    window.holdAt = async (el) => {
+      el.scrollIntoView({ block: "center" });
+      const r = el.getBoundingClientRect();
+      await window.holdPoint(r.left + r.width / 2, r.top + r.height / 2);
+    };
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.waitForFunction(() => !!customElements.get("spectra-card"));
@@ -111,7 +130,7 @@ const js = fs.readFileSync(file);
         return Promise.resolve({ response: {} });
       },
     };
-    try { localStorage.removeItem("spectra-cards:recipe-sort"); } catch (e) { /* none */ }
+    try { localStorage.removeItem("spectra-cards:recipe-sort"); localStorage.removeItem("spectra-recipe-add"); } catch (e) { /* none */ }
 
     /* ---- the Recipes card ---- */
     const rc = document.createElement("spectra-card");
@@ -119,6 +138,7 @@ const js = fs.readFileSync(file);
     rc.setConfig({ type: "custom:spectra-card", accent: 6, title: "Recipes", body: {
       type: "recipes", box: { mealie: "e1", recipes: true }, planned: { mealie: "e1", days: 14 },
       ask: { script: "script.meal_recipe_ask" },
+      import: { script: "script.meal_recipe_import" },
       edit: { save: "home_signals.save_recipe", tag: "script.meal_recipe_tag" },
     } });
     rc.hass = hass;
@@ -217,10 +237,50 @@ const js = fs.readFileSync(file);
       && rowOf("risotto").classList.contains("pinned"), `${names().join("|")} ${text(rowOf("risotto").querySelector(".rpwhy"))}`);
     check("ignoring a pick that is not in the box", rows().filter((li) => li.classList.contains("pinned")).length === 1, "pinned a stranger");
 
-    const btn = rowOf("fajitas").querySelector("[data-recipe-open]");
-    btn.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
-    check("a long press shows the first ingredients", !rowOf("fajitas").querySelector(".rping").hidden
-      && text(rowOf("fajitas").querySelector(".rping")).startsWith("500g chicken thighs"), rowOf("fajitas").innerHTML.slice(0, 200));
+    /* ---- selecting on the Recipes card ---- */
+    const selbar = R.querySelector("[data-rc-selbar]");
+    check("no selection bar while nothing is selected", selbar && selbar.hidden, selbar && String(selbar.hidden));
+    const opened = () => R.querySelectorAll(".confirmwrap").length;
+    const before = opened();
+    await window.holdAt(rowOf("fajitas").querySelector("[data-recipe-open]"));
+    await settle();
+    check("a long press on the card selects the recipe", rowOf("fajitas").classList.contains("ticked")
+      && !selbar.hidden && text(R.querySelector("[data-rc-count]")) === "1 selected", `${rowOf("fajitas").className} ${selbar.hidden}`);
+    check("and neither peeks nor opens it", (!rowOf("fajitas").querySelector(".rping") || rowOf("fajitas").querySelector(".rping").hidden)
+      && opened() === before, `${opened()} sheets`);
+    rowOf("risotto").querySelector("[data-recipe-open]").click();
+    await settle();
+    check("while selecting a tap ticks", rowOf("risotto").classList.contains("ticked") && opened() === before
+      && text(R.querySelector("[data-rc-count]")) === "2 selected", text(R.querySelector("[data-rc-count]")));
+    rowOf("risotto").querySelector("[data-recipe-open]").click();
+    await settle();
+    check("and unticks", !rowOf("risotto").classList.contains("ticked") && text(R.querySelector("[data-rc-count]")) === "1 selected",
+      text(R.querySelector("[data-rc-count]")));
+    R.querySelector("[data-rc-done]").click();
+    await settle();
+    check("done puts the search row back", selbar.hidden && !R.querySelector("[data-rp-row].ticked"), String(selbar.hidden));
+    rowOf("stew").querySelector("[data-recipe-open]").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    await settle();
+    check("a right-click selects too", rowOf("stew").classList.contains("ticked") && !selbar.hidden, rowOf("stew").className);
+    R.querySelector("[data-rc-done]").click();
+    await settle();
+
+    /* ---- one way to add a recipe ---- */
+    check("the search row ends with one add button", R.querySelectorAll("[data-recipe-add]").length === 1
+      && !R.querySelector("[data-recipe-link], [data-recipe-photo], [data-recipe-new]"), "old buttons");
+    R.querySelector("[data-recipe-add]").click();
+    await settle();
+    const addTabs = [...R.querySelectorAll(".confirmwrap .plantabs [data-plantab]")].map((b) => b.getAttribute("data-plantab"));
+    check("which opens Add a recipe, a tab for each way in", text(R.querySelector(".confirmwrap .confirmhead")) === "Add a recipe"
+      && addTabs.join(",") === "link,type" && R.querySelector(".confirmwrap [data-plantab='link']").classList.contains("on")
+      && Boolean(R.querySelector(".confirmwrap [data-f='url']")) && text(R.querySelector(".confirmwrap [data-yes]")) === "Add recipe",
+      `${text(R.querySelector(".confirmwrap .confirmhead"))} ${addTabs.join(",")}`);
+    R.querySelector(".confirmwrap [data-plantab='type']").click();
+    await settle();
+    let keptTab = "";
+    try { keptTab = localStorage.getItem("spectra-recipe-add"); } catch (e) { keptTab = "type"; }
+    check("Type it is the new-recipe form, in the same sheet", R.querySelectorAll(".confirmwrap").length === 1
+      && Boolean(R.querySelector(".confirmwrap [data-f='name']")) && keptTab === "type", `${R.querySelectorAll(".confirmwrap").length} ${keptTab}`);
 
     /* ---- the heart, and tags in the form ---- */
     rowOf("risotto").querySelector("[data-recipe-open]").click();
@@ -234,6 +294,12 @@ const js = fs.readFileSync(file);
     check("which saves it as a favourite", fav && fav.service_data.favourite === true && fav.service_data.recipe === "risotto",
       JSON.stringify(fav && fav.service_data));
     check("and fills in", sheet().querySelector("[data-fav]").getAttribute("aria-pressed") === "true", "still empty");
+    const more = sheet().querySelector(".mlrecmore .mlmenu");
+    check("Edit waits in the recipe's menu", more && more.hidden && Boolean(more.querySelector("[data-edit]"))
+      && Boolean(sheet().querySelector("[data-cook]")), sheet().querySelector(".confirmbtns") && text(sheet().querySelector(".confirmbtns")));
+    sheet().querySelector("[data-more]").click();
+    await settle();
+    check("which the ⋮ opens", !sheet().querySelector(".mlrecmore .mlmenu").hidden, "still hidden");
     sheet().querySelector("[data-edit]").click();
     await settle();
     const tag = (t) => sheet().querySelector(`[data-tag="${t}"]`);
@@ -246,6 +312,7 @@ const js = fs.readFileSync(file);
     check("tags nobody changed are not sent", same && !("tags" in same.service_data), JSON.stringify(same && same.service_data));
     rowOf("risotto").querySelector("[data-recipe-open]").click();
     await settle();
+    sheet().querySelector("[data-more]").click();
     sheet().querySelector("[data-edit]").click();
     await settle();
     tag("Quick").click();
@@ -255,8 +322,10 @@ const js = fs.readFileSync(file);
     check("a changed tag is", changed && changed.service_data.tags === "Dinner, Quick, Vegetarian, Rice",
       JSON.stringify(changed && changed.service_data.tags));
 
-    rc._mealEdit("e1", null, 6, { save: "home_signals.save_recipe", tag: "script.meal_recipe_tag" });
+    R.querySelector("[data-recipe-add]").click();
     await settle();
+    check("the add sheet opens on the tab last used", R.querySelector(".confirmwrap [data-plantab='type']").classList.contains("on")
+      && Boolean(sheet().querySelector('[data-f="name"]')), "another tab");
     sheet().querySelector('[data-f="name"]').value = "Leek soup";
     sheet().querySelector("[data-yes]").click();
     await settle();
@@ -286,9 +355,13 @@ const js = fs.readFileSync(file);
       if (c.getAttribute("data-meal") === `${day(2)}|dinner`) c.click();
     });
     await settle();
-    E.querySelector(".mldetail [data-meal-choose]").click();
-    await settle();
     const S = E.querySelector(".confirmwrap:last-of-type");
+    check("an empty day ahead opens the Plan sheet's box straight away", !E.querySelector(".mldetail") && S
+      && /^Plan /.test(text(S.querySelector(".confirmhead"))) && Boolean(S.querySelector(".rpbox")),
+      S && text(S.querySelector(".confirmhead")));
+    const quick = [...S.querySelectorAll("[data-quick]")].map(text);
+    check("with quick picks for an empty dinner", quick.join("|") === "Leftover chicken fajitas|Takeaway|Eating out|From the freezer"
+      && !S.querySelector("[data-keep]"), quick.join("|"));
     const srows = () => [...S.querySelectorAll("[data-rp-row]")].filter((li) => !li.hidden);
     const snames = () => srows().map((li) => text(li.querySelector(".rcname")).replace(" ♥", ""));
     check("opened for a dinner, Suits dinner is already on",
@@ -300,11 +373,28 @@ const js = fs.readFileSync(file);
     check("pinned at the top with the reason", snames()[0] === "Nana's stew"
       && text(srows()[0].querySelector(".rpwhy")) === "Not had yet, and it is Sunday."
       && text(S.querySelector("[data-rp-note]")).startsWith("Suggested for"), `${snames().join("|")} ${text(S.querySelector("[data-rp-note]"))}`);
+    const peek = srows().find((li) => text(li).includes("Mushroom risotto"));
+    await window.holdAt(peek.querySelector("[data-recipe-open]"));
+    await settle();
+    check("in the box a long press shows the first ingredients", peek.querySelector(".rping") && !peek.querySelector(".rping").hidden
+      && text(peek.querySelector(".rping")).startsWith("300g arborio rice") && S.isConnected, peek.innerHTML.slice(0, 200));
     srows()[0].querySelector("[data-recipe-open]").click();
     await settle();
     const set = asked.filter((m) => m.service === "meal_plan_set").pop();
     check("a tap plans it in that slot", set && set.service_data.recipe_id === "r4" && set.service_data.date === day(2)
       && set.service_data.entry_type === "dinner", JSON.stringify(set && set.service_data));
+    E.querySelectorAll(".mlgridview [data-meal]").forEach((c) => {
+      if (c.getAttribute("data-meal") === `${day(2)}|breakfast`) c.click();
+    });
+    await settle();
+    const B = E.querySelector(".confirmwrap:last-of-type");
+    const bq = B ? [...B.querySelectorAll("[data-quick]")].map(text) : [];
+    check("a breakfast's quick picks leave out takeaway", bq.join("|") === "Leftovers|From the freezer", bq.join("|"));
+    B.querySelector("[data-quick='From the freezer']").click();
+    await settle();
+    const qset = asked.filter((m) => m.service === "meal_plan_set").pop();
+    check("a quick pick plans that note", qset && qset.service_data.title === "From the freezer" && qset.service_data.date === day(2)
+      && qset.service_data.entry_type === "breakfast" && !qset.service_data.recipe_id, JSON.stringify(qset && qset.service_data));
     return problems;
   });
 
@@ -314,5 +404,5 @@ const js = fs.readFileSync(file);
     console.log(`FAILED (${fails.length})`);
     process.exit(1);
   }
-  console.log("OK (the picker: index, chips, search, sort, ask, suggestions, glance, favourites, tags)");
+  console.log("OK (the picker: index, chips, search, sort, ask, select, add, suggestions, quick picks, glance, peek, favourites, tags)");
 })();
