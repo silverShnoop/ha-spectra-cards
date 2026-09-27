@@ -1818,6 +1818,43 @@ with no sheet open, nothing being typed and the mic idle, an open slot
 shuts, More folds, Next week goes back to This week and the chosen day
 goes back to today. The next person to look expects today.
 
+### Prep ahead
+
+Needs home_signals 0.14 (`sensor.meal_prep` and the `prep` split on
+recipes). Nothing to configure: with the sensor present, a meals card
+shows prep, and without it, it shows none.
+
+- **A recipe can be split** into *Prep ahead* and *To cook*. Its sheet reads
+  in those two halves, each prep step saying how far ahead it can be done,
+  what it needs (a marinade's hour) and where it keeps. The form has **In
+  order / Prep and cook**, and per step **Prep ahead / At cook**; saving
+  puts the prep steps first.
+- **Each meal with prep says so, as a fact**: *Prep Mon 19:30*, *Prepped*
+  or *Prep not planned*. The open slot's tray adds a line and a **Prep**
+  tile.
+- **Prep** (a meal) shows each part's window and offers, in order: joining
+  a sitting already on Home Tasks, the house's prep times, or any time. A
+  part the time cannot serve is left to the day, and the sheet says why.
+- **Prep N meals** in the week's bar is offered while any meal's prep is
+  not in a sitting. It packs the week into the fewest sittings the windows
+  allow, each one Home Tasks item; every row can be moved. It replaces the
+  tasks made meal by meal.
+- **The plan keeps the prep honest.** A meal moved takes its prep with it;
+  a meal cleared takes it off the task; Undo on the meal brings it back.
+- **Cooking knows.** Prepped, Cook starts at the first cook step; not, the
+  prep comes first with what that costs, and **Skip the prep**.
+- **Shop for the week** says the shopping is needed by the first sitting.
+- **Home Tasks** shows a due time on an item that has one, and only then.
+
+The job itself -- prep due today, or late with the meal still ahead -- is
+a `Needs you` row raised by home_signals, and colours the Kitchen card
+and its rail button through `outline` and `accent`; the card draws no
+level of its own.
+
+With `import.split`, **From a link** waits for the split after saving and
+shows it once: **Looks right**, **Keep in order** (the method as it came)
+or **Edit**.
+
 ### Recipe photos
 
 ```yaml
@@ -1923,7 +1960,7 @@ body:
     dictate: script.meal_recipe_from_speech
     tag: script.meal_recipe_tag            # optional: AI tags a new recipe nobody tagged
   ask: {script: script.meal_recipe_ask}    # optional: "Ask" the box, and suggestions for a slot
-  import: {script: script.meal_import_recipe}   # optional: "From a link"
+  import: {script: script.meal_import_recipe, split: script.meal_recipe_split}   # optional: "From a link"; split: check its prep once
   schedule: {script: script.meal_plan_set, types: [breakfast, lunch, dinner, snack]}  # optional: "Plan it"
   photo: {save: home_signals.save_photo, script: script.meal_recipe_from_photo}      # optional: "From a photo"
   planned: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}             # optional: "Tue" beside a recipe
