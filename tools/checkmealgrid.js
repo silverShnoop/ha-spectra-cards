@@ -100,6 +100,7 @@ const shots = process.env.SHOTS || "";
           const { start_date: a, end_date: z } = msg.service_data;
           return Promise.resolve({ response: { mealplan: plan.filter((e) => e.mealplan_date >= a && e.mealplan_date <= z) } });
         }
+        if (msg.service === "get_recipes") return Promise.resolve({ response: { recipes: { items: [] } } });
         if (msg.service === "meal_plan_week") {
           const d = msg.service_data;
           return Promise.resolve({ response: { planned: [{ date: d.start_date, meal: `A ${d.entry_type}`, recipe_id: "" }] } });
@@ -308,7 +309,7 @@ const shots = process.env.SHOTS || "";
     await settle();
     await settle();
     const sets = asked.filter((m) => m.service === "meal_plan_set");
-    check("then each goes into its empty slot",
+    check("then each is written, only if its slot is still empty",
       sets.map((m) => `${m.service_data.entry_type}:${m.service_data.date}:${m.service_data.only_if_empty}`).join(",")
         === `lunch:${day(0)}:true,dinner:${day(0)}:true`,
       JSON.stringify(sets.map((m) => m.service_data)));
