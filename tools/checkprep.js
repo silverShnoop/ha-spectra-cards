@@ -277,6 +277,46 @@ const js = fs.readFileSync(file);
     check("In order takes the split off", saved && saved.service_data.prep && saved.service_data.prep.mode === "order",
       saved && JSON.stringify(saved.service_data));
 
+    /* ---- an unchecked split goes back in order exactly ---- */
+    index[1].prep = { mode: "split", checked: false, steps: [{ ahead_max: 72 }], original: ["Make and warm the chilli."] };
+    await card._recipeIndex("e1", true);
+    asked.length = 0;
+    card._mealEdit("e1", { recipe_id: "r2", slug: "chilli", name: "Chilli",
+      instructions: [{ text: "Make the chilli." }, { text: "Warm it through and serve." }] }, 6, { save: "home_signals.save_recipe" });
+    await settle();
+    check("an unchecked split says so in the form", text(q(".confirmwrap .ppnote")).includes("Check the steps"), text(q(".confirmwrap .ppnote")));
+    q(".confirmwrap [data-ppmode='order']").click();
+    q(".confirmwrap [data-yes]").click();
+    await settle();
+    saved = asked.filter((m) => m.service === "save_recipe").pop();
+    check("In order on an unchecked split puts the method back as it came", saved && saved.service_data.method === "Make and warm the chilli."
+      && saved.service_data.prep.mode === "order", saved && JSON.stringify(saved.service_data));
+
+    /* ---- the house's times ---- */
+    acted.length = 0;
+    q("[data-meal-prepweek]").click();
+    await settle();
+    q(".confirmwrap [data-pp-times]").click();
+    await settle();
+    const tsheet = q(".confirmwrap");
+    check("Times shows the meal and prep times", tsheet.querySelector("[data-pp-meal='dinner']").value === "17:00"
+      && tsheet.querySelectorAll(".pprules li").length === 1, text(tsheet));
+    tsheet.querySelector("[data-pp-meal='dinner']").value = "18:30";
+    const addBefore = tsheet.querySelector("[data-pp-add]").getBoundingClientRect().top;
+    tsheet.querySelector("[data-pp-add]").click();
+    await settle();
+    check("adding a prep time does not move Add", Math.abs(q(".confirmwrap [data-pp-add]").getBoundingClientRect().top - addBefore) < 1,
+      `${addBefore} -> ${q(".confirmwrap [data-pp-add]").getBoundingClientRect().top}`);
+    q(".confirmwrap [data-pp-time='0']").value = "16:00";
+    q(".confirmwrap [data-pp-day='0:6']").click();
+    q(".confirmwrap [data-pp-keep]").click();
+    await settle();
+    const set = acted.find((a) => a.service === "home_signals.prep_settings");
+    check("Save writes them to home_signals", set && set.data.meal_times.dinner === "18:30" && set.data.prep_times.length === 2
+      && set.data.prep_times[0].time === "16:00" && set.data.prep_times[0].days.join() === "6", set && JSON.stringify(set.data));
+    await new Promise((r) => setTimeout(r, 800));
+    [...root.querySelectorAll(".confirmwrap")].forEach((w) => w.remove());
+
     /* ---- shopping is needed by the first sitting ---- */
     q("[data-meal-shopweek]").click();
     await settle();
