@@ -1148,21 +1148,20 @@ ha-icon { display:inline-flex; line-height:0; }
  * is without a number under it. Held back behind the surface everywhere
  * except the span being reported, because marks have to read over it.
  *
- * The lit span is the GAP -- from where the room is to where it was asked
- * to be. Brightness fills from the left edge because brightness is a
- * quantity: 30% is less light than 60%. Temperature is not. Eighteen
- * degrees is not less full than twenty-two, and a bar filled to the
- * setpoint would be measuring nothing at all. The gap is the one quantity
- * on this control that means something -- the work still to do -- and at
- * target it has no width, which is the state worth reading from a doorway.
+ * The lit span runs from the cold end to where the room IS, and the rest
+ * is dimmed: one meaning, always. It used to be the gap between the room
+ * and its target, with the stretch past what Tado will accept veiled as
+ * well -- so the dimmed part meant the limit or the reading, whichever was
+ * higher, and a reader had to know which. The limit needs no mark: the
+ * thumb simply stops there, the way a physical slider stops at its end.
+ * The target is the thumb; the reading is where the light ends.
  */
 /* The track's layers, as ELEMENTS in the order they must paint: veil,
-   then the unsettable ends, then the gap on top.
+   then the lit span on top.
 
    The veil used to be the track's ::after, and ::after paints after every
    child -- so it sat on top of the gap it was meant to sit behind, and the
-   gap, the one quantity on this control that means anything, was never
-   visible at all. Nothing failed: the clip values were right and the card
+   lit span was never visible at all. Nothing failed: the clip values were right and the card
    looked finished. A generated box cannot be ordered against its siblings
    except by coming last, so the veil is a span now, placed first.
 
@@ -1175,13 +1174,9 @@ ha-icon { display:inline-flex; line-height:0; }
     var(--sp-ramp-3) 56.667%, var(--sp-ramp-4) 76.667%, var(--sp-ramp-5) 100%);
   background:var(--ramp);
 }
-.rampveil, .rampdead, .rampgap { position:absolute; top:0; bottom:0; }
+.rampveil, .rampgap { position:absolute; top:0; bottom:0; }
 .rampveil { left:0; right:0; background:var(--sp-surface); opacity:.28; }
-/* Past what the thermostat will accept. The ramp carries on -- a room can
-   be 30 degrees -- but a thumb cannot go there, and a finger should be able
-   to see that before it tries. */
-.rampdead { background:var(--sp-surface); opacity:.42; }
-/* The same ramp at full strength, clipped to the gap. ONE full-width layer
+/* The same ramp at full strength, clipped to the lit span. ONE full-width layer
    rather than a positioned slice: clipped, the colour at any point stays
    the colour of that point's temperature at any card width, and there is
    nothing to keep in register. */
@@ -7137,8 +7132,9 @@ function sceneTrackMarkup(key, scenes, activeName, lit) {
 
    That costs something, and it is paid knowingly: the thumb stops at 25
    part-way along, and the stretch beyond it is somewhere a finger cannot
-   set. The alternative was a scale that lied about hot rooms. The dead
-   stretch is veiled so a finger can see it before trying. */
+   set. The alternative was a scale that lied about hot rooms. The stretch
+   is not marked: the thumb stopping is the mark, and a veil there made the
+   dimmed part of the track mean two different things. */
 const TEMP_SCALE_MIN = 15;
 const TEMP_SCALE_MAX = 30;
 
@@ -7204,12 +7200,9 @@ function tempStripeMarkup(row) {
      room in January or a kitchen in a heatwave -- real, and not rare. */
   const beyond = !isFinite(now) ? ""
     : (now > smax ? " over" : (now < smin ? " under" : ""));
-  /* Clipped from both sides: the gap is a span, not a fill, and it has two
-     ends that both move. */
-  const from = here === null ? at : Math.min(at, here);
-  const to = here === null ? at : Math.max(at, here);
-  const deadLo = place(lo);
-  const deadHi = place(hi);
+  /* Lit from the cold end to the reading; no reading, nothing lit. */
+  const from = 0;
+  const to = here === null ? 0 : here;
 
   return `<div class="slide lead climstripe${lit ? "" : " off"}" data-temp`
     + ` data-at="${at.toFixed(3)}" data-from="${from.toFixed(3)}" data-to="${to.toFixed(3)}"`
@@ -7221,8 +7214,6 @@ function tempStripeMarkup(row) {
     + `<div class="slidehold">`
     + `<div class="dimtrack ramptrack" style="--ramp:${rampGradient(smin, smax)}">`
     + `<span class="rampveil"></span>`
-    + (deadLo > 0 ? `<span class="rampdead" style="left:0;width:${deadLo.toFixed(3)}%"></span>` : "")
-    + (deadHi < 100 ? `<span class="rampdead" style="left:${deadHi.toFixed(3)}%;right:0"></span>` : "")
     + `<span class="rampgap" data-rampgap`
     + ` style="clip-path:inset(0 ${(100 - to).toFixed(3)}% 0 ${from.toFixed(3)}%)"></span></div>`
     + `<span class="dimthumb" data-tempthumb style="left:${at.toFixed(3)}%"></span>`
@@ -11342,20 +11333,15 @@ class SpectraCard extends HTMLElement {
       describe: (v) => ({ text: v.toFixed(decimals) + suffix, icon: "" }),
       paint: (v) => {
         const at = place(v);
-        /* The needle does not move -- the room did not change because a
-           thumb did -- but both ends of the gap are recomputed, because
-           either of them can be the left one. */
-        const here = isFinite(now) ? place(now) : at;
-        if (gap) {
-          gap.style.clipPath = `inset(0 ${(100 - Math.max(at, here)).toFixed(3)}% `
-            + `0 ${Math.min(at, here).toFixed(3)}%)`;
-        }
+        /* Only the thumb moves. The lit span is the reading, and the room
+           did not change because a thumb did. */
+        const here = isFinite(now) ? place(now) : 0;
         if (thumb) thumb.style.left = `${at.toFixed(3)}%`;
         /* Kept current under the finger. Without it the render after the
            lift would animate from where the drag STARTED -- back to the old
            target and then forward again to the one just chosen. */
         this._wasTemp[key] = {
-          at, from: Math.min(at, here), to: Math.max(at, here), lit: true,
+          at, from: 0, to: here, lit: true,
         };
         el.setAttribute("aria-valuenow", String(v));
         el.setAttribute("aria-valuetext", v.toFixed(decimals) + suffix);
