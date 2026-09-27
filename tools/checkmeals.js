@@ -1,16 +1,22 @@
 #!/usr/bin/env node
-/* The meal card: the week's plan, and the three things a slot can do.
+/* The meal card: the week's plan, what a slot does, and the week bar.
  *
  *   - the slots are the days and meals asked for, not the entries: an
  *     unplanned day is drawn, greyed, rather than left out
  *   - the days are LOCAL days from today, which is the one date bug this
  *     card can have that nobody would see until it planned the wrong night
- *   - a slot opens and shuts its tray, and only one is open at a time
- *   - Clear asks, sends the id as a string, and rereads the plan
- *   - the mic hands the words, the day and the meal to the script, says
- *     back what was planned, and rereads the plan
+ *   - a planned slot opens and shuts its tray, and only one is open at a
+ *     time; an empty slot opens its Plan sheet instead of a tray
+ *   - Clear does not ask, sends the id as a string, and rereads the plan
+ *   - the Plan sheet's Describe mic hands the words, the day and the meal
+ *     to the say script, says back what was planned, and rereads the plan
  *   - the ingredients go past the review sheet, and only what is kept is
  *     written, in order
+ *   - the week bar sits above the days: Plan (Suggest runs the week script
+ *     with the request) and a menu with Add the week to shopping list and
+ *     Recipe box; Move and Cancel leave it where it is
+ *   - the recipe sheet keeps Edit behind its menu; the box writes, dictates
+ *     and deletes recipes; the Recipes card's + adds by link or by typing
  *   - the plan is reread on a timer, because nothing it can watch moves
  *
  * The microphone itself is checkvoice's business. Here `_listen` is stubbed
@@ -174,6 +180,7 @@ const js = fs.readFileSync(file);
           plan: { mealie: "entry1", days: 7 },
           days: 7,
           say: { script: "script.meal_plan_say" },
+          place: { script: "script.meal_plan_set" },
           shop: { script: "script.meal_ingredients_to_items", list: "todo.phoenix" },
         }, extra || {}),
       })));
@@ -228,22 +235,31 @@ const js = fs.readFileSync(file);
       "tray under the wrong day");
     check("a recipe offers ingredients", Boolean(q("[data-meal-shop]")), "no shop button");
     check("and clear", Boolean(q("[data-meal-clear]")), "no clear button");
-    check("and the mic", Boolean(q("[data-meal-say]")), "no mic");
-    check("which offers something else", q("[data-meal-say]").getAttribute("aria-label") === "Say something else",
-      q("[data-meal-say]").getAttribute("aria-label"));
-
-    all(".mlslot")[1].click();
-    await settle();
-    check("only one tray at a time", all(".mltray").length === 1, all(".mltray").length);
-    check("an empty slot offers the mic", q("[data-meal-say]").getAttribute("aria-label") === "Say what's for dinner",
-      q("[data-meal-say]").getAttribute("aria-label"));
-    check("and nothing to clear or shop for", !q("[data-meal-clear]") && !q("[data-meal-shop]"),
-      "clear or shop on an empty slot");
+    check("and Change", Boolean(q(".mltile[data-meal-change]")), text(tray));
+    check("but no mic, typing or quick picks in the tray", !q("[data-meal-say]") && !q("[data-meal-typed]")
+      && !q("[data-meal-quick]") && !q("[data-meal-pick]"), text(tray));
 
     all(".mlslot")[2].click();
     await settle();
+    check("only one tray at a time", all(".mltray").length === 1, all(".mltray").length);
     check("a note has nothing to shop for", !q("[data-meal-shop]") && Boolean(q("[data-meal-clear]")),
       "shop on a note, or no clear");
+
+    all(".mlslot")[1].click();
+    await settle();
+    const emptySheet = root().querySelector(".confirmwrap");
+    check("an empty slot opens its Plan sheet, not a tray", !q(".mltray") && emptySheet
+      && /^Plan .*dinner/.test(text(emptySheet.querySelector(".confirmhead"))),
+      emptySheet ? text(emptySheet.querySelector(".confirmhead")) : text(q(".mltray")));
+    check("which, with only a say script, is Describe", emptySheet && emptySheet.querySelector("[data-said]")
+      && emptySheet.querySelector("[data-said-mic]"), emptySheet && text(emptySheet));
+    emptySheet.querySelector("[data-no]").click();
+    await settle();
+    check("Cancel plans nothing", !root().querySelector(".confirmwrap")
+      && !asked.some((m) => m.service === "meal_plan_say"), JSON.stringify(asked.map((m) => m.service)));
+
+    all(".mlslot")[2].click();
+    await settle();
 
     all(".mlslot")[2].click();
     await settle();
@@ -264,12 +280,12 @@ const js = fs.readFileSync(file);
       del && JSON.stringify(del.data));
     check("and rereads the plan", fetches() > before, `${fetches()} vs ${before}`);
 
-    /* ---- say ---- */
+    /* ---- say: the Plan sheet's Describe mic ---- */
     el._listen = () => Promise.resolve("lasagne please");
     all(".mlslot")[1].click();
     await settle();
     before = fetches();
-    q("[data-meal-say]").click();
+    root().querySelector(".confirmwrap [data-said-mic]").click();
     await settle();
     const said = asked.find((m) => m.service === "meal_plan_say");
     check("the mic calls the plan script", Boolean(said), JSON.stringify(asked.map((m) => m.service)));
@@ -278,17 +294,25 @@ const js = fs.readFileSync(file);
         && said.service_data.date === day(1) && said.service_data.entry_type === "dinner",
       said && JSON.stringify(said.service_data));
     check("and wants the answer back", said && said.return_response === true, said && said.return_response);
-    check("says back what was planned", text(q(".mltray .mlsaid")) === "Lasagne planned",
-      text(q(".mltray .mlsaid")));
+    check("the sheet shuts and says back what was planned", !root().querySelector(".confirmwrap")
+      && text(q(".mlfoot .tdvoicesay")) === "Lasagne planned", text(q(".mlfoot")));
+    check("with Undo", Boolean(q(".mltoast.undo [data-undo]")), "no undo");
     check("and rereads the plan", fetches() > before, `${fetches()} vs ${before}`);
-    check("the mic writes nothing itself", !calls.some((c) => c.service === "mealie.set_mealplan"),
-      JSON.stringify(calls));
+    check("the mic writes nothing itself", !calls.some((c) => c.service === "mealie.set_mealplan")
+      && !asked.some((m) => m.service === "meal_plan_set"), JSON.stringify(calls));
+    el._voiceSay("idle", "");
 
     el._listen = () => Promise.resolve("");
-    q("[data-meal-say]").click();
+    const saysBefore = asked.filter((m) => m.service === "meal_plan_say").length;
+    all(".mlslot")[1].click();
     await settle();
-    check("silence plans nothing", text(q(".mltray .mlsaid")) === "Nothing was heard.",
-      text(q(".mltray .mlsaid")));
+    root().querySelector(".confirmwrap [data-said-mic]").click();
+    await settle();
+    check("silence plans nothing, and the sheet stays",
+      asked.filter((m) => m.service === "meal_plan_say").length === saysBefore && Boolean(root().querySelector(".confirmwrap [data-said]")),
+      JSON.stringify(asked.map((m) => m.service)));
+    root().querySelector(".confirmwrap [data-no]").click();
+    await settle();
     el._voiceSay("idle", "");
 
     /* ---- shop ---- */
@@ -341,9 +365,32 @@ const js = fs.readFileSync(file);
     el._signature = null;
     el._update();
     await settle();
-    check("the week's own controls sit under the days",
-      Boolean(q(".mlfoot [data-meal-week]")) && Boolean(q(".mlfoot [data-meal-shopweek]")),
+    check("the week bar sits above the days, with Plan and a menu",
+      Boolean(q(".mlfoot [data-meal-plan]")) && Boolean(q(".mlfoot [data-meal-menu]"))
+      && Boolean(q(".mlfoot").compareDocumentPosition(q(".mlday")) & Node.DOCUMENT_POSITION_FOLLOWING),
       q(".mlfoot") && text(q(".mlfoot")));
+    check("the old week buttons are gone", !q("[data-meal-week]") && !q("[data-meal-words]") && !q(".mlacts"),
+      text(q(".mlfoot")));
+    check("the menu is shut until asked", !q(".mlmenu") && q("[data-meal-menu]").getAttribute("aria-expanded") === "false",
+      text(q(".mlfoot")));
+    q("[data-meal-menu]").click();
+    await settle();
+    check("the menu opens with the week's other things", Boolean(q(".mlmenu [data-meal-shopweek]"))
+      && q("[data-meal-menu]").getAttribute("aria-expanded") === "true", text(q(".mlmenu")));
+    q("[data-meal-menushut]").click();
+    await settle();
+    check("and a press outside it shuts it", !q(".mlmenu"), text(q(".mlfoot")));
+    q("[data-meal-menu]").click();
+    await settle();
+    q("[data-meal-menu]").click();
+    await settle();
+    check("as does its own button again", !q(".mlmenu"), text(q(".mlfoot")));
+    const fromMenu = async (sel) => {
+      q("[data-meal-menu]").click();
+      await settle();
+      q(`.mlmenu ${sel}`).click();
+      await settle();
+    };
 
     all(".mlslot")[0].click();
     await settle();
@@ -370,21 +417,7 @@ const js = fs.readFileSync(file);
     await settle();
     check("Close shuts it", !root().querySelector(".confirmwrap"), "still open");
 
-    all(".mlslot")[1].click();
-    await settle();
-    check("an empty slot offers Surprise me, and no Move", text(q("[data-meal-pick]")) === "Surprise me"
-      && !q("[data-meal-move]") && !q("[data-meal-recipe]"), text(q(".mltray")));
-    let before2 = fetches();
-    q("[data-meal-pick]").click();
-    await settle();
-    const picked = asked.filter((m) => m.service === "meal_plan_pick").pop();
-    check("Pick one asks the script for that day and meal",
-      picked && picked.service_data.date === day(1) && picked.service_data.entry_type === "dinner",
-      picked && JSON.stringify(picked.service_data));
-    check("says what it picked", text(q(".mltray .mlsaid")) === "Sea bass with ginger planned",
-      text(q(".mltray .mlsaid")));
-    check("and rereads the plan", fetches() > before2, `${fetches()} vs ${before2}`);
-    el._voiceSay("idle", "");
+    let before2;
 
     /* Move: the Takeaway on day 2, onto day 5. */
     all(".mlslot")[2].click();
@@ -395,11 +428,11 @@ const js = fs.readFileSync(file);
       && text(q(".mlmoving")).includes("Tap the day to move Takeaway to"), text(q(".mlmoving")));
     check("the meal being moved is marked", all(".mlslot")[2].classList.contains("moving"),
       all(".mlslot")[2].className);
-    check("the week's buttons stay where they are, held, while it waits",
-      q(".mlfoot.held [data-meal-week]") && getComputedStyle(q(".mlfoot")).pointerEvents === "none", "gone or live");
+    check("the week bar stays where it is while it waits", Boolean(q(".mlfoot [data-meal-plan]")),
+      text(q(".mlfoot")));
     q("[data-meal-cancel]").click();
     await settle();
-    check("Cancel puts everything back", !q(".mlslot.moving") && Boolean(q("[data-meal-week]")) && !q(".mlfoot.held"),
+    check("Cancel puts everything back", !q(".mlslot.moving") && !q(".mlmoving") && Boolean(q(".mlfoot [data-meal-plan]")),
       text(q(".mlfoot")));
 
     all(".mlslot")[2].click();
@@ -432,10 +465,16 @@ const js = fs.readFileSync(file);
       asked.filter((m) => m.service === "meal_plan_move").length === moves && !q(".mlslot.moving"),
       "a move was sent");
 
-    q("[data-meal-week]").click();
+    q(".mlfoot [data-meal-plan]").click();
     await settle();
     const chooser = root().querySelector(".confirmwrap");
-    check("Fill asks first, even for one kind of meal", chooser && chooser.querySelector("[data-request]")
+    const planOn = chooser && chooser.querySelector(".plantabs [data-plantab].on");
+    check("Plan opens on Suggest for the week", planOn && planOn.getAttribute("data-plantab") === "suggest"
+      && /^Plan this week/.test(text(chooser.querySelector(".confirmhead"))),
+      chooser && text(chooser.querySelector(".confirmhead")) + " / " + (planOn && planOn.getAttribute("data-plantab")));
+    check("Suggest asks first, even for one kind of meal, with no source to pick",
+      chooser && chooser.querySelector("[data-request]") && !chooser.querySelector("[data-src]")
+      && text(chooser.querySelector("[data-yes]")) === "Suggest meals"
       && !asked.some((m) => m.service === "meal_plan_week"), chooser && text(chooser));
     chooser.querySelector("[data-request]").value = "something light";
     chooser.querySelector('[data-hint="No fish"]').click();
@@ -444,7 +483,7 @@ const js = fs.readFileSync(file);
     chooser.querySelector("[data-yes]").click();
     await settle();
     const wk = asked.filter((m) => m.service === "meal_plan_week").pop();
-    check("Fill empty days asks for the card's days and meal",
+    check("Suggest meals asks for the card's days and meal",
       wk && wk.service_data.days === 7 && wk.service_data.entry_type === "dinner"
       && wk.service_data.start_date === day(0),
       wk && JSON.stringify(wk.service_data));
@@ -455,10 +494,9 @@ const js = fs.readFileSync(file);
     el._voiceSay("idle", "");
 
     const addsBefore = calls.filter((c) => c.service === "todo.add_item").length;
-    q("[data-meal-shopweek]").click();
-    await settle();
+    await fromMenu("[data-meal-shopweek]");
     const sw = asked.filter((m) => m.service === "meal_week_to_items").pop();
-    check("Shop for the week asks for the week's items for the list",
+    check("Add the week to shopping list asks for the week's items for the list",
       sw && sw.service_data.days === 7 && sw.service_data.list === "todo.phoenix",
       sw && JSON.stringify(sw.service_data));
     const sheet2 = root().querySelector(".confirmwrap");
@@ -483,9 +521,14 @@ const js = fs.readFileSync(file);
     await settle();
     const top = () => root().querySelector(".confirmwrap:last-of-type");
     const sheets = () => root().querySelectorAll(".confirmwrap").length;
+    const fromMenu2 = async (sel) => {
+      q("[data-meal-menu]").click();
+      await settle();
+      q(`.mlmenu ${sel}`).click();
+      await settle();
+    };
 
-    q("[data-meal-box]").click();
-    await settle();
+    await fromMenu2("[data-meal-box]");
     const names = Array.from(top().querySelectorAll(".mlbox button")).map((b) => text(b));
     check("Recipes lists the whole box, by name",
       names.length === 2 && names[0].startsWith("Sea bass") && names[1].startsWith("Spaghetti"),
@@ -507,6 +550,13 @@ const js = fs.readFileSync(file);
       && text(top()).includes("Season the fish."), sheets());
     el._voiceSay("idle", "");
 
+    check("the recipe's footer is Close and Cook, with Edit behind its menu",
+      Boolean(top().querySelector(".confirmbtns [data-no]")) && Boolean(top().querySelector(".confirmbtns [data-cook]"))
+      && top().querySelector(".mlrecmore .mlmenu").hidden, text(top().querySelector(".confirmbtns")));
+    top().querySelector("[data-more]").click();
+    await settle();
+    check("which opens on a press", !top().querySelector(".mlrecmore .mlmenu").hidden
+      && Boolean(top().querySelector(".mlrecmore [data-edit]")), text(top().querySelector(".mlrecmore")));
     top().querySelector("[data-edit]").click();
     await settle();
     const f = (name) => top().querySelector(`[data-f="${name}"]`);
@@ -535,8 +585,7 @@ const js = fs.readFileSync(file);
       `${sheets()} ${el._editing} ${text(q(".mlfoot"))}`);
     el._voiceSay("idle", "");
 
-    q("[data-meal-box]").click();
-    await settle();
+    await fromMenu2("[data-meal-box]");
     top().querySelector("[data-new]").click();
     await settle();
     check("New recipe is an empty form", f("name").value === "" && f("ingredients").value === "",
@@ -569,9 +618,10 @@ const js = fs.readFileSync(file);
       && created.service_data.name === "Nana's curry", created && JSON.stringify(created.service_data));
     el._voiceSay("idle", "");
 
-    q("[data-meal-box]").click();
-    await settle();
+    await fromMenu2("[data-meal-box]");
     top().querySelector('[data-recipe-open="0"]').click();
+    await settle();
+    top().querySelector("[data-more]").click();
     await settle();
     top().querySelector("[data-edit]").click();
     await settle();
@@ -593,6 +643,7 @@ const js = fs.readFileSync(file);
     const rq = (sel) => rroot().querySelector(sel);
     const rall = (sel) => Array.from(rroot().querySelectorAll(sel));
     const rtop = () => rroot().querySelector(".confirmwrap:last-of-type");
+    try { localStorage.removeItem("spectra-recipe-add"); } catch (x) { /* none kept */ }
     rc.setConfig({
       type: "custom:spectra-card", accent: 6, icon: "mdi:book-open-variant", title: "Recipes",
       body: {
@@ -636,15 +687,29 @@ const js = fs.readFileSync(file);
     rtop().querySelector("[data-no]").click();
     await settle();
 
-    rq("[data-recipe-new]").click();
+    check("the search row ends in one + button", Boolean(rq(".rchead [data-recipe-add]"))
+      && !rq("[data-recipe-new]") && !rq("[data-recipe-link]") && !rq("[data-recipe-photo]"),
+      rall(".rchead button").map((b) => b.getAttribute("aria-label")).join("|"));
+    rq("[data-recipe-add]").click();
     await settle();
-    check("New opens an empty form", text(rtop()).includes("New recipe")
-      && rtop().querySelector("[data-f=name]").value === "", text(rtop()));
+    const addTabs = rall(".confirmwrap .plantabs [data-plantab]").map((b) => b.getAttribute("data-plantab"));
+    check("+ opens Add a recipe, with Link, Photo and Type", addTabs.join("|") === "link|photo|type"
+      || (addTabs.includes("link") && addTabs.includes("type")), addTabs.join("|"));
+    rtop().querySelector("[data-plantab=type]").click();
+    await settle();
+    check("Type is an empty form", rroot().querySelectorAll(".confirmwrap").length === 1
+      && text(rtop()).includes("New recipe") && rtop().querySelector("[data-f=name]").value === "", text(rtop()));
     rtop().querySelector("[data-no]").click();
     await settle();
-
-    rq("[data-recipe-link]").click();
+    rq("[data-recipe-add]").click();
     await settle();
+    const lastTab = rtop().querySelector(".plantabs [data-plantab].on");
+    check("and + opens on the tab used last", lastTab && lastTab.getAttribute("data-plantab") === "type",
+      lastTab && lastTab.getAttribute("data-plantab"));
+    rtop().querySelector("[data-plantab=link]").click();
+    await settle();
+    check("Link asks for the address", Boolean(rtop().querySelector("[data-f=url]"))
+      && text(rtop().querySelector("[data-yes]")) === "Add recipe", text(rtop()));
     rtop().querySelector("[data-f=url]").value = "not a link";
     rtop().querySelector("[data-yes]").click();
     await settle();
@@ -695,5 +760,5 @@ const js = fs.readFileSync(file);
     console.log(`FAILED (${fails.length})`);
     process.exit(1);
   }
-  console.log("OK (meals: a week of slots, and nothing on the list without a yes)");
+  console.log("OK (meals: a week of slots, the week bar and Plan sheet, and nothing on the list without a yes)");
 })();

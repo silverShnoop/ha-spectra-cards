@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 /* Planning with the card rather than at it.
  *
- *   - Fill empty suggests and a person chooses: nothing is written until
- *     "Plan these", then only ticked rows, only into empty slots
+ *   - Plan, on its Suggest tab, suggests and a person chooses: nothing is
+ *     written until "Plan these", then only ticked rows, only into empty
+ *     slots
  *   - "Another" asks again for one row, avoiding what is already listed
+ *   - Plan's Choose tab for the week ticks recipes in the box and places
+ *     them into empty dinners through the same suggestions sheet
  *   - a meal that is only a name becomes a recipe: AI drafts it, the form
  *     opens for checking, and the saved recipe goes into the slot
- *   - an empty slot takes a recipe chosen from the box
- *   - "Plan it" on a recipe puts it on a day and a meal
- *   - a photo is shrunk before it is sent, and a cookbook page opens the
- *     form while a fridge opens the suggestions
+ *   - an empty slot opens the Plan sheet on Choose: a recipe from the box,
+ *     or a quick note (Leftover ..., Takeaway ...); a planned one's Change
+ *     can keep what is there and add the choice beside it
+ *   - "Plan" on a recipe puts it on a day and a meal; Edit is under its ⋮
+ *   - a photo is shrunk before it is sent; the Recipes card's + opens
+ *     "Add a recipe", whose photo tab reads a cookbook page into the form;
+ *     Plan's "Use what's in the fridge" opens the fridge sheet
  *
  *   node tools/checkmealplan.js [path/to/spectra-cards.js]
  */
@@ -134,9 +140,12 @@ const js = fs.readFileSync(file);
     const text = (n) => (n ? n.textContent.replace(/\s+/g, " ").trim() : "");
     const calls = (svc) => asked.filter((m) => m.service === svc);
 
-    /* ---- Fill: suggest, choose, then write ---- */
-    q("[data-meal-week]").click();
+    /* ---- Plan, Suggest: suggest, choose, then write ---- */
+    q("[data-meal-plan]").click();
     await settle();
+    check("Plan opens on Suggest", top() && top().querySelector('[data-plantab="suggest"].on')
+      && text(top().querySelector("[data-yes]")) === "Suggest meals",
+      top() && text(top()));
     top().querySelector('[data-type="lunch"]').click();
     top().querySelector("[data-yes]").click();
     await settle();
@@ -179,6 +188,33 @@ const js = fs.readFileSync(file);
     el._voiceSay("idle", "");
     await settle();
 
+    /* ---- Plan, Choose: tick recipes for the week ---- */
+    q("[data-meal-plan]").click();
+    await settle();
+    top().querySelector('[data-plantab="choose"]').click();
+    await settle();
+    const sev = () => top().querySelector("[data-several]");
+    check("Choose for the week opens the box ticking", top().querySelector(".confirmbox.ticking")
+      && top().querySelector('[data-plantab="choose"].on') && text(sev()) === "Tick some" && sev().disabled,
+      top() && text(sev()));
+    top().querySelector('[data-recipe-open="1"]').click();
+    await settle();
+    check("a tick counts", text(sev()) === "Plan 1" && !sev().disabled, text(sev()));
+    const setsBefore = calls("meal_plan_set").length;
+    sev().click();
+    await settle();
+    check("and goes to the suggestions sheet, into the first empty dinner",
+      text(top().querySelector(".mlprow .mlpname")) === "Sea bass with ginger"
+      && calls("meal_plan_set").length === setsBefore, top() && text(top()));
+    top().querySelector("[data-yes]").click();
+    await settle();
+    const sevSet = calls("meal_plan_set").pop();
+    check("then written there", calls("meal_plan_set").length === setsBefore + 1 && sevSet.service_data.recipe_id === "r1"
+      && sevSet.service_data.date === day(1) && sevSet.service_data.entry_type === "dinner",
+      JSON.stringify(sevSet.service_data));
+    el._voiceSay("idle", "");
+    await settle();
+
     /* ---- Make it a recipe ---- */
     q(`[data-meal="${day(0)}|dinner"]`).click();
     await settle();
@@ -209,16 +245,52 @@ const js = fs.readFileSync(file);
     /* ---- Choose a recipe for an empty slot ---- */
     q(`[data-meal="${day(1)}|lunch"]`).click();
     await settle();
-    q(".mldetail [data-meal-choose]").click();
-    await settle();
-    check("the box opens to choose from", text(top().querySelector(".confirmhead")) === "Tomorrow's lunch: choose a recipe"
-      && !top().querySelector("[data-new]"), text(top().querySelector(".confirmhead")));
+    check("an empty slot opens Plan on Choose, the box", text(top().querySelector(".confirmhead")) === "Plan tomorrow's lunch"
+      && top().querySelector('[data-plantab="choose"].on') && !top().querySelector("[data-new]") && !q(".mldetail"),
+      text(top().querySelector(".confirmhead")));
+    const quick = Array.from(top().querySelectorAll("[data-quick]")).map((b) => b.getAttribute("data-quick"));
+    check("with quick notes, yesterday's dinner first",
+      quick.join("|") === "Leftover fish pie|Takeaway|Eating out|From the freezer", quick.join("|"));
+    check("and no Keep, the slot being empty", !top().querySelector("[data-keep]"), "a keep");
     top().querySelector('[data-recipe-open="1"]').click();
     await settle();
     const chose = calls("meal_plan_set").pop();
     check("a name goes straight into the slot", chose.service_data.recipe_id === "r1"
-      && chose.service_data.date === day(1) && chose.service_data.entry_type === "lunch",
+      && chose.service_data.date === day(1) && chose.service_data.entry_type === "lunch" && !chose.service_data.add,
       JSON.stringify(chose.service_data));
+    check("with Undo", Boolean(root.querySelector(".mltoast [data-undo]")), "no undo");
+    el._voiceSay("idle", "");
+    el._mealPick = null;
+    await settle();
+    q(`[data-meal="${day(1)}|lunch"]`).click();
+    await settle();
+    top().querySelector('[data-quick="Takeaway"]').click();
+    await settle();
+    const note = calls("meal_plan_set").pop();
+    check("a quick note goes in as a title", note.service_data.title === "Takeaway" && !note.service_data.recipe_id
+      && note.service_data.date === day(1) && note.service_data.entry_type === "lunch",
+      JSON.stringify(note.service_data));
+    el._voiceSay("idle", "");
+    el._mealPick = null;
+    await settle();
+
+    /* ---- Change, keeping what is there ---- */
+    q(`[data-meal="${day(0)}|dinner"]`).click();
+    await settle();
+    q(".mldetail [data-meal-change]").click();
+    await settle();
+    const keep = top().querySelector("[data-keep]");
+    check("Change opens Choose for the slot, offering to keep what is there",
+      text(top().querySelector(".confirmhead")) === "Plan today's dinner" && keep
+      && text(keep) === "Keep Fish pie too" && keep.getAttribute("aria-pressed") === "false"
+      && !top().querySelector("[data-quick]"), text(top()));
+    keep.click();
+    top().querySelector('[data-recipe-open="2"]').click();
+    await settle();
+    const added = calls("meal_plan_set").pop();
+    check("and a pick with Keep on is added beside it", added.service_data.recipe_id === "r2" && added.service_data.add === true
+      && added.service_data.date === day(0) && added.service_data.entry_type === "dinner",
+      JSON.stringify(added.service_data));
     el._voiceSay("idle", "");
     el._mealPick = null;
     await settle();
@@ -236,8 +308,16 @@ const js = fs.readFileSync(file);
     await settle();
     const rr = rc.shadowRoot || rc;
     const rtop = () => rr.querySelector(".confirmwrap:last-of-type");
+    check("the search row ends with one +", rr.querySelector(".rchead [data-recipe-add]")
+      && !rr.querySelector("[data-recipe-link], [data-recipe-photo], [data-recipe-new]"), "old buttons");
     rr.querySelector('[data-recipe-open="1"]').click();
     await settle();
+    const more = rtop().querySelector(".mlrecmore .mlmenu");
+    check("the recipe's footer is Close, Plan, and Edit under ⋮",
+      rtop().querySelector(".mlrecbtns [data-no]") && rtop().querySelector(".mlrecbtns [data-plan]")
+      && more && more.hidden && more.querySelector("[data-edit]"), rtop() && text(rtop().querySelector(".mlrecbtns")));
+    rtop().querySelector("[data-more]").click();
+    check("⋮ shows the menu", !more.hidden, "hidden");
     rtop().querySelector("[data-plan]").click();
     await settle();
     check("Plan it offers the meals and the coming week",
@@ -279,7 +359,17 @@ const js = fs.readFileSync(file);
       `${url.slice(0, 20)} ${img.width}x${img.height}`);
 
     rc._mealPhoto = () => Promise.resolve({ media_content_id: "media-source://x/cookbook.jpg", media_content_type: "image/jpeg" });
-    rr.querySelector("[data-recipe-photo]").click();
+    rr.querySelector("[data-recipe-add]").click();
+    await settle();
+    check("+ opens Add a recipe, a tab for each way in",
+      text(rtop().querySelector(".confirmhead")) === "Add a recipe"
+      && Array.from(rtop().querySelectorAll("[data-plantab]")).map((b) => b.getAttribute("data-plantab")).join(",") === "photo,type",
+      rtop() && text(rtop()));
+    if (!rtop().querySelector('[data-plantab="photo"].on')) {
+      rtop().querySelector('[data-plantab="photo"]').click();
+      await settle();
+    }
+    rtop().querySelector("[data-take]").click();
     await settle();
     const read = calls("meal_recipe_from_photo").pop();
     check("a cookbook photo is read", read && read.service_data.photo === "media-source://x/cookbook.jpg",
@@ -289,12 +379,20 @@ const js = fs.readFileSync(file);
     rtop().querySelector("[data-no]").click();
     await settle();
 
-    /* The fridge opens its own sheet now (photos, meals, days); the
-       photos and the suggestions are checked in checksmart.js. */
-    q("[data-meal-fridge]").click();
+    /* The fridge is a row on Plan's Suggest tab, and opens its own sheet
+       (photos, meals, days); the photos and the suggestions are checked in
+       checksmart.js. */
+    q("[data-meal-plan]").click();
+    await settle();
+    if (!top().querySelector('[data-plantab="suggest"].on')) {
+      top().querySelector('[data-plantab="suggest"]').click();
+      await settle();
+    }
+    top().querySelector("[data-fridge]").click();
     await settle();
     check("the fridge opens a sheet for up to four photos", top() && top().querySelectorAll("[data-shot]").length === 4,
       top() && text(top()));
+    check("still under the Plan tabs", top() && top().querySelector(".plantabs [data-plantab]"), "no tabs");
     top().querySelector("[data-no]").click();
     await settle();
     return problems;
