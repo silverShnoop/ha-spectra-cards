@@ -245,8 +245,9 @@ const js = fs.readFileSync(file);
     /* ---- Choose a recipe for an empty slot ---- */
     q(`[data-meal="${day(1)}|lunch"]`).click();
     await settle();
-    check("an empty slot opens Plan on Choose, the box", text(top().querySelector(".confirmhead")) === "Plan tomorrow's lunch"
-      && top().querySelector('[data-plantab="choose"].on') && !top().querySelector("[data-new]") && !q(".mldetail"),
+    check("an empty slot opens Plan on Choose, the box (no tab strip: Choose is its only way here)", text(top().querySelector(".confirmhead")) === "Plan tomorrow's lunch"
+      && !top().querySelector("[data-plantab]") && top().querySelector("[data-recipe-open]")
+      && !top().querySelector("[data-new]") && !q(".mldetail"),
       text(top().querySelector(".confirmhead")));
     const quick = Array.from(top().querySelectorAll("[data-quick]")).map((b) => b.getAttribute("data-quick"));
     check("with quick notes, yesterday's dinner first",
@@ -285,7 +286,8 @@ const js = fs.readFileSync(file);
       && text(keep) === "Keep Fish pie too" && keep.getAttribute("aria-pressed") === "false"
       && !top().querySelector("[data-quick]"), text(top()));
     keep.click();
-    top().querySelector('[data-recipe-open="2"]').click();
+    /* The box is in name order: 0 is Mushroom risotto (r2). */
+    top().querySelector('[data-recipe-open="0"]').click();
     await settle();
     const added = calls("meal_plan_set").pop();
     check("and a pick with Keep on is added beside it", added.service_data.recipe_id === "r2" && added.service_data.add === true

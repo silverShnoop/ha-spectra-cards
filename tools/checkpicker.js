@@ -281,6 +281,9 @@ const js = fs.readFileSync(file);
     try { keptTab = localStorage.getItem("spectra-recipe-add"); } catch (e) { keptTab = "type"; }
     check("Type it is the new-recipe form, in the same sheet", R.querySelectorAll(".confirmwrap").length === 1
       && Boolean(R.querySelector(".confirmwrap [data-f='name']")) && keptTab === "type", `${R.querySelectorAll(".confirmwrap").length} ${keptTab}`);
+    R.querySelector(".confirmwrap [data-no]").click();
+    await settle();
+    check("and Cancel shuts it", !R.querySelector(".confirmwrap"), "still open");
 
     /* ---- the heart, and tags in the form ---- */
     rowOf("risotto").querySelector("[data-recipe-open]").click();

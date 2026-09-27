@@ -447,11 +447,14 @@ const js = fs.readFileSync(file);
       moved && moved.service_data.from_date === day(2) && moved.service_data.to_date === day(5)
         && moved.service_data.entry_type === "dinner",
       moved && JSON.stringify(moved.service_data));
-    check("says so on the day it went to", text(q(".mltray .mlsaid")) === "Takeaway moved",
-      text(q(".mltray .mlsaid")));
+    check("says so", text(q(".mlfoot .tdvoicesay")) === "Takeaway moved" && !root().querySelector(".confirmwrap"),
+      text(q(".mlfoot")));
+    check("with Undo", Boolean(q(".mltoast.undo [data-undo]")), "no undo");
     check("and rereads the plan", fetches() > before2, `${fetches()} vs ${before2}`);
+    /* The mock's plan never changes, so the day it went to is still empty
+       here, and tapping it would open its Plan sheet: shut it directly. */
+    el._mealPick = null;
     el._voiceSay("idle", "");
-    all(".mlslot")[5].click();
     await settle();
 
     all(".mlslot")[2].click();
