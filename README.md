@@ -1845,11 +1845,14 @@ shows prep, and without it, it shows none.
   prep comes first with what that costs, and **Skip the prep**.
 - **Shop for the week** says the shopping is needed by the first sitting.
 - **Home Tasks** shows a due time on an item that has one, and only then.
+- **Times** in the week's prep sheet edits when meals are eaten and when the
+  house preps (days and a time for each), kept by home_signals.
 
 The job itself -- prep due today, or late with the meal still ahead -- is
-a `Needs you` row raised by home_signals, and colours the Kitchen card
-and its rail button through `outline` and `accent`; the card draws no
-level of its own.
+a `Needs you` row raised by home_signals. It belongs to the Kitchen, so the
+meals card's `outline` reads `sensor.needs_you` `card_meals` and the rail
+button's `accent` and `fill` read `tab_kitchen`, as every other tab does;
+the card draws no level of its own.
 
 With `import.split`, **From a link** waits for the split after saving and
 shows it once: **Looks right**, **Keep in order** (the method as it came)

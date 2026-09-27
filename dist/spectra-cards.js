@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.125.0";
+const VERSION = "0.126.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2105,6 +2105,18 @@ button.mlhead { text-align:center; }
 .ppbanner b { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--accent-on); }
 .ppbanner .mdi { width:16px; height:16px; vertical-align:-3px; }
 .confirmbox.ppweek { max-width:900px; }
+.pptimes { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+.pptimes label { display:grid; gap:4px; font-size:12px; color:var(--sp-ink-2); }
+.pptimes input, .pprules input { font:inherit; font-size:14px; min-height:40px; padding:4px 8px; border-radius:8px;
+  border:1px solid var(--sp-edge); background:var(--sp-surface); color:var(--sp-ink); box-sizing:border-box; min-width:0; }
+.mlrecipe .pprules { list-style:none; margin:0 0 8px; padding:0; display:grid; gap:10px; }
+.pprules li { display:grid; grid-template-columns:minmax(0,1fr) 128px 40px; gap:8px; align-items:center;
+  border:1px solid var(--sp-edge); border-radius:10px; padding:10px; }
+.pprules .ppdays { grid-column:1 / -1; display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:4px; }
+.ppdays button { font:inherit; font-size:12px; font-weight:600; min-height:34px; border-radius:8px; border:1px solid var(--sp-edge);
+  background:var(--sp-surface); color:var(--sp-ink-2); cursor:pointer; padding:0; }
+.ppdays button[aria-pressed="true"] { background:var(--accent-soft); border-color:var(--accent); color:var(--accent-on); }
+
 .tddue { display:block; font-size:12px; color:var(--sp-ink-2); margin-top:2px; }
 .tddue.soon { color:var(--sp-ink); font-weight:600; }
 /* On a narrow card the week's buttons shed their words and share one row
@@ -3103,6 +3115,7 @@ const WEATHER_ICONS = {
    an empty cell, reads as a card that has not loaded. Inline, they are there
    with the first paint. */
 const MDI_INLINE = {
+  "mdi:clock-outline": "M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z",
   "mdi:knife": "M20.62,2C23.97,7.61 12.47,20.15 12.47,20.15L9.6,17.28L4.91,22L2.77,19.86L20.62,2Z",
   "mdi:calendar-clock": "M15,13H16.5V15.82L18.94,17.23L18.19,18.53L15,16.69V13M19,8H5V19H9.67C9.24,18.09 9,17.07 9,16A7,7 0 0,1 16,9C17.07,9 18.09,9.24 19,9.67V8M5,21C3.89,21 3,20.1 3,19V5C3,3.89 3.89,3 5,3H6V1H8V3H16V1H18V3H19A2,2 0 0,1 21,5V11.1C22.24,12.36 23,14.09 23,16A7,7 0 0,1 16,23C14.09,23 12.36,22.24 11.1,21H5M16,11.15A4.85,4.85 0 0,0 11.15,16C11.15,18.68 13.32,20.85 16,20.85A4.85,4.85 0 0,0 20.85,16C20.85,13.32 18.68,11.15 16,11.15Z",
   "mdi:check-circle": "M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z",
@@ -14275,8 +14288,8 @@ class SpectraCard extends HTMLElement {
         /* Cooking knows whether the prep was done: ticked, it starts at
            the first cook step and says what is ready; not, the prep comes
            first and says what that costs. */
-        + (flag === "ok" && i === ahead ? `<div class="ppbanner ok"><b>Prepped</b><span>${iconMarkup("mdi:check-circle")} `
-          + `${esc(steps.slice(0, ahead).map(prepShort).join(" \u00b7 "))}</span></div>` : "")
+        + (flag === "ok" && i === Math.min(ahead, steps.length - 1) ? `<div class="ppbanner ok"><b>Prepped</b><span>${iconMarkup("mdi:check-circle")} `
+          + `${esc(ahead >= steps.length ? "All of it was done ahead." : steps.slice(0, ahead).map(prepShort).join(" \u00b7 "))}</span></div>` : "")
         + (flag === "no" && i === 0 ? `<div class="ppbanner no"><b>Not prepped</b><span>${iconMarkup("mdi:alert-circle-outline")} `
           + `The prep comes first${prepMinutes(split && split.steps) ? `: it adds about ${prepMinutes(split.steps)} minutes` : ""}`
           + `${split && split.steps.some((x) => Number(x.ahead_min) > 0) ? ", and anything that needs time to sit gets less of it" : ""}.</span></div>` : "")
@@ -14372,7 +14385,8 @@ class SpectraCard extends HTMLElement {
           const s = !st ? null : (meal ? prepSessionOf(st.sessions, meal.day, meal.type, rid)
             : st.sessions.find((x) => x.items.some((i) => String(i.recipe_id) === rid && soon.includes(String(i.date)))));
           flag = s && s.done ? "ok" : "no";
-          cook(flag === "ok" ? ahead : 0, false);
+          /* A recipe that is all prep opens on its last step, saying so. */
+          cook(flag === "ok" ? Math.min(ahead, steps.length - 1) : 0, false);
         });
       }
       const pp = wrap.querySelector("[data-planprep]");
@@ -14754,6 +14768,78 @@ class SpectraCard extends HTMLElement {
     });
   }
 
+  /* When the house eats and when it preps: the times every prep window and
+     every offer is worked out from. Kept by home_signals, so the panel and
+     a phone agree. */
+  _prepTimes(accent, after) {
+    const st = prepState(this._hass);
+    if (!st) return;
+    const MEALS = [["breakfast", "Breakfast"], ["lunch", "Lunch"], ["dinner", "Dinner"]];
+    const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const meals = Object.assign({}, st.meals);
+    let rules = st.times.map((x) => ({ label: x.label || "", days: (x.days || []).map(Number), time: x.time || "19:30" }));
+    const sheet = this._prepSheet(accent, "mdi:clock-outline", "Meal and prep times");
+    const draw = (note) => {
+      const inner = `<p class="confirmtext">When meals are eaten, and when the house usually does its prep. Prep is only offered at these times, or any time you pick.</p>`
+        + `<h4>Meals</h4><div class="pptimes">${MEALS.map(([k, w]) => `<label>${esc(w)}`
+          + `<input type="time" data-pp-meal="${k}" value="${esc(meals[k] || "")}"></label>`).join("")}</div>`
+        /* Add sits above the list, so a row added never pushes it away. */
+        + `<div class="ppsec"><h4>Prep</h4><button type="button" class="mlbtn quiet" data-pp-add>${iconMarkup("mdi:plus")} Add a prep time</button></div>`
+        + `<ul class="pprules">${rules.map((x, i) => `<li>`
+          + `<input type="text" data-pp-label="${i}" value="${esc(x.label)}" placeholder="Name, e.g. Sunday afternoon" aria-label="Name">`
+          + `<input type="time" data-pp-time="${i}" value="${esc(x.time)}" aria-label="Time">`
+          + `<button type="button" class="mlbtn quiet" data-pp-drop="${i}" aria-label="Remove">${iconMarkup("mdi:close")}</button>`
+          + `<span class="ppdays" role="group" aria-label="Days">${DAYS.map((d, n) => `<button type="button" data-pp-day="${i}:${n}"`
+            + ` aria-pressed="${x.days.includes(n)}">${d}</button>`).join("")}</span></li>`).join("")}</ul>`
+        + `<p class="confirmtext quiet" data-status>${esc(note || "")}</p>`;
+      sheet.fill(inner, `<button type="button" class="confirmno" data-no>Cancel</button>`
+        + `<button type="button" class="confirmyes" data-pp-keep>Save</button>`);
+      const box = sheet.wrap.querySelector(".confirmbox");
+      box.classList.add("still");
+      const read = () => {
+        box.querySelectorAll("[data-pp-meal]").forEach((el) => { meals[el.getAttribute("data-pp-meal")] = el.value; });
+        box.querySelectorAll("[data-pp-label]").forEach((el) => { rules[Number(el.getAttribute("data-pp-label"))].label = el.value; });
+        box.querySelectorAll("[data-pp-time]").forEach((el) => { rules[Number(el.getAttribute("data-pp-time"))].time = el.value; });
+      };
+      box.querySelectorAll("[data-pp-day]").forEach((b) => b.addEventListener("click", () => {
+        const [i, n] = b.getAttribute("data-pp-day").split(":").map(Number);
+        const days = rules[i].days;
+        if (days.includes(n)) days.splice(days.indexOf(n), 1); else days.push(n);
+        days.sort();
+        b.setAttribute("aria-pressed", String(days.includes(n)));
+      }));
+      box.querySelectorAll("[data-pp-drop]").forEach((b) => b.addEventListener("click", () => {
+        read();
+        rules.splice(Number(b.getAttribute("data-pp-drop")), 1);
+        draw();
+      }));
+      box.querySelector("[data-pp-add]").addEventListener("click", () => {
+        read();
+        rules.unshift({ label: "", days: [], time: "19:30" });
+        draw();
+      });
+      box.querySelector("[data-pp-keep]").addEventListener("click", () => {
+        read();
+        const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
+        const keep = rules.filter((x) => x.days.length && hhmm.test(x.time));
+        if (MEALS.some(([k]) => !hhmm.test(meals[k] || ""))) { draw("Each meal needs a time."); return; }
+        if (!keep.length) { draw("Keep at least one prep time, with a day ticked."); return; }
+        const data = {
+          meal_times: Object.fromEntries(MEALS.map(([k]) => [k, meals[k]])),
+          prep_times: keep.map((x) => Object.assign({ days: x.days, time: x.time }, x.label.trim() ? { label: x.label.trim() } : {})),
+        };
+        box.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+        this._callAction({ service: "home_signals.prep_settings", data }).then(() => {
+          sheet.finish();
+          this._voiceSay("idle", "Prep times saved");
+          /* The sensor answers a moment later; the week waits for it. */
+          if (after) setTimeout(after, 600);
+        });
+      });
+    };
+    draw();
+  }
+
   /* The week's prep in as few sittings as the windows allow. Each part is
      an interval -- the earliest it keeps to the latest it still works --
      and the fewest times that touch them all is found the classic way:
@@ -14856,9 +14942,15 @@ class SpectraCard extends HTMLElement {
           + `</p><div class="ppgrid2">${sittings.map(box).join("")}${day ? box(0) : ""}</div>`
           + (nothing.length ? `<p class="ppnote">${esc(prepNames(nothing.map((m) => ({ name: mealName(m.e) }))))}: nothing to do ahead.</p>` : "")
           + (n ? `<p class="ppnote">The shopping for these is needed by ${esc(prepWhenIn(new Date(sittings[0]), true))}, not by each meal.</p>` : "");
-        sheet.fill(inner, `<button type="button" class="confirmno" data-no>Not now</button>`
+        sheet.fill(inner, `<button type="button" class="confirmno" data-pp-times>${iconMarkup("mdi:clock-outline")} Times</button>`
+          + `<button type="button" class="confirmno" data-no>Not now</button>`
           + `<button type="button" class="confirmyes" data-pp-save${n || earlier ? "" : " disabled"}>${esc(n ? (n === 1 ? "Save 1 task" : `Save ${n} tasks`) : "Save")}</button>`);
         sheet.wrap.querySelector(".confirmbox").classList.add("still");
+        /* The house's times, then the week again with them. */
+        sheet.wrap.querySelector("[data-pp-times]").addEventListener("click", () => {
+          sheet.finish();
+          this._prepTimes(accent, () => this._prepWeek(body, accent));
+        });
         sheet.wrap.querySelectorAll("[data-pp-row]").forEach((sel) => sel.addEventListener("change", () => {
           const r = rows[Number(sel.getAttribute("data-pp-row"))];
           const t = Number(sel.value) || 0;
@@ -15459,7 +15551,15 @@ class SpectraCard extends HTMLElement {
             return out;
           }),
         };
-      } else if (splitBefore) data.prep = { mode: "order" };
+      } else if (splitBefore) {
+        data.prep = { mode: "order" };
+        /* An unchecked split still knows the method as it came: In order
+           puts that back, cut steps and all, unless it was edited here. */
+        const was = Array.isArray(prepBefore.original) ? prepBefore.original : null;
+        if (was && was.length && prepBefore.checked === false && field("method").value === lines(r.instructions, "text")) {
+          data.method = was.join("\n");
+        }
+      }
       else if (prepBefore && prepBefore.checked === false) data.prep = { mode: prepBefore.mode === "none" ? "none" : "order", checked: true };
       if (name) data.name = name;
       const serves = Number(field("servings").value);
