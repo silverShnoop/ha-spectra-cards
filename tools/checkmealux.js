@@ -245,9 +245,12 @@ const js = fs.readFileSync(file);
     const tops = kids.map((k) => Math.round(k.getBoundingClientRect().top + k.getBoundingClientRect().height / 2));
     check("on a phone the week, Plan and the menu share one row", kids.length === 3
       && Math.max(...tops) - Math.min(...tops) <= 4, tops.join(","));
-    console.log("DEBUG " + Array.from(foot.querySelectorAll("*")).map((c) => [c.tagName + "." + c.className, Math.round(c.getBoundingClientRect().right)]).filter((x) => x[1] > 376).map((x) => x.join("@")).join(" "));
-    check("without spilling sideways", foot && foot.scrollWidth <= foot.clientWidth + 1,
-      foot && `${foot.scrollWidth} > ${foot.clientWidth}`);
+    /* Children's boxes, not scrollWidth: an icon's invisible hit area
+       (::after, inset -4px) reaches past the edge on purpose. */
+    const fr = foot.getBoundingClientRect();
+    const spill = Array.from(foot.children).filter((c) => c.getBoundingClientRect().width
+      && (c.getBoundingClientRect().left < fr.left - 0.5 || c.getBoundingClientRect().right > fr.right + 0.5));
+    check("without spilling sideways", !spill.length, spill.map((c) => c.className).join(","));
     check("the menu keeps its name for a screen reader",
       pr.querySelector("[data-meal-menu]").getAttribute("aria-label") === "More",
       pr.querySelector("[data-meal-menu]").getAttribute("aria-label"));
