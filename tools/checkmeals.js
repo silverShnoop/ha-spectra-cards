@@ -502,7 +502,7 @@ const js = fs.readFileSync(file);
     const placed = asked.filter((m) => m.service === "meal_plan_set").slice(setsBefore);
     check("a yes plans each of them through the place script", !root().querySelector(".confirmwrap")
       && placed.map((m) => m.service_data.title).join(",") === "A,B,C", JSON.stringify(placed.map((m) => m.service_data)));
-    check("and says how many it planned, above the week", /3/.test(text(q(".mlfoot .tdvoicesay"))),
+    check("and says how many it planned, above the week", text(q(".mlfoot .tdvoicesay")) === "3 meals planned",
       text(q(".mlfoot")));
     el._voiceSay("idle", "");
 

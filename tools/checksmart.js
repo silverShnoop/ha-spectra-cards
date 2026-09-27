@@ -143,7 +143,7 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-yes]").click();
     await settle();
     const fill = calls("meal_plan_week").pop();
-    check("Fill passes where the suggestions come from", fill && fill.service_data.mix === "new", fill && JSON.stringify(fill.service_data));
+    check("Suggest passes where the suggestions come from", fill && fill.service_data.mix === "new", fill && JSON.stringify(fill.service_data));
 
     /* ---- balance ---- */
     check("the sheet says how the week leans", text(q(".confirmwrap .mlbalance")) === "This week's dinners: Pasta 3 times.",
@@ -207,6 +207,7 @@ const js = fs.readFileSync(file);
       srcs.join(",") === "1:true,2:false" && !q(".confirmwrap [data-request]") && !q(".confirmwrap [data-mix]")
       && text(q(".confirmwrap [data-yes]")) === "Copy them", srcs.join(",") + " " + text(q(".confirmwrap [data-yes]")));
     const readsBefore = calls("get_mealplan").length;
+    const setsBefore = calls("meal_plan_set").length;
     q(".confirmwrap [data-yes]").click();
     await settle();
     const read = calls("get_mealplan").slice(readsBefore)[0];
@@ -214,7 +215,7 @@ const js = fs.readFileSync(file);
       read && JSON.stringify(read.service_data));
     const copied = all(".confirmwrap .mlprow .mlpname").map(text);
     check("and offers it a week on, on the suggestions sheet, writing nothing yet",
-      copied.join(",") === "Spaghetti bolognese,Lasagne" && calls("meal_plan_set").length === pointed.length,
+      copied.join(",") === "Spaghetti bolognese,Lasagne" && calls("meal_plan_set").length === setsBefore,
       copied.join(","));
     await shut();
 
@@ -295,5 +296,5 @@ const js = fs.readFileSync(file);
     console.log(`FAILED (${fails.length})`);
     process.exit(1);
   }
-  console.log("OK (smarter planning: where from, balance, written ideas, words and the fridge)");
+  console.log("OK (smarter planning: where from, balance, written ideas, words, copy, one slot said, and the fridge)");
 })();
