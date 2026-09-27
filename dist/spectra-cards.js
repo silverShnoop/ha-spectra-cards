@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.126.0";
+const VERSION = "0.126.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -14147,6 +14147,13 @@ class SpectraCard extends HTMLElement {
           status(`${firstOf(saved.recipe, "The recipe")} is in the box. Looking for what can be done ahead\u2026`);
           this._mealCall(spec.split, { recipe: String(saved.slug) }).then((split) => {
             if (done) return;
+            /* No answer from the model is not "nothing to prep": the
+               recipe is saved and simply not split yet. */
+            if (!split || split.mode === "error") {
+              status(`${firstOf(saved.recipe, "The recipe")} is in the box. What can be done ahead could not be worked out this time.`);
+              setTimeout(finish, 2500);
+              return;
+            }
             this._prepReview(wrap, saved, split, finish);
           }, (error) => {
             LOGGER_WARN("spectra-card: could not split the recipe", error);

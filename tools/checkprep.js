@@ -334,6 +334,30 @@ const js = fs.readFileSync(file);
     const dues = [...tasks.shadowRoot.querySelectorAll(".tddue")].map(text);
     check("a task with a deadline shows it, and only that one", dues.length === 1 && /^Due today 23:59$/.test(dues[0]), dues.join("|"));
 
+    /* ---- a split the model could not answer is not "no prep" ---- */
+    const imp = document.createElement("spectra-card");
+    document.getElementById("host").appendChild(imp);
+    imp.setConfig({ type: "custom:spectra-card", accent: 6, title: "Recipes", body: { type: "recipes",
+      box: { mealie: "e1", recipes: true }, import: { script: "script.meal_import_recipe", split: "script.meal_recipe_split" } } });
+    const oldWS = hass.callWS;
+    hass.callWS = (msg) => {
+      if (msg.service === "meal_import_recipe") return Promise.resolve({ response: { recipe: "Stew", slug: "stew" } });
+      if (msg.service === "meal_recipe_split") return Promise.resolve({ response: { mode: "error", skipped: true, prep: [], cook: [] } });
+      return oldWS(msg);
+    };
+    imp.hass = hass;
+    await settle();
+    imp._mealImport({ script: "script.meal_import_recipe", split: "script.meal_recipe_split" }, 6);
+    await settle();
+    const iw = imp.shadowRoot.querySelector(".confirmwrap");
+    iw.querySelector("[data-f=url]").value = "https://example.com/stew";
+    iw.querySelector("[data-yes]").click();
+    await settle();
+    check("a split the model could not answer offers nothing to confirm", !iw.querySelector("[data-pp-ok]")
+      && text(iw).includes("could not be worked out"), text(iw));
+    hass.callWS = oldWS;
+    imp.remove();
+
     /* ---- an import's split, checked once ---- */
     asked.length = 0;
     const w = document.createElement("div");
