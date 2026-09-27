@@ -13939,12 +13939,12 @@ class SpectraCard extends HTMLElement {
       span = { start_date: days[0], days: Math.round((Date.parse(`${days[days.length - 1]}T12:00:00`) - Date.parse(`${days[0]}T12:00:00`)) / 86400000) + 1 };
     }
     const tabs = one
-      ? [["suggest", "Suggest", "mdi:creation", ways.ideas], ["describe", "Describe", "mdi:text-box-edit-outline", ways.say && ways.sets],
-        ["choose", "Choose", "mdi:book-open-variant", ways.box]]
-      : [["suggest", "Suggest", "mdi:creation", ways.suggest && ways.sets], ["describe", "Describe", "mdi:text-box-edit-outline", ways.words],
-        ["choose", "Choose", "mdi:book-open-variant", ways.box], ["copy", "Copy", "mdi:content-copy", ways.sets && this._mealSources.size > 0]];
+      ? [["suggest", "Suggest", "mdi:creation", ways.ideas], ["describe", "Describe", "mdi:text-box-edit-outline", ways.say],
+        ["choose", "Choose", "mdi:book-open-variant", ways.box && this._mealSources.size > 0]]
+      : [["suggest", "Suggest", "mdi:creation", ways.suggest], ["describe", "Describe", "mdi:text-box-edit-outline", ways.words],
+        ["choose", "Choose", "mdi:book-open-variant", ways.box && this._mealSources.size > 0], ["copy", "Copy", "mdi:content-copy", ways.sets && this._mealSources.size > 0]];
     const open = tabs.filter((t) => t[3]);
-    if (!open.length || !this._mealSources.size) return;
+    if (!open.length) return;
     const kind = one ? "one" : "many";
     this._planTab = this._planTab || {};
     let at = tab || this._planTab[kind] || (one ? "choose" : "suggest");
@@ -13958,7 +13958,7 @@ class SpectraCard extends HTMLElement {
       : "");
     const ctx = { title, note, tabs: open.map(([k, w, i]) => [k, w, i]), at, still,
       go: (k) => this._planOpen(body, model, scope, k, true) };
-    const [source] = this._mealSources.values();
+    const [source] = this._mealSources.size ? this._mealSources.values() : [{}];
     const planned = recipePlanned(body.plan);
     if (one) {
       const [day, type] = one;
@@ -13995,6 +13995,9 @@ class SpectraCard extends HTMLElement {
         if (!answer.types.length) return;
         if (only && !only.size) { this._voiceSay("idle", "Those are all planned already."); return; }
         if (answer.copy) { this._mealCopy(body, answer.types, span, accent, answer.copy); return; }
+        /* With nowhere to write proposals to, the week script plans the
+           empty days itself, as Fill always did on such a card. */
+        if (!ways.sets) { this._mealFill(body.week, answer.types, span, answer.request); return; }
         this._mealPropose(body, answer.types, span, accent, null, answer.request, only, answer.mix);
       });
   }
