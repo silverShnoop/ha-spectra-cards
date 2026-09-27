@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.124.0";
+const VERSION = "0.125.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2041,6 +2041,72 @@ button.mlhead { text-align:center; }
 .mltile span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mltile .mdi { width:22px; height:22px; color:var(--accent); }
 .mltile:active { background:var(--accent-soft); }
+/* ---- prep ahead ----
+   A split recipe's two halves, the facts under a prep step, and the
+   sheets that plan when prep happens. The tags on a meal are facts and
+   wear the tab's accent or none: a level would be a job, and the job is
+   Needs you's. */
+.ppsec { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:14px 0 6px; }
+.ppsec h4 { margin:0 !important; }
+.ppsec > span:not(.ppseg) { font-size:12px; color:var(--sp-ink-2); }
+.ppsteps { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.ppsteps li { display:grid; grid-template-columns:24px minmax(0,1fr); gap:4px 10px; font-size:15px; line-height:1.45; color:var(--sp-ink); }
+.ppsteps li > b { grid-row:span 2; width:24px; height:24px; border-radius:50%; background:var(--accent-soft); color:var(--accent-on);
+  font-size:12px; display:grid; place-items:center; font-weight:700; }
+.ppsteps li.cook > b { background:var(--sp-sink); color:var(--sp-ink-2); }
+.ppkeep { display:flex; flex-wrap:wrap; gap:6px; }
+.ppchip { font-size:11.5px; padding:2px 8px; border-radius:999px; background:var(--sp-sink); color:var(--sp-ink-2); white-space:nowrap; }
+.ppchip.a { background:var(--accent-soft); color:var(--accent-on); }
+.ppnote { margin:10px 0 0; padding:10px 12px; border-radius:10px; background:var(--sp-sink); font-size:13px; color:var(--sp-ink-2); line-height:1.4; }
+.ppnote .mdi { width:16px; height:16px; vertical-align:-3px; color:var(--accent); }
+/* Two choices side by side, each the same width whichever is pressed, so
+   a press never moves the other one. */
+.ppseg { display:inline-grid; grid-auto-flow:column; grid-auto-columns:1fr; padding:3px; border-radius:999px; background:var(--sp-sink); flex:none; }
+.ppseg button { font:inherit; font-size:12px; font-weight:600; padding:6px 10px; min-height:32px; border:0; border-radius:999px;
+  background:none; color:var(--sp-ink-2); cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
+.ppseg button[aria-pressed="true"] { background:var(--sp-surface); color:var(--sp-ink); box-shadow:0 1px 2px rgba(0,0,0,.12); }
+.ppedit { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.ppedit li { border:1px solid var(--sp-edge); border-radius:10px; padding:10px 12px; display:grid; gap:8px; }
+.ppedit li.prep { border-color:var(--accent); }
+.ppedit li p { margin:0; font-size:14px; line-height:1.4; color:var(--sp-ink); }
+.ppedit .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.ppedit select, .ppsess select, .ppotherat { font:inherit; font-size:12.5px; min-height:32px; padding:2px 8px; border-radius:6px;
+  border:1px solid var(--sp-edge); background:var(--sp-surface); color:var(--sp-ink); max-width:100%; }
+.ppotherat { margin:4px 0 0; min-height:40px; }
+.ppgroup { border-top:1px solid var(--sp-sink); padding:10px 0 4px; display:grid; gap:4px; }
+.ppgroup .top { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+.ppgroup .top b { font-size:15px; color:var(--sp-ink); font-weight:600; }
+.ppgroup .top span { font-size:12px; color:var(--sp-ink-2); white-space:nowrap; }
+.ppgroup .how { font-size:13px; color:var(--sp-ink-2); line-height:1.4; }
+.ppdue { font-size:13.5px; color:var(--sp-ink); line-height:1.45; min-height:3em; }
+.ppdue b { color:var(--accent-on); }
+.ppgrid2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; margin-top:10px; }
+.ppsess { border:1px solid var(--sp-edge); border-radius:12px; padding:12px 14px; display:grid; gap:8px; align-content:start; }
+.ppsess .h { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.ppsess .h b { font-size:16px; color:var(--sp-ink); }
+.ppsess .h span { font-size:12.5px; color:var(--sp-ink-2); }
+.ppsess ul { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.ppsess li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 10px; font-size:14px; color:var(--sp-ink); align-items:start; }
+.ppsess li small { grid-column:1; font-size:12px; color:var(--sp-ink-2); }
+.ppsess li select { grid-row:span 2; grid-column:2; }
+/* Wraps rather than clipping: a seventh of a panel is narrow, and "Prep
+   not pla..." says nothing. */
+.ppmark { align-self:flex-start; margin-top:2px; display:inline-flex; align-items:center; gap:3px; max-width:100%;
+  font-size:10px; line-height:1.25; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--sp-ink-2);
+  background:var(--sp-surface); border-radius:8px; padding:1px 6px 1px 4px; box-sizing:border-box; }
+.ppmark .mdi { width:12px; height:12px; flex:none; }
+.ppmark.done { color:var(--accent-on); }
+.mlslot .ppmark { margin:0 0 0 auto; align-self:center; background:var(--sp-sink); }
+.pptray { font-size:13px; color:var(--sp-ink-2); margin:0; display:flex; gap:8px; align-items:center; }
+.pptray .mdi { width:16px; height:16px; color:var(--accent); flex:none; }
+.ppbanner { border-radius:10px; padding:10px 12px; font-size:14px; line-height:1.4; display:grid; gap:4px; margin:0 0 8px; }
+.ppbanner.ok { background:var(--accent-soft); color:var(--sp-ink); }
+.ppbanner.no { background:var(--sp-sink); color:var(--sp-ink); }
+.ppbanner b { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--accent-on); }
+.ppbanner .mdi { width:16px; height:16px; vertical-align:-3px; }
+.confirmbox.ppweek { max-width:900px; }
+.tddue { display:block; font-size:12px; color:var(--sp-ink-2); margin-top:2px; }
+.tddue.soon { color:var(--sp-ink); font-weight:600; }
 /* On a narrow card the week's buttons shed their words and share one row
    that scrolls, rather than stacking four deep under the plan. */
 .mlacts { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
@@ -3037,6 +3103,12 @@ const WEATHER_ICONS = {
    an empty cell, reads as a card that has not loaded. Inline, they are there
    with the first paint. */
 const MDI_INLINE = {
+  "mdi:knife": "M20.62,2C23.97,7.61 12.47,20.15 12.47,20.15L9.6,17.28L4.91,22L2.77,19.86L20.62,2Z",
+  "mdi:calendar-clock": "M15,13H16.5V15.82L18.94,17.23L18.19,18.53L15,16.69V13M19,8H5V19H9.67C9.24,18.09 9,17.07 9,16A7,7 0 0,1 16,9C17.07,9 18.09,9.24 19,9.67V8M5,21C3.89,21 3,20.1 3,19V5C3,3.89 3.89,3 5,3H6V1H8V3H16V1H18V3H19A2,2 0 0,1 21,5V11.1C22.24,12.36 23,14.09 23,16A7,7 0 0,1 16,23C14.09,23 12.36,22.24 11.1,21H5M16,11.15A4.85,4.85 0 0,0 11.15,16C11.15,18.68 13.32,20.85 16,20.85A4.85,4.85 0 0,0 20.85,16C20.85,13.32 18.68,11.15 16,11.15Z",
+  "mdi:check-circle": "M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z",
+  "mdi:alert-circle-outline": "M11,15H13V17H11V15M11,7H13V13H11V7M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20Z",
+  "mdi:auto-fix": "M7.5,5.6L5,7L6.4,4.5L5,2L7.5,3.4L10,2L8.6,4.5L10,7L7.5,5.6M19.5,15.4L22,14L20.6,16.5L22,19L19.5,17.6L17,19L18.4,16.5L17,14L19.5,15.4M22,2L20.6,4.5L22,7L19.5,5.6L17,7L18.4,4.5L17,2L19.5,3.4L22,2M13.34,12.78L15.78,10.34L13.66,8.22L11.22,10.66L13.34,12.78M14.37,7.29L16.71,9.63C17.1,10 17.1,10.65 16.71,11.04L5.04,22.71C4.65,23.1 4,23.1 3.63,22.71L1.29,20.37C0.9,20 0.9,19.35 1.29,18.96L12.96,7.29C13.35,6.9 14,6.9 14.37,7.29Z",
+  "mdi:skip-next": "M16,18H18V6H16M6,18L14.5,12L6,6V18Z",
   "mdi:eye-outline": "M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5M3.18,12C4.83,15.36 8.24,17.5 12,17.5C15.76,17.5 19.17,15.36 20.82,12C19.17,8.64 15.76,6.5 12,6.5C8.24,6.5 4.83,8.64 3.18,12Z",
   "mdi:plus-box-multiple-outline": "M18 11H15V14H13V11H10V9H13V6H15V9H18M20 4V16H8V4H20M20 2H8C6.9 2 6 2.9 6 4V16C6 17.11 6.9 18 8 18H20C21.11 18 22 17.11 22 16V4C22 2.9 21.11 2 20 2M4 6H2V20C2 21.11 2.9 22 4 22H18V20H4V6Z",
   "mdi:checkbox-marked": "M10,17L5,12L6.41,10.58L10,14.17L17.59,6.58L19,8M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3Z",
@@ -4748,6 +4820,11 @@ const BODIES = {
       const sub = full && detail === "below"
         ? `<span class="tdsub">${esc(full)}</span>` : "";
       const who = isBlank(item.who) ? "" : `<span class="tdwho">${esc(item.who)}</span>`;
+      /* Drawn only on an item that has one: nothing in this house set a
+         due date until prep sessions did, and an empty line under every
+         row is how it shipped the first time. */
+      const due = done ? null : todoDue(item.due);
+      const dueLine = due ? `<span class="tddue${due.soon ? " soon" : ""}">${esc(due.text)}</span>` : "";
       return `<div class="tditem${done ? " ticked" : ""}${open ? " open" : ""}`
         + `${endsColumn ? " colend" : ""}"`
         + ` data-key="${esc(keyPrefix + uid)}">`
@@ -4758,7 +4835,7 @@ const BODIES = {
         + `<span class="tdmark"><ha-icon icon="${esc(tick)}"></ha-icon></span>`
         + `</button>`
         + `<span class="tdtext"${sub ? ` data-note="${esc(uid)}"` : ""}>`
-        + `<span class="tdname">${esc(name)}${extra}${who}</span>${sub}</span>`
+        + `<span class="tdname">${esc(name)}${extra}${who}</span>${dueLine}${sub}</span>`
         + `</div>`;
     };
 
@@ -7467,6 +7544,7 @@ function mealSlot(b, plan, day, type, picked, moving, labelled) {
     + recipeThumb(b, entry && entry.recipe, "mlthumb")
     + (name ? `<span class="mlname">${esc(name)}</span>` : blank)
     + (time ? `<span class="mltime">${esc(time)}</span>` : "")
+    + prepTag(b, slot)
     + (ro ? `</div>` : `</button>`);
   if (open && !ro) out += mealTray(b, entry, type, past);
   return out;
@@ -7594,7 +7672,186 @@ function mealCell(plan, day, type, picked, moving, next, b) {
       : (past || ro ? "" : `<span class="mladd" aria-hidden="true">${iconMarkup("mdi:plus")}</span>`))
     + mealsAt(plan, day, type).slice(1).map((e) => `<span class="mlname mlalso">+ ${esc(mealName(e))}</span>`).join("")
     + (time ? `<span class="mltime">${esc(time)}</span>` : "")
+    + prepTag(b, slot)
     + (ro ? `</div>` : `</button>`);
+}
+
+/* ---- prep ahead ----
+
+   A recipe can say which of its steps can be done ahead, for how long and
+   where they keep (home_signals keeps that in Mealie and hands it back in
+   the recipe index as `prep`). A prep SESSION is one sitting that does the
+   ahead-of-time steps of one or more meals, and it is one Home Tasks item
+   with a deadline; sensor.meal_prep keeps them and says which are done.
+
+   Everything the card draws about prep is a fact -- "Prep Mon 19:30",
+   "Prepped", "Prep not planned". The job, when there is one, is a Needs
+   you row raised by the sensor, not something this card colours. */
+const PREP_SENSOR = "sensor.meal_prep";
+const PREP_MEAL_TIMES = { breakfast: "07:00", lunch: "12:00", dinner: "17:00" };
+const PREP_TIMES = [
+  { label: "Sunday afternoon", days: [6], time: "16:00" },
+  { label: "Weekday evening", days: [0, 1, 2, 3, 4], time: "19:30" },
+];
+const PREP_AHEAD = [[8, "Up to 8 h ahead"], [24, "Up to 24 h ahead"], [48, "Up to 2 days ahead"],
+  [72, "Up to 3 days ahead"]];
+const PREP_NEEDS = [[0, "Ready any time"], [1, "Needs 1 h"], [4, "Needs 4 h"], [8, "Needs overnight"]];
+const PREP_KEEPS = ["Fridge", "Freezer", "Cupboard"];
+/* A split with no timing is taken as keeping a day: the house rule for
+   most chopped and mixed things, and short enough to be safe. */
+const PREP_DEFAULT_AHEAD = 24;
+
+/* The recipe's split, when it has one worth scheduling. */
+function prepSplit(r) {
+  const p = r && r.prep;
+  return p && p.mode === "split" && Array.isArray(p.steps) && p.steps.length ? p : null;
+}
+
+function prepAheadWords(hours) {
+  const h = Number(hours);
+  if (!(h > 0)) return "";
+  if (h >= 48 && h % 24 === 0) return `Up to ${h / 24} days ahead`;
+  return `Up to ${h} h ahead`;
+}
+
+/* The small facts under a prep step: how far ahead, what it needs, where
+   it keeps. The first one wears the accent, because it is the one that
+   decides when the prep can happen. */
+function prepChips(step) {
+  const out = [];
+  const ahead = prepAheadWords(step && step.ahead_max);
+  if (ahead) out.push(`<span class="ppchip a">${esc(ahead)}</span>`);
+  if (step && Number(step.ahead_min) > 0) {
+    out.push(`<span class="ppchip">${esc(Number(step.ahead_min) >= 8 ? "Needs overnight" : `Needs ${step.ahead_min} h`)}</span>`);
+  }
+  if (step && !isBlank(step.keeps)) out.push(`<span class="ppchip">${esc(step.keeps)}</span>`);
+  if (step && step.source === "page") out.push(`<span class="ppchip">from the recipe</span>`);
+  return out.length ? `<span class="ppkeep">${out.join("")}</span>` : "";
+}
+
+function prepMinutes(steps) {
+  const n = (Array.isArray(steps) ? steps : []).reduce((t, s) => t + (Number(s && s.minutes) > 0 ? Number(s.minutes) : 0), 0);
+  return n > 0 ? n : null;
+}
+
+/* The sensor, read once: sessions, and the house's meal and prep times. */
+function prepState(hass) {
+  const s = hass && hass.states ? hass.states[PREP_SENSOR] : null;
+  if (!s) return null;
+  const a = s.attributes || {};
+  return {
+    sessions: Array.isArray(a.sessions) ? a.sessions.filter((x) => x && Array.isArray(x.items)) : [],
+    meals: Object.assign({}, PREP_MEAL_TIMES, a.meal_times || {}),
+    times: Array.isArray(a.prep_times) && a.prep_times.length ? a.prep_times : PREP_TIMES,
+  };
+}
+
+function prepMealAt(day, type, meals) {
+  const t = (meals && (meals[String(type).toLowerCase()] || meals.dinner)) || "17:00";
+  return new Date(`${day}T${t}:00`);
+}
+
+/* When a prep step can be done: no earlier than it keeps, no later than
+   it needs (a marinade's hour), and never less than half an hour before
+   the meal -- a deadline at the moment of cooking is not prep. */
+function prepWindow(step, mealAt) {
+  const ahead = Number(step && step.ahead_max) > 0 ? Number(step.ahead_max) : PREP_DEFAULT_AHEAD;
+  const need = Math.max(0.5, Number(step && step.ahead_min) || 0);
+  return { from: new Date(mealAt.getTime() - ahead * 3600000), to: new Date(mealAt.getTime() - need * 3600000) };
+}
+
+function prepDay(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/* Local time with no zone: home_signals reads it as house time. */
+function prepIso(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${prepDay(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+}
+
+/* "Mon 19:30", or "Today 19:30". */
+function prepWhen(d, long) {
+  const t = d instanceof Date ? d : new Date(d);
+  if (isNaN(t.getTime())) return "";
+  const days = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate())
+    - new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())) / 86400000);
+  const word = days === 0 ? "Today" : (days === 1 ? "Tomorrow"
+    : t.toLocaleDateString([], { weekday: long ? "long" : "short" }));
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${word} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+}
+
+/* The same, inside a sentence: "due tomorrow 19:30". */
+function prepWhenIn(d, long) {
+  return prepWhen(d, long).replace(/^Today/, "today").replace(/^Tomorrow/, "tomorrow");
+}
+
+/* The house's prep times between two moments, as dates. The sensor's
+   weekdays are Python's (Monday 0), a Date's are Sunday 0. */
+function prepHouseTimes(times, from, to) {
+  const out = [];
+  const day = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  for (; day <= to; day.setDate(day.getDate() + 1)) {
+    const py = (day.getDay() + 6) % 7;
+    for (const rule of times || []) {
+      if (!Array.isArray(rule.days) || !rule.days.map(Number).includes(py) || isBlank(rule.time)) continue;
+      const at = new Date(`${prepDay(day)}T${rule.time}:00`);
+      if (at >= from && at <= to) out.push(at);
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
+function prepKey(date, type, rid) {
+  return `${String(date).slice(0, 10)}|${String(type).toLowerCase()}|${rid}`;
+}
+
+function prepItemKey(i) {
+  return prepKey(i.date, i.entry_type, firstOf(i.recipe_id, i.name));
+}
+
+function prepSessionOf(sessions, date, type, rid) {
+  const key = prepKey(date, type, rid);
+  return (sessions || []).find((s) => s.items.some((i) => prepItemKey(i) === key)) || null;
+}
+
+/* "Chilli and fajitas" */
+function prepNames(items) {
+  const names = [];
+  for (const i of items || []) if (!names.includes(i.name)) names.push(i.name);
+  if (names.length < 2) return names[0] || "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/* A step's first clause, for a list where the whole step would wrap
+   three times: "Slice the onion and peppers". */
+function prepShort(text) {
+  const first = String(text || "").split(/(?<=[.;])\s/)[0].replace(/[.;]$/, "");
+  return first.length > 60 ? `${first.slice(0, 57)}…` : first;
+}
+
+/* "Due today 19:30", for a to-do item that has a deadline. */
+function todoDue(value) {
+  if (isBlank(value)) return null;
+  const text = String(value);
+  const dated = /^\d{4}-\d{2}-\d{2}$/.test(text);
+  const t = new Date(dated ? `${text}T23:59:00` : text);
+  if (isNaN(t.getTime())) return null;
+  const now = new Date();
+  const soon = prepDay(t) <= prepDay(now);
+  const late = t < now;
+  const when = (dated ? (weekdayLabel(`${text}T12:00:00`) || text) : prepWhen(t))
+    .replace(/^Today/, "today").replace(/^Tomorrow/, "tomorrow");
+  return { text: `${late ? "Was due" : "Due"} ${when}`, soon };
+}
+
+/* The prep fact for a slot, as a small tag on the meal. */
+function prepTag(b, slot) {
+  const m = b.prep && b.prep.marks ? b.prep.marks[slot] : null;
+  if (!m) return "";
+  return `<span class="ppmark${m.done ? " done" : ""}">${iconMarkup(m.done ? "mdi:check" : "mdi:knife")}${esc(m.text)}</span>`;
 }
 
 function mealTray(b, entry, type, past, all) {
@@ -7619,6 +7876,9 @@ function mealTray(b, entry, type, past, all) {
   let out = `<div class="mltray">`;
   const glance = entry && entry.recipe && b.glance ? b.glance[String(entry.recipe.recipe_id)] : "";
   if (glance) out += `<p class="mlglance">${esc(glance)}</p>`;
+  const prepped = entry && b.prep && b.prep.marks
+    ? b.prep.marks[`${String(entry.mealplan_date).slice(0, 10)}|${type}`] : null;
+  if (prepped && prepped.tray) out += `<p class="pptray">${iconMarkup(prepped.done ? "mdi:check" : "mdi:knife")}<span>${esc(prepped.tray)}</span></p>`;
   /* Two meals in the slot: each with its own recipe and its own clear. */
   const both = Array.isArray(all) && all.length > 1 ? all : null;
   if (both) {
@@ -7648,6 +7908,7 @@ function mealTray(b, entry, type, past, all) {
   let tiles = "";
   const recipe = entry && entry.recipe && !isBlank(entry.recipe.recipe_id) && b.recipe !== false;
   if (recipe) tiles += tile("data-meal-recipe", "mdi:chef-hat", "Recipe");
+  if (recipe && prepped && !prepped.done && !past && !b.readonly) tiles += tile("data-meal-prep", "mdi:calendar-clock", "Prep");
   if (shop) tiles += tile("data-meal-shop", "mdi:cart-plus", "Shop");
   /* A day that has gone can be read, not planned. */
   if (!past) {
@@ -7967,6 +8228,10 @@ function mealFoot(b, picked, moving, dates, plan, types) {
   const acts = (sets && types && dates && dates.length > 2 ? act("data-meal-select", "mdi:checkbox-multiple-outline", "Select", "Select", true) : "")
     + (week ? act("data-meal-week", "mdi:calendar-star", "Fill empty days", "Fill") : "")
     + (b.sentence && !isBlank(b.sentence.script) && sets ? act("data-meal-words", "mdi:text-box-edit-outline", "Plan in words", "Words") : "")
+    /* Offered for as long as the week has prep that is not in a sitting,
+       with how many meals that is; quiet once it is all planned. */
+    + (b.prep && b.prep.any && !b.readonly ? act("data-meal-prepweek", "mdi:knife",
+      b.prep.open ? `Prep ${b.prep.open} ${b.prep.open === 1 ? "meal" : "meals"}` : "Prep", b.prep.open ? `Prep ${b.prep.open}` : "Prep", !b.prep.open) : "")
     + (shop ? act("data-meal-shopweek", "mdi:cart-outline", "Shop for the week", "Shop") : "")
     + (fridge ? act("data-meal-fridge", "mdi:fridge-outline", "What's in the fridge?", "Fridge", true) : "")
     + (box ? act("data-meal-box", "mdi:book-open-variant", "Recipes", "Recipes", true) : "")
@@ -8494,6 +8759,15 @@ const VOICE_NOTE_MS = 12000;
 const MEAL_REFRESH_MS = 5 * 60 * 1000;
 /* The recipe box as a picker reads it, per Mealie, shared by every card. */
 const RECIPE_INDEX = new Map();
+/* Whole recipes read for their prep steps, by `entry|recipe_id`. */
+const RECIPE_FULL = new Map();
+/* While prep is being written, a plan read does not try to follow it. */
+let PREP_BUSY = 0;
+/* When prep was last written: a plan read that set off before it is older
+   than the prep, and must not be followed. */
+let PREP_SAVED_AT = 0;
+/* Prep taken off a task because its meal went, kept a minute for Undo. */
+const PREP_GONE = new Map();
 const MEAL_IDLE_MS = 2 * 60 * 1000;
 
 /* An error carrying the sentence a person is meant to read.
@@ -8960,6 +9234,7 @@ class SpectraCard extends HTMLElement {
       };
     /* The box goes through the shared index, so every card reading the
        same Mealie reads it once. */
+    const asked = Date.now();
     const read = source.recipes ? this._recipeIndex(source.entry, true) : Promise.resolve(
       this._hass.callWS(Object.assign({ type: "call_service", domain: "mealie", return_response: true }, ask)),
     ).then((result) => {
@@ -8969,6 +9244,7 @@ class SpectraCard extends HTMLElement {
     });
     read.then((got) => {
       this._meals[key] = got;
+      if (!source.recipes) this._prepReconcile(got, ask.service_data.start_date, ask.service_data.end_date, asked);
       delete this._failed[key];
       this._signature = null;
       this._update();
@@ -9300,6 +9576,7 @@ class SpectraCard extends HTMLElement {
         model.body.thumbs = this._recipeImages(model.body.plan.map((e) => e && e.recipe), "tiny");
       }
       model.body.glance = this._mealGlance(model.body);
+      model.body.prep = this._mealPrepMarks(model.body);
     }
     /* What is typed in the recipe box's search, so a repaint keeps it. */
     if (model.body && model.body.type === "recipes") {
@@ -12451,6 +12728,22 @@ class SpectraCard extends HTMLElement {
       });
     });
 
+    this._holder.querySelectorAll("[data-meal-prep]").forEach((el) => {
+      if (!slot || !entry || !entry.recipe) return;
+      press(el, () => {
+        flashPress(el);
+        this._prepOne(body, slot[0], slot[1], entry, model.accent);
+      });
+    });
+
+    this._holder.querySelectorAll("[data-meal-prepweek]").forEach((el) => {
+      press(el, () => {
+        flashPress(el);
+        this._mealPick = null;
+        this._prepWeek(body, model.accent);
+      });
+    });
+
     this._holder.querySelectorAll("[data-meal-shopweek]").forEach((el) => {
       const shop = body.shop_week;
       if (!shop || isBlank(shop.script) || isBlank(shop.list)) return;
@@ -12459,8 +12752,17 @@ class SpectraCard extends HTMLElement {
         this._mealPick = null;
         const span = mealSpan(body);
         if (!span) { this._voiceSay("idle", "This week is over. Look at next week."); return; }
+        /* Prep moves the shopping earlier: it is needed by the first
+           sitting, not by each dinner. */
+        const st = prepState(this._hass);
+        const end = new Date(`${span.start_date}T12:00:00`);
+        end.setDate(end.getDate() + span.days - 1);
+        const last = prepDay(end);
+        const first = st ? st.sessions.filter((x) => !x.done && x.items.some((i) => i.date >= span.start_date && i.date <= last))
+          .map((x) => new Date(x.due)).sort((a, b) => a - b)[0] : null;
+        const week = (Number(body.week_offset) || 0) ? "next week" : "this week";
         this._mealShop(shop, span, "Reading the week\u2019s recipes\u2026",
-          (Number(body.week_offset) || 0) ? "next week" : "this week");
+          first ? `${week} \u00b7 needed by ${prepWhenIn(first, true)}, for the prep` : week);
       });
     });
 
@@ -12470,7 +12772,8 @@ class SpectraCard extends HTMLElement {
       press(el, () => {
         flashPress(el);
         this._mealRecipe(source.entry, entry.recipe, model.accent, body.recipes,
-          { schedule: body.place ? Object.assign({ types: body.types }, body.place) : null });
+          { schedule: body.place ? Object.assign({ types: body.types }, body.place) : null,
+            meal: { body, day: slot[0], type: slot[1], entry } });
       });
     });
 
@@ -13825,6 +14128,19 @@ class SpectraCard extends HTMLElement {
         const saved = (result && result.response) || {};
         status(`${firstOf(saved.recipe, "The recipe")} is in the box.`);
         this._refetchMeals();
+        /* Then what can be done ahead, checked once while it is fresh:
+           the split runs after every import, and this waits for it. */
+        if (!isBlank(spec.split) && !isBlank(saved.slug) && !saved.already) {
+          status(`${firstOf(saved.recipe, "The recipe")} is in the box. Looking for what can be done ahead\u2026`);
+          this._mealCall(spec.split, { recipe: String(saved.slug) }).then((split) => {
+            if (done) return;
+            this._prepReview(wrap, saved, split, finish);
+          }, (error) => {
+            LOGGER_WARN("spectra-card: could not split the recipe", error);
+            setTimeout(finish, 1200);
+          });
+          return;
+        }
         setTimeout(finish, 1200);
       }, (error) => {
         LOGGER_WARN("spectra-card: could not import the recipe", error);
@@ -13838,11 +14154,82 @@ class SpectraCard extends HTMLElement {
     if (input.focus && finePointer()) input.focus({ preventScroll: true });
   }
 
+  /* An import's split, checked once. The page's own make-ahead notes and
+     the house's keep times are what it rests on, and each step says which.
+     Looks right marks it checked; Keep in order puts the method back as it
+     came; Edit opens the form, where each step can be changed. */
+  _prepReview(wrap, saved, split, finish) {
+    const name = firstOf(saved.recipe, "The recipe");
+    const prep = Array.isArray(split && split.prep) ? split.prep : [];
+    const cook = Array.isArray(split && split.cook) ? split.cook : [];
+    const original = Array.isArray(split && split.original) ? split.original : null;
+    const call = (data) => this._mealCall("home_signals.save_recipe", Object.assign({ recipe: String(saved.slug) }, data));
+    const steps = prep.map(({ text, ...t }) => t);
+    const from = (t) => (t.source === "page" ? "from the recipe" : "house rule");
+    const numbered = (list, at, chips) => `<ol class="ppsteps">${list.map((x, n) => `<li>`
+      + `<b>${at + n + 1}</b><span>${esc(prepShort(typeof x === "string" ? x : x.text))}</span>`
+      + (chips ? `<span class="ppkeep"><span class="ppchip a">${esc(prepAheadWords(x.ahead_max))}</span>`
+        + `<span class="ppchip">${esc(from(x))}</span></span>` : "")
+      + `</li>`).join("")}</ol>`;
+    const page = prep.some((x) => x.source === "page");
+    const box = wrap.querySelector(".confirmbox");
+    box.classList.add("tall", "still");
+    box.innerHTML = `<div class="confirmhead">${iconMarkup("mdi:auto-fix")}<span>${esc(name)}</span></div>`
+      + `<div class="mlrecipe">`
+      + (prep.length
+        ? `<p class="confirmtext">Saved to the box. ${page ? "The recipe says what can be made ahead, so" : "Some of it keeps, so"} the method was split:</p>`
+          + `<div class="ppsec"><h4>Prep ahead · ${prep.length === 1 ? "1 step" : `${prep.length} steps`}</h4>`
+          + `<span>${prepMinutes(prep) ? `${prepMinutes(prep)} min` : ""}</span></div>${numbered(prep, 0, true)}`
+          + `<div class="ppsec"><h4>To cook · ${cook.length === 1 ? "1 step" : `${cook.length} steps`}</h4><span></span></div>`
+          + numbered(cook, prep.length, false)
+        : `<p class="confirmtext">Saved to the box. Nothing in it is worth doing ahead, so it cooks in order.</p>`)
+      + `<p class="confirmtext quiet" data-status></p></div>`
+      + `<div class="confirmbtns">`
+      + (prep.length ? `<button type="button" class="confirmno" data-pp-order>Keep in order</button>` : "")
+      + `<button type="button" class="confirmno" data-pp-edit>Edit</button>`
+      + `<button type="button" class="confirmyes" data-pp-ok>Looks right</button></div>`;
+    const say = (t) => { const el = box.querySelector("[data-status]"); if (el) el.textContent = t; };
+    const run = (data, after) => {
+      box.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+      say("Saving…");
+      call(data).then(() => {
+        const [entry] = this._mealSources.size ? [...this._mealSources.values()].map((x) => x.entry) : [];
+        if (entry) this._recipeIndex(entry, true).then(() => { this._signature = null; this._update(); }, () => {});
+        finish();
+        if (after) after();
+      }, () => { say("That could not be saved."); box.querySelectorAll("button").forEach((b) => { b.disabled = false; }); });
+    };
+    box.querySelector("[data-pp-ok]").addEventListener("click", () => run(prep.length
+      ? { prep: { mode: "split", checked: true, steps } } : { prep: { mode: "none", checked: true } }));
+    const order = box.querySelector("[data-pp-order]");
+    if (order) {
+      order.addEventListener("click", () => run(Object.assign({ prep: { mode: "order" } },
+        original ? { method: original.join("\n") } : {})));
+    }
+    box.querySelector("[data-pp-edit]").addEventListener("click", () => {
+      finish();
+      if (!this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      const b = (this._config && this._config.body) || {};
+      const edit = [b.edit, b.recipes].find((x) => x && typeof x === "object" && !isBlank(x.save));
+      Promise.resolve(this._hass.callWS({
+        type: "call_service", domain: "mealie", service: "get_recipe",
+        service_data: { config_entry_id: source.entry, recipe_id: String(saved.slug) }, return_response: true,
+      })).then((r) => this._recipeIndex(source.entry, true).then(() => r)).then((r) => {
+        const full = (r && r.response && r.response.recipe) || null;
+        if (full && edit) this._mealEdit(source.entry, full, this._model && this._model.accent, edit);
+      }, (error) => LOGGER_WARN("spectra-card: could not open the recipe to edit", error));
+    });
+  }
+
   /* The recipe, on a sheet over the card, for reading at the hob. Fetched
      when asked for rather than with the plan: a week of recipes is a lot to
      carry for the one that gets opened. */
   _mealRecipe(entry, recipe, accent, edit, opts) {
     const schedule = opts && opts.schedule && !isBlank(opts.schedule.script) ? opts.schedule : null;
+    /* Opened from a planned meal: which one, so its prep can be planned
+       and cooking knows whether it was done. */
+    const meal = opts && opts.meal ? opts.meal : null;
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
@@ -13857,6 +14244,10 @@ class SpectraCard extends HTMLElement {
     let full = null;
     let steps = [];
     let ingredients = [];
+    /* How many of the steps are prep, when the recipe is split. */
+    let ahead = 0;
+    let split = null;
+    let flag = "";
     let hero = this._imagesOn() && !isBlank(recipe.image) ? `<div class="mlhero mlheroph"></div>` : "";
     let body = "";
     let lock = null;
@@ -13873,11 +14264,22 @@ class SpectraCard extends HTMLElement {
       const i = Math.max(0, Math.min(steps.length - 1, at));
       wrap.innerHTML = `<div class="confirmbox tall mlcook" role="dialog" aria-modal="true" aria-label="${esc(title)}: cooking">`
         + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
-        + `<div class="mlcookbar"><span class="mlcookof">Step ${i + 1} of ${steps.length}</span>`
+        + `<div class="mlcookbar"><span class="mlcookof">Step ${i + 1} of ${steps.length}`
+        + `${ahead ? (i < ahead ? " \u00b7 prep" : " \u00b7 to cook") : ""}</span>`
+        + (flag === "no" && i < ahead ? `<button type="button" class="mlbtn quiet" data-cook-skip>`
+          + `${iconMarkup("mdi:skip-next")} Skip the prep</button>` : "")
         + (ingredients.length ? `<button type="button" class="mlbtn quiet" data-cook-ing aria-pressed="${!!showing}">`
           + `${iconMarkup("mdi:format-list-bulleted")} Ingredients</button>` : "")
         + `</div>`
         + `<div class="mlcookdots" aria-hidden="true">${steps.map((_, n) => `<i${n === i ? " class=\"on\"" : (n < i ? " class=\"done\"" : "")}></i>`).join("")}</div>`
+        /* Cooking knows whether the prep was done: ticked, it starts at
+           the first cook step and says what is ready; not, the prep comes
+           first and says what that costs. */
+        + (flag === "ok" && i === ahead ? `<div class="ppbanner ok"><b>Prepped</b><span>${iconMarkup("mdi:check-circle")} `
+          + `${esc(steps.slice(0, ahead).map(prepShort).join(" \u00b7 "))}</span></div>` : "")
+        + (flag === "no" && i === 0 ? `<div class="ppbanner no"><b>Not prepped</b><span>${iconMarkup("mdi:alert-circle-outline")} `
+          + `The prep comes first${prepMinutes(split && split.steps) ? `: it adds about ${prepMinutes(split.steps)} minutes` : ""}`
+          + `${split && split.steps.some((x) => Number(x.ahead_min) > 0) ? ", and anything that needs time to sit gets less of it" : ""}.</span></div>` : "")
         /* The ingredients take the step's place rather than pushing it
            down: Back and Next stay where the thumb already is. */
         + (showing ? `<div class="mlrecipe mlcookstep"><ul class="mlcooking">${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`
@@ -13897,6 +14299,8 @@ class SpectraCard extends HTMLElement {
       if (next) next.addEventListener("click", () => cook(i + 1, false));
       const ing = wrap.querySelector("[data-cook-ing]");
       if (ing) ing.addEventListener("click", () => cook(i, !showing));
+      const skip = wrap.querySelector("[data-cook-skip]");
+      if (skip) skip.addEventListener("click", () => cook(ahead, false));
       const box = wrap.querySelector(".mlcook");
       let from = null;
       box.addEventListener("touchstart", (event) => {
@@ -13927,7 +14331,9 @@ class SpectraCard extends HTMLElement {
         + `<div class="mlrecipe">${hero}${inner}</div>`
         + `<div class="confirmbtns">`
         + (canEdit ? `<button type="button" class="confirmno" data-edit>Edit</button>` : "")
-        + (schedule ? `<button type="button" class="confirmno" data-plan>Plan it</button>` : "")
+        + (schedule && !meal ? `<button type="button" class="confirmno" data-plan>Plan it</button>` : "")
+        + (ahead && meal && prepState(this._hass) && !meal.body.readonly
+          ? `<button type="button" class="confirmno" data-planprep>${iconMarkup("mdi:calendar-clock")} Plan prep</button>` : "")
         + (steps.length ? `<button type="button" class="confirmno" data-cook>${iconMarkup("mdi:play")} Cook</button>` : "")
         + `<button type="button" class="confirmyes" data-no>Close</button></div>`
         + `</div>`;
@@ -13954,7 +14360,23 @@ class SpectraCard extends HTMLElement {
         });
       }
       const c = wrap.querySelector("[data-cook]");
-      if (c) c.addEventListener("click", () => cook(0, false));
+      if (c) {
+        c.addEventListener("click", () => {
+          flag = "";
+          if (!ahead) { cook(0, false); return; }
+          /* The prep for THIS meal when opened from one; otherwise the
+             nearest session holding this recipe today or tomorrow. */
+          const st = prepState(this._hass);
+          const rid = String(recipe.recipe_id);
+          const soon = [localDay(0), localDay(1)];
+          const s = !st ? null : (meal ? prepSessionOf(st.sessions, meal.day, meal.type, rid)
+            : st.sessions.find((x) => x.items.some((i) => String(i.recipe_id) === rid && soon.includes(String(i.date)))));
+          flag = s && s.done ? "ok" : "no";
+          cook(flag === "ok" ? ahead : 0, false);
+        });
+      }
+      const pp = wrap.querySelector("[data-planprep]");
+      if (pp) pp.addEventListener("click", () => { finish(); this._prepOne(meal.body, meal.day, meal.type, meal.entry, accent); });
       wrap.querySelector("[data-no]").addEventListener("click", finish);
       const pl = wrap.querySelector("[data-plan]");
       if (pl) pl.addEventListener("click", () => { finish(); this._mealSchedule(recipe, accent, schedule); });
@@ -14016,11 +14438,22 @@ class SpectraCard extends HTMLElement {
           } else if (ph) ph.remove();
         });
       } else hero = "";
-      body = (facts ? `<p class="confirmtext">${esc(facts)}</p>` : "")
+      split = prepSplit(indexed());
+      ahead = split && split.steps.length <= steps.length ? split.steps.length : 0;
+      const early = ahead ? prepMinutes(split.steps) : null;
+      const numbered = (list, from, cls, chips) => `<ol class="ppsteps">${list.map((x, n) => `<li${cls ? ` class="${cls}"` : ""}>`
+        + `<b>${from + n + 1}</b><span>${esc(x)}</span>${chips ? chips(n) : ""}</li>`).join("")}</ol>`;
+      /* A split recipe reads in its two halves, each step numbered as it
+         is in Mealie, the prep ones with how far ahead and where they keep. */
+      const method = !ahead ? `<h4>Method</h4><ol>${steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>`
+        : `<div class="ppsec"><h4>Prep ahead</h4><span>${early ? `${early} min` : ""}</span></div>`
+          + numbered(steps.slice(0, ahead), 0, "", (n) => prepChips(split.steps[n]))
+          + (steps.length > ahead ? `<div class="ppsec"><h4>To cook</h4><span></span></div>`
+            + numbered(steps.slice(ahead), ahead, "cook") : "");
+      body = (facts || early ? `<p class="confirmtext">${esc([facts, early ? `${early} min of it can be done ahead` : ""].filter(Boolean).join(" \u00b7 "))}</p>` : "")
         + (ingredients.length
           ? `<h4>Ingredients</h4><ul>${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "")
-        + (steps.length
-          ? `<h4>Method</h4><ol>${steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : "")
+        + (steps.length ? method : "")
         + (!ingredients.length && !steps.length
           ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : "");
       fill(body);
@@ -14028,6 +14461,503 @@ class SpectraCard extends HTMLElement {
       LOGGER_WARN("spectra-card: could not open the recipe", error);
       if (!done) fill(`<p class="confirmtext">Could not open the recipe.</p>`);
     });
+  }
+
+  /* ---- prep ahead ---- */
+
+  /* What the week says about prep, slot by slot, as facts: when it is
+     planned for, that it was done, or that it is not planned yet. Null
+     when there is no prep sensor or the index has not been read. */
+  _mealPrepMarks(body) {
+    const st = prepState(this._hass);
+    if (!st || !this._mealSources.size) return null;
+    const [source] = this._mealSources.values();
+    const hit = RECIPE_INDEX.get(source.entry);
+    if (!hit || !Array.isArray(hit.list)) {
+      /* A card with no recipe box still needs the index to know which
+         meals have prep: asked for once, in the background. */
+      if (!this._prepAsked && this._hass && !(hit && hit.promise)) {
+        this._prepAsked = true;
+        this._recipeIndex(source.entry).then(() => { this._signature = null; this._update(); }, () => {});
+      }
+      return null;
+    }
+    const byId = new Map(hit.list.map((r) => [String(r.recipe_id), r]));
+    const shown = new Set(mealDates(body));
+    const now = Date.now();
+    const marks = {};
+    let open = 0;
+    let any = 0;
+    for (const e of Array.isArray(body.plan) ? body.plan : []) {
+      if (!e || !e.recipe || isBlank(e.recipe.recipe_id)) continue;
+      const split = prepSplit(byId.get(String(e.recipe.recipe_id)));
+      if (!split) continue;
+      const day = String(e.mealplan_date).slice(0, 10);
+      const type = String(e.entry_type).toLowerCase();
+      const slot = `${day}|${type}`;
+      const s = prepSessionOf(st.sessions, day, type, String(e.recipe.recipe_id));
+      const steps = split.steps.length;
+      const mins = prepMinutes(split.steps);
+      const what = `${steps === 1 ? "1 step" : `${steps} steps`}${mins ? ` · ${mins} min` : ""}`;
+      if (prepMealAt(day, type, st.meals).getTime() <= now) {
+        if (s && s.done) marks[slot] = { text: "Prepped", done: true, tray: `Prepped · ${what}` };
+        continue;
+      }
+      if (shown.has(day)) any += 1;
+      if (s && s.done) {
+        marks[slot] = { text: "Prepped", done: true, tray: `Prepped · ${what} · ticked on Home Tasks` };
+      } else if (s) {
+        const due = new Date(s.due);
+        const pad = (n) => String(n).padStart(2, "0");
+        marks[slot] = { text: `Prep ${due.toLocaleDateString([], { weekday: "short" })} ${pad(due.getHours())}:${pad(due.getMinutes())}`,
+          tray: `Prep: ${what} · by ${prepWhenIn(due)} · on Home Tasks` };
+      } else {
+        marks[slot] = { text: "Prep not planned", tray: `${what} can be done ahead · not planned yet` };
+        if (shown.has(day)) open += 1;
+      }
+    }
+    return { marks, open, any };
+  }
+
+  /* A recipe's method as prep and cook, read from Mealie once and kept
+     for a few minutes: a week's prep sheet reads every dinner's. */
+  _prepSteps(entry, recipe) {
+    const rid = String(recipe.recipe_id);
+    const key = `${entry}|${rid}`;
+    const hit = RECIPE_FULL.get(key);
+    const read = hit && Date.now() - hit.at < 600000 ? hit.promise : Promise.resolve(this._hass.callWS({
+      type: "call_service", domain: "mealie", service: "get_recipe",
+      service_data: { config_entry_id: entry, recipe_id: rid }, return_response: true,
+    })).then((result) => (result && result.response && result.response.recipe) || {});
+    if (!hit || hit.promise !== read) RECIPE_FULL.set(key, { at: Date.now(), promise: read });
+    read.catch(() => RECIPE_FULL.delete(key));
+    return read.then((r) => {
+      const known = (RECIPE_INDEX.get(entry) || {}).list || [];
+      const split = prepSplit(known.find((x) => String(x.recipe_id) === rid));
+      const texts = (Array.isArray(r.instructions) ? r.instructions : [])
+        .map((i) => (i && !isBlank(i.text) ? String(i.text) : "")).filter((x) => !isBlank(x));
+      const n = split && split.steps.length <= texts.length ? split.steps.length : 0;
+      return {
+        recipe: r,
+        split,
+        prep: texts.slice(0, n).map((text, i) => Object.assign({ text }, split.steps[i])),
+        cook: texts.slice(n),
+      };
+    });
+  }
+
+  /* Write sessions, in order, and answer with the way back. Each change is
+     {id?, due, items}; no items removes the session and its task. */
+  _prepApply(changes) {
+    const st = prepState(this._hass);
+    const before = new Map((st ? st.sessions : []).map((s) => [s.id, s]));
+    const touched = [];
+    const clean = (i) => {
+      const out = { date: String(i.date).slice(0, 10), entry_type: String(i.entry_type), name: String(i.name) };
+      if (!isBlank(i.recipe_id)) out.recipe_id = String(i.recipe_id);
+      if (!isBlank(i.slug)) out.slug = String(i.slug);
+      out.steps = (Array.isArray(i.steps) ? i.steps : []).map(String);
+      if (Number(i.minutes) > 0) out.minutes = Math.round(Number(i.minutes));
+      return out;
+    };
+    PREP_BUSY += 1;
+    PREP_SAVED_AT = Date.now();
+    return changes.reduce((c, ch) => c.then(() => {
+      const data = { due: ch.due instanceof Date ? prepIso(ch.due) : String(ch.due), items: ch.items.map(clean) };
+      if (!isBlank(ch.id)) data.id = String(ch.id);
+      return this._mealCall("home_signals.save_prep_session", data).then((r) => {
+        touched.push({ id: firstOf(r && r.id, ch.id), was: ch.id ? before.get(ch.id) || null : null });
+      });
+    }), Promise.resolve()).then(() => () => this._prepUndo(touched)).finally(() => { PREP_BUSY -= 1; PREP_SAVED_AT = Date.now(); });
+  }
+
+  _prepUndo(touched) {
+    PREP_BUSY += 1;
+    PREP_SAVED_AT = Date.now();
+    return touched.slice().reverse().reduce((c, t) => c.then(() => {
+      if (isBlank(t.id)) return null;
+      if (!t.was) return this._callAction({ service: "home_signals.remove_prep_session", data: { id: String(t.id) } }, true);
+      return this._mealCall("home_signals.save_prep_session", {
+        id: String(t.id), due: String(t.was.due), items: t.was.items, title: t.was.title,
+      });
+    }), Promise.resolve()).finally(() => { PREP_BUSY -= 1; PREP_SAVED_AT = Date.now(); });
+  }
+
+  /* A sheet with a head, a body and buttons, for the two prep sheets. */
+  _prepSheet(accent, icon, head, cls) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    this._wearAccent(wrap, accent);
+    let done = false;
+    const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(); } };
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    };
+    const fill = (inner, buttons) => {
+      wrap.innerHTML = `<div class="confirmbox tall${cls ? ` ${cls}` : ""}" role="dialog" aria-modal="true" aria-label="${esc(head)}">`
+        + `<div class="confirmhead">${iconMarkup(icon)}<span>${esc(head)}</span></div>`
+        + `<div class="mlrecipe">${inner}</div>`
+        + `<div class="confirmbtns">${buttons || `<button type="button" class="confirmyes" data-no>Close</button>`}</div></div>`;
+      const no = wrap.querySelector("[data-no]");
+      if (no) no.addEventListener("click", finish);
+    };
+    wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
+    document.addEventListener("keydown", onKey, true);
+    this._holder.appendChild(wrap);
+    return { wrap, fill, finish, gone: () => done };
+  }
+
+  /* One meal's prep: each part's window, then when to do it. Joining a
+     session already on Home Tasks comes first, because the house would
+     rather have fewer, bigger jobs; then the house's prep times; then any
+     time at all. A part the chosen time cannot serve is left to the day,
+     and the sheet says so. */
+  _prepOne(body, day, type, entry, accent) {
+    const st = prepState(this._hass);
+    if (!st || !this._mealSources.size || !entry || !entry.recipe) return;
+    const [source] = this._mealSources.values();
+    const rid = String(entry.recipe.recipe_id);
+    const name = mealName(entry);
+    const key = prepKey(day, type, rid);
+    const kind = mealType(type).word;
+    const mealAt = prepMealAt(day, type, st.meals);
+    const sheet = this._prepSheet(accent, "mdi:calendar-clock", `Prep: ${name}`);
+    sheet.fill(`<p class="confirmtext">Reading the recipe…</p>`);
+    this._prepSteps(source.entry, entry.recipe).then(({ prep }) => {
+      if (sheet.gone()) return;
+      if (!prep.length) {
+        sheet.fill(`<p class="confirmtext">${esc(name)} has nothing to do ahead: it is all at the cook.</p>`);
+        return;
+      }
+      const now = new Date();
+      const parts = prep.map((p) => Object.assign({}, p, { win: prepWindow(p, mealAt) }));
+      const fits = (t, p) => t > now && t >= p.win.from && t <= p.win.to;
+      const current = prepSessionOf(st.sessions, day, type, rid);
+      const options = [];
+      const seen = new Set();
+      if (current && !current.done) {
+        const t = new Date(current.due);
+        options.push({ at: t, session: current, keep: true, n: parts.filter((p) => fits(t, p)).length,
+          label: `Keep ${prepWhen(t)}` });
+        seen.add(t.getTime());
+      }
+      for (const s of st.sessions) {
+        const t = new Date(s.due);
+        if (s.done || s === current || t <= now || seen.has(t.getTime())) continue;
+        const n = parts.filter((p) => fits(t, p)).length;
+        if (!n) continue;
+        seen.add(t.getTime());
+        options.push({ at: t, session: s, n, label: `Join ${prepWhen(t)} · ${prepNames(s.items)}` });
+      }
+      const lo = new Date(Math.max(now.getTime(), Math.min(...parts.map((p) => p.win.from.getTime()))));
+      const hi = new Date(Math.max(...parts.map((p) => p.win.to.getTime())));
+      for (const t of prepHouseTimes(st.times, lo, hi)) {
+        if (seen.has(t.getTime())) continue;
+        const n = parts.filter((p) => fits(t, p)).length;
+        if (n) options.push({ at: t, n, label: prepWhen(t) });
+      }
+      const all = parts.length;
+      const rank = (o) => (o.keep ? 0 : 1) + (o.n === all ? 0 : 10) + (o.session ? 0 : 2);
+      options.sort((a, b) => rank(a) - rank(b) || (a.n === b.n ? b.at - a.at : b.n - a.n));
+      const shown = options.slice(0, 5);
+      let chosen = shown[0] || null;
+      let other = null;
+      const draw = () => {
+        const at = chosen ? chosen.at : other;
+        const fitting = at ? parts.filter((p) => fits(at, p)) : [];
+        const left = at ? parts.filter((p) => !fits(at, p)) : [];
+        const title = chosen && chosen.session && !chosen.keep
+          ? `Prep: ${prepNames([...chosen.session.items.filter((i) => prepItemKey(i) !== key), { name }])}`
+          : (chosen && chosen.keep ? chosen.session.title : `Prep: ${name}`);
+        let say = "";
+        if (at && fitting.length) {
+          say = chosen && chosen.keep
+            ? `On Home Tasks as <b>${esc(title)}</b>, due <b>${esc(prepWhenIn(at))}</b>.`
+            : (chosen && chosen.session
+              ? `Joins the ${esc(prepWhenIn(at))} session already on Home Tasks, so no new task: it becomes <b>${esc(title)}</b>, due <b>${esc(prepWhenIn(at))}</b>.`
+              : `One Home Tasks item, <b>${esc(title)}</b>, due <b>${esc(prepWhenIn(at))}</b>.`);
+          if (left.length) {
+            say += ` ${esc(left.map((p) => prepShort(p.text)).join("; "))}: left to the day, `
+              + (left.every((p) => at < p.win.from) ? "it would not keep that long." : "it needs longer than that.");
+          }
+        } else if (at) say = "Nothing can be done ahead at that time. Pick another.";
+        const mins = prepMinutes(fitting);
+        const inner = `<p class="confirmtext">${esc(kind)} is ${esc(prepWhenIn(mealAt, true))}. Each part can be done inside its window; the time you pick goes on Home Tasks as its deadline.</p>`
+          + parts.map((p) => `<div class="ppgroup"><div class="top"><b>${esc(prepShort(p.text))}</b>`
+            + `<span>${Number(p.minutes) > 0 ? `${esc(p.minutes)} min` : ""}</span></div>`
+            + `<div class="how">From ${esc(prepWhenIn(p.win.from))} to ${esc(prepWhenIn(p.win.to))}`
+            + `${p.win.to <= now ? " · too late now" : ""}</div></div>`).join("")
+          + `<h4>Do it</h4><div class="mlchoose">`
+          + shown.map((o, i) => `<button type="button" class="mlchip" data-pp-at="${i}" aria-pressed="${chosen === o}">${esc(o.label)}</button>`).join("")
+          + `<button type="button" class="mlchip" data-pp-other aria-pressed="${!chosen}">Other time…</button></div>`
+          + (!chosen ? `<input type="datetime-local" class="ppotherat" data-pp-when value="${other ? esc(prepIso(other).slice(0, 16)) : ""}">` : "")
+          + `<p class="ppdue" aria-live="polite">${say}${mins && fitting.length ? ` ${mins} min.` : ""}</p>`;
+        sheet.fill(inner,
+          (current && !current.done ? `<button type="button" class="confirmno" data-pp-off>Take off Home Tasks</button>` : "")
+          + `<button type="button" class="confirmno" data-no>Not now</button>`
+          + `<button type="button" class="confirmyes" data-pp-save${fitting.length ? "" : " disabled"}>`
+          + `${esc(chosen && chosen.keep ? "Save" : "Add to Home Tasks")}</button>`);
+        const box = sheet.wrap.querySelector(".confirmbox");
+        box.classList.add("still");
+        sheet.wrap.querySelectorAll("[data-pp-at]").forEach((b) => b.addEventListener("click", () => {
+          chosen = shown[Number(b.getAttribute("data-pp-at"))];
+          draw();
+        }));
+        const oth = sheet.wrap.querySelector("[data-pp-other]");
+        oth.addEventListener("click", () => { chosen = null; draw(); });
+        const when = sheet.wrap.querySelector("[data-pp-when]");
+        if (when) {
+          when.addEventListener("change", () => {
+            const t = new Date(when.value);
+            other = isNaN(t.getTime()) ? null : t;
+            draw();
+          });
+        }
+        const item = () => ({
+          date: day, entry_type: type, name, recipe_id: rid, slug: entry.recipe.slug,
+          steps: fitting.map((p) => p.text), minutes: prepMinutes(fitting),
+        });
+        const without = (s) => s.items.filter((i) => prepItemKey(i) !== key);
+        const go = (changes, said) => {
+          sheet.finish();
+          this._work(() => this._prepApply(changes).then((back) => {
+            this._voiceSay("idle", said);
+            this._mealOfferUndo(said, back);
+          }, (error) => {
+            LOGGER_WARN("spectra-card: could not plan the prep", error);
+            this._voiceSay("idle", "The prep could not be saved.");
+          }));
+        };
+        sheet.wrap.querySelector("[data-pp-save]").addEventListener("click", () => {
+          if (!at || !fitting.length) return;
+          const changes = [];
+          if (chosen && chosen.keep) {
+            changes.push({ id: current.id, due: current.due, items: [...without(current), item()] });
+          } else {
+            if (current && !current.done) changes.push({ id: current.id, due: current.due, items: without(current) });
+            if (chosen && chosen.session) {
+              changes.push({ id: chosen.session.id, due: chosen.session.due, items: [...without(chosen.session), item()] });
+            } else changes.push({ due: at, items: [item()] });
+          }
+          go(changes, `Prep for ${name} due ${prepWhenIn(at)}`);
+        });
+        const off = sheet.wrap.querySelector("[data-pp-off]");
+        if (off) off.addEventListener("click", () => go([{ id: current.id, due: current.due, items: without(current) }], `Prep for ${name} taken off`));
+      };
+      draw();
+    }, (error) => {
+      LOGGER_WARN("spectra-card: could not read the recipe for its prep", error);
+      if (!sheet.gone()) sheet.fill(`<p class="confirmtext">Could not read the recipe.</p>`);
+    });
+  }
+
+  /* The week's prep in as few sittings as the windows allow. Each part is
+     an interval -- the earliest it keeps to the latest it still works --
+     and the fewest times that touch them all is found the classic way:
+     take the part that must be done soonest, put it at the latest time it
+     can have, and let everything that time also serves come along. Only
+     the house's prep times and sessions already on Home Tasks are times. */
+  _prepWeek(body, accent) {
+    const st = prepState(this._hass);
+    if (!st || !this._mealSources.size) return;
+    const [source] = this._mealSources.values();
+    const hit = RECIPE_INDEX.get(source.entry);
+    const byId = new Map(((hit && hit.list) || []).map((r) => [String(r.recipe_id), r]));
+    const dates = new Set(mealDates(body));
+    const now = new Date();
+    const meals = (Array.isArray(body.plan) ? body.plan : []).filter((e) => e && e.recipe
+      && dates.has(String(e.mealplan_date).slice(0, 10))
+      && prepSplit(byId.get(String(e.recipe.recipe_id))))
+      .map((e) => {
+        const day = String(e.mealplan_date).slice(0, 10);
+        const type = String(e.entry_type).toLowerCase();
+        const rid = String(e.recipe.recipe_id);
+        return { e, day, type, rid, key: prepKey(day, type, rid), at: prepMealAt(day, type, st.meals),
+          session: prepSessionOf(st.sessions, day, type, rid) };
+      })
+      .filter((m) => m.at > now && !(m.session && m.session.done));
+    const week = (Number(body.week_offset) || 0) ? "next week" : "this week";
+    if (!meals.length) {
+      this._voiceSay("idle", `Nothing ${week} has prep to do ahead.`);
+      return;
+    }
+    const sheet = this._prepSheet(accent, "mdi:calendar-clock", `Prep for ${week}`, "rpbox ppweek");
+    sheet.fill(`<p class="confirmtext">Reading the recipes…</p>`);
+    Promise.all(meals.map((m) => this._prepSteps(source.entry, m.e.recipe))).then((read) => {
+      if (sheet.gone()) return;
+      const parts = [];
+      meals.forEach((m, mi) => read[mi].prep.forEach((p) => parts.push(Object.assign({}, p, {
+        m, win: prepWindow(p, m.at),
+      }))));
+      const open = st.sessions.filter((s) => !s.done && new Date(s.due) > now);
+      const times = new Map();
+      const hi = new Date(Math.max(...parts.map((p) => p.win.to.getTime())));
+      for (const t of prepHouseTimes(st.times, now, hi)) times.set(t.getTime(), t);
+      for (const s of open) { const t = new Date(s.due); times.set(t.getTime(), t); }
+      const cands = [...times.values()].sort((a, b) => a - b);
+      const inside = (t, p) => t > now && t >= p.win.from && t <= p.win.to;
+      /* Rows: one per meal per sitting, which is what a person moves. */
+      const place = new Map();
+      const todo = parts.filter((p) => cands.some((t) => inside(t, p)))
+        .sort((a, b) => a.win.to - b.win.to);
+      const placed = new Set();
+      for (const p of todo) {
+        if (placed.has(p)) continue;
+        const t = cands.filter((c) => inside(c, p)).pop();
+        for (const q of todo) if (!placed.has(q) && inside(t, q)) { place.set(q, t.getTime()); placed.add(q); }
+      }
+      /* A sitting already on Home Tasks that serves exactly the same parts
+         is preferred to a new one at another time: it changes a task
+         rather than making one. */
+      const groups = new Map();
+      for (const [p, t] of place) { if (!groups.has(t)) groups.set(t, []); groups.get(t).push(p); }
+      for (const [t, list] of [...groups]) {
+        const alt = open.map((s) => new Date(s.due)).find((d) => d.getTime() !== t && list.every((p) => inside(d, p)));
+        if (alt && !groups.has(alt.getTime())) {
+          groups.delete(t);
+          groups.set(alt.getTime(), list);
+          list.forEach((p) => place.set(p, alt.getTime()));
+        }
+      }
+      let rows = [];
+      const byMeal = new Map();
+      for (const p of parts) {
+        const t = place.has(p) ? place.get(p) : 0;
+        const k = `${p.m.key}@${t}`;
+        if (!byMeal.has(k)) { byMeal.set(k, { m: p.m, t, parts: [] }); rows.push(byMeal.get(k)); }
+        byMeal.get(k).parts.push(p);
+      }
+      const earlier = meals.filter((m) => m.session).length;
+      const nothing = meals.filter((m, mi) => !read[mi].prep.length);
+      const draw = () => {
+        const sittings = [...new Set(rows.filter((r) => r.t).map((r) => r.t))].sort((a, b) => a - b);
+        const choices = (r) => cands.filter((c) => r.parts.every((p) => inside(c, p)));
+        const row = (r) => `<li><span>${esc(mealName(r.m.e))}: ${esc(r.parts.map((p) => prepShort(p.text).toLowerCase()).join(", "))}</span>`
+          + `<select data-pp-row="${rows.indexOf(r)}" aria-label="When">`
+          + choices(r).map((c) => `<option value="${c.getTime()}"${c.getTime() === r.t ? " selected" : ""}>${esc(prepWhen(c, true))}</option>`).join("")
+          + `<option value="0"${r.t ? "" : " selected"}>On the day</option></select>`
+          + `<small>${esc(weekdayLabel(`${r.m.day}T12:00:00`) || r.m.day)} ${esc(r.m.type)}`
+          + `${r.parts.map((p) => prepAheadWords(p.ahead_max)).filter(Boolean).slice(0, 1).map((w) => ` · ${w.toLowerCase()}`).join("")}</small></li>`;
+        const box = (t) => {
+          const list = rows.filter((r) => r.t === t);
+          const mins = prepMinutes(list.flatMap((r) => r.parts));
+          return `<div class="ppsess"><div class="h"><b>${esc(t ? prepWhen(new Date(t), true) : "Left for the day")}</b>`
+            + `<span>${esc(t ? `${mins ? `${mins} min · ` : ""}one task` : "no task")}</span></div>`
+            + `<ul>${list.map(row).join("")}</ul></div>`;
+        };
+        const day = rows.some((r) => !r.t);
+        const n = sittings.length;
+        const inner = `<p class="confirmtext">${meals.length === 1 ? "One meal" : `${meals.length} meals`} ${esc(week)} ${meals.length === 1 ? "has" : "have"} something to do ahead.`
+          + (earlier ? ` ${earlier === 1 ? "One was" : `${earlier} were`} already planned meal by meal.` : "")
+          + (n ? ` It fits in ${n === 1 ? "one sitting" : `${n} sittings`}. Each is one task on Home Tasks, due at its time${earlier ? ", and replaces the tasks made meal by meal" : ""}.` : " None of it fits a prep time: it is all left to the day.")
+          + `</p><div class="ppgrid2">${sittings.map(box).join("")}${day ? box(0) : ""}</div>`
+          + (nothing.length ? `<p class="ppnote">${esc(prepNames(nothing.map((m) => ({ name: mealName(m.e) }))))}: nothing to do ahead.</p>` : "")
+          + (n ? `<p class="ppnote">The shopping for these is needed by ${esc(prepWhenIn(new Date(sittings[0]), true))}, not by each meal.</p>` : "");
+        sheet.fill(inner, `<button type="button" class="confirmno" data-no>Not now</button>`
+          + `<button type="button" class="confirmyes" data-pp-save${n || earlier ? "" : " disabled"}>${esc(n ? (n === 1 ? "Save 1 task" : `Save ${n} tasks`) : "Save")}</button>`);
+        sheet.wrap.querySelector(".confirmbox").classList.add("still");
+        sheet.wrap.querySelectorAll("[data-pp-row]").forEach((sel) => sel.addEventListener("change", () => {
+          const r = rows[Number(sel.getAttribute("data-pp-row"))];
+          const t = Number(sel.value) || 0;
+          const same = rows.find((x) => x !== r && x.m === r.m && x.t === t);
+          if (same) { same.parts.push(...r.parts); rows = rows.filter((x) => x !== r); } else r.t = t;
+          draw();
+        }));
+        sheet.wrap.querySelector("[data-pp-save]").addEventListener("click", () => {
+          const scope = new Set(meals.map((m) => m.key));
+          const outside = (s) => s.items.filter((i) => !scope.has(prepItemKey(i)));
+          const reused = new Set();
+          const changes = [];
+          for (const t of sittings) {
+            const items = rows.filter((r) => r.t === t).map((r) => ({
+              date: r.m.day, entry_type: r.m.type, name: mealName(r.m.e), recipe_id: r.m.rid, slug: r.m.e.recipe.slug,
+              steps: r.parts.map((p) => p.text), minutes: prepMinutes(r.parts),
+            }));
+            const same = open.find((s) => new Date(s.due).getTime() === t && !reused.has(s.id));
+            if (same) { reused.add(same.id); changes.push({ id: same.id, due: same.due, items: [...outside(same), ...items] }); } else changes.push({ due: new Date(t), items });
+          }
+          for (const s of open) {
+            if (reused.has(s.id) || !s.items.some((i) => scope.has(prepItemKey(i)))) continue;
+            changes.unshift({ id: s.id, due: s.due, items: outside(s) });
+          }
+          sheet.finish();
+          const said = n === 1 ? "Prep: 1 task on Home Tasks" : `Prep: ${n} tasks on Home Tasks`;
+          this._work(() => this._prepApply(changes).then((back) => {
+            this._voiceSay("idle", said);
+            this._mealOfferUndo(said, back);
+          }, (error) => {
+            LOGGER_WARN("spectra-card: could not plan the week's prep", error);
+            this._voiceSay("idle", "The prep could not be saved.");
+          }));
+        });
+      };
+      draw();
+    }, (error) => {
+      LOGGER_WARN("spectra-card: could not read the week's recipes", error);
+      if (!sheet.gone()) sheet.fill(`<p class="confirmtext">Could not read the recipes.</p>`);
+    });
+  }
+
+  /* The plan keeps the prep honest. Each time a plan is read, a session's
+     meal that is no longer on it is followed: moved, if the same recipe
+     is now planned elsewhere and the session's time still serves it;
+     otherwise taken off the task. What is taken off is remembered for a
+     minute, so Undo on the meal puts the prep back as well.
+
+     Only meals inside the dates just read, and still ahead, are touched:
+     a card showing two days knows nothing about the rest of the week. */
+  _prepReconcile(plan, start, end, asked) {
+    const st = prepState(this._hass);
+    if (!st || PREP_BUSY || (asked && asked < PREP_SAVED_AT) || !Array.isArray(plan) || !this._hass.services.home_signals
+      || !this._hass.services.home_signals.save_prep_session) return;
+    const now = Date.now();
+    const inRange = (d) => d >= start && d <= end;
+    const keyOf = (e) => prepKey(String(e.mealplan_date).slice(0, 10), String(e.entry_type).toLowerCase(), String(e.recipe.recipe_id));
+    const recipes = plan.filter((e) => e && e.recipe && !isBlank(e.recipe.recipe_id));
+    const planned = new Set(recipes.map(keyOf));
+    const held = new Set(st.sessions.flatMap((s) => s.items.map(prepItemKey)));
+    const changes = [];
+    for (const s of st.sessions) {
+      if (s.done) continue;
+      const due = new Date(s.due);
+      const keep = [];
+      let moved = false;
+      for (const i of s.items) {
+        const k = prepItemKey(i);
+        if (!inRange(i.date) || prepMealAt(i.date, i.entry_type, st.meals).getTime() <= now || planned.has(k) || isBlank(i.recipe_id)) {
+          keep.push(i);
+          continue;
+        }
+        moved = true;
+        const to = recipes.filter((e) => String(e.recipe.recipe_id) === String(i.recipe_id) && !held.has(keyOf(e))
+          && prepMealAt(String(e.mealplan_date).slice(0, 10), e.entry_type, st.meals) > due
+          && prepMealAt(String(e.mealplan_date).slice(0, 10), e.entry_type, st.meals).getTime() - due.getTime() <= 72 * 3600000)
+          .sort((a, b) => String(a.mealplan_date).localeCompare(String(b.mealplan_date)))[0];
+        if (to) {
+          const k2 = keyOf(to);
+          held.add(k2);
+          keep.push(Object.assign({}, i, { date: String(to.mealplan_date).slice(0, 10), entry_type: String(to.entry_type).toLowerCase() }));
+        } else PREP_GONE.set(k, { id: s.id, due: s.due, item: i, at: now });
+      }
+      if (moved) changes.push({ id: s.id, due: s.due, items: keep });
+    }
+    /* Undo on a meal puts it back where it was: its prep follows. */
+    for (const [k, g] of [...PREP_GONE]) {
+      if (now - g.at > 60000) { PREP_GONE.delete(k); continue; }
+      if (!planned.has(k) || held.has(k)) continue;
+      PREP_GONE.delete(k);
+      const into = changes.find((c) => c.id === g.id) || st.sessions.find((s) => s.id === g.id && !s.done);
+      if (into && into.items) {
+        const change = changes.find((c) => c.id === g.id);
+        if (change) change.items.push(g.item);
+        else changes.push({ id: g.id, due: into.due, items: [...into.items, g.item] });
+      } else changes.push({ id: g.id, due: g.due, items: [g.item] });
+    }
+    if (!changes.length) return;
+    this._prepApply(changes).catch((error) => LOGGER_WARN("spectra-card: could not keep the prep in step", error));
   }
 
   /* The whole recipe box, not only what is planned. Each name opens its
@@ -14387,6 +15317,20 @@ class SpectraCard extends HTMLElement {
     const servings = Number(r.recipe_servings) > 0 ? String(Math.round(Number(r.recipe_servings))) : "";
     const dictate = !isBlank(edit.dictate);
     const tagsBefore = recipeTagsOf(r);
+    /* The split, as the index has it. A draft may bring its own. */
+    const known = recipe && !isBlank(recipe.recipe_id)
+      ? (((RECIPE_INDEX.get(entry) || {}).list || []).find((x) => String(x.recipe_id) === String(recipe.recipe_id)) || null) : null;
+    const prepBefore = (known && known.prep) || (opts && opts.draft && opts.draft.prep) || null;
+    const splitBefore = prepSplit({ prep: prepBefore });
+    let prepMode = splitBefore ? "split" : "order";
+    /* Timing by the step's text, so editing the method keeps what each
+       step already said about itself, and a step moved keeps its timing. */
+    const timing = new Map();
+    const methodLines = (Array.isArray(r.instructions) ? r.instructions : [])
+      .map((x) => (x && !isBlank(x.text) ? String(x.text).trim() : "")).filter(Boolean);
+    if (splitBefore) {
+      methodLines.slice(0, splitBefore.steps.length).forEach((text, i) => timing.set(text, Object.assign({ prep: true }, splitBefore.steps[i])));
+    }
     wrap.innerHTML = `<div class="confirmbox tall" role="dialog" aria-modal="true" aria-label="Edit recipe">`
       + `<div class="confirmhead"><ha-icon icon="mdi:pencil"></ha-icon>`
       + `<span>${esc(recipe ? "Edit recipe" : ((opts && opts.heading) || "New recipe"))}</span></div>`
@@ -14404,6 +15348,14 @@ class SpectraCard extends HTMLElement {
       + `<textarea id="mling" data-f="ingredients">${esc(lines(r.ingredients, "display"))}</textarea>`
       + `<label for="mlmethod">Method, one step per line</label>`
       + `<textarea id="mlmethod" data-f="method">${esc(lines(r.instructions, "text"))}</textarea>`
+      /* Prep ahead: optional, and nothing changes until it is switched on. */
+      + `<div class="ppsec"><h4>Prep ahead</h4><span class="ppseg" role="group" aria-label="How the method is cooked">`
+      + `<button type="button" data-ppmode="order">In order</button><button type="button" data-ppmode="split">Prep and cook</button></span></div>`
+      + (prepBefore && prepBefore.checked === false
+        ? `<p class="ppnote">${iconMarkup("mdi:auto-fix")} Split into prep and cook when it was imported. Check the steps, then save.</p>` : "")
+      + (prepBefore && prepBefore.mode === "none"
+        ? `<p class="ppnote">Looked at before: nothing in it is worth doing ahead.</p>` : "")
+      + `<ol class="ppedit" data-ppsteps></ol>`
       + `<p class="confirmtext quiet" data-status></p>`
       + `</div><div class="confirmbtns">`
       + (recipe && !isBlank(edit.delete) ? `<button type="button" class="mldelete" data-del>Delete</button>` : "")
@@ -14412,6 +15364,47 @@ class SpectraCard extends HTMLElement {
 
     const field = (name) => wrap.querySelector(`[data-f="${name}"]`);
     const status = (text) => { wrap.querySelector("[data-status]").textContent = text; };
+    const stepLines = () => field("method").value.split("\n").map((x) => x.trim()).filter(Boolean);
+    const timed = (text) => {
+      if (!timing.has(text)) timing.set(text, { prep: false });
+      return timing.get(text);
+    };
+    const options = (list, value, blank) => (blank ? `<option value="">${esc(blank)}</option>` : "")
+      + (list.some(([v]) => String(v) === String(value)) || isBlank(value) ? "" : `<option value="${esc(value)}" selected>${esc(value)}</option>`)
+      + list.map(([v, word]) => `<option value="${esc(v)}"${String(v) === String(value) ? " selected" : ""}>${esc(word)}</option>`).join("");
+    const drawPrep = () => {
+      wrap.querySelectorAll("[data-ppmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.getAttribute("data-ppmode") === prepMode)));
+      const ol = wrap.querySelector("[data-ppsteps]");
+      if (prepMode !== "split") { ol.innerHTML = ""; return; }
+      ol.innerHTML = stepLines().map((text, i) => {
+        const t = timed(text);
+        return `<li${t.prep ? " class=\"prep\"" : ""}><p>${esc(text)}</p><div class="row">`
+          + `<span class="ppseg" role="group" aria-label="Step ${i + 1}">`
+          + `<button type="button" data-pp-step="${i}" data-pp-is="1" aria-pressed="${t.prep}">Prep ahead</button>`
+          + `<button type="button" data-pp-step="${i}" data-pp-is="" aria-pressed="${!t.prep}">At cook</button></span>`
+          + (t.prep ? `<select data-pp-set="ahead_max" data-pp-of="${i}" aria-label="How far ahead">${options(PREP_AHEAD, firstOf(t.ahead_max, PREP_DEFAULT_AHEAD))}</select>`
+            + `<select data-pp-set="ahead_min" data-pp-of="${i}" aria-label="What it needs">${options(PREP_NEEDS, firstOf(t.ahead_min, 0))}</select>`
+            + `<select data-pp-set="keeps" data-pp-of="${i}" aria-label="Where it keeps">${options(PREP_KEEPS.map((k) => [k, k]), t.keeps || "", "Keeps\u2026")}</select>` : "")
+          + `</div></li>`;
+      }).join("");
+      ol.querySelectorAll("[data-pp-step]").forEach((b) => b.addEventListener("click", () => {
+        const t = timed(stepLines()[Number(b.getAttribute("data-pp-step"))]);
+        t.prep = b.getAttribute("data-pp-is") === "1";
+        if (t.prep && !(Number(t.ahead_max) > 0)) t.ahead_max = PREP_DEFAULT_AHEAD;
+        drawPrep();
+      }));
+      ol.querySelectorAll("[data-pp-set]").forEach((sel) => sel.addEventListener("change", () => {
+        const t = timed(stepLines()[Number(sel.getAttribute("data-pp-of"))]);
+        const k = sel.getAttribute("data-pp-set");
+        t[k] = k === "keeps" ? sel.value : Number(sel.value);
+      }));
+    };
+    wrap.querySelectorAll("[data-ppmode]").forEach((b) => b.addEventListener("click", () => {
+      prepMode = b.getAttribute("data-ppmode");
+      drawPrep();
+    }));
+    field("method").addEventListener("change", drawPrep);
+    drawPrep();
     wrap.querySelectorAll("[data-tag]").forEach((chip) => chip.addEventListener("click", () => {
       chip.setAttribute("aria-pressed", String(chip.getAttribute("aria-pressed") !== "true"));
     }));
@@ -14449,6 +15442,25 @@ class SpectraCard extends HTMLElement {
         method: field("method").value,
         total_time: field("total_time").value.trim(),
       };
+      /* A split saves the prep steps first, in their order, then the rest:
+         that is how Mealie's own page shows "Prep ahead" and "To cook". */
+      const all = stepLines();
+      const early = prepMode === "split" ? all.filter((x) => timed(x).prep) : [];
+      if (early.length) {
+        data.method = [...early, ...all.filter((x) => !timed(x).prep)].join("\n");
+        data.prep = {
+          mode: "split", checked: true,
+          steps: early.map((x) => {
+            const t = timed(x);
+            const out = {};
+            ["ahead_max", "ahead_min", "minutes"].forEach((k) => { if (Number(t[k]) > 0) out[k] = Number(t[k]); });
+            if (!isBlank(t.keeps)) out.keeps = String(t.keeps);
+            if (!isBlank(t.source)) out.source = String(t.source);
+            return out;
+          }),
+        };
+      } else if (splitBefore) data.prep = { mode: "order" };
+      else if (prepBefore && prepBefore.checked === false) data.prep = { mode: prepBefore.mode === "none" ? "none" : "order", checked: true };
       if (name) data.name = name;
       const serves = Number(field("servings").value);
       if (serves > 0) data.servings = serves;
@@ -14464,6 +15476,8 @@ class SpectraCard extends HTMLElement {
         const saved = (result && result.response) || {};
         finish();
         this._voiceSay("idle", `${firstOf(saved.name, name, "Recipe")} saved`);
+        if (data.prep && recipe) RECIPE_FULL.delete(`${entry}|${recipe.recipe_id}`);
+        if (data.prep) this._recipeIndex(entry, true).then(() => { this._signature = null; this._update(); }, () => {});
         this._refetchMeals();
         if (onSaved) onSaved(saved);
         /* A new recipe nobody tagged is tagged by AI, in the background:

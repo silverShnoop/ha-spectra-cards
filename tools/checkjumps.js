@@ -45,6 +45,9 @@ const js = fs.readFileSync(file);
   const run = async (width) => {
     const page = await browser.newPage({ viewport: { width, height: 1600 }, hasTouch: true });
     page.on("pageerror", (e) => console.log("PAGEERROR:", e.stack.split("\n").slice(0, 3).join(" | ")));
+    /* A Wednesday: the card shows a Monday week, and on a Sunday
+       tomorrow is next week, off the grid this presses. */
+    await page.clock.setFixedTime(new Date("2026-09-30T10:00:00"));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.waitForFunction(() => !!customElements.get("spectra-card"));
     const out = await page.evaluate(async (w) => {
@@ -61,7 +64,8 @@ const js = fs.readFileSync(file);
       const INDEX = [
         { recipe_id: "r1", slug: "sea-bass", name: "Sea bass with ginger", total_time: "25 minutes",
           tags: ["Dinner", "Fish", "Quick"], ingredients: ["2 fillets", "1 lime"], last_made: day(-21),
-          date_added: "2026-08-01", favourite: true, image: "x1" },
+          date_added: "2026-08-01", favourite: true, image: "x1",
+          prep: { mode: "split", checked: true, steps: [{ ahead_max: 24, keeps: "Fridge", minutes: 5 }, { ahead_max: 8 }] } },
         { recipe_id: "r2", slug: "oats", name: "Overnight oats", total_time: "10 minutes",
           tags: ["Breakfast", "Quick"], ingredients: ["50g oats", "milk"], last_made: null,
           date_added: "2026-09-20", favourite: false, image: null },
@@ -75,8 +79,10 @@ const js = fs.readFileSync(file);
         { mealplan_id: 2, mealplan_date: day(1), entry_type: "dinner", recipe: null, title: "Fish pie" },
       ];
       const hass = {
-        states: {},
-        services: { home_signals: { recipe_index: {}, save_recipe: {} } },
+        states: { "sensor.meal_prep": { state: "0", attributes: { sessions: [], level: null,
+          meal_times: { breakfast: "07:00", lunch: "12:00", dinner: "17:00" },
+          prep_times: [{ days: [0, 1, 2, 3, 4, 5, 6], time: "12:00" }] } } },
+        services: { home_signals: { recipe_index: {}, save_recipe: {}, save_prep_session: {} } },
         callService: () => Promise.resolve(),
         callWS: (msg) => {
           const d = msg.service_data || {};
@@ -190,6 +196,18 @@ const js = fs.readFileSync(file);
         }],
         ["the fridge", async () => {
           const r = await fresh(); r.querySelector("[data-meal-fridge]").click(); await wait(300); return [r, ".confirmwrap"];
+        }],
+        ["one meal's prep", async () => {
+          const r = await fresh(); cellOf(r, `${day(0)}|dinner`).click(); await wait(150);
+          r.querySelector("[data-meal-prep]").click(); await wait(500); return [r, ".confirmwrap"];
+        }],
+        ["the week's prep", async () => {
+          const r = await fresh(); r.querySelector("[data-meal-prepweek]").click(); await wait(500); return [r, ".confirmwrap"];
+        }],
+        ["the form's split", async () => {
+          const r = await fresh(); cellOf(r, `${day(0)}|dinner`).click(); await wait(150);
+          r.querySelector("[data-meal-recipe]").click(); await wait(500);
+          r.querySelector(".confirmwrap [data-edit]").click(); await wait(300); return [r, ".confirmwrap .ppedit, .confirmwrap .ppsec"];
         }],
         ["fill", async () => {
           const r = await fresh(); r.querySelector("[data-meal-week]").click(); await wait(300);
