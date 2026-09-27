@@ -492,7 +492,17 @@ const js = fs.readFileSync(file);
       wk && JSON.stringify(wk.service_data));
     check("with what to bear in mind", wk && wk.service_data.request === "something light, No fish",
       wk && JSON.stringify(wk.service_data));
-    check("and says how many it planned, under the week", text(q(".mlfoot .tdvoicesay")) === "3 dinners planned",
+    const proposed = root().querySelector(".confirmwrap");
+    check("and shows what it suggests before writing anything", proposed && text(proposed).includes("Suggested meals")
+      && text(proposed).includes("A") && text(proposed).includes("C")
+      && !asked.some((m) => m.service === "meal_plan_set"), proposed && text(proposed));
+    const setsBefore = asked.filter((m) => m.service === "meal_plan_set").length;
+    proposed.querySelector("[data-yes]").click();
+    await settle();
+    const placed = asked.filter((m) => m.service === "meal_plan_set").slice(setsBefore);
+    check("a yes plans each of them through the place script", !root().querySelector(".confirmwrap")
+      && placed.map((m) => m.service_data.title).join(",") === "A,B,C", JSON.stringify(placed.map((m) => m.service_data)));
+    check("and says how many it planned, above the week", /3/.test(text(q(".mlfoot .tdvoicesay"))),
       text(q(".mlfoot")));
     el._voiceSay("idle", "");
 
@@ -696,12 +706,13 @@ const js = fs.readFileSync(file);
     rq("[data-recipe-add]").click();
     await settle();
     const addTabs = rall(".confirmwrap .plantabs [data-plantab]").map((b) => b.getAttribute("data-plantab"));
-    check("+ opens Add a recipe, with Link, Photo and Type", addTabs.join("|") === "link|photo|type"
-      || (addTabs.includes("link") && addTabs.includes("type")), addTabs.join("|"));
+    check("+ opens Add a recipe, with Link and Type (no Photo without a photo script)",
+      addTabs.join("|") === "link|type", addTabs.join("|"));
     rtop().querySelector("[data-plantab=type]").click();
     await settle();
-    check("Type is an empty form", rroot().querySelectorAll(".confirmwrap").length === 1
-      && text(rtop()).includes("New recipe") && rtop().querySelector("[data-f=name]").value === "", text(rtop()));
+    check("Type is an empty form, in the same sheet", rroot().querySelectorAll(".confirmwrap").length === 1
+      && rtop().querySelector("[data-f=name]").value === "" && rtop().querySelector("[data-f=ingredients]").value === ""
+      && rtop().querySelector(".plantabs [data-plantab=type].on"), text(rtop()));
     rtop().querySelector("[data-no]").click();
     await settle();
     rq("[data-recipe-add]").click();
