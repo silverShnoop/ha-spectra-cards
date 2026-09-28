@@ -115,6 +115,7 @@ customElements.define("fake-section", FakeSection);
           cards: [card("Downstairs", 2), card("Kitchen", 3), card("Living", 3), card("Hall", 2), card("Study", 4)] },
         { type: "grid", column_span: 3, cards: [card("Upstairs", 2), card("Bedroom", 3), card("Ensuite", 2), card("Guest", 4), card("Landing", 3), card("Riley's Room", 4), card("Loft", 5)] },
         { type: "grid", column_span: 1, cards: [card("Other tab", 2)] },
+        { type: "grid", column_span: 1, spectra_slot: "side", cards: [card("Clock", 1)] },
       ];
       const sections = configs.map((c) => { const s = document.createElement("fake-section"); s.config = c; return s; });
       const view = document.createElement("spectra-panel");
@@ -142,16 +143,22 @@ customElements.define("fake-section", FakeSection);
       };
       scroller.scrollTop = 0;
       /* A different tab resets the scroll and recounts the columns. */
-      sections[2].setHidden(true); sections[3].setHidden(true); sections[4].setHidden(false);
+      sections[2].setHidden(true); sections[3].setHidden(true); sections[4].setHidden(false); sections[5].setHidden(true);
       await new Promise((r) => setTimeout(r, 100));
       out.loneCols = Number(root.querySelector(".grid").style.getPropertyValue("--pn-cols"));
-      sections[2].setHidden(false); sections[3].setHidden(false); sections[4].setHidden(true);
+      sections[2].setHidden(false); sections[3].setHidden(false); sections[4].setHidden(true); sections[5].setHidden(false);
       /* Nothing to do: Needs you goes, and the content takes its room. */
+      /* The side slot: under Needs you in a column, in the grid in a strip. */
+      out.sideInAside = !!sections[5].closest && root.querySelector(".sidebox").contains(sections[5]);
+      out.sideInGrid = root.querySelector(".grid").contains(sections[5]);
+      /* Nothing to do and nothing riding under it: the column goes. */
+      sections[5].setHidden(true);
       sections[0].setHidden(true);
       await new Promise((r) => setTimeout(r, 100));
       out.needsGone = getComputedStyle(root.querySelector(".needs")).display === "none";
       out.mainX = rect(".main").x;
       sections[0].setHidden(false);
+      sections[5].setHidden(false);
       await new Promise((r) => setTimeout(r, 100));
       return out;
     });
@@ -176,6 +183,8 @@ customElements.define("fake-section", FakeSection);
     check("a hidden section takes no room", !got.hiddenShown, got.hiddenShown);
     check("columns", got.cols === (name === "phone" ? 1 : 2), got.cols);
     check("a lone span-1 section fills the width", got.loneCols === 1, got.loneCols);
+    check(side ? "a side section rides under Needs you" : "a side section joins the grid",
+      side ? got.sideInAside && !got.sideInGrid : got.sideInGrid && !got.sideInAside, got);
     check("no Needs you, no gap for it", got.needsGone && got.mainX < 40, got);
 
     if (shots) {
