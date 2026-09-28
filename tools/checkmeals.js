@@ -408,7 +408,7 @@ const js = fs.readFileSync(file);
       read && JSON.stringify(read.service_data));
     check("and shows its ingredients and method in order",
       book && book.querySelectorAll(".mlrecipe ul li").length === 2
-        && text(book.querySelector(".mlrecipe ol li")) === "Season the fish.",
+        && text(book.querySelector(".mlrecipe ol li .rmtext")) === "Season the fish.",
       book && text(book));
     check("with the time and servings", book && text(book).includes("25 min · serves 6"), book && text(book));
     check("and writes nothing", !calls.length || calls.every((c) => c.service !== "mealie.set_mealplan"),
