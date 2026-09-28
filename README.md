@@ -1841,15 +1841,27 @@ expects today.
 
 ### Prep ahead
 
-Needs home_signals 0.14 (`sensor.meal_prep` and the `prep` split on
+Needs home_signals 0.15 (`sensor.meal_prep`, and `prep` noted in place on
 recipes). Nothing to configure: with the sensor present, a meals card
 shows prep, and without it, it shows none.
 
-- **A recipe can be split** into *Prep ahead* and *To cook*. Its sheet reads
-  in those two halves, each prep step saying how far ahead it can be done,
-  what it needs (a marinade's hour) and where it keeps. The form has **In
-  order / Prep and cook**, and per step **Prep ahead / At cook**; saving
-  puts the prep steps first.
+**Prepping is optional, so a recipe has one method in its own order.** What
+can be done ahead is noted on the steps rather than moved to the front:
+
+- a step that can be done ahead carries its chips: how far ahead, what it
+  needs (a marinade's hour) and where it keeps;
+- a step that is part ahead and part on the night shows **both halves**;
+- anything that only applies when made ahead is its own **If made ahead:**
+  line ("Cover and chill"), so the same-day cook can skip it;
+- a run of steps made ahead together (a sauce) is bracketed as a block, with
+  its reheat as the block's *If made ahead* line.
+
+**Cook asks "Did you prep ahead?"**, unless Home Tasks already knows the
+sitting was done. *Yes* starts at the first cook step with the prep shown as
+done; *No* cooks the whole method in order. The form's **No prep / Some
+ahead** and per-step **Prep ahead / At cook** save the notes without
+touching the method. An older split, with its prep moved first, still reads
+in its two halves.
 - **Each meal with prep says so, as a fact**: *Prep Mon 19:30*, *Prepped*
   or *Prep not planned*. The open slot's tray adds a line and a **Prep**
   tile.
@@ -1876,8 +1888,24 @@ button's `accent` and `fill` read `tab_kitchen`, as every other tab does;
 the card draws no level of its own.
 
 With `import.split`, **From a link** waits for the split after saving and
-shows it once: **Looks right**, **Keep in order** (the method as it came)
-or **Edit**.
+shows it once, as the sheet will: **Looks right**, **No prep** or **Edit**.
+
+### Where a recipe came from
+
+A small mark at the end of a step says AI had a hand in it, and which kind:
+
+| Mark | Icon | Meaning |
+| --- | --- | --- |
+| Interpreted | `mdi:eye-outline` | read from a page, video or photo by AI |
+| Created | `mdi:creation` | written by AI, with no source |
+| Enhanced | `mdi:auto-fix` | added to by AI: a split half, an *If made ahead* line |
+
+Tapping a mark says who and when (*Enhanced by Claude Sonnet 5 · 28 Sep*).
+A step a person rewrites loses its mark. **About this recipe**, folded at
+the foot of the sheet, has where it came from and when it was added, and a
+line for everything AI did to it: read, written, split, tagged. It all
+comes from the recipe's `provenance` in the home_signals index, and a
+recipe with none shows no marks and no About.
 
 ### Recipe photos
 
