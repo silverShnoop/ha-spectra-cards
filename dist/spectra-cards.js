@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.130.0";
+const VERSION = "0.130.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2212,7 +2212,7 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
    groups and steps run on the page beneath it, full width. */
 .rmpanel, .rmphase { margin-top:24px; }
 .rmmethod.lanes { margin-top:0; }
-.rmlanehead { padding:10px 12px; border-radius:10px; }
+h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .rmpanel > .rmlanehead { background:var(--sp-sink); color:var(--sp-ink-2); }
 .rmpanel > .rmlanehead .rmlane { color:var(--sp-ink-2); background:color-mix(in srgb, var(--sp-surface) 55%, transparent); }
 .rmlanehead.ahead { background:var(--rm-ahead); color:var(--sp-surface); }
