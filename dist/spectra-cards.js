@@ -4177,6 +4177,8 @@ function collectSources(spec, found) {
      when something happens, and a quiet house is exactly when the glow
      has to keep going down. */
   if (spec.type === "floorplan") found.live = true;
+  /* "Wet for 12m" counts up while nothing else on the card changes. */
+  if (spec.type === "washer" && spec.wet_since !== undefined) found.live = true;
   if (typeof spec.entity === "string") {
     found.entities.add(spec.entity);
     return found;
@@ -5254,7 +5256,15 @@ const BODIES = {
     /* Stood down is not quiet: the cutoff fires only on the pad GOING wet,
        so until it dries a second leak would cut nothing. Attention, with
        its own Needs-you row, until it does. */
-    if (wet) chips.push(chipOf("Sensor wet", "mdi:water", leak ? "critical" : "attention"));
+    /* How long, not since when: how long water may have been on the floor
+       is what decides how worried to be. `wet_since` is a timestamp and
+       the card ticks while it is set, so the chip counts up by itself.
+       Without one it falls back to the plain fact. */
+    if (wet) {
+      const wetFor = isBlank(b.wet_since) ? null : shortSince(b.wet_since);
+      chips.push(chipOf(wetFor ? `Wet for ${wetFor}` : "Sensor wet", "mdi:water",
+        leak ? "critical" : "attention"));
+    }
     if (!powered) chips.push(chipOf("Plug off", "mdi:power-plug-off", "waiting"));
     /* No wattage chip. The draw is already in the card's `meta`, top right,
        where every other measurement on this panel lives -- so the chip was
