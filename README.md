@@ -1845,16 +1845,33 @@ Needs home_signals 0.15 (`sensor.meal_prep`, and `prep` noted in place on
 recipes). Nothing to configure: with the sensor present, a meals card
 shows prep, and without it, it shows none.
 
-**Prepping is optional, so a recipe has one method in its own order.** What
-can be done ahead is noted on the steps rather than moved to the front:
+**Prepping is optional, so a recipe has one method in its own order**, in
+its titled groups of steps (*The chicken*, *The sauce*, *To finish*) from
+Mealie's own section titles, which the recipe page or the split supplies.
+**Doing ahead belongs to a group, not a step**, and a group can be a single
+step:
 
-- a step that can be done ahead carries its chips: how far ahead, what it
-  needs (a marinade's hour) and where it keeps;
-- a step that is part ahead and part on the night shows **both halves**;
-- anything that only applies when made ahead is its own **If made ahead:**
-  line ("Cover and chill"), so the same-day cook can skip it;
-- a run of steps made ahead together (a sauce) is bracketed as a block, with
-  its reheat as the block's *If made ahead* line.
+- the method has two **lanes**, each an icon and a colour, said once in a
+  key at its top: **Ahead** (knife, teal) and **On the day** (flame, the
+  card's accent). Every step's number wears its lane's colour, so prep and
+  cooking read apart at a glance, whether or not anything is being made
+  ahead this time. Colour is never the only sign: the key, the icons and
+  the chips say it too;
+- a group that can be done ahead carries its chips beside its title: how
+  far ahead, what it needs (a marinade's hour) and where it keeps. Its steps
+  stay plain, numbered flush under the title;
+- under its steps, in the steps' own column, are the lines that only apply
+  when it is made ahead, each marked with its lane's icon where a step has
+  its number: how to keep it (Ahead: "Cover and chill") and what that
+  changes on the day (On the day: "Take it out 20 mins before grilling",
+  "Reheat the sauce"). The same-day cook skips them;
+- a step that is part ahead and part on the day shows both halves, the
+  second in the On the day lane;
+- a group only partly done ahead (an older split) says which steps.
+
+Cooking shows the group beside the step count (*Step 3 of 8 · The sauce*),
+in either version. A recipe with no titles still groups what can be done
+ahead, named by its steps.
 
 **Cook asks "Did you prep ahead?"**, unless Home Tasks already knows the
 sitting was done. *Yes* starts at the first cook step with the prep shown as
