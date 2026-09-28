@@ -2376,6 +2376,58 @@ chips:
 Optional on purpose: most chips are a measurement, and a measurement has no
 icon.
 
+## `spectra-panel` — a view that keeps the chrome still
+
+Not a card: a **view type**. It takes the same `sections` a sections view
+does, and lifts two of them out of the scroll.
+
+```yaml
+views:
+  - title: Home
+    path: home
+    type: custom:spectra-panel
+    max_columns: 3            # as on a sections view
+    needs_width: 340          # optional: the side column, px
+    needs_max_height: 36      # optional: upright cap on Needs you, % of height
+    side_min_width: 900       # optional: narrowest width that goes sideways
+    sections:
+      - type: grid
+        spectra_slot: needs   # this section is Needs you
+        cards: [...]
+      - type: grid            # holds a spectra-dock, so it is the rail
+        cards: [...]
+      - ...                   # everything else scrolls
+```
+
+**Needs you and the rail never scroll.** The page itself does not scroll at
+all: the panel is exactly as tall as the screen that is left under Home
+Assistant's header — measured, so kiosk mode needs no setting — and only the
+content below the rail scrolls, inside itself. A job cannot scroll out of
+sight, and the tabs are always a thumb away.
+
+**Upright, Needs you goes across the top; sideways, down the left.** A strip
+across the top spends the scarce dimension of a landscape screen on a list,
+so held sideways (wider than tall, and at least `side_min_width`) it becomes
+a full-height column, one job to a line. Upright it stays across the top but
+is capped, scrolling inside itself, so a busy morning cannot push the rail
+off the bottom. With nothing to do it takes no room in either.
+
+**The rest is laid out as a sections view lays it out** — as many 320px
+columns as fit, up to `max_columns`, never more than the visible sections
+can fill, `column_span` honoured, and each section's own 12-column grid
+spread across its span. So a card with `grid_options: {columns: 12}` is one
+column wide: in a span-3 section it sits two or three to a row on a tablet
+and alone on a phone, where `columns: full` would be a single column
+everywhere. A section `background` is drawn as it would be there.
+
+Switching tab starts the new tab at the top. There is no edit mode for this
+view in the dashboard editor; switch the view's `type` to `sections` to edit
+it there, and back.
+
+`tools/checkpanel.js` renders it upright, sideways and on a phone, scrolls
+the content to the bottom, and fails if Needs you or the rail moved a pixel
+or the page scrolled at all.
+
 ## Rows from a collection
 
 A `list` (or any array) can be built one row per item:
