@@ -2264,6 +2264,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .rmabout summary::-webkit-details-marker { display:none; }
 .rmabout p { display:flex; gap:8px; align-items:flex-start; margin:6px 0 0; line-height:1.4; }
 .rmabout .mdi { width:16px; height:16px; flex:none; color:var(--sp-ink-3); margin-top:1px; }
+.rmabout .rmcame { display:block; margin-top:1px; font-size:12.5px; color:var(--sp-ink-3); }
 .ppnote { margin:10px 0 0; padding:10px 12px; border-radius:10px; background:var(--sp-sink); font-size:13px; color:var(--sp-ink-2); line-height:1.4; }
 .ppnote .mdi { width:16px; height:16px; vertical-align:-3px; color:var(--accent); }
 /* Two choices side by side, each the same width whichever is pressed, so
@@ -8272,8 +8273,11 @@ function recipeMethodMarkup(texts, split, prov, sections) {
 }
 
 /* Where a recipe came from and what AI did to it, folded away under the
-   method: facts for whoever wonders, never in the way. */
-function recipeAboutMarkup(prov, r) {
+   method: facts for whoever wonders, never in the way. Each time AI ran
+   says what came of it, even when that was nothing: "nothing worth doing
+   ahead" is an answer, and a run that shows no trace looks like one that
+   never happened. */
+function recipeAboutMarkup(prov, r, prep) {
   const src = (prov && prov.source) || {};
   const lines = [];
   const host = (u) => String(u || "").replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
@@ -8284,13 +8288,25 @@ function recipeAboutMarkup(prov, r) {
     lines.push([src.kind === "page" || src.kind === "video" ? "mdi:link" : "mdi:information-outline",
       `Added${added ? ` ${added.replace(/, \d\d:\d\d$/, "")}` : ""}${src.kind ? ` ${KIND[src.kind] || ""}` : ""}`]);
   }
-  ((prov && prov.events) || []).forEach((e) => {
+  const events = (prov && prov.events) || [];
+  const lastSplit = [...events].reverse().find((e) => e.what === "split");
+  /* What the latest split left, when it did not say: read off the prep as
+     it stands. An older split's answer has been replaced, so it says none. */
+  const splitNow = () => {
+    if (!prep || !prep.mode) return "";
+    if (prep.mode === "none") return "Nothing worth doing ahead";
+    const n = Array.isArray(prep.steps) ? prep.steps.length : 0;
+    if (!n) return "";
+    return `${n === 1 ? "1 step" : `${n} steps`} can be done ahead${isBlank(prep.reheat) ? "" : ", then reheated"}`;
+  };
+  events.forEach((e) => {
     const icon = e.what === "split" ? "mdi:knife" : (e.what === "tagged" ? "mdi:tag-outline" : (e.what === "wrote" ? "mdi:creation" : (e.what === "read" ? "mdi:eye-outline" : "mdi:check")));
-    lines.push([icon, `${AI_EVENTS[e.what] || "Changed by"} ${e.what === "checked" ? "a person" : aiName(e.by)}${aiWhen(e.at) ? ` \u00b7 ${aiWhen(e.at)}` : ""}`]);
+    const came = !isBlank(e.note) ? String(e.note) : (e === lastSplit ? splitNow() : "");
+    lines.push([icon, `${AI_EVENTS[e.what] || "Changed by"} ${e.what === "checked" ? "a person" : aiName(e.by)}${aiWhen(e.at) ? ` \u00b7 ${aiWhen(e.at)}` : ""}`, came]);
   });
   if (!lines.length) return "";
   return `<details class="rmabout"><summary>${iconMarkup("mdi:information-outline")}<span>About this recipe</span></summary>`
-    + lines.map(([icon, text]) => `<p>${iconMarkup(icon)}<span>${esc(text)}</span></p>`).join("") + `</details>`;
+    + lines.map(([icon, text, came]) => `<p>${iconMarkup(icon)}<span>${esc(text)}${came ? `<small class="rmcame">${esc(came)}</small>` : ""}</span></p>`).join("") + `</details>`;
 }
 
 function prepAheadWords(hours) {
@@ -15525,7 +15541,7 @@ class SpectraCard extends HTMLElement {
         + (steps.length ? methodHtml : "")
         + (!ingredients.length && !steps.length
           ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : "")
-        + recipeAboutMarkup(prov, full);
+        + recipeAboutMarkup(prov, full, known && known.prep);
       fill(body);
     }, (error) => {
       LOGGER_WARN("spectra-card: could not open the recipe", error);
