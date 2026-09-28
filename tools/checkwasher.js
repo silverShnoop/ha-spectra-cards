@@ -462,6 +462,12 @@ const js = fs.readFileSync(file);
     check("at attention, not critical",
       wetChip && getComputedStyle(wetChip).color === tokenColour("--sp-attention-on"),
       wetChip && getComputedStyle(wetChip).color);
+    /* How long the pad has been wet, not when: the chip counts up. */
+    await show({ leak: true, leak_alarm: true, powered: false,
+      wet_since: new Date(Date.now() - 12 * 60000).toISOString() });
+    check("the wet chip says how long",
+      all(".pill").some((p) => p.textContent.includes("Wet for 12m")),
+      all(".pill").map((p) => p.textContent.trim()).join(" | "));
     await show({ leak: true, leak_alarm: true, powered: true });
     check("while a leak nobody has acted on is still red",
       getComputedStyle(q(".drumglyph")).color === lvl("critical"),
