@@ -139,6 +139,22 @@ customElements.define("fake-section", FakeSection);
         cols: Number(root.querySelector(".grid").style.getPropertyValue("--pn-cols")),
         before, after, scrollable, scrolledTo: scroller.scrollTop,
         pageScrolls: document.scrollingElement.scrollHeight > window.innerHeight + 1,
+        /* The rail on a phone: at the bottom, icons only, caret pointing up. */
+        railBottom: rect(".rail").y + rect(".rail").h,
+        scrollTop: rect(".scroll").y,
+        railY: rect(".rail").y,
+        labels: (() => {
+          const dock = root.querySelector("spectra-dock");
+          const h4 = dock && dock.shadowRoot.querySelector(".dockbtn h4");
+          return h4 ? getComputedStyle(h4).display : "missing";
+        })(),
+        caret: (() => {
+          const dock = root.querySelector("spectra-dock");
+          const sel = dock && dock.shadowRoot.querySelector(".dockbtn.selected");
+          if (!sel) return "missing";
+          const after = getComputedStyle(sel, "::after");
+          return parseFloat(after.top) < 0 ? "up" : "down";
+        })(),
         hiddenShown: getComputedStyle(sections[4].parentElement).display !== "none",
       };
       scroller.scrollTop = 0;
@@ -182,6 +198,14 @@ customElements.define("fake-section", FakeSection);
     check("the page itself never scrolls", !got.pageScrolls, got.pageScrolls);
     check("a hidden section takes no room", !got.hiddenShown, got.hiddenShown);
     check("columns", got.cols === (name === "phone" ? 1 : 2), got.cols);
+    if (name === "phone") {
+      check("the rail sits at the bottom of the screen", got.railY > got.scrollTop && got.railBottom > viewport.height - 40, got);
+      check("the rail is icons only", got.labels === "none", got.labels);
+      check("its caret points up at the cards", got.caret === "up", got.caret);
+    } else {
+      check("the rail keeps its labels", got.labels !== "none", got.labels);
+      check("its caret points down at the cards", got.caret === "down", got.caret);
+    }
     check("a lone span-1 section fills the width", got.loneCols === 1, got.loneCols);
     check(side ? "a side section rides under Needs you" : "a side section joins the grid",
       side ? got.sideInAside && !got.sideInGrid : got.sideInGrid && !got.sideInAside, got);
