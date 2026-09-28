@@ -1852,9 +1852,18 @@ can be done ahead is noted on the steps rather than moved to the front:
   needs (a marinade's hour) and where it keeps;
 - a step that is part ahead and part on the night shows **both halves**;
 - anything that only applies when made ahead is its own **If made ahead:**
-  line ("Cover and chill"), so the same-day cook can skip it;
+  line, in two parts because it is said at two times: how to keep it
+  ("Cover and chill", said at the prep) and **On the night:** what that
+  changes ("Take it out 20 mins before grilling", said at the stove). The
+  same-day cook skips both;
 - a run of steps made ahead together (a sauce) is bracketed as a block, with
-  its reheat as the block's *If made ahead* line.
+  how it keeps and its reheat as the block's *If made ahead* line.
+
+**Groups of steps are titled** (*The chicken*, *The sauce*, *To finish*),
+from Mealie's own section titles, which the recipe page or the split
+supplies. A part made ahead is its own group, so its title heads its block
+and says what "it" is. Cooking shows the group beside the step count
+(*Step 3 of 8 · The sauce*), in either version.
 
 **Cook asks "Did you prep ahead?"**, unless Home Tasks already knows the
 sitting was done. *Yes* starts at the first cook step with the prep shown as

@@ -280,12 +280,13 @@ const js = fs.readFileSync(file);
     const katsu = { recipe_id: "r5", slug: "katsu", name: "Katsu" };
     index.push({ recipe_id: "r5", slug: "katsu", name: "Katsu", prep: { mode: "split", checked: true, in_place: true,
       reheat: "Warm the sauce through.", reheat_at: 1, steps: [
-        { n: 1, ahead_max: 72, keeps: "Fridge", minutes: 25, if_ahead: "Cool, cover and chill." },
+        { n: 1, ahead_max: 72, keeps: "Fridge", minutes: 25, store: "Cool, cover and chill." },
         { n: 2, ahead_max: 24, minutes: 10, ahead: "Bread the chicken.", cook: "Fry the chicken until golden.", if_ahead: "Pat it dry first." }] },
       provenance: { source: { kind: "page", url: "https://example.com/katsu" },
         events: [{ id: 1, what: "read", by: "Mealie", at: "2026-09-01T10:00:00+00:00" },
           { id: 2, what: "split", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:01:00+00:00" }],
-        marks: { 3: { mark: "interpreted", event: 1 } } } });
+        marks: { 3: { mark: "interpreted", event: 1 } } },
+      sections: [{ n: 1, title: "The sauce" }, { n: 2, title: "The chicken" }] });
     method.r5 = ["Make the curry sauce.", "Bread and fry the chicken.", "Serve with rice."];
     await card._recipeIndex("e1", true);
     card._mealRecipe("e1", katsu, 6, { save: "home_signals.save_recipe" }, {});
@@ -295,8 +296,14 @@ const js = fs.readFileSync(file);
     check("in place: one method, in the recipe's order", lis.length === 3
       && [...r.querySelectorAll(".ppsec h4")].map(text).join() === "Method", r && text(r));
     check("a split step shows both halves", lis[1] && lis[1].querySelectorAll(".rmhalf").length === 2, lis[1] && lis[1].innerHTML);
-    check("what only applies when made ahead is its own line", text(r.querySelector(".rmif")).includes("Cool, cover and chill"),
-      text(r.querySelector(".rmif")));
+    const ifs = [...r.querySelectorAll(".rmif")].map(text);
+    check("a part made ahead says how it keeps, and its night, once at its end",
+      ifs[0] === "If made ahead: Cool, cover and chill. On the night: Warm the sauce through.", ifs.join(" | "));
+    check("a step's night line is said as the night's", ifs[1] === "If made ahead, on the night: Pat it dry first.", ifs.join(" | "));
+    check("groups of steps are titled, the made-ahead one heading its block",
+      [...r.querySelectorAll(".rmsec")].map(text).join() === "The sauce,The chicken"
+      && text(r.querySelector(".rmblock > .rmsec")) === "The sauce" && !text(r.querySelector(".rmblocktag")).includes("Steps"),
+      [...r.querySelectorAll(".rmsec")].map(text).join());
     check("each AI change carries its mark", Boolean(lis[2] && lis[2].querySelector(".aimark[aria-label^='Interpreted']"))
       && Boolean(lis[1] && lis[1].querySelector(".aimark[aria-label^='Enhanced']")), lis[2] && lis[2].innerHTML);
     lis[2].querySelector(".aimark").click();
@@ -312,6 +319,8 @@ const js = fs.readFileSync(file);
     await settle();
     check("no: the whole method, in order", text(q(".mlcook .mlcookof")).startsWith("Step 1 of 3")
       && !q(".mlcook .ppbanner"), text(q(".mlcook")));
+    check("and cooking says which part of the dish it is in", text(q(".mlcook .mlcookof")) === "Step 1 of 3 · The sauce",
+      text(q(".mlcook .mlcookof")));
     q(".mlcook [data-cook-done]").click();
     q(".confirmwrap [data-no]").click();
     await settle();
@@ -322,8 +331,10 @@ const js = fs.readFileSync(file);
     q(".mlcook [data-cook-prepped]").click();
     await settle();
     const night = [];
+    const parts = [];
     for (let i = 0; i < 6; i += 1) {
       night.push(text(q(".mlcook .mlcookstep")));
+      parts.push(text(q(".mlcook .mlcookof")).split(" · ").pop());
       const next = q(".mlcook [data-cook-next]");
       if (!next || next.disabled) break;
       next.click();
@@ -332,6 +343,7 @@ const js = fs.readFileSync(file);
     check("yes: the night's steps, with what only applies when made ahead",
       night.join(" | ") === "Warm the sauce through. | Pat it dry first. Fry the chicken until golden. | Serve with rice.",
       night.join(" | "));
+    check("each still in its part of the dish", parts.join() === "The sauce,The chicken,The chicken", parts.join());
     q(".mlcook [data-cook-done]").click();
     q(".confirmwrap [data-no]").click();
     await settle();

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.128.1";
+const VERSION = "0.129.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2178,12 +2178,17 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .rmsteps li.ahead > b { background:var(--accent-soft); color:var(--accent-on); }
 .rmsteps li > div { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .rmhalf + .ppkeep + .rmhalf, .rmhalf + .rmhalf { margin-top:2px; }
-.rmif { padding-left:10px; border-left:2px solid var(--accent-soft); font-size:13.5px; font-style:italic; color:var(--sp-ink-2); }
+.rmif { padding-left:10px; border-left:2px solid var(--accent-soft); font-size:13.5px; font-style:italic; color:var(--sp-ink-2);
+  display:grid; gap:3px; }
 .rmif b { font-style:normal; font-weight:600; color:var(--accent-on); }
 .rmblock { position:relative; margin:12px 0; padding-left:10px; border-left:3px solid var(--accent); display:grid; gap:10px; }
 .rmblocktag { margin:0; display:flex; flex-wrap:wrap; gap:6px; }
 .rmblock .ppkeep { display:inline-flex; }
 .rmsteps + .rmblock, .rmblock + .rmsteps { margin-top:12px; }
+/* A group of steps, titled the way the recipe (or Mealie) titles it. */
+.rmsec { margin:16px 0 8px; font-size:14px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--sp-ink); }
+.rmblock > .rmsec { margin:2px 0 0; }
+.rmsec:first-child { margin-top:4px; }
 .rmahead { display:flex; align-items:center; gap:8px; margin:10px 0 4px; padding:9px 12px; border-radius:10px;
   background:var(--accent-soft); color:var(--accent-on); font-size:13.5px; }
 .rmahead .mdi { width:18px; height:18px; flex:none; }
@@ -7915,33 +7920,37 @@ function prepPlan(split, texts) {
     if (!n) return null;
     return { inPlace: false, all: texts,
       ahead: texts.slice(0, n).map((text, i) => Object.assign({}, split.steps[i], { n: i + 1, text })),
-      cook: texts.slice(n) };
+      cook: texts.slice(n), cookAt: texts.slice(n).map((_, i) => n + i + 1) };
   }
   if (split.steps.some((x) => !(Number(x.n) >= 1) || Number(x.n) > texts.length)) return null;
   const by = new Map(split.steps.map((x) => [Number(x.n), x]));
   const ahead = [];
   const cook = [];
-  /* A part made ahead in one run (the sauce): on the night its reheat is
-     all there is of it, so its steps' storing lines stay with the prep. */
-  let blockTo = 0;
-  if (!isBlank(split.reheat) && by.has(Number(split.reheat_at))) {
-    blockTo = Number(split.reheat_at);
-    while (by.has(blockTo + 1) && isBlank(by.get(blockTo + 1).ahead)) blockTo += 1;
-  }
-  const inBlock = (n) => blockTo && n >= Number(split.reheat_at) && n <= blockTo;
+  /* Which step of the method each line on the night came from, so cooking
+     can say which part of the dish it is in. */
+  const cookAt = [];
+  const night = (n, line) => { cook.push(line); cookAt.push(n); };
   texts.forEach((t, i) => {
     const n = i + 1;
-    if (!isBlank(split.reheat) && n === Number(split.reheat_at)) cook.push(String(split.reheat));
+    if (!isBlank(split.reheat) && n === Number(split.reheat_at)) night(n, String(split.reheat));
     const x = by.get(n);
-    if (!x) { cook.push(t); return; }
+    if (!x) { night(n, t); return; }
+    /* Made ahead, a step says two extra things at two times: how to keep
+       it, at the prep; and what that changes, on the night, where the step
+       was (taking it out of the fridge, pouring off the water). */
     const text = isBlank(x.ahead) ? t : String(x.ahead);
-    ahead.push(Object.assign({}, x, { text: isBlank(x.if_ahead) ? text : `${text} ${x.if_ahead}` }));
-    /* What only applies when made ahead is said on the night too, where the
-       step was: taking a marinade out of the fridge, pouring off the water. */
-    const night = [inBlock(n) ? "" : x.if_ahead, x.cook].filter((s) => !isBlank(s)).map(String);
-    if (night.length) cook.push(night.join(" "));
+    ahead.push(Object.assign({}, x, { text: isBlank(x.store) ? text : `${text} ${x.store}` }));
+    const later = [x.if_ahead, x.cook].filter((s) => !isBlank(s)).map(String);
+    if (later.length) night(n, later.join(" "));
   });
-  return { inPlace: true, all: texts, ahead, cook };
+  return { inPlace: true, all: texts, ahead, cook, cookAt };
+}
+
+/* The section a step of the method is in: the last title at or before it. */
+function sectionAt(sections, n) {
+  let title = "";
+  (Array.isArray(sections) ? sections : []).forEach((s) => { if (Number(s.n) <= n && !isBlank(s.title)) title = String(s.title); });
+  return title;
 }
 
 /* What AI did to a recipe, as the recipe sheet marks it. */
@@ -7989,8 +7998,13 @@ function aiNote(kind, event) {
 /* The method in its own order, with what can be done ahead noted in place
    and a mark on each step AI touched. A run of steps that together make a
    part of the dish ahead is bracketed once rather than tagged each time. */
-function recipeMethodMarkup(texts, split, prov) {
+function recipeMethodMarkup(texts, split, prov, sections) {
   const plan = split && split.in_place ? prepPlan(split, texts) : null;
+  /* The recipe's groups of steps, each titled where it starts. */
+  const titles = new Map((Array.isArray(sections) ? sections : [])
+    .filter((s) => Number(s.n) >= 1 && Number(s.n) <= texts.length && !isBlank(s.title))
+    .map((s) => [Number(s.n), String(s.title)]));
+  const heading = (n) => (titles.has(n) ? `<h5 class="rmsec">${esc(titles.get(n))}</h5>` : "");
   const notes = plan ? new Map(split.steps.map((x) => [Number(x.n), x])) : new Map();
   const marks = (prov && prov.marks) || {};
   const events = new Map(((prov && prov.events) || []).map((e) => [Number(e.id), e]));
@@ -8010,22 +8024,35 @@ function recipeMethodMarkup(texts, split, prov) {
     if (!notes.has(blockFrom)) { blockFrom = 0; blockTo = 0; }
   }
   const tagOf = (x) => prepChips(x);
+  /* Made ahead, a step says two things more, at two times: how to keep it
+     (at the prep) and what that changes on the night. */
+  const ifLine = (store, night, key) => {
+    if (isBlank(store) && isBlank(night)) return "";
+    const kept = isBlank(store) ? "" : `${esc(store)}${aiMark("created", splitEvent, `k${key}`)}`;
+    const then = isBlank(night) ? "" : `${esc(night)}${aiMark("created", splitEvent, `i${key}`)}`;
+    return `<span class="rmif">${kept && then ? `<span><b>If made ahead:</b> ${kept}</span> <span><b>On the night:</b> ${then}</span>`
+      : (kept ? `<span><b>If made ahead:</b> ${kept}</span>` : `<span><b>If made ahead, on the night:</b> ${then}</span>`)}</span>`;
+  };
+  const inBlock = (n) => blockFrom && n >= blockFrom && n <= blockTo;
   const li = (t, n) => {
     const x = notes.get(n);
-    const inBlock = blockFrom && n >= blockFrom && n <= blockTo;
     let inner;
     if (x && !isBlank(x.ahead) && !isBlank(x.cook)) {
       inner = `<span class="rmhalf">${esc(x.ahead)}${aiMark("enhanced", splitEvent, `h${n}`)}</span>`
-        + (inBlock ? "" : tagOf(x))
+        + (inBlock(n) ? "" : tagOf(x))
         + `<span class="rmhalf">${esc(x.cook)}${aiMark("enhanced", splitEvent, `c${n}`)}</span>`;
     } else {
-      inner = `<span class="rmtext">${esc(t)}${mark(n)}</span>` + (x && !inBlock ? tagOf(x) : "");
+      inner = `<span class="rmtext">${esc(t)}${mark(n)}</span>` + (x && !inBlock(n) ? tagOf(x) : "");
     }
-    if (x && !isBlank(x.if_ahead)) {
-      inner += `<span class="rmif"><b>If made ahead:</b> ${esc(x.if_ahead)}${aiMark("created", splitEvent, `i${n}`)}</span>`;
-    }
-    if (inBlock && n === blockTo) {
-      inner += `<span class="rmif"><b>If made ahead:</b> ${esc(split.reheat)}${aiMark("created", splitEvent, "r")}</span>`;
+    /* In a part made ahead as a whole, the part says it once, at its end:
+       how it keeps, and its reheat. */
+    if (x && !inBlock(n)) inner += ifLine(x.store, x.if_ahead, n);
+    if (inBlock(n) && n === blockTo) {
+      const run = [];
+      for (let k = blockFrom; k <= blockTo; k += 1) run.push(notes.get(k) || {});
+      const store = run.map((y) => y.store).filter((s) => !isBlank(s)).pop() || "";
+      const night = [split.reheat, ...run.map((y) => y.if_ahead)].filter((s) => !isBlank(s)).join(" ");
+      inner += ifLine(store, night, "r");
     }
     return `<li class="${x ? "ahead" : ""}" data-step="${n}"><b>${n}</b><div>${inner}<span class="rmnote" data-ai-note hidden></span></div></li>`;
   };
@@ -8034,8 +8061,15 @@ function recipeMethodMarkup(texts, split, prov) {
   texts.forEach((t, i) => {
     const n = i + 1;
     if (blockFrom && n === blockFrom) {
+      /* A part made ahead is its own group: its title, when it has one,
+         heads it, and says what "it" is better than a step range can. */
       const x = notes.get(n);
-      out += `${open ? "</ol>" : ""}<div class="rmblock"><p class="rmblocktag">${n === blockTo ? "" : `<span class="ppchip a">Steps ${blockFrom}–${blockTo} can be done ahead</span>`}${tagOf(x)}</p><ol class="rmsteps">`;
+      const titled = titles.has(n);
+      out += `${open ? "</ol>" : ""}<div class="rmblock">${heading(n)}<p class="rmblocktag">`
+        + `${titled || n === blockTo ? "" : `<span class="ppchip a">Steps ${blockFrom}–${blockTo} can be done ahead</span>`}${tagOf(x)}</p><ol class="rmsteps">`;
+      open = true;
+    } else if (titles.has(n)) {
+      out += `${open ? "</ol>" : ""}${heading(n)}<ol class="rmsteps">`;
       open = true;
     } else if (!open) {
       out += `<ol class="rmsteps">`;
@@ -14929,7 +14963,7 @@ class SpectraCard extends HTMLElement {
       + (notes.length
         ? `<p class="confirmtext">Saved to the box. ${page ? "The recipe says what can be made ahead:" : "Some of it keeps, so it can be done ahead:"}</p>`
           + `<p class="rmahead">${iconMarkup("mdi:knife")}<span>${notes.length === 1 ? "1 step" : `${notes.length} steps`} can be done ahead${mins ? ` · ${mins} min` : ""}</span></p>`
-          + recipeMethodMarkup(split.method, shown, null)
+          + recipeMethodMarkup(split.method, shown, null, split.sections)
         : `<p class="confirmtext">Saved to the box. Nothing in it is worth doing ahead.</p>`)
       + `<p class="confirmtext quiet" data-status></p></div>`
       + `<div class="confirmbtns">`
@@ -14997,6 +15031,10 @@ class SpectraCard extends HTMLElement {
        and the method as the recipe has it, which cooking uses unprepped. */
     let plan = null;
     let method = [];
+    /* The recipe's titled groups of steps, and which step of the method
+       each step being cooked is, so cooking can say which part it is in. */
+    let sections = [];
+    let stepAt = [];
     let flag = "";
     let hero = this._imagesOn() && !isBlank(recipe.image) ? `<div class="mlhero mlheroph"></div>` : "";
     let body = "";
@@ -15015,7 +15053,8 @@ class SpectraCard extends HTMLElement {
       wrap.innerHTML = `<div class="confirmbox tall mlcook" role="dialog" aria-modal="true" aria-label="${esc(title)}: cooking">`
         + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
         + `<div class="mlcookbar"><span class="mlcookof">Step ${i + 1} of ${steps.length}`
-        + `${ahead ? (i < ahead ? " \u00b7 prep" : " \u00b7 to cook") : ""}</span>`
+        + `${ahead ? (i < ahead ? " \u00b7 prep" : " \u00b7 to cook") : ""}`
+        + `${stepAt[i] && sectionAt(sections, stepAt[i]) ? ` \u00b7 ${esc(sectionAt(sections, stepAt[i]))}` : ""}</span>`
         + (flag === "no" && i < ahead ? `<button type="button" class="mlbtn quiet" data-cook-skip>`
           + `${iconMarkup("mdi:skip-next")} Skip the prep</button>` : "")
         + (ingredients.length ? `<button type="button" class="mlbtn quiet" data-cook-ing aria-pressed="${!!showing}">`
@@ -15161,12 +15200,14 @@ class SpectraCard extends HTMLElement {
               : st.sessions.find((x) => x.items.some((i) => String(i.recipe_id) === rid && soon.includes(String(i.date)))));
             const prepped = () => {
               steps = [...plan.ahead.map((x) => x.text), ...plan.cook];
+              stepAt = [...plan.ahead.map((x) => Number(x.n)), ...plan.cookAt];
               ahead = plan.ahead.length;
               flag = "ok";
               cook(Math.min(ahead, steps.length - 1), false);
             };
             const whole = () => {
               steps = method.slice();
+              stepAt = method.map((_, k) => k + 1);
               ahead = 0;
               flag = "";
               cook(0, false);
@@ -15182,7 +15223,7 @@ class SpectraCard extends HTMLElement {
             wrap.querySelector("[data-cook-prepped]").addEventListener("click", prepped);
             return;
           }
-          if (plan && plan.inPlace) { steps = method.slice(); ahead = 0; cook(0, false); return; }
+          if (plan && plan.inPlace) { steps = method.slice(); stepAt = method.map((_, k) => k + 1); ahead = 0; cook(0, false); return; }
           if (!ahead) { cook(0, false); return; }
           /* The prep for THIS meal when opened from one; otherwise the
              nearest session holding this recipe today or tomorrow. */
@@ -15263,6 +15304,11 @@ class SpectraCard extends HTMLElement {
       split = prepSplit(indexed());
       const known = indexed();
       const prov = known && known.provenance ? known.provenance : null;
+      /* Titled groups: from the index, else from Mealie's own step titles. */
+      sections = known && Array.isArray(known.sections) ? known.sections
+        : (Array.isArray(r.instructions) ? r.instructions : []).filter((x) => x && !isBlank(x.text))
+          .map((x, k) => ({ n: k + 1, title: x.title })).filter((x) => !isBlank(x.title) && !["Prep ahead", "To cook"].includes(x.title));
+      stepAt = method.map((_, k) => k + 1);
       plan = split ? prepPlan(split, steps) : null;
       /* An older split moved its prep to the front, and reads in two halves
          as it always did. One noted in place reads in the recipe's order. */
@@ -15278,7 +15324,7 @@ class SpectraCard extends HTMLElement {
       const aheadLine = inPlace ? `<p class="rmahead">${iconMarkup("mdi:knife")}<span>${esc(!isBlank(split.reheat) && parts > 1
         ? "Part of it can be made ahead" : `${parts === 1 ? "1 step" : `${parts} steps`} can be done ahead`)}${aheadMins ? ` \u00b7 ${aheadMins} min` : ""}</span></p>` : "";
       const methodHtml = !ahead ? `${aheadLine}<div class="ppsec"><h4>Method</h4><span>${steps.length === 1 ? "1 step" : `${steps.length} steps`}</span></div>`
-          + recipeMethodMarkup(steps, inPlace ? split : null, prov)
+          + recipeMethodMarkup(steps, inPlace ? split : null, prov, sections)
         : `<div class="ppsec"><h4>Prep ahead</h4><span>${early ? `${early} min` : ""}</span></div>`
           + numbered(steps.slice(0, ahead), 0, "", (n) => prepChips(split.steps[n]))
           + (steps.length > ahead ? `<div class="ppsec"><h4>To cook</h4><span></span></div>`
@@ -16422,7 +16468,7 @@ class SpectraCard extends HTMLElement {
             const t = timed(x);
             const out = { n: i + 1 };
             ["ahead_max", "ahead_min", "minutes"].forEach((k) => { if (Number(t[k]) > 0) out[k] = Number(t[k]); });
-            ["keeps", "source", "ahead", "cook", "if_ahead"].forEach((k) => { if (!isBlank(t[k])) out[k] = String(t[k]); });
+            ["keeps", "source", "ahead", "cook", "store", "if_ahead"].forEach((k) => { if (!isBlank(t[k])) out[k] = String(t[k]); });
             return out;
           }),
         };
