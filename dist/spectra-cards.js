@@ -2168,27 +2168,27 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .ppkeep { display:flex; flex-wrap:wrap; gap:6px; }
 .ppchip { font-size:11.5px; padding:2px 8px; border-radius:999px; background:var(--sp-sink); color:var(--sp-ink-2); white-space:nowrap; }
 .ppchip.a { background:var(--accent-soft); color:var(--accent-on); }
-/* The method in its own order: what can be done ahead is tagged where it
-   is, a part made ahead is bracketed once, and the lines that only apply
-   when it was made ahead are quiet and indented. */
+/* The method in its own order, numbered as Mealie numbers it. */
 .rmsteps { list-style:none; margin:0; padding:0; display:grid; gap:12px; }
 .rmsteps li { display:grid; grid-template-columns:24px minmax(0,1fr); gap:10px; font-size:15px; line-height:1.45; color:var(--sp-ink); }
 .rmsteps li > b { width:24px; height:24px; border-radius:50%; background:var(--sp-sink); color:var(--sp-ink-2);
   font-size:12px; display:grid; place-items:center; font-weight:700; }
 .rmsteps li.ahead > b { background:var(--accent-soft); color:var(--accent-on); }
 .rmsteps li > div { display:flex; flex-direction:column; gap:6px; min-width:0; }
-.rmhalf + .ppkeep + .rmhalf, .rmhalf + .rmhalf { margin-top:2px; }
-.rmif { padding-left:10px; border-left:2px solid var(--accent-soft); font-size:13.5px; font-style:italic; color:var(--sp-ink-2);
-  display:grid; gap:3px; }
-.rmif b { font-style:normal; font-weight:600; color:var(--accent-on); }
-.rmblock { position:relative; margin:12px 0; padding-left:10px; border-left:3px solid var(--accent); display:grid; gap:10px; }
-.rmblocktag { margin:0; display:flex; flex-wrap:wrap; gap:6px; }
-.rmblock .ppkeep { display:inline-flex; }
-.rmsteps + .rmblock, .rmblock + .rmsteps { margin-top:12px; }
-/* A group of steps, titled the way the recipe (or Mealie) titles it. */
-.rmsec { margin:16px 0 8px; font-size:14px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--sp-ink); }
-.rmblock > .rmsec { margin:2px 0 0; }
-.rmsec:first-child { margin-top:4px; }
+/* A group of steps: its title, with what can be done ahead beside it, a
+   short note on what making it ahead changes, then its steps, flush under
+   the title rather than indented or bracketed. */
+.mlrecipe .rmsteps { padding:0; margin:0; }
+.rmgroup { margin-top:6px; }
+.rmgroup + .rmgroup { margin-top:22px; }
+.rmghead { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin:0 0 8px; }
+.rmghead .ppkeep { display:inline-flex; }
+.rmsec { margin:0; font-size:15px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--sp-ink); }
+.rmprep { margin:10px 0 0 34px; padding:8px 12px; border-radius:10px; background:var(--sp-sink); display:grid; gap:4px;
+  font-size:13.5px; line-height:1.4; color:var(--sp-ink-2); }
+.rmprep b { font-weight:600; color:var(--accent-on); }
+.rmthen { color:var(--sp-ink); }
+.rmthen > b { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent-on); margin-right:6px; }
 .rmahead { display:flex; align-items:center; gap:8px; margin:10px 0 4px; padding:9px 12px; border-radius:10px;
   background:var(--accent-soft); color:var(--accent-on); font-size:13.5px; }
 .rmahead .mdi { width:18px; height:18px; flex:none; }
@@ -7995,16 +7995,13 @@ function aiNote(kind, event) {
     + (event && aiWhen(event.at) ? `<small>${esc(aiWhen(event.at))}</small>` : "");
 }
 
-/* The method in its own order, with what can be done ahead noted in place
-   and a mark on each step AI touched. A run of steps that together make a
-   part of the dish ahead is bracketed once rather than tagged each time. */
+/* The method in its own order, in its groups of steps. What can be done
+   ahead belongs to a group, not a step: the group's title carries how far
+   ahead and where it keeps, and a short note under it says what making it
+   ahead changes, at the prep and on the night. Steps stay plain, flush
+   under their title, with a mark on each one AI touched. */
 function recipeMethodMarkup(texts, split, prov, sections) {
   const plan = split && split.in_place ? prepPlan(split, texts) : null;
-  /* The recipe's groups of steps, each titled where it starts. */
-  const titles = new Map((Array.isArray(sections) ? sections : [])
-    .filter((s) => Number(s.n) >= 1 && Number(s.n) <= texts.length && !isBlank(s.title))
-    .map((s) => [Number(s.n), String(s.title)]));
-  const heading = (n) => (titles.has(n) ? `<h5 class="rmsec">${esc(titles.get(n))}</h5>` : "");
   const notes = plan ? new Map(split.steps.map((x) => [Number(x.n), x])) : new Map();
   const marks = (prov && prov.marks) || {};
   const events = new Map(((prov && prov.events) || []).map((e) => [Number(e.id), e]));
@@ -8013,73 +8010,71 @@ function recipeMethodMarkup(texts, split, prov, sections) {
     const m = marks[String(n)];
     return m ? aiMark(m.mark, events.get(Number(m.event)), `s${n}`) : "";
   };
-  /* The block: a reheat names where a part made ahead begins, and the run
-     of plain notes from there is it. */
-  let blockFrom = 0;
-  let blockTo = 0;
-  if (plan && !isBlank(split.reheat)) {
-    blockFrom = Number(split.reheat_at);
-    blockTo = blockFrom;
-    while (notes.has(blockTo + 1) && isBlank(notes.get(blockTo + 1).ahead)) blockTo += 1;
-    if (!notes.has(blockFrom)) { blockFrom = 0; blockTo = 0; }
+  /* The groups: the recipe's titled sections. Without titles, a run of
+     steps that can be done ahead is a group of its own, named by its steps,
+     so what is ahead is still said once, at the group. */
+  const titles = new Map((Array.isArray(sections) ? sections : [])
+    .filter((s) => Number(s.n) >= 1 && Number(s.n) <= texts.length && !isBlank(s.title))
+    .map((s) => [Number(s.n), String(s.title)]));
+  const starts = new Map(titles);
+  if (!titles.size && notes.size) {
+    const range = (a, b) => (a === b ? `Step ${a}` : `Steps ${a}–${b}`);
+    let n = 1;
+    while (n <= texts.length) {
+      const ahead = notes.has(n);
+      let end = n;
+      while (end < texts.length && notes.has(end + 1) === ahead) end += 1;
+      starts.set(n, ahead ? range(n, end) : "");
+      n = end + 1;
+    }
   }
-  const tagOf = (x) => prepChips(x);
-  /* Made ahead, a step says two things more, at two times: how to keep it
-     (at the prep) and what that changes on the night. */
-  const ifLine = (store, night, key) => {
-    if (isBlank(store) && isBlank(night)) return "";
-    const kept = isBlank(store) ? "" : `${esc(store)}${aiMark("created", splitEvent, `k${key}`)}`;
-    const then = isBlank(night) ? "" : `${esc(night)}${aiMark("created", splitEvent, `i${key}`)}`;
-    return `<span class="rmif">${kept && then ? `<span><b>If made ahead:</b> ${kept}</span> <span><b>On the night:</b> ${then}</span>`
-      : (kept ? `<span><b>If made ahead:</b> ${kept}</span>` : `<span><b>If made ahead, on the night:</b> ${then}</span>`)}</span>`;
+  if (!starts.has(1)) starts.set(1, "");
+  const firsts = [...starts.keys()].sort((a, b) => a - b);
+  const groups = firsts.map((from, i) => ({ title: starts.get(from), from, to: i + 1 < firsts.length ? firsts[i + 1] - 1 : texts.length }));
+
+  /* A group's prep, from its steps' notes: the tightest window, the longest
+     wait, where it keeps; and, when only some of it goes ahead, which. */
+  const prepOf = (g) => {
+    const got = [];
+    for (let n = g.from; n <= g.to; n += 1) if (notes.has(n)) got.push(notes.get(n));
+    if (!got.length) return null;
+    const maxes = got.map((x) => Number(x.ahead_max)).filter((v) => v > 0);
+    const mins = got.map((x) => Number(x.ahead_min)).filter((v) => v > 0);
+    const all = { ahead_max: maxes.length ? Math.min(...maxes) : null, ahead_min: mins.length ? Math.max(...mins) : null,
+      keeps: (got.find((x) => !isBlank(x.keeps)) || {}).keeps, source: got.some((x) => x.source === "page") ? "page" : "house" };
+    const some = got.length < g.to - g.from + 1 ? got.map((x) => Number(x.n)) : null;
+    const store = [...new Set(got.map((x) => x.store).filter((s) => !isBlank(s)))].join(" ");
+    const reheat = !isBlank(split.reheat) && Number(split.reheat_at) >= g.from && Number(split.reheat_at) <= g.to ? split.reheat : "";
+    const night = [reheat, ...got.map((x) => x.if_ahead)].filter((s) => !isBlank(s)).join(" ");
+    return { all, some, store, night };
   };
-  const inBlock = (n) => blockFrom && n >= blockFrom && n <= blockTo;
-  const li = (t, n) => {
+  const note = (p, key) => {
+    if (isBlank(p.store) && isBlank(p.night)) return "";
+    const line = (label, text, k) => `<span><b>${label}</b> ${esc(text)}${aiMark("created", splitEvent, `${k}${key}`)}</span>`;
+    return `<p class="rmprep">${isBlank(p.store) ? "" : line("If made ahead:", p.store, "k")}`
+      + `${isBlank(p.store) || isBlank(p.night) ? "" : " "}${isBlank(p.night) ? "" : line(isBlank(p.store) ? "If made ahead, on the night:" : "On the night:", p.night, "i")}</p>`;
+  };
+  const li = (t, n, tint) => {
     const x = notes.get(n);
-    let inner;
-    if (x && !isBlank(x.ahead) && !isBlank(x.cook)) {
-      inner = `<span class="rmhalf">${esc(x.ahead)}${aiMark("enhanced", splitEvent, `h${n}`)}</span>`
-        + (inBlock(n) ? "" : tagOf(x))
-        + `<span class="rmhalf">${esc(x.cook)}${aiMark("enhanced", splitEvent, `c${n}`)}</span>`;
-    } else {
-      inner = `<span class="rmtext">${esc(t)}${mark(n)}</span>` + (x && !inBlock(n) ? tagOf(x) : "");
-    }
-    /* In a part made ahead as a whole, the part says it once, at its end:
-       how it keeps, and its reheat. */
-    if (x && !inBlock(n)) inner += ifLine(x.store, x.if_ahead, n);
-    if (inBlock(n) && n === blockTo) {
-      const run = [];
-      for (let k = blockFrom; k <= blockTo; k += 1) run.push(notes.get(k) || {});
-      const store = run.map((y) => y.store).filter((s) => !isBlank(s)).pop() || "";
-      const night = [split.reheat, ...run.map((y) => y.if_ahead)].filter((s) => !isBlank(s)).join(" ");
-      inner += ifLine(store, night, "r");
-    }
-    return `<li class="${x ? "ahead" : ""}" data-step="${n}"><b>${n}</b><div>${inner}<span class="rmnote" data-ai-note hidden></span></div></li>`;
+    /* A step done partly ahead: its two halves, the second said to be on
+       the night, since the group already says the rest can be done ahead. */
+    const inner = x && !isBlank(x.ahead) && !isBlank(x.cook)
+      ? `<span class="rmtext">${esc(x.ahead)}${aiMark("enhanced", splitEvent, `h${n}`)}</span>`
+        + `<span class="rmtext rmthen"><b>On the night</b> ${esc(x.cook)}${aiMark("enhanced", splitEvent, `c${n}`)}</span>`
+      : `<span class="rmtext">${esc(t)}${mark(n)}</span>`;
+    return `<li class="${tint && x ? "ahead" : ""}" data-step="${n}"><b>${n}</b><div>${inner}<span class="rmnote" data-ai-note hidden></span></div></li>`;
   };
-  let out = "";
-  let open = false;
-  texts.forEach((t, i) => {
-    const n = i + 1;
-    if (blockFrom && n === blockFrom) {
-      /* A part made ahead is its own group: its title, when it has one,
-         heads it, and says what "it" is better than a step range can. */
-      const x = notes.get(n);
-      const titled = titles.has(n);
-      out += `${open ? "</ol>" : ""}<div class="rmblock">${heading(n)}<p class="rmblocktag">`
-        + `${titled || n === blockTo ? "" : `<span class="ppchip a">Steps ${blockFrom}–${blockTo} can be done ahead</span>`}${tagOf(x)}</p><ol class="rmsteps">`;
-      open = true;
-    } else if (titles.has(n)) {
-      out += `${open ? "</ol>" : ""}${heading(n)}<ol class="rmsteps">`;
-      open = true;
-    } else if (!open) {
-      out += `<ol class="rmsteps">`;
-      open = true;
-    }
-    out += li(t, n);
-    if (blockFrom && n === blockTo) { out += `</ol></div>`; open = false; }
-  });
-  if (open) out += `</ol>`;
-  return out;
+  return groups.map((g, i) => {
+    const p = plan ? prepOf(g) : null;
+    const chips = p ? prepChips(p.all) : "";
+    const which = p && p.some ? `<span class="ppchip a">${p.some.length === 1 ? `Step ${p.some[0]}` : `Steps ${p.some.join(", ")}`} ahead</span>` : "";
+    const head = g.title || chips
+      ? `<div class="rmghead">${g.title ? `<h5 class="rmsec">${esc(g.title)}</h5> ` : ""}${which || chips ? `<span class="ppkeep">${which}${chips.replace(/^<span class="ppkeep">|<\/span>$/g, "")}</span>` : ""}</div>`
+      : "";
+    const steps = [];
+    for (let n = g.from; n <= g.to; n += 1) steps.push(li(texts[n - 1], n, Boolean(p && p.some)));
+    return `<section class="rmgroup${p ? " ahead" : ""}" data-from="${g.from}">${head}<ol class="rmsteps">${steps.join("")}</ol>${p ? note(p, i) : ""}</section>`;
+  }).join("");
 }
 
 /* Where a recipe came from and what AI did to it, folded away under the

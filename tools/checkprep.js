@@ -295,15 +295,16 @@ const js = fs.readFileSync(file);
     const lis = r ? [...r.querySelectorAll(".rmsteps > li")] : [];
     check("in place: one method, in the recipe's order", lis.length === 3
       && [...r.querySelectorAll(".ppsec h4")].map(text).join() === "Method", r && text(r));
-    check("a split step shows both halves", lis[1] && lis[1].querySelectorAll(".rmhalf").length === 2, lis[1] && lis[1].innerHTML);
-    const ifs = [...r.querySelectorAll(".rmif")].map(text);
-    check("a part made ahead says how it keeps, and its night, once at its end",
+    check("a split step shows both halves, the second on the night", lis[1] && lis[1].querySelectorAll(".rmtext").length === 2
+      && text(lis[1].querySelector(".rmthen")) === "On the night Fry the chicken until golden.", lis[1] && lis[1].innerHTML);
+    const ifs = [...r.querySelectorAll(".rmprep")].map(text);
+    check("a group made ahead says how it keeps, and its night, once, under its steps",
       ifs[0] === "If made ahead: Cool, cover and chill. On the night: Warm the sauce through.", ifs.join(" | "));
-    check("a step's night line is said as the night's", ifs[1] === "If made ahead, on the night: Pat it dry first.", ifs.join(" | "));
-    check("groups of steps are titled, the made-ahead one heading its block",
-      [...r.querySelectorAll(".rmsec")].map(text).join() === "The sauce,The chicken"
-      && text(r.querySelector(".rmblock > .rmsec")) === "The sauce" && !text(r.querySelector(".rmblocktag")).includes("Steps"),
-      [...r.querySelectorAll(".rmsec")].map(text).join());
+    check("a night line alone is said as the night's", ifs[1] === "If made ahead, on the night: Pat it dry first.", ifs.join(" | "));
+    const ghead = [...r.querySelectorAll(".rmghead")].map((h) => [text(h.querySelector(".rmsec")), ...[...h.querySelectorAll(".ppchip")].map(text)].join(" / "));
+    check("groups are titled, and what can go ahead sits beside the title",
+      ghead[0] === "The sauce / Up to 3 days ahead / Fridge" && ghead[1] === "The chicken / Step 2 ahead / Up to 24 h ahead", ghead.join(" | "));
+    check("and never on a step", !r.querySelector(".rmsteps .ppkeep") && !r.querySelector(".rmblock"), r.innerHTML.slice(0, 300));
     check("each AI change carries its mark", Boolean(lis[2] && lis[2].querySelector(".aimark[aria-label^='Interpreted']"))
       && Boolean(lis[1] && lis[1].querySelector(".aimark[aria-label^='Enhanced']")), lis[2] && lis[2].innerHTML);
     lis[2].querySelector(".aimark").click();
