@@ -1324,6 +1324,7 @@ body:
   powered: {entity: sensor.washing_machine, attribute: powered}
   leak: {entity: sensor.washing_machine, attribute: leak}
   leak_alarm: {entity: sensor.washing_machine, attribute: leak_alarm}
+  wet_since: {entity: sensor.washing_machine, attribute: leak_since}
   machine: mdi:washing-machine       # idle; a dryer sets mdi:tumble-dryer
   machine_off: mdi:washing-machine-off
   door_open: {entity: sensor.washing_machine, attribute: door_open}
@@ -1492,7 +1493,8 @@ the wash, so from then on the card shows the cycle — no "Leaking", no water
 drum, no red. The `Sensor wet` chip stays, at **attention**: the cutoff
 fires only on the pad *going* wet, so until it dries a second leak would cut
 nothing. `home_signals` raises a matching attention row. Leave `leak_alarm`
-out and every wet pad is an alarm, as before.
+out and every wet pad is an alarm, as before. With `wet_since`, the chip says how long
+rather than when — `Wet for 12m` — and counts up by itself.
 
 **Colour says which machine; the glyph says what is happening.** It was
 the other way round, and the cost was that a washer and a dryer sitting
