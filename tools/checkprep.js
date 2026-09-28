@@ -280,12 +280,15 @@ const js = fs.readFileSync(file);
     const katsu = { recipe_id: "r5", slug: "katsu", name: "Katsu" };
     index.push({ recipe_id: "r5", slug: "katsu", name: "Katsu", prep: { mode: "split", checked: true, in_place: true,
       reheat: "Warm the sauce through.", reheat_at: 1, steps: [
-        { n: 1, ahead_max: 72, keeps: "Fridge", minutes: 25, if_ahead: "Cool, cover and chill." },
+        { n: 1, ahead_max: 72, keeps: "Fridge", minutes: 25, store: "Cool, cover and chill." },
         { n: 2, ahead_max: 24, minutes: 10, ahead: "Bread the chicken.", cook: "Fry the chicken until golden.", if_ahead: "Pat it dry first." }] },
       provenance: { source: { kind: "page", url: "https://example.com/katsu" },
         events: [{ id: 1, what: "read", by: "Mealie", at: "2026-09-01T10:00:00+00:00" },
           { id: 2, what: "split", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:01:00+00:00" }],
-        marks: { 3: { mark: "interpreted", event: 1 } } } });
+        marks: { 3: { mark: "interpreted", event: 1 } } },
+      /* The third is how Mealie's video reading titles every step: the step
+         again, as a sentence. It is not a heading. */
+      sections: [{ n: 1, title: "The sauce" }, { n: 2, title: "The chicken" }, { n: 3, title: "Serve with rice." }] });
     method.r5 = ["Make the curry sauce.", "Bread and fry the chicken.", "Serve with rice."];
     await card._recipeIndex("e1", true);
     card._mealRecipe("e1", katsu, 6, { save: "home_signals.save_recipe" }, {});
@@ -294,9 +297,20 @@ const js = fs.readFileSync(file);
     const lis = r ? [...r.querySelectorAll(".rmsteps > li")] : [];
     check("in place: one method, in the recipe's order", lis.length === 3
       && [...r.querySelectorAll(".ppsec h4")].map(text).join() === "Method", r && text(r));
-    check("a split step shows both halves", lis[1] && lis[1].querySelectorAll(".rmhalf").length === 2, lis[1] && lis[1].innerHTML);
-    check("what only applies when made ahead is its own line", text(r.querySelector(".rmif")).includes("Cool, cover and chill"),
-      text(r.querySelector(".rmif")));
+    check("a split step shows both halves, the second in the On the day lane", lis[1] && lis[1].querySelectorAll(".rmtext").length === 2
+      && text(lis[1].querySelector(".rmline.day")) === "Fry the chicken until golden."
+      && lis[1].querySelector(".rmline.day .rmlane").getAttribute("aria-label") === "On the day", lis[1] && lis[1].innerHTML);
+    check("the two lanes are said once, in a key", [...r.querySelectorAll(".rmkey .rmk")].map(text).join() === "Ahead,On the day",
+      text(r.querySelector(".rmkey")));
+    check("each step's number is in its lane", lis.map((l) => l.className).join() === "ahead,ahead,day", lis.map((l) => l.className).join());
+    const ifs = [...r.querySelectorAll(".rmprep")].map((p) => [...p.querySelectorAll(".rmline")].map((l) => `${l.classList.contains("ahead") ? "A" : "D"}:${text(l)}`).join(" / "));
+    check("a group made ahead says how it keeps, and its day, once, under its steps",
+      ifs[0] === "A:Cool, cover and chill. / D:Warm the sauce through.", ifs.join(" | "));
+    check("a day line alone is in the day's lane", ifs[1] === "D:Pat it dry first.", ifs.join(" | "));
+    const ghead = [...r.querySelectorAll(".rmghead")].map((h) => [text(h.querySelector(".rmsec")), ...[...h.querySelectorAll(".ppchip")].map(text)].join(" / "));
+    check("groups are titled, and what can go ahead sits beside the title",
+      ghead[0] === "The sauce / Up to 3 days ahead / Fridge" && ghead[1] === "The chicken / Step 2 ahead / Up to 24 h ahead", ghead.join(" | "));
+    check("and never on a step", !r.querySelector(".rmsteps .ppkeep") && !r.querySelector(".rmblock"), r.innerHTML.slice(0, 300));
     check("each AI change carries its mark", Boolean(lis[2] && lis[2].querySelector(".aimark[aria-label^='Interpreted']"))
       && Boolean(lis[1] && lis[1].querySelector(".aimark[aria-label^='Enhanced']")), lis[2] && lis[2].innerHTML);
     lis[2].querySelector(".aimark").click();
@@ -312,6 +326,8 @@ const js = fs.readFileSync(file);
     await settle();
     check("no: the whole method, in order", text(q(".mlcook .mlcookof")).startsWith("Step 1 of 3")
       && !q(".mlcook .ppbanner"), text(q(".mlcook")));
+    check("and cooking says which part of the dish it is in", text(q(".mlcook .mlcookof")) === "Step 1 of 3 · The sauce",
+      text(q(".mlcook .mlcookof")));
     q(".mlcook [data-cook-done]").click();
     q(".confirmwrap [data-no]").click();
     await settle();
@@ -322,8 +338,10 @@ const js = fs.readFileSync(file);
     q(".mlcook [data-cook-prepped]").click();
     await settle();
     const night = [];
+    const parts = [];
     for (let i = 0; i < 6; i += 1) {
       night.push(text(q(".mlcook .mlcookstep")));
+      parts.push(text(q(".mlcook .mlcookof")).split(" · ").pop());
       const next = q(".mlcook [data-cook-next]");
       if (!next || next.disabled) break;
       next.click();
@@ -332,6 +350,7 @@ const js = fs.readFileSync(file);
     check("yes: the night's steps, with what only applies when made ahead",
       night.join(" | ") === "Warm the sauce through. | Pat it dry first. Fry the chicken until golden. | Serve with rice.",
       night.join(" | "));
+    check("each still in its part of the dish", parts.join() === "The sauce,The chicken,The chicken", parts.join());
     q(".mlcook [data-cook-done]").click();
     q(".confirmwrap [data-no]").click();
     await settle();
