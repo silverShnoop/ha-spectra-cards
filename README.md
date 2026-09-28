@@ -2402,6 +2402,7 @@ views:
     needs_width: 340          # optional: the side column, px
     needs_max_height: 36      # optional: upright cap on Needs you, % of height
     side_min_width: 900       # optional: narrowest width that goes sideways
+    phone_max_width: 600      # optional: widest screen that gets the phone rail
     column_min_width: 280     # optional: narrowest column, px (default 320)
     masonry: true             # optional: pack sections with no row gaps
     sections:
@@ -2421,6 +2422,14 @@ all: the panel is exactly as tall as the screen that is left under Home
 Assistant's header — measured, so kiosk mode needs no setting — and only the
 content below the rail scrolls, inside itself. A job cannot scroll out of
 sight, and the tabs are always a thumb away.
+
+**On a phone the rail goes to the bottom and is icons only.** At or below
+`phone_max_width` (default 600) the rail pins to the bottom edge, where a
+thumb is, and its selection bar and caret flip to point up at the cards.
+The rail itself turns icons-only whenever it is narrower than 560px,
+wherever it is placed: eight labels cannot share a phone's width. The
+words are not lost — each button reads its label and summary to a screen
+reader, and anything the house wants done is spelled out in Needs you.
 
 **Upright, Needs you goes across the top; sideways, down the left.** A strip
 across the top spends the scarce dimension of a landscape screen on a list,

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.134.0";
+const VERSION = "0.135.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3106,6 +3106,31 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .dockbtn.live .docksum { color:var(--accent-on); }
+
+/* A narrow rail -- a phone -- is icons only. Eight labels cannot share a
+   phone's width, and a row of "LIGH..." "CLIM..." reads worse than the
+   icons alone. The words are not lost: each button says its label and
+   summary to a screen reader, and anything the house wants done is a row
+   in Needs you, which says it in full. The edge and the fill still carry
+   the level; selection keeps its bar and caret. */
+.dockwrap { container-type:inline-size; }
+@container (max-width: 560px) {
+  .dock { gap:4px; flex-wrap:nowrap; }
+  .dockbtn { flex:1 1 0; padding:9px 0; min-height:44px; box-sizing:border-box;
+    display:flex; align-items:center; justify-content:center; }
+  .dockhead { justify-content:center; gap:0; }
+  .dockhead ha-icon { --mdc-icon-size:22px; }
+  .dockhead h4, .docksum { display:none; }
+}
+/* Pinned to the bottom of the screen, the rail's content is above it, so
+   the selection bar moves to the top edge and the caret points up at the
+   cards it owns. Told by the panel through an inherited property, because
+   the rail cannot see where it has been put. */
+@container style(--sp-dock-edge: bottom) {
+  .dockbtn.selected::before { top:0; bottom:auto; border-radius:4px 4px 0 0; }
+  .dockbtn.selected::after { top:-7px; bottom:auto; border-top:0;
+    border-bottom:7px solid var(--sp-ink); }
+}
 
 /* alert — the reference draws this with the flex on .card itself; the same
    measurements moved onto a wrapper, so the shell keeps owning its padding. */
@@ -17080,11 +17105,12 @@ class SpectraDock extends HTMLElement {
 
   _render(buttons, selected) {
     const here = isBlank(selected) ? null : String(selected);
-    this._holder.innerHTML = `<div class="dock">${buttons.map((button, index) => {
+    this._holder.innerHTML = `<div class="dockwrap"><div class="dock">${buttons.map((button, index) => {
       const b = button || {};
       const on = here !== null && String(b.label) === here;
       return `<div class="dockbtn${b.live ? " live" : ""}${b.fill ? " fill" : ""}${on ? " selected" : ""}"`
         + ` role="button" tabindex="0" aria-current="${on ? "page" : "false"}"`
+        + ` aria-label="${esc([b.label, firstOf(b.summary, "")].filter((t) => !isBlank(t)).join(": "))}"`
         + ` data-button="${index}" style="${toneStyle(b.accent)}">`
         + `<div class="dockhead">`
         + (isBlank(b.icon) ? "" : `<ha-icon icon="${esc(b.icon)}"></ha-icon>`)
@@ -17092,7 +17118,7 @@ class SpectraDock extends HTMLElement {
         + `</div>`
         + `<p class="docksum">${esc(firstOf(b.summary, "—"))}</p>`
         + `</div>`;
-    }).join("")}</div>`;
+    }).join("")}</div></div>`;
 
     const all = this._holder.querySelectorAll("[data-button]");
     all.forEach((el) => {
@@ -17251,6 +17277,11 @@ const PANEL_SHEET = `
 .sidebox { display:none; flex-direction:column; gap:var(--pn-row-gap); }
 .panel.side .sidebox { display:flex; margin-top:12px; }
 .sidebox > .section { grid-row-end:auto; }
+/* A phone: the rail goes to the bottom of the screen, where a thumb is. */
+.panel.phone .rail { order:2; padding:6px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+  --sp-dock-edge:bottom; }
+.panel.phone .scroll { order:1; padding-bottom:12px; }
+.panel.phone .main { gap:6px; }
 .panel.side .needs { width:var(--pn-needs-width, 340px); max-height:none;
   align-self:stretch; padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)); }
 
@@ -17398,6 +17429,8 @@ class SpectraPanel extends HTMLElement {
     const sideMin = Number(this._config.side_min_width) || 900;
     const side = width > height && width >= sideMin;
     this._panel.classList.toggle("side", side);
+    const phoneMax = Number(this._config.phone_max_width) || 600;
+    this._panel.classList.toggle("phone", !side && width <= phoneMax);
 
     /* `spectra_slot: side` sections live under Needs you in a column and
        in the grid, in their written order, in a strip. Only moved when the
