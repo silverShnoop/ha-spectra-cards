@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 /* Several at once: slots, recipes, days and weeks.
  *
- *   - Select, then tap meals, a row or a day; the choices float over the
- *     bottom of the screen and act on all of them: Fill, One recipe, Shop,
- *     Clear (with one Undo for the lot)
+ *   - the week bar is one Plan button and a menu (the overlay shuts it)
+ *   - Select (from the menu), a right-click or a long press (a real mouse
+ *     hold) turns the week bar into the selection's bar in place, the held
+ *     meal ticked; taps, a row or a day tick; the bar counts them (and the
+ *     empty ones) and acts on all: Shop, Clear (one Undo for the lot), Move
+ *     (only for exactly one planned meal), and Plan
+ *   - Plan from a selection opens "Plan N meals" with its tabs: Choose puts
+ *     one recipe into each, Suggest proposes only for the empty ones; the
+ *     tab last used is kept; one selected is the one-slot Plan sheet
+ *   - Plan for the week, Choose: several recipes ticked go into the week's
+ *     empty slots, arranged by a script, through the suggestions sheet,
+ *     where a row's day can be changed and two rows swap
+ *   - Plan for the week, Copy: last week into the empty slots
  *   - Plan it on several days
- *   - several recipes ticked in the box go into the week's empty slots,
- *     arranged by a script, through the suggestions sheet, where a row's
- *     day can be changed and two rows swap
- *   - Fill can copy last week into the empty slots
  *
  *   node tools/checkseveral.js [path/to/spectra-cards.js]
  */
@@ -40,6 +46,20 @@ const js = fs.readFileSync(file);
   page.on("console", (m) => {
     const t = m.text();
     if (!t.includes("SPECTRA-CARDS") && !t.includes("spectra-card:")) console.log("  " + t);
+  });
+  /* A real mouse hold: down, wait past the 450 ms long press, up. */
+  await page.exposeFunction("holdPoint", async (x, y) => {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.waitForTimeout(600);
+    await page.mouse.up();
+  });
+  await page.addInitScript(() => {
+    window.holdAt = async (el) => {
+      el.scrollIntoView({ block: "center" });
+      const r = el.getBoundingClientRect();
+      await window.holdPoint(r.left + r.width / 2, r.top + r.height / 2);
+    };
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.waitForFunction(() => !!customElements.get("spectra-card"));
@@ -91,6 +111,7 @@ const js = fs.readFileSync(file);
             { date: day(0), meal: "Soup", recipe_id: "", reason: "" },
             { date: day(3), meal: "Chilli", recipe_id: "", reason: "" }] } });
         }
+        if (msg.service === "meal_plan_move") return Promise.resolve({ response: { moved: "Chicken fajitas", swapped: "" } });
         if (msg.service === "meal_week_to_items") return Promise.resolve({ response: { items: [] } });
         return Promise.resolve({ response: {} });
       },
@@ -104,6 +125,7 @@ const js = fs.readFileSync(file);
       week: { script: "script.meal_plan_week" },
       shop_week: { script: "script.meal_week_to_items", list: "todo.shop" },
       arrange: { script: "script.meal_place_several" },
+      move: { script: "script.meal_plan_move" },
       recipes: { save: "home_signals.save_recipe" },
     } });
     card.hass = hass;
@@ -114,12 +136,27 @@ const js = fs.readFileSync(file);
     const calls = (svc) => asked.filter((m) => m.service === svc);
     const cell = (d, t) => q(`.mlgridview [data-meal="${d}|${t}"]`);
 
-    /* ---- select ---- */
+    /* ---- the week bar: Plan, and a menu for the rest ---- */
+    check("the week bar has one Plan button and a menu", all(".mlfoot [data-meal-plan]").length === 1
+      && Boolean(q(".mlfoot [data-meal-menu]")) && !q(".mlmenu"), text(q(".mlfoot")));
+    q("[data-meal-menu]").click();
+    await settle();
+    const items = all(".mlmenu [role='menuitem']").map((b) => [...b.attributes].map((a) => a.name).find((n) => n.startsWith("data-meal-")));
+    check("the menu holds the week's other things", ["data-meal-shopweek", "data-meal-select", "data-meal-box"].every((k) => items.includes(k)),
+      items.join(","));
+    q("[data-meal-menushut]").click();
+    await settle();
+    check("and the overlay shuts it", !q(".mlmenu"), "still open");
+
+    /* ---- select, from the menu ---- */
+    q("[data-meal-menu]").click();
+    await settle();
     q("[data-meal-select]").click();
     await settle();
-    check("Select floats its choices over the screen", q(".mlselbar") && text(q(".mlselbar")).includes("Tap meals"),
-      text(q(".mlselbar")));
-    check("and holds the week's bar where it is", Boolean(q(".mlfoot.held")), "not held");
+    check("Select turns the week's bar into the selection's, in place", Boolean(q(".mlfoot.mlselrow"))
+      && text(q(".mlselrow .mlselcount")) === "Tap meals to select" && !q(".mlselbar") && !q(".mlmenu"), text(q(".mlfoot")));
+    check("with nothing ticked Plan waits", q(".mlselrow [data-meal-plan]").disabled, "enabled");
+    check("each meal shows a box to tick", Boolean(cell(day(1), "dinner").querySelector(".mlchk")), cell(day(1), "dinner").innerHTML.slice(0, 120));
     cell(day(1), "dinner").click();
     await settle();
     check("a tap ticks a meal and opens nothing", cell(day(1), "dinner").classList.contains("chosen") && !q(".mldetail"),
@@ -136,23 +173,28 @@ const js = fs.readFileSync(file);
     check("a day's heading ticks that day", all(".mlgridview .mlcell.chosen").length === 2, all(".mlgridview .mlcell.chosen").length);
     cell(day(1), "dinner").click();
     await settle();
-    check("the bar counts them", text(q(".mlselbar")).startsWith("3 selected"), text(q(".mlselbar")));
+    check("the bar counts them, and the empty ones", text(q(".mlselcount")) === "3 selected · 1 empty", text(q(".mlselcount")));
+    check("Move needs exactly one planned meal", q("[data-sel-move]").disabled && !q("[data-sel-shop]").disabled
+      && !q("[data-sel-clear]").disabled, `${q("[data-sel-move]").disabled} ${q("[data-sel-shop]").disabled}`);
 
     q("[data-sel-shop]").click();
     await settle();
     const shop = calls("meal_week_to_items").pop();
     check("Shop asks for only those meals", shop && JSON.stringify(shop.service_data.slots)
       === JSON.stringify([`${day(1)}|dinner`, `${day(2)}|breakfast`, `${day(2)}|dinner`]), shop && JSON.stringify(shop.service_data));
-    check("and leaves select mode", !q(".mlselbar"), "still selecting");
+    check("and leaves select mode", !q(".mlselrow"), "still selecting");
 
-    /* Clear two, then undo both. */
+    /* Clear two, then undo both. A right-click selects, with that meal ticked. */
     card._voiceSay("idle", "");
-    q("[data-meal-select]").click();
+    cell(day(1), "dinner").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     await settle();
-    cell(day(1), "dinner").click();
-    await settle();
+    check("a right-click selects that meal", Boolean(q(".mlselrow")) && cell(day(1), "dinner").classList.contains("chosen")
+      && text(q(".mlselcount")) === "1 selected", text(q(".mlfoot")));
+    check("and with exactly one planned meal, Move is offered", !q("[data-sel-move]").disabled, "disabled");
+    await new Promise((r) => setTimeout(r, 450));
     cell(day(2), "dinner").click();
     await settle();
+    check("and now two are not one", q("[data-sel-move]").disabled, "enabled");
     q("[data-sel-clear]").click();
     await settle();
     const dels = acted.filter((a) => a.service === "mealie.delete_mealplan").map((a) => a.data.mealplan_id);
@@ -162,40 +204,93 @@ const js = fs.readFileSync(file);
     const puts = calls("meal_plan_set").slice(-2).map((m) => m.service_data.recipe_id || m.service_data.title);
     check("and one Undo puts both back", puts.join(",") === "r1,Fish pie", puts.join(","));
 
-    /* One recipe for several. */
-    q("[data-meal-select]").click();
+    /* A long press selects, with the held meal ticked; Plan then chooses one recipe for all. */
+    card._voiceSay("idle", "");
+    await window.holdAt(cell(day(3), "breakfast"));
     await settle();
-    cell(day(3), "breakfast").click();
+    check("a long press selects, with the held meal ticked", Boolean(q(".mlselrow"))
+      && cell(day(3), "breakfast").classList.contains("chosen") && text(q(".mlselcount")) === "1 selected",
+      `${text(q(".mlfoot"))} ${cell(day(3), "breakfast").className}`);
+    check("the tap that ends the hold opens nothing", !q(".confirmwrap") && !q(".mldetail"), "something opened");
+    check("an empty meal is not something to move", q("[data-sel-move]").disabled && q("[data-sel-clear]").disabled, "enabled");
+    await new Promise((r) => setTimeout(r, 450));
     cell(day(4), "breakfast").click();
     await settle();
-    q("[data-sel-one]").click();
+    q(".mlselrow [data-meal-plan]").click();
     await settle();
-    check("One recipe opens the box for all of them", text(q(".confirmwrap .confirmhead")).includes("One recipe for 2 meals"),
-      text(q(".confirmwrap .confirmhead")));
+    const tabs = all(".confirmwrap .plantabs [data-plantab]").map((b) => b.getAttribute("data-plantab"));
+    check("Plan from a selection opens Plan 2 meals, with its tabs", text(q(".confirmwrap .confirmhead")) === "Plan 2 meals"
+      && tabs.join(",") === "suggest,choose,copy" && !q(".mlselrow"), `${text(q(".confirmwrap .confirmhead"))} ${tabs.join(",")}`);
+    check("suggesting first, for several", q(".confirmwrap [data-plantab='suggest']").classList.contains("on")
+      && q(".confirmwrap [data-plantab='suggest']").getAttribute("aria-selected") === "true", "another tab");
+    q(".confirmwrap [data-plantab='choose']").click();
+    await settle();
+    check("a tab swaps the sheet in place", all(".confirmwrap").length === 1 && Boolean(q(".confirmwrap .rpbox"))
+      && q(".confirmwrap [data-plantab='choose']").classList.contains("on"), all(".confirmwrap").length);
     q(".confirmwrap [data-recipe-open='1']").click();
     await settle();
     const two = calls("meal_plan_set").slice(-2).map((m) => `${m.service_data.date}:${m.service_data.recipe_id}`);
-    check("and plans it into each", two.join(",") === `${day(3)}:r3,${day(4)}:r3`, two.join(","));
+    check("Choose plans one recipe into each", two.join(",") === `${day(3)}:r3,${day(4)}:r3`, two.join(","));
 
-    /* Fill only the chosen ones. */
+    /* Suggest only for the chosen empty ones. */
+    q("[data-meal-menu]").click();
+    await settle();
     q("[data-meal-select]").click();
     await settle();
     cell(day(3), "dinner").click();
+    cell(day(1), "dinner").click();
     await settle();
-    q("[data-sel-fill]").click();
+    q(".mlselrow [data-meal-plan]").click();
+    await settle();
+    check("the tab last used is kept", q(".confirmwrap [data-plantab='choose']").classList.contains("on"), "not kept");
+    check("and the sheet says which will be filled", text(q(".confirmwrap .plannote")).startsWith("1 of them empty"),
+      text(q(".confirmwrap .plannote")));
+    q(".confirmwrap [data-plantab='suggest']").click();
+    await settle();
+    check("Suggest has no source to choose, and says Suggest meals", !q(".confirmwrap [data-src]")
+      && text(q(".confirmwrap [data-yes]")) === "Suggest meals", text(q(".confirmwrap [data-yes]")));
+    q(".confirmwrap [data-yes]").click();
     await settle();
     const rows = all(".confirmwrap .mlprow .mlpname").map(text);
-    check("Fill suggests only for the chosen slots", rows.join(",") === "Chilli", rows.join(","));
+    check("Suggest proposes only for the chosen empty slots", rows.join(",") === "Chilli", rows.join(","));
     q(".confirmwrap [data-no]").click();
     await settle();
 
+    /* One selected: the one-slot Plan sheet; then Move. */
+    cell(day(1), "dinner").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    await settle();
+    await new Promise((r) => setTimeout(r, 450));
+    q(".mlselrow [data-meal-plan]").click();
+    await settle();
+    check("Plan with one selected plans that one meal", /^Plan tomorrow/i.test(text(q(".confirmwrap .confirmhead")))
+      && Boolean(q(".confirmwrap .rpbox")), text(q(".confirmwrap .confirmhead")));
+    q(".confirmwrap [data-no]").click();
+    await settle();
+    cell(day(1), "dinner").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    await settle();
+    await new Promise((r) => setTimeout(r, 450));
+    q("[data-sel-move]").click();
+    await settle();
+    check("Move leaves selecting and waits for a day", !q(".mlselrow") && text(q(".mlmoving")).includes("Chicken fajitas"),
+      text(q(".mlmoving")));
+    cell(day(4), "dinner").click();
+    await settle();
+    const mv = calls("meal_plan_move").pop();
+    check("and the day tapped is where it goes", mv && mv.service_data.from_date === day(1) && mv.service_data.to_date === day(4)
+      && mv.service_data.entry_type === "dinner", mv && JSON.stringify(mv.service_data));
+    card._mealPick = null;
+    card._voiceSay("idle", "");
+    await settle();
+
     /* ---- several recipes into the week ---- */
-    q("[data-meal-box]").click();
+    q(".mlfoot [data-meal-plan]").click();
     await settle();
-    q(".confirmwrap [data-several]").click();
+    check("Plan with nothing selected is for the week shown", text(q(".confirmwrap .confirmhead")) === "Plan this week",
+      text(q(".confirmwrap .confirmhead")));
+    q(".confirmwrap [data-plantab='choose']").click();
     await settle();
-    check("Choose several ticks instead of opening", q(".confirmwrap .ticking") && q(".confirmwrap [data-several]").disabled,
-      q(".confirmwrap [data-several]").textContent);
+    check("Choose for the week ticks from the start", q(".confirmwrap .ticking") && q(".confirmwrap [data-several]").disabled
+      && text(q(".confirmwrap [data-several]")) === "Tick some", q(".confirmwrap [data-several]") && q(".confirmwrap [data-several]").textContent);
     q(".confirmwrap [data-recipe-open='2']").click();
     q(".confirmwrap [data-recipe-open='1']").click();
     await settle();
@@ -220,12 +315,14 @@ const js = fs.readFileSync(file);
     await settle();
 
     /* ---- copy last week ---- */
-    q("[data-meal-week]").click();
+    q(".mlfoot [data-meal-plan]").click();
     await settle();
-    q(".confirmwrap [data-src='1']").click();
+    q(".confirmwrap [data-plantab='copy']").click();
     await settle();
-    check("copying greys what it does not need, without moving it", q(".confirmwrap [data-request]").disabled
-      && text(q(".confirmwrap [data-yes]")) === "Copy them", text(q(".confirmwrap [data-yes]")));
+    check("Copy offers last week or the one before, and nothing to bear in mind",
+      q(".confirmwrap [data-src='1']").getAttribute("aria-pressed") === "true" && Boolean(q(".confirmwrap [data-src='2']"))
+      && !q(".confirmwrap [data-src='ideas']") && !q(".confirmwrap [data-request]")
+      && text(q(".confirmwrap [data-yes]")) === "Copy them", text(q(".confirmwrap .confirmbox")));
     q(".confirmwrap [data-yes]").click();
     await settle();
     const copied = all(".confirmwrap .mlprow").map((li) => `${text(li.querySelector(".mlpname"))}@${li.querySelector("select").value}`);

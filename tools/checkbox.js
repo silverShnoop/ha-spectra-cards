@@ -2,11 +2,12 @@
 /* Two meals in a slot, drag to move, and the box kept tidy.
  *
  *   - a slot can hold two meals: the cell shows both, the tray lists each
- *     with its own recipe and clear, and Another adds rather than replaces
+ *     with its own recipe and clear; Change opens the Plan sheet's box, and
+ *     its "Keep <name> too" switch adds rather than replaces
  *   - on the panel a meal is dragged to another day; a click after a drag
  *     is not a press
  *   - deleting a planned recipe asks: keep those meals as notes, or clear
- *   - which meals a screen shows is a per-device choice
+ *   - which meals a screen shows is a per-device choice, from the ⋮ menu
  *   - ?recipe=<slug> opens that recipe's form, once, from any card
  *
  *   node tools/checkbox.js [path/to/spectra-cards.js]
@@ -127,9 +128,18 @@ const js = fs.readFileSync(file);
       back && JSON.stringify(back.service_data));
     card._mealPick = `${day(1)}|dinner`;
     card._signature = null; card._update(); await settle();
-    q(".mldetail [data-meal-another]").click();
+    check("the tray has no Another any more", !q(".mldetail [data-meal-another]") && Boolean(q(".mldetail [data-meal-change]")),
+      all(".mldetail .mltile").map(text).join(","));
+    q(".mldetail [data-meal-change]").click();
     await settle();
-    check("Another opens the box to add", text(q(".confirmwrap .confirmhead")).includes("add another"), text(q(".confirmwrap .confirmhead")));
+    const keepBtn = q(".confirmwrap [data-keep]");
+    check("Change opens the Plan sheet's box, offering to keep what is there", /^Plan tomorrow/i.test(text(q(".confirmwrap .confirmhead")))
+      && Boolean(q(".confirmwrap .rpbox")) && keepBtn && text(keepBtn) === "Keep Chicken fajitas too"
+      && keepBtn.getAttribute("aria-pressed") === "false" && !q(".confirmwrap [data-quick]"),
+      `${text(q(".confirmwrap .confirmhead"))} | ${keepBtn && text(keepBtn)}`);
+    keepBtn.click();
+    await settle();
+    check("Keep is a switch", q(".confirmwrap [data-keep]").getAttribute("aria-pressed") === "true", "not pressed");
     q(".confirmwrap [data-recipe-open='1']").click();
     await settle();
     const added = calls("meal_plan_set").pop();
@@ -174,6 +184,9 @@ const js = fs.readFileSync(file);
     check("and then the recipe goes", asked.some((m) => m.service === "delete_recipe"), "not deleted");
 
     /* ---- meals shown ---- */
+    q("[data-meal-menu]").click();
+    await settle();
+    check("Meals shown here is in the week's menu", Boolean(q(".mlmenu [data-meal-shown]")), text(q(".mlmenu")));
     q("[data-meal-shown]").click();
     await settle();
     q(".confirmwrap [data-show='snack']").click();
