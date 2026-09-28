@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.131.0";
+const VERSION = "0.132.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -17229,6 +17229,11 @@ const PANEL_SHEET = `
   gap:var(--pn-row-gap) var(--pn-col-gap); margin:0 auto;
   max-width:calc(var(--pn-cols, 1) * var(--pn-max) + (var(--pn-cols, 1) - 1) * var(--pn-col-gap)); }
 .section { position:relative; min-width:0; grid-column:span var(--column-span, 1); }
+/* Masonry: rows 4px tall and no row gap, each section spanning as many as
+   its own height (plus the gap) needs, so a short section no longer holds
+   open a row as tall as its tallest neighbour. */
+.grid.masonry { grid-auto-rows:4px; row-gap:0; }
+.grid.masonry > .section { grid-row-end:span var(--pn-rows, 1); }
 .section:has(> [hidden]) { display:none; }
 .section > hui-section { position:relative; }
 .section.bg { padding:8px; border-radius:var(--ha-section-border-radius, 16px); }
@@ -17284,6 +17289,8 @@ class SpectraPanel extends HTMLElement {
     };
     set("--pn-needs-width", this._config.needs_width, "px");
     set("--pn-needs-max", this._config.needs_max_height, "%");
+    set("--pn-min", this._config.column_min_width, "px");
+    this._grid.classList.toggle("masonry", Boolean(this._config.masonry));
     this._layout();
   }
 
@@ -17341,6 +17348,7 @@ class SpectraPanel extends HTMLElement {
       wrap.appendChild(section);
       this._grid.appendChild(wrap);
       this._wrappers.push({ wrap, section });
+      if (this._sizer) this._sizer.observe(wrap);
     }
     this._layout();
   }
@@ -17349,6 +17357,10 @@ class SpectraPanel extends HTMLElement {
     if (!this._observer && typeof ResizeObserver !== "undefined") {
       this._observer = new ResizeObserver(this._relayout);
       this._observer.observe(this);
+      /* A section's height changes on its own -- a list grows a row, a card
+         hides -- and masonry has to hear about it to re-span. */
+      this._sizer = new ResizeObserver(() => this._spanRows());
+      for (const w of this._wrappers) this._sizer.observe(w.wrap);
     }
     window.addEventListener("resize", this._relayout);
     this._layout();
@@ -17356,6 +17368,7 @@ class SpectraPanel extends HTMLElement {
 
   disconnectedCallback() {
     if (this._observer) { this._observer.disconnect(); this._observer = null; }
+    if (this._sizer) { this._sizer.disconnect(); this._sizer = null; }
     window.removeEventListener("resize", this._relayout);
   }
 
@@ -17394,12 +17407,29 @@ class SpectraPanel extends HTMLElement {
       w.wrap.style.setProperty("--column-span", String(Math.min(spanOf(w), cols)));
     }
 
+    this._spanRows();
+
     /* A different set of sections is a different tab. Start it at the top
        rather than wherever the last one was left. */
     const signature = shown.map((w) => this._wrappers.indexOf(w)).join(",");
     if (signature !== this._shown) {
       this._shown = signature;
       this._scroll.scrollTop = 0;
+    }
+  }
+
+  /* Masonry: how many 4px rows each section needs, gap included. The
+     section is aligned to the start of its area, so its height is its own
+     and never the span's -- measuring it cannot feed back into itself. */
+  _spanRows() {
+    if (!this._config.masonry) return;
+    const gap = parseFloat(getComputedStyle(this).getPropertyValue("--pn-row-gap")) || 20;
+    for (const w of this._wrappers) {
+      const h = w.wrap.getBoundingClientRect().height;
+      const rows = h > 0 ? Math.ceil((h + gap) / 4) : 1;
+      if (w.wrap.style.getPropertyValue("--pn-rows") !== String(rows)) {
+        w.wrap.style.setProperty("--pn-rows", String(rows));
+      }
     }
   }
 }
