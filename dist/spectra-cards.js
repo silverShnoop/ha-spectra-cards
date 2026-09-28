@@ -1860,7 +1860,9 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 }
 .mlmenu button:hover { background:var(--sp-sink); }
 .mlmenu .mdi { width:20px; height:20px; color:var(--sp-ink-2); flex:none; }
-.mlselrow { padding:0 4px 0 0; border-radius:10px; background:var(--accent-soft); border-bottom-color:transparent; margin-bottom:10px; }
+/* The same outer height as the week's bar (52 + 1 + 10), with the tint on
+   its top 44px, so every control sits exactly where the week's did. */
+.mlselrow { min-height:44px; padding:0 4px 0 0; border-radius:10px; background:var(--accent-soft); border-bottom-color:transparent; margin-bottom:18px; }
 .mlselrow .mlicon { color:var(--accent-on); }
 .mlselcount { flex:1 1 auto; min-width:0; font-size:14px; font-weight:600; color:var(--accent-on);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
