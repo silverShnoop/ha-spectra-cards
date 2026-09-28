@@ -185,6 +185,49 @@ customElements.define("fake-section", FakeSection);
     await page.close();
   }
 
+  /* Masonry: a short section must not hold open a row as tall as its
+     neighbour. Three columns; the first section is short, the next two are
+     tall, and the fourth has to land directly under the short one. */
+  {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    page.on("pageerror", (e) => problems.push(`masonry: PAGEERROR ${e.message}`));
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.waitForFunction(() => !!customElements.get("spectra-panel"));
+    const got = await page.evaluate(async () => {
+      window.HASS = { states: {}, themes: { darkMode: true }, callService: () => Promise.resolve() };
+      const card = (title, rows) => ({
+        type: "custom:spectra-card", title, accent: 4,
+        body: { type: "list", rows: Array.from({ length: rows }, (_, i) => ({ name: `${title} ${i + 1}`, value: "x" })) },
+      });
+      const sizes = [1, 8, 8, 2, 1];
+      const sections = sizes.map((n, i) => {
+        const s = document.createElement("fake-section");
+        s.config = { type: "grid", cards: [card(`S${i}`, n)] };
+        return s;
+      });
+      const view = document.createElement("spectra-panel");
+      view.setConfig({ type: "custom:spectra-panel", masonry: true, column_min_width: 280 });
+      document.getElementById("a").appendChild(view);
+      view.sections = sections;
+      await new Promise((r) => setTimeout(r, 300));
+      const box = (i) => sections[i].parentElement.getBoundingClientRect();
+      const rowGap = parseFloat(getComputedStyle(view).getPropertyValue("--pn-row-gap"));
+      return {
+        cols: Number(view.shadowRoot.querySelector(".grid").style.getPropertyValue("--pn-cols")),
+        firstBottom: box(0).bottom, fourthTop: box(3).top, fourthX: box(3).x, firstX: box(0).x, rowGap,
+      };
+    });
+    const check = (label, ok, detail) => {
+      console.log(`${ok ? "ok  " : "FAIL"} masonry: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`masonry: ${label}`);
+    };
+    check("column_min_width lets a 1280 landscape take three", got.cols === 3, got);
+    check("the fourth lands under the short first", Math.abs(got.fourthX - got.firstX) < 1, got);
+    check("with no more than a gap between them",
+      got.fourthTop - got.firstBottom >= got.rowGap - 1 && got.fourthTop - got.firstBottom <= got.rowGap + 4, got);
+    await page.close();
+  }
+
   await browser.close();
   server.close();
   if (problems.length) {

@@ -2390,6 +2390,8 @@ views:
     needs_width: 340          # optional: the side column, px
     needs_max_height: 36      # optional: upright cap on Needs you, % of height
     side_min_width: 900       # optional: narrowest width that goes sideways
+    column_min_width: 280     # optional: narrowest column, px (default 320)
+    masonry: true             # optional: pack sections with no row gaps
     sections:
       - type: grid
         spectra_slot: needs   # this section is Needs you
@@ -2420,13 +2422,22 @@ column wide: in a span-3 section it sits two or three to a row on a tablet
 and alone on a phone, where `columns: full` would be a single column
 everywhere. A section `background` is drawn as it would be there.
 
+**`masonry: true` packs instead of aligning rows.** A sections view lines
+its sections up in rows, so a clock beside the week's weather holds open a
+gap as tall as the weather. With masonry each section takes exactly its own
+height and the next one fills in underneath the shortest column — which is
+what lets a tab of eleven small cards fit one screen. It is measured, and
+re-measured whenever a section changes height. It suits a tab of one-card
+sections; a span-3 group reads the same either way.
+
 Switching tab starts the new tab at the top. There is no edit mode for this
 view in the dashboard editor; switch the view's `type` to `sections` to edit
 it there, and back.
 
 `tools/checkpanel.js` renders it upright, sideways and on a phone, scrolls
 the content to the bottom, and fails if Needs you or the rail moved a pixel
-or the page scrolled at all.
+or the page scrolled at all. It also checks that under masonry a section
+lands directly beneath a short one, a gap and no more below it.
 
 ## Rows from a collection
 
