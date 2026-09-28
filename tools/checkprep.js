@@ -272,6 +272,46 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-no]").click();
     await settle();
 
+    /* ---- the recipe, prep noted in place ---- */
+    const katsu = { recipe_id: "r5", slug: "katsu", name: "Katsu" };
+    index.push({ recipe_id: "r5", slug: "katsu", name: "Katsu", prep: { mode: "split", checked: true, in_place: true,
+      reheat: "Warm the sauce through.", reheat_at: 1, steps: [
+        { n: 1, ahead_max: 72, keeps: "Fridge", minutes: 25, if_ahead: "Cool, cover and chill." },
+        { n: 2, ahead_max: 24, minutes: 10, ahead: "Bread the chicken.", cook: "Fry the chicken until golden." }] },
+      provenance: { source: { kind: "page", url: "https://example.com/katsu" },
+        events: [{ id: 1, what: "read", by: "Mealie", at: "2026-09-01T10:00:00+00:00" },
+          { id: 2, what: "split", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:01:00+00:00" }],
+        marks: { 3: { mark: "interpreted", event: 1 } } } });
+    method.r5 = ["Make the curry sauce.", "Bread and fry the chicken.", "Serve with rice."];
+    await card._recipeIndex("e1", true);
+    card._mealRecipe("e1", katsu, 6, { save: "home_signals.save_recipe" }, {});
+    await settle();
+    r = q(".confirmwrap:last-of-type");
+    const lis = r ? [...r.querySelectorAll(".rmsteps > li")] : [];
+    check("in place: one method, in the recipe's order", lis.length === 3
+      && [...r.querySelectorAll(".ppsec h4")].map(text).join() === "Method", r && text(r));
+    check("a split step shows both halves", lis[1] && lis[1].querySelectorAll(".rmhalf").length === 2, lis[1] && lis[1].innerHTML);
+    check("what only applies when made ahead is its own line", text(r.querySelector(".rmif")).includes("Cool, cover and chill"),
+      text(r.querySelector(".rmif")));
+    check("each AI change carries its mark", Boolean(lis[2] && lis[2].querySelector(".aimark[aria-label^='Interpreted']"))
+      && Boolean(lis[1] && lis[1].querySelector(".aimark[aria-label^='Enhanced']")), lis[2] && lis[2].innerHTML);
+    lis[2].querySelector(".aimark").click();
+    await settle();
+    check("tapping a mark says who and when", !lis[2].querySelector(".rmnote").hidden
+      && text(lis[2].querySelector(".rmnote")).includes("Mealie"), text(lis[2].querySelector(".rmnote")));
+    check("About this recipe is folded away", r.querySelector("details.rmabout") && !r.querySelector("details.rmabout").open,
+      r.querySelector("details.rmabout") && r.querySelector("details.rmabout").outerHTML);
+    r.querySelector("[data-cook]").click();
+    await settle();
+    check("Cook asks whether it was prepped", text(q(".mlcook .rmask")) === "Did you prep ahead?", text(q(".mlcook")));
+    q(".mlcook [data-cook-whole]").click();
+    await settle();
+    check("no: the whole method, in order", text(q(".mlcook .mlcookof")).startsWith("Step 1 of 3")
+      && !q(".mlcook .ppbanner"), text(q(".mlcook")));
+    q(".mlcook [data-cook-done]").click();
+    q(".confirmwrap [data-no]").click();
+    await settle();
+
     /* ---- the form ---- */
     asked.length = 0;
     card._mealEdit("e1", { recipe_id: "r2", slug: "chilli", name: "Chilli",
@@ -286,8 +326,9 @@ const js = fs.readFileSync(file);
     form.querySelector("[data-yes]").click();
     await settle();
     let saved = asked.filter((m) => m.service === "save_recipe").pop();
-    check("saving puts the prep steps first", saved && saved.service_data.method === "Make the chilli.\nGrate cheese.\nWarm it through and serve."
-      && saved.service_data.prep.steps.length === 2 && saved.service_data.prep.checked === true,
+    check("saving keeps the recipe's order and notes the prep in place",
+      saved && saved.service_data.method === "Make the chilli.\nWarm it through and serve.\nGrate cheese."
+      && saved.service_data.prep.steps.map((x) => x.n).join() === "1,3" && saved.service_data.prep.checked === true,
       saved && JSON.stringify(saved.service_data));
     card._mealEdit("e1", { recipe_id: "r2", slug: "chilli", name: "Chilli",
       instructions: [{ text: "Make the chilli." }, { text: "Warm it through and serve." }] }, 6, { save: "home_signals.save_recipe" });
@@ -306,7 +347,7 @@ const js = fs.readFileSync(file);
     card._mealEdit("e1", { recipe_id: "r2", slug: "chilli", name: "Chilli",
       instructions: [{ text: "Make the chilli." }, { text: "Warm it through and serve." }] }, 6, { save: "home_signals.save_recipe" });
     await settle();
-    check("an unchecked split says so in the form", text(q(".confirmwrap .ppnote")).includes("Check the steps"), text(q(".confirmwrap .ppnote")));
+    check("an unchecked split says so in the form", text(q(".confirmwrap .ppnote")).includes("Check which steps"), text(q(".confirmwrap .ppnote")));
     q(".confirmwrap [data-ppmode='order']").click();
     q(".confirmwrap [data-yes]").click();
     await settle();

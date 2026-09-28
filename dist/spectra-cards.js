@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.127.0";
+const VERSION = "0.128.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2168,6 +2168,42 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .ppkeep { display:flex; flex-wrap:wrap; gap:6px; }
 .ppchip { font-size:11.5px; padding:2px 8px; border-radius:999px; background:var(--sp-sink); color:var(--sp-ink-2); white-space:nowrap; }
 .ppchip.a { background:var(--accent-soft); color:var(--accent-on); }
+/* The method in its own order: what can be done ahead is tagged where it
+   is, a part made ahead is bracketed once, and the lines that only apply
+   when it was made ahead are quiet and indented. */
+.rmsteps { list-style:none; margin:0; padding:0; display:grid; gap:12px; }
+.rmsteps li { display:grid; grid-template-columns:24px minmax(0,1fr); gap:10px; font-size:15px; line-height:1.45; color:var(--sp-ink); }
+.rmsteps li > b { width:24px; height:24px; border-radius:50%; background:var(--sp-sink); color:var(--sp-ink-2);
+  font-size:12px; display:grid; place-items:center; font-weight:700; }
+.rmsteps li.ahead > b { background:var(--accent-soft); color:var(--accent-on); }
+.rmsteps li > div { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.rmhalf + .ppkeep + .rmhalf, .rmhalf + .rmhalf { margin-top:2px; }
+.rmif { padding-left:10px; border-left:2px solid var(--accent-soft); font-size:13.5px; font-style:italic; color:var(--sp-ink-2); }
+.rmif b { font-style:normal; font-weight:600; color:var(--accent-on); }
+.rmblock { position:relative; margin:12px 0; padding-left:10px; border-left:3px solid var(--accent); display:grid; gap:10px; }
+.rmblocktag { margin:0; display:flex; flex-wrap:wrap; gap:6px; }
+.rmblock .ppkeep { display:inline-flex; }
+.rmsteps + .rmblock, .rmblock + .rmsteps { margin-top:12px; }
+.rmahead { display:flex; align-items:center; gap:8px; margin:10px 0 4px; padding:9px 12px; border-radius:10px;
+  background:var(--accent-soft); color:var(--accent-on); font-size:13.5px; }
+.rmahead .mdi { width:18px; height:18px; flex:none; }
+.mlrecipe h4.rmask { margin:6px 0 4px; font-size:17px; font-weight:600; text-transform:none; letter-spacing:0; color:var(--sp-ink); }
+/* A step AI read, wrote or changed: a small quiet mark at its end. */
+.aimark { display:inline-grid; place-items:center; width:22px; height:22px; margin:0 0 0 4px; padding:0; border:none;
+  border-radius:6px; background:none; color:var(--sp-ink-3); vertical-align:-5px; cursor:pointer; position:relative; }
+.aimark::after { content:""; position:absolute; inset:-8px; }
+.aimark .mdi { width:15px; height:15px; }
+.aimark[aria-expanded="true"] { background:var(--sp-sink); color:var(--sp-ink); }
+.rmnote { display:flex; flex-direction:column; gap:1px; padding:8px 10px; border-radius:8px; background:var(--sp-ink); color:var(--sp-surface);
+  font-size:12.5px; line-height:1.35; }
+.rmnote[hidden] { display:none; }
+.rmnote b { font-weight:600; font-size:13px; }
+.rmnote small { opacity:.75; font-size:11.5px; }
+.rmabout { margin-top:14px; padding-top:10px; border-top:1px solid var(--sp-edge); font-size:13px; color:var(--sp-ink-2); }
+.rmabout summary { display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; list-style:none; min-height:32px; }
+.rmabout summary::-webkit-details-marker { display:none; }
+.rmabout p { display:flex; gap:8px; align-items:flex-start; margin:6px 0 0; line-height:1.4; }
+.rmabout .mdi { width:16px; height:16px; flex:none; color:var(--sp-ink-3); margin-top:1px; }
 .ppnote { margin:10px 0 0; padding:10px 12px; border-radius:10px; background:var(--sp-sink); font-size:13px; color:var(--sp-ink-2); line-height:1.4; }
 .ppnote .mdi { width:16px; height:16px; vertical-align:-3px; color:var(--accent); }
 /* Two choices side by side, each the same width whichever is pressed, so
@@ -3242,6 +3278,8 @@ const MDI_INLINE = {
   "mdi:camera": "M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z",
   "mdi:content-copy": "M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z",
   "mdi:minus-box": "M17,13H7V11H17M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3Z",
+  "mdi:information-outline": "M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z",
+  "mdi:tag-outline": "M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4A2,2 0 0,0 2,4V11C2,11.55 2.22,12.05 2.59,12.42L11.59,21.42C11.95,21.78 12.45,22 13,22C13.55,22 14.05,21.78 14.41,21.41L21.41,14.41C21.78,14.05 22,13.55 22,13C22,12.45 21.77,11.94 21.41,11.58M13,20L4,11V4H11L20,13M6.5,5A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 6.5,8A1.5,1.5 0 0,1 5,6.5A1.5,1.5 0 0,1 6.5,5Z",
   "mdi:checkbox-blank-outline": "M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19Z",
   "mdi:text-box-edit-outline": "M10 21H5C3.89 21 3 20.11 3 19V5C3 3.89 3.89 3 5 3H19C20.11 3 21 3.89 21 5V10.33C20.7 10.21 20.37 10.14 20.04 10.14C19.67 10.14 19.32 10.22 19 10.37V5H5V19H10.11L10 19.11V21M7 9H17V7H7V9M7 17H12.11L14 15.12V15H7V17M7 13H16.12L17 12.12V11H7V13M21.7 13.58L20.42 12.3C20.21 12.09 19.86 12.09 19.65 12.3L18.65 13.3L20.7 15.35L21.7 14.35C21.91 14.14 21.91 13.79 21.7 13.58M12 22H14.06L20.11 15.93L18.06 13.88L12 19.94V22Z",
   "mdi:camera-plus-outline": "M21 6H17.8L16 4H10V6H15.1L17 8H21V20H5V11H3V20C3 21.1 3.9 22 5 22H21C22.1 22 23 21.1 23 20V8C23 6.9 22.1 6 21 6M8 14C8 18.45 13.39 20.69 16.54 17.54C19.69 14.39 17.45 9 13 9C10.24 9 8 11.24 8 14M13 11C14.64 11.05 15.95 12.36 16 14C15.95 15.64 14.64 16.95 13 17C11.36 16.95 10.05 15.64 10 14C10.05 12.36 11.36 11.05 13 11M5 6H8V4H5V1H3V4H0V6H3V9H5",
@@ -7862,6 +7900,163 @@ const PREP_DEFAULT_AHEAD = 24;
 function prepSplit(r) {
   const p = r && r.prep;
   return p && p.mode === "split" && Array.isArray(p.steps) && p.steps.length ? p : null;
+}
+
+/* A split read against the method, as the two versions of the recipe:
+   what is done ahead (each with its note, the ahead half where a step does
+   both, and any line that only applies when made ahead) and what is left
+   for the night (in order, the stove half of a split step, a reheat where
+   a part made ahead was). An older split moved its prep to the front, so
+   its first steps are the prep. Null when the notes no longer fit. */
+function prepPlan(split, texts) {
+  if (!split || !Array.isArray(texts)) return null;
+  if (!split.in_place) {
+    const n = split.steps.length <= texts.length ? split.steps.length : 0;
+    if (!n) return null;
+    return { inPlace: false, all: texts,
+      ahead: texts.slice(0, n).map((text, i) => Object.assign({}, split.steps[i], { n: i + 1, text })),
+      cook: texts.slice(n) };
+  }
+  if (split.steps.some((x) => !(Number(x.n) >= 1) || Number(x.n) > texts.length)) return null;
+  const by = new Map(split.steps.map((x) => [Number(x.n), x]));
+  const ahead = [];
+  const cook = [];
+  texts.forEach((t, i) => {
+    const n = i + 1;
+    if (!isBlank(split.reheat) && n === Number(split.reheat_at)) cook.push(String(split.reheat));
+    const x = by.get(n);
+    if (!x) { cook.push(t); return; }
+    const text = isBlank(x.ahead) ? t : String(x.ahead);
+    ahead.push(Object.assign({}, x, { text: isBlank(x.if_ahead) ? text : `${text} ${x.if_ahead}` }));
+    if (!isBlank(x.cook)) cook.push(String(x.cook));
+  });
+  return { inPlace: true, all: texts, ahead, cook };
+}
+
+/* What AI did to a recipe, as the recipe sheet marks it. */
+const AI_MARKS = {
+  interpreted: { icon: "mdi:eye-outline", word: "Interpreted", did: "Read from its source by" },
+  created: { icon: "mdi:creation", word: "Created", did: "Written by" },
+  enhanced: { icon: "mdi:auto-fix", word: "Enhanced", did: "Changed by" },
+};
+const AI_EVENTS = { read: "Read by", wrote: "Written by", split: "Prep suggested by", tagged: "Tagged by", checked: "Checked by" };
+
+/* A model as a person would name it: "Anthropic: Claude Sonnet 5" is the
+   OpenRouter entity's own name; the provider goes. */
+function aiName(by) {
+  const s = String(by || "").trim();
+  return s.includes(": ") ? s.split(": ").slice(1).join(": ") : (s || "AI");
+}
+
+function aiWhen(at) {
+  const t = Date.parse(String(at || ""));
+  if (!Number.isFinite(t)) return "";
+  const d = new Date(t);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getDate()} ${d.toLocaleDateString([], { month: "short" })} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/* A step's mark: the symbol, and what tapping it says. */
+function aiMark(kind, event, key) {
+  const m = AI_MARKS[kind];
+  if (!m) return "";
+  const by = event ? aiName(event.by) : "";
+  const label = `${m.word}${by ? ` by ${by}` : " by AI"}`;
+  return `<button type="button" class="aimark" data-ai="${esc(key)}" data-note="${esc(aiNote(kind, event))}"`
+    + ` aria-label="${esc(label)}" aria-expanded="false">${iconMarkup(m.icon)}</button>`;
+}
+
+function aiNote(kind, event) {
+  const m = AI_MARKS[kind];
+  if (!m) return "";
+  const by = event && !isBlank(event.by) ? aiName(event.by) : "";
+  return `<b>${esc(m.word)} by ${esc(by || "AI")}</b>`
+    + (event && !isBlank(event.note) ? `<span>${esc(event.note)}</span>` : (event ? "" : `<span>The model was not recorded.</span>`))
+    + (event && aiWhen(event.at) ? `<small>${esc(aiWhen(event.at))}</small>` : "");
+}
+
+/* The method in its own order, with what can be done ahead noted in place
+   and a mark on each step AI touched. A run of steps that together make a
+   part of the dish ahead is bracketed once rather than tagged each time. */
+function recipeMethodMarkup(texts, split, prov) {
+  const plan = split && split.in_place ? prepPlan(split, texts) : null;
+  const notes = plan ? new Map(split.steps.map((x) => [Number(x.n), x])) : new Map();
+  const marks = (prov && prov.marks) || {};
+  const events = new Map(((prov && prov.events) || []).map((e) => [Number(e.id), e]));
+  const splitEvent = [...((prov && prov.events) || [])].reverse().find((e) => e.what === "split") || null;
+  const mark = (n) => {
+    const m = marks[String(n)];
+    return m ? aiMark(m.mark, events.get(Number(m.event)), `s${n}`) : "";
+  };
+  /* The block: a reheat names where a part made ahead begins, and the run
+     of plain notes from there is it. */
+  let blockFrom = 0;
+  let blockTo = 0;
+  if (plan && !isBlank(split.reheat)) {
+    blockFrom = Number(split.reheat_at);
+    blockTo = blockFrom;
+    while (notes.has(blockTo + 1) && isBlank(notes.get(blockTo + 1).ahead)) blockTo += 1;
+    if (!notes.has(blockFrom)) { blockFrom = 0; blockTo = 0; }
+  }
+  const tagOf = (x) => prepChips(x);
+  const li = (t, n) => {
+    const x = notes.get(n);
+    const inBlock = blockFrom && n >= blockFrom && n <= blockTo;
+    let inner;
+    if (x && !isBlank(x.ahead) && !isBlank(x.cook)) {
+      inner = `<span class="rmhalf">${esc(x.ahead)}${aiMark("enhanced", splitEvent, `h${n}`)}</span>`
+        + (inBlock ? "" : tagOf(x))
+        + `<span class="rmhalf">${esc(x.cook)}${aiMark("enhanced", splitEvent, `c${n}`)}</span>`;
+    } else {
+      inner = `<span class="rmtext">${esc(t)}${mark(n)}</span>` + (x && !inBlock ? tagOf(x) : "");
+    }
+    if (x && !isBlank(x.if_ahead)) {
+      inner += `<span class="rmif"><b>If made ahead:</b> ${esc(x.if_ahead)}${aiMark("created", splitEvent, `i${n}`)}</span>`;
+    }
+    if (inBlock && n === blockTo) {
+      inner += `<span class="rmif"><b>If made ahead:</b> ${esc(split.reheat)}${aiMark("created", splitEvent, "r")}</span>`;
+    }
+    return `<li class="${x ? "ahead" : ""}" data-step="${n}"><b>${n}</b><div>${inner}<span class="rmnote" data-ai-note hidden></span></div></li>`;
+  };
+  let out = "";
+  let open = false;
+  texts.forEach((t, i) => {
+    const n = i + 1;
+    if (blockFrom && n === blockFrom) {
+      const x = notes.get(n);
+      out += `${open ? "</ol>" : ""}<div class="rmblock"><p class="rmblocktag">${n === blockTo ? "" : `<span class="ppchip a">Steps ${blockFrom}–${blockTo} can be done ahead</span>`}${tagOf(x)}</p><ol class="rmsteps">`;
+      open = true;
+    } else if (!open) {
+      out += `<ol class="rmsteps">`;
+      open = true;
+    }
+    out += li(t, n);
+    if (blockFrom && n === blockTo) { out += `</ol></div>`; open = false; }
+  });
+  if (open) out += `</ol>`;
+  return out;
+}
+
+/* Where a recipe came from and what AI did to it, folded away under the
+   method: facts for whoever wonders, never in the way. */
+function recipeAboutMarkup(prov, r) {
+  const src = (prov && prov.source) || {};
+  const lines = [];
+  const host = (u) => String(u || "").replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+  const added = aiWhen(src.added);
+  const KIND = { page: `from ${host(src.url) || "a web page"}`, video: `from a video on ${host(src.url) || "the web"}`,
+    photo: "from a photo", said: "read out", typed: "typed in", written: `written by AI${isBlank(src.from) ? "" : ` from the name \u201c${src.from}\u201d`}` };
+  if (src.kind || added) {
+    lines.push([src.kind === "page" || src.kind === "video" ? "mdi:link" : "mdi:information-outline",
+      `Added${added ? ` ${added.replace(/, \d\d:\d\d$/, "")}` : ""}${src.kind ? ` ${KIND[src.kind] || ""}` : ""}`]);
+  }
+  ((prov && prov.events) || []).forEach((e) => {
+    const icon = e.what === "split" ? "mdi:knife" : (e.what === "tagged" ? "mdi:tag-outline" : (e.what === "wrote" ? "mdi:creation" : (e.what === "read" ? "mdi:eye-outline" : "mdi:check")));
+    lines.push([icon, `${AI_EVENTS[e.what] || "Changed by"} ${e.what === "checked" ? "a person" : aiName(e.by)}${aiWhen(e.at) ? ` \u00b7 ${aiWhen(e.at)}` : ""}`]);
+  });
+  if (!lines.length) return "";
+  return `<details class="rmabout"><summary>${iconMarkup("mdi:information-outline")}<span>About this recipe</span></summary>`
+    + lines.map(([icon, text]) => `<p>${iconMarkup(icon)}<span>${esc(text)}</span></p>`).join("") + `</details>`;
 }
 
 function prepAheadWords(hours) {
@@ -13732,6 +13927,9 @@ class SpectraCard extends HTMLElement {
           method: (Array.isArray(got.method) ? got.method : []).map(String).join("\n"),
           total_time: got.total_time || "",
           config_entry_id: source.entry,
+          /* Written by AI, unseen: every step says so. */
+          source: { kind: "written", from: r.name },
+          ai: { what: "wrote", by: got.made_by || "", model: got.model || "", mark: "created", note: `Written from the name “${r.name}”` },
         };
         if (Number(got.servings) > 0) data.servings = Number(got.servings);
         return this._mealCall(body.recipes.save, data).then((saved) => {
@@ -13858,6 +14056,8 @@ class SpectraCard extends HTMLElement {
       };
       this._mealEdit(entry, null, accent, body.recipes, {
         draft,
+        made: { source: { kind: "written", from: name },
+          ai: { what: "wrote", by: got.made_by || "", model: got.model || "", mark: "created", note: `Written from the name “${name}”` } },
         heading: "Check the recipe, then save",
         onSaved: (saved) => {
           if (isBlank(saved.recipe_id)) return;
@@ -13908,6 +14108,8 @@ class SpectraCard extends HTMLElement {
           }
           this._mealEdit(entry, null, accent, edit, {
             heading: "Check the recipe, then save",
+            made: { source: { kind: "photo" },
+              ai: { what: "read", by: got.made_by || "", model: got.model || "", mark: "interpreted", note: "Read from a photo" } },
             draft: {
               name: got.name || "",
               total_time: got.total_time || "",
@@ -14631,6 +14833,11 @@ class SpectraCard extends HTMLElement {
      Looks right marks it checked; Keep in order puts the method back as it
      came; Edit opens the form, where each step can be changed. */
   _prepReview(wrap, saved, split, finish) {
+    /* Noted in place: shown as the recipe sheet shows it, in its order. */
+    if (split && Array.isArray(split.notes) && Array.isArray(split.method)) {
+      this._prepReviewInPlace(wrap, saved, split, finish);
+      return;
+    }
     const name = firstOf(saved.recipe, "The recipe");
     const prep = Array.isArray(split && split.prep) ? split.prep : [];
     const cook = Array.isArray(split && split.cook) ? split.cook : [];
@@ -14694,6 +14901,62 @@ class SpectraCard extends HTMLElement {
     });
   }
 
+  /* An import's notes on what can be done ahead, checked once. The method
+     is the page's, in its order; the notes sit on it. Looks right marks
+     them checked; No prep takes them off; Edit opens the form. */
+  _prepReviewInPlace(wrap, saved, split, finish) {
+    const name = firstOf(saved.recipe, "The recipe");
+    const notes = split.notes;
+    const shown = { in_place: true, steps: notes, reheat: split.reheat, reheat_at: split.reheat_at };
+    const call = (data) => this._mealCall("home_signals.save_recipe", Object.assign({ recipe: String(saved.slug) }, data));
+    const page = notes.some((x) => x.source === "page");
+    const mins = prepMinutes(notes);
+    const box = wrap.querySelector(".confirmbox");
+    box.classList.add("tall", "still");
+    box.innerHTML = `<div class="confirmhead">${iconMarkup("mdi:auto-fix")}<span>${esc(name)}</span></div>`
+      + `<div class="mlrecipe">`
+      + (notes.length
+        ? `<p class="confirmtext">Saved to the box. ${page ? "The recipe says what can be made ahead:" : "Some of it keeps, so it can be done ahead:"}</p>`
+          + `<p class="rmahead">${iconMarkup("mdi:knife")}<span>${notes.length === 1 ? "1 step" : `${notes.length} steps`} can be done ahead${mins ? ` · ${mins} min` : ""}</span></p>`
+          + recipeMethodMarkup(split.method, shown, null)
+        : `<p class="confirmtext">Saved to the box. Nothing in it is worth doing ahead.</p>`)
+      + `<p class="confirmtext quiet" data-status></p></div>`
+      + `<div class="confirmbtns">`
+      + (notes.length ? `<button type="button" class="confirmno" data-pp-order>No prep</button>` : "")
+      + `<button type="button" class="confirmno" data-pp-edit>Edit</button>`
+      + `<button type="button" class="confirmyes" data-pp-ok>Looks right</button></div>`;
+    const say = (t) => { const el = box.querySelector("[data-status]"); if (el) el.textContent = t; };
+    const run = (data) => {
+      box.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+      say("Saving…");
+      call(data).then(() => {
+        const [entry] = this._mealSources.size ? [...this._mealSources.values()].map((x) => x.entry) : [];
+        if (entry) this._recipeIndex(entry, true).then(() => { this._signature = null; this._update(); }, () => {});
+        finish();
+      }, () => { say("That could not be saved."); box.querySelectorAll("button").forEach((b) => { b.disabled = false; }); });
+    };
+    box.querySelector("[data-pp-ok]").addEventListener("click", () => run(notes.length
+      ? { prep: Object.assign({ mode: "split", checked: true, steps: notes },
+        isBlank(split.reheat) ? {} : { reheat: split.reheat, reheat_at: split.reheat_at }) }
+      : { prep: { mode: "none", checked: true } }));
+    const none = box.querySelector("[data-pp-order]");
+    if (none) none.addEventListener("click", () => run({ prep: { mode: "none", checked: true } }));
+    box.querySelector("[data-pp-edit]").addEventListener("click", () => {
+      finish();
+      if (!this._mealSources.size) return;
+      const [source] = this._mealSources.values();
+      const b = (this._config && this._config.body) || {};
+      const edit = [b.edit, b.recipes].find((x) => x && typeof x === "object" && !isBlank(x.save));
+      Promise.resolve(this._hass.callWS({
+        type: "call_service", domain: "mealie", service: "get_recipe",
+        service_data: { config_entry_id: source.entry, recipe_id: String(saved.slug) }, return_response: true,
+      })).then((r) => this._recipeIndex(source.entry, true).then(() => r)).then((r) => {
+        const full = (r && r.response && r.response.recipe) || null;
+        if (full && edit) this._mealEdit(source.entry, full, this._model && this._model.accent, edit);
+      }, (error) => LOGGER_WARN("spectra-card: could not open the recipe to edit", error));
+    });
+  }
+
   /* The recipe, on a sheet over the card, for reading at the hob. Fetched
      when asked for rather than with the plan: a week of recipes is a lot to
      carry for the one that gets opened. */
@@ -14719,6 +14982,10 @@ class SpectraCard extends HTMLElement {
     /* How many of the steps are prep, when the recipe is split. */
     let ahead = 0;
     let split = null;
+    /* The split read against the method: what goes ahead, what is left;
+       and the method as the recipe has it, which cooking uses unprepped. */
+    let plan = null;
+    let method = [];
     let flag = "";
     let hero = this._imagesOn() && !isBlank(recipe.image) ? `<div class="mlhero mlheroph"></div>` : "";
     let body = "";
@@ -14834,6 +15101,21 @@ class SpectraCard extends HTMLElement {
       if (sh) sh.addEventListener("click", () => { finish(); this._mealShop(shopSpec, { recipe: String(recipe.recipe_id) }, "Reading the recipe\u2026", title); });
       const img = wrap.querySelector(".mlhero");
       if (img) img.addEventListener("error", () => { hero = ""; img.remove(); });
+      /* A step's AI mark says, under the step, which model and when. */
+      wrap.querySelectorAll("[data-ai]").forEach((b) => b.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const holder = b.closest("li");
+        const note = holder ? holder.querySelector("[data-ai-note]") : null;
+        if (!note) return;
+        const same = !note.hidden && note.getAttribute("data-for") === b.getAttribute("data-ai");
+        wrap.querySelectorAll("[data-ai-note]").forEach((x) => { x.hidden = true; });
+        wrap.querySelectorAll("[data-ai]").forEach((x) => x.setAttribute("aria-expanded", "false"));
+        if (same) return;
+        note.innerHTML = b.getAttribute("data-note") || "";
+        note.setAttribute("data-for", b.getAttribute("data-ai"));
+        note.hidden = false;
+        b.setAttribute("aria-expanded", "true");
+      }));
       const fav = wrap.querySelector("[data-fav]");
       if (fav) {
         fav.addEventListener("click", () => {
@@ -14858,6 +15140,38 @@ class SpectraCard extends HTMLElement {
       if (c) {
         c.addEventListener("click", () => {
           flag = "";
+          /* Noted in place: which version is cooked is chosen here. Home
+             Tasks may already know the prep was done; otherwise it asks. */
+          if (plan && plan.inPlace && plan.ahead.length) {
+            const st = prepState(this._hass);
+            const rid = String(recipe.recipe_id);
+            const soon = [localDay(0), localDay(1)];
+            const sess = !st ? null : (meal ? prepSessionOf(st.sessions, meal.day, meal.type, rid)
+              : st.sessions.find((x) => x.items.some((i) => String(i.recipe_id) === rid && soon.includes(String(i.date)))));
+            const prepped = () => {
+              steps = [...plan.ahead.map((x) => x.text), ...plan.cook];
+              ahead = plan.ahead.length;
+              flag = "ok";
+              cook(Math.min(ahead, steps.length - 1), false);
+            };
+            const whole = () => {
+              steps = method.slice();
+              ahead = 0;
+              flag = "";
+              cook(0, false);
+            };
+            if (sess && sess.done) { prepped(); return; }
+            wrap.innerHTML = `<div class="confirmbox mlcook" role="dialog" aria-modal="true" aria-label="${esc(title)}: cooking">`
+              + `<div class="confirmhead"><ha-icon icon="mdi:chef-hat"></ha-icon><span>${esc(title)}</span></div>`
+              + `<div class="mlrecipe"><h4 class="rmask">Did you prep ahead?</h4>`
+              + `<p class="confirmtext">${esc(plan.ahead.map((x) => prepShort(x.text)).join(" · "))}</p></div>`
+              + `<div class="confirmbtns"><button type="button" class="confirmno" data-cook-whole>No, cook it all</button>`
+              + `<button type="button" class="confirmyes" data-cook-prepped>Yes, it’s done</button></div></div>`;
+            wrap.querySelector("[data-cook-whole]").addEventListener("click", whole);
+            wrap.querySelector("[data-cook-prepped]").addEventListener("click", prepped);
+            return;
+          }
+          if (plan && plan.inPlace) { steps = method.slice(); ahead = 0; cook(0, false); return; }
           if (!ahead) { cook(0, false); return; }
           /* The prep for THIS meal when opened from one; otherwise the
              nearest session holding this recipe today or tomorrow. */
@@ -14916,6 +15230,7 @@ class SpectraCard extends HTMLElement {
       steps = (Array.isArray(r.instructions) ? r.instructions : [])
         .map((i) => (i && !isBlank(i.text) ? String(i.text) : ""))
         .filter((x) => !isBlank(x));
+      method = steps.slice();
       if (this._imagesOn() && !isBlank(firstOf(r.image, recipe.image))) {
         if (!hero) hero = `<div class="mlhero mlheroph"></div>`;
         this._signImage(String(recipe.recipe_id), "min").then((url) => {
@@ -14935,13 +15250,24 @@ class SpectraCard extends HTMLElement {
         });
       } else hero = "";
       split = prepSplit(indexed());
-      ahead = split && split.steps.length <= steps.length ? split.steps.length : 0;
+      const known = indexed();
+      const prov = known && known.provenance ? known.provenance : null;
+      plan = split ? prepPlan(split, steps) : null;
+      /* An older split moved its prep to the front, and reads in two halves
+         as it always did. One noted in place reads in the recipe's order. */
+      ahead = plan && !plan.inPlace ? plan.ahead.length : 0;
+      const inPlace = Boolean(plan && plan.inPlace);
       const early = ahead ? prepMinutes(split.steps) : null;
       const numbered = (list, from, cls, chips) => `<ol class="ppsteps">${list.map((x, n) => `<li${cls ? ` class="${cls}"` : ""}>`
         + `<b>${from + n + 1}</b><span>${esc(x)}</span>${chips ? chips(n) : ""}</li>`).join("")}</ol>`;
       /* A split recipe reads in its two halves, each step numbered as it
          is in Mealie, the prep ones with how far ahead and where they keep. */
-      const method = !ahead ? `<h4>Method</h4><ol>${steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>`
+      const parts = inPlace ? plan.ahead.length : 0;
+      const aheadMins = inPlace ? prepMinutes(split.steps) : null;
+      const aheadLine = inPlace ? `<p class="rmahead">${iconMarkup("mdi:knife")}<span>${esc(!isBlank(split.reheat) && parts > 1
+        ? "Part of it can be made ahead" : `${parts === 1 ? "1 step" : `${parts} steps`} can be done ahead`)}${aheadMins ? ` \u00b7 ${aheadMins} min` : ""}</span></p>` : "";
+      const methodHtml = !ahead ? `${aheadLine}<div class="ppsec"><h4>Method</h4><span>${steps.length === 1 ? "1 step" : `${steps.length} steps`}</span></div>`
+          + recipeMethodMarkup(steps, inPlace ? split : null, prov)
         : `<div class="ppsec"><h4>Prep ahead</h4><span>${early ? `${early} min` : ""}</span></div>`
           + numbered(steps.slice(0, ahead), 0, "", (n) => prepChips(split.steps[n]))
           + (steps.length > ahead ? `<div class="ppsec"><h4>To cook</h4><span></span></div>`
@@ -14949,9 +15275,10 @@ class SpectraCard extends HTMLElement {
       body = (facts || early ? `<p class="confirmtext">${esc([facts, early ? `${early} min of it can be done ahead` : ""].filter(Boolean).join(" \u00b7 "))}</p>` : "")
         + (ingredients.length
           ? `<h4>Ingredients</h4><ul>${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "")
-        + (steps.length ? method : "")
+        + (steps.length ? methodHtml : "")
         + (!ingredients.length && !steps.length
-          ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : "");
+          ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : "")
+        + recipeAboutMarkup(prov, full);
       fill(body);
     }, (error) => {
       LOGGER_WARN("spectra-card: could not open the recipe", error);
@@ -15032,12 +15359,12 @@ class SpectraCard extends HTMLElement {
       const split = prepSplit(known.find((x) => String(x.recipe_id) === rid));
       const texts = (Array.isArray(r.instructions) ? r.instructions : [])
         .map((i) => (i && !isBlank(i.text) ? String(i.text) : "")).filter((x) => !isBlank(x));
-      const n = split && split.steps.length <= texts.length ? split.steps.length : 0;
+      const plan = prepPlan(split, texts);
       return {
         recipe: r,
-        split,
-        prep: texts.slice(0, n).map((text, i) => Object.assign({ text }, split.steps[i])),
-        cook: texts.slice(n),
+        split: plan ? split : null,
+        prep: plan ? plan.ahead : [],
+        cook: plan ? plan.cook : texts,
       };
     });
   }
@@ -15944,9 +16271,22 @@ class SpectraCard extends HTMLElement {
     const timing = new Map();
     const methodLines = (Array.isArray(r.instructions) ? r.instructions : [])
       .map((x) => (x && !isBlank(x.text) ? String(x.text).trim() : "")).filter(Boolean);
-    if (splitBefore) {
+    if (splitBefore && splitBefore.in_place) {
+      splitBefore.steps.forEach((x) => {
+        const text = methodLines[Number(x.n) - 1];
+        if (text) timing.set(text, Object.assign({ prep: true }, x));
+      });
+    } else if (splitBefore) {
       methodLines.slice(0, splitBefore.steps.length).forEach((text, i) => timing.set(text, Object.assign({ prep: true }, splitBefore.steps[i])));
     }
+    /* A reheat belongs to the step it stands in for, found by its words. */
+    /* A draft says who made it: {source, ai}. The method's lines as the AI
+       gave them, to know which are still its own when saved. */
+    let madeNow = opts && opts.made ? Object.assign({}, opts.made, {
+      lines: ((opts.draft && opts.draft.instructions) || []).map((x) => String((x && x.text) || "").trim()).filter(Boolean),
+    }) : null;
+    const reheatText = splitBefore && splitBefore.in_place && !isBlank(splitBefore.reheat) ? String(splitBefore.reheat) : "";
+    const reheatStep = reheatText ? methodLines[Number(splitBefore.reheat_at) - 1] || "" : "";
     wrap.innerHTML = `<div class="confirmbox tall" role="dialog" aria-modal="true" aria-label="Edit recipe">`
       + `<div class="confirmhead"><ha-icon icon="mdi:pencil"></ha-icon>`
       + `<span>${esc(recipe ? "Edit recipe" : ((opts && opts.heading) || "New recipe"))}</span></div>`
@@ -15966,9 +16306,9 @@ class SpectraCard extends HTMLElement {
       + `<textarea id="mlmethod" data-f="method">${esc(lines(r.instructions, "text"))}</textarea>`
       /* Prep ahead: optional, and nothing changes until it is switched on. */
       + `<div class="ppsec"><h4>Prep ahead</h4><span class="ppseg" role="group" aria-label="How the method is cooked">`
-      + `<button type="button" data-ppmode="order">In order</button><button type="button" data-ppmode="split">Prep and cook</button></span></div>`
+      + `<button type="button" data-ppmode="order">No prep</button><button type="button" data-ppmode="split">Some ahead</button></span></div>`
       + (prepBefore && prepBefore.checked === false
-        ? `<p class="ppnote">${iconMarkup("mdi:auto-fix")} Split into prep and cook when it was imported. Check the steps, then save.</p>` : "")
+        ? `<p class="ppnote">${iconMarkup("mdi:auto-fix")} Suggested when it was imported. Check which steps can be done ahead, then save.</p>` : "")
       + (prepBefore && prepBefore.mode === "none"
         ? `<p class="ppnote">Looked at before: nothing in it is worth doing ahead.</p>` : "")
       + `<ol class="ppedit" data-ppsteps></ol>`
@@ -16059,23 +16399,24 @@ class SpectraCard extends HTMLElement {
         method: field("method").value,
         total_time: field("total_time").value.trim(),
       };
-      /* A split saves the prep steps first, in their order, then the rest:
-         that is how Mealie's own page shows "Prep ahead" and "To cook". */
+      /* What can be done ahead is noted on the steps where they are: the
+         method keeps its own order, because prepping is optional. */
       const all = stepLines();
       const early = prepMode === "split" ? all.filter((x) => timed(x).prep) : [];
       if (early.length) {
-        data.method = [...early, ...all.filter((x) => !timed(x).prep)].join("\n");
+        data.method = all.join("\n");
         data.prep = {
           mode: "split", checked: true,
-          steps: early.map((x) => {
+          steps: all.map((x, i) => [x, i]).filter(([x]) => timed(x).prep).map(([x, i]) => {
             const t = timed(x);
-            const out = {};
+            const out = { n: i + 1 };
             ["ahead_max", "ahead_min", "minutes"].forEach((k) => { if (Number(t[k]) > 0) out[k] = Number(t[k]); });
-            if (!isBlank(t.keeps)) out.keeps = String(t.keeps);
-            if (!isBlank(t.source)) out.source = String(t.source);
+            ["keeps", "source", "ahead", "cook", "if_ahead"].forEach((k) => { if (!isBlank(t[k])) out[k] = String(t[k]); });
             return out;
           }),
         };
+        const at = reheatStep ? all.indexOf(reheatStep) : -1;
+        if (at >= 0 && timed(reheatStep).prep) Object.assign(data.prep, { reheat: reheatText, reheat_at: at + 1 });
       } else if (splitBefore) {
         data.prep = { mode: "order" };
         /* An unchecked split still knows the method as it came: In order
@@ -16094,6 +16435,15 @@ class SpectraCard extends HTMLElement {
       /* As one comma-separated line: home_signals before 0.13.1 turned a
          list into its own text and split that into mangled tags. */
       if (!same(tags, tagsBefore)) data.tags = tags.join(", ");
+      /* Where it came from, and what AI did: only the steps still as the
+         AI gave them are marked, because the rest are a person's now. */
+      if (madeNow && madeNow.ai) {
+        const kept = all.map((x, i) => (madeNow.lines.includes(x) ? i + 1 : 0)).filter(Boolean);
+        if (kept.length) data.ai = Object.assign({}, madeNow.ai, { steps: kept });
+        else data.ai = Object.assign({}, madeNow.ai, { mark: undefined });
+        if (data.ai.mark === undefined) delete data.ai.mark;
+      }
+      if (!recipe && madeNow && madeNow.source) data.source = madeNow.source;
       data.config_entry_id = entry;
       yes.disabled = true;
       status("Saving\u2026");
@@ -16193,6 +16543,12 @@ class SpectraCard extends HTMLElement {
             if (Number(got.servings) > 0) put("servings", Math.round(Number(got.servings)));
             put("ingredients", got.ingredients);
             put("method", got.method);
+            /* Read out, and read by AI: said so when it is saved. */
+            if (Array.isArray(got.method) && got.method.length) {
+              madeNow = { source: { kind: "said" },
+                ai: { what: "read", by: got.made_by || "", model: got.model || "", mark: "interpreted", note: "Read from what was said" },
+                lines: got.method.map((x) => String(x).trim()).filter(Boolean) };
+            }
             said.textContent = "Check it, then Save.";
           });
         }).catch((error) => {
