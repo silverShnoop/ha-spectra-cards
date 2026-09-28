@@ -1845,29 +1845,35 @@ Needs home_signals 0.15 (`sensor.meal_prep`, and `prep` noted in place on
 recipes). Nothing to configure: with the sensor present, a meals card
 shows prep, and without it, it shows none.
 
-**Prepping is optional, so a recipe has one method in its own order**, in
-its titled groups of steps (*The chicken*, *The sauce*, *To finish*) from
-Mealie's own section titles, which the recipe page or the split supplies.
-**Doing ahead belongs to a group, not a step**, and a group can be a single
-step:
+**A recipe sheet is its sections, one after another**: Ingredients, then
+the method as **Prep** and **Cook**, each a section of its own opening with
+a band in its colour, in the recipe's order (where prep sits in the middle,
+the sections repeat: Cook, Prep, Cook). A recipe with nothing to prep has
+one **Method** section. Prepping is optional and the method is never
+reordered; within each section are the recipe's titled groups of steps
+(*The chicken*, *The sauce*, *To finish*) from Mealie's own section titles.
 
-- the method has two **lanes**, each an icon and a colour, said once in a
-  key at its top: **Ahead** (knife, teal) and **On the day** (flame, the
-  card's accent). Every step's number wears its lane's colour, so prep and
-  cooking read apart at a glance, whether or not anything is being made
-  ahead this time. Colour is never the only sign: the key, the icons and
-  the chips say it too;
-- a group that can be done ahead carries its chips beside its title: how
-  far ahead, what it needs (a marinade's hour) and where it keeps. Its steps
-  stay plain, numbered flush under the title;
-- under its steps, in the steps' own column, are the lines that only apply
-  when it is made ahead, each marked with its lane's icon where a step has
-  its number: how to keep it (Ahead: "Cover and chill") and what that
-  changes on the day (On the day: "Take it out 20 mins before grilling",
-  "Reheat the sauce"). The same-day cook skips them;
-- a step that is part ahead and part on the day shows both halves, the
-  second in the On the day lane;
-- a group only partly done ahead (an older split) says which steps.
+Three signs, said once in a key at the top of the recipe and used by icon
+alone after that:
+
+- **Prep** (knife, teal) and **Cook** (flame, the card's accent) are what
+  kind of work a step is. Every step's number wears its phase's colour;
+- **If made ahead** (the clock, in no phase's colour) is only ever an
+  option, never assumed. Beside a group's title it says how far ahead that
+  group can be made, what it needs and where it keeps ("Up to 3 days ahead
+  · Fridge"), the clocks aligned down the right-hand side. After a group's
+  steps, as one more step with the clock where its number would be, are the
+  lines that only apply when it is made ahead, each with the icon of the
+  phase it happens in: how to keep it (knife: "Cover and chill") and what
+  that changes when cooking (flame: "Take it out 20 mins before grilling",
+  "Reheat the sauce"). The same-day cook skips them.
+
+**Doing ahead belongs to a group, not a step**, and a group can be a single
+step. A group made ahead is used when cooking, never only by another group
+made ahead: the onion chopped for a sauce is part of the sauce, and keeps
+as the sauce does. A step that is part ahead and part cooking shows both
+halves, the second with the flame. A group only partly done ahead (an older
+split) says which steps.
 
 Cooking shows the group beside the step count (*Step 3 of 8 · The sauce*),
 in either version. A recipe with no titles still groups what can be done
@@ -1879,7 +1885,7 @@ done; *No* cooks the whole method in order. The form's **No prep / Some
 ahead** and per-step **Prep ahead / At cook** save the notes without
 touching the method. An older split, with its prep moved first, still reads
 in its two halves.
-- **Each meal with prep says so, as a fact**: *Prep Mon 19:30*, *Prepped*
+- **Each meal with prep says so, as a fact**, with the clock: *Prep Mon 19:30*, *Prepped*
   or *Prep not planned*. The open slot's tray adds a line and a **Prep**
   tile.
 - **Prep** (a meal) shows each part's window and offers, in order: joining
