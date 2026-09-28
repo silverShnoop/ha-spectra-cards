@@ -2398,6 +2398,9 @@ views:
         cards: [...]
       - type: grid            # holds a spectra-dock, so it is the rail
         cards: [...]
+      - type: grid
+        spectra_slot: side    # under Needs you when it is a column
+        cards: [...]
       - ...                   # everything else scrolls
 ```
 
@@ -2421,6 +2424,12 @@ spread across its span. So a card with `grid_options: {columns: 12}` is one
 column wide: in a span-3 section it sits two or three to a row on a tablet
 and alone on a phone, where `columns: full` would be a single column
 everywhere. A section `background` is drawn as it would be there.
+
+**`spectra_slot: side` uses the rest of that column.** Needs you is rarely
+tall enough to fill a landscape screen, so a section marked `side` rides
+underneath it there — a clock, who is home — and joins the grid in its
+written place when the screen is upright. The column scrolls if a busy
+morning makes it overflow, and goes altogether when it has nothing in it.
 
 **`masonry: true` packs instead of aligning rows.** A sections view lines
 its sections up in rows, so a clock beside the week's weather holds open a
