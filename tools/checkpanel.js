@@ -119,7 +119,7 @@ customElements.define("fake-section", FakeSection);
       ];
       const sections = configs.map((c) => { const s = document.createElement("fake-section"); s.config = c; return s; });
       const view = document.createElement("spectra-panel");
-      view.setConfig({ type: "custom:spectra-panel", max_columns: 3 });
+      view.setConfig({ type: "custom:spectra-panel", max_columns: 3, needs_entity: "sensor.needs_you" });
       view.hass = window.HASS;
       document.getElementById("a").appendChild(view);
       view.sections = sections;
@@ -158,6 +158,23 @@ customElements.define("fake-section", FakeSection);
         hiddenShown: getComputedStyle(sections[4].parentElement).display !== "none",
       };
       scroller.scrollTop = 0;
+      /* The folded bar: on a phone, Needs you is one line until pressed. */
+      const bar = root.querySelector(".needsbar");
+      const shown = (el) => getComputedStyle(el).display !== "none";
+      out.bar = {
+        shown: shown(bar), text: bar.textContent.trim(), critical: bar.classList.contains("lv-critical"),
+        listShown: shown(root.querySelector(".needs")),
+      };
+      if (out.bar.shown) {
+        bar.click();
+        await new Promise((r) => setTimeout(r, 50));
+        const needsBox = root.querySelector(".needs").getBoundingClientRect();
+        out.bar.openShown = shown(root.querySelector(".needs"));
+        out.bar.opensBelow = needsBox.top >= bar.getBoundingClientRect().bottom;
+        root.querySelector(".scrim").click();
+        await new Promise((r) => setTimeout(r, 50));
+        out.bar.closedAgain = !shown(root.querySelector(".needs"));
+      }
       /* A different tab resets the scroll and recounts the columns. */
       sections[2].setHidden(true); sections[3].setHidden(true); sections[4].setHidden(false); sections[5].setHidden(true);
       await new Promise((r) => setTimeout(r, 100));
@@ -199,11 +216,17 @@ customElements.define("fake-section", FakeSection);
     check("a hidden section takes no room", !got.hiddenShown, got.hiddenShown);
     check("columns", got.cols === (name === "phone" ? 1 : 2), got.cols);
     if (name === "phone") {
+      check("Needs you folds to a bar", got.bar.shown && !got.bar.listShown, got.bar);
+      check("the bar says the count and the most urgent job", /6 to do/.test(got.bar.text) && /Job 1/.test(got.bar.text), got.bar.text);
+      check("the bar wears the loudest level", got.bar.critical, got.bar);
+      check("pressed, the list opens under the bar", got.bar.openShown && got.bar.opensBelow, got.bar);
+      check("pressing behind it folds it again", got.bar.closedAgain, got.bar);
       check("the rail sits at the bottom of the screen", got.railY > got.scrollTop && got.railBottom > viewport.height - 40, got);
       check("the rail is icons only", got.labels === "none", got.labels);
       check("its caret points up at the cards", got.caret === "up", got.caret);
     } else {
       check("the rail keeps its labels", got.labels !== "none", got.labels);
+      check("no bar: Needs you is shown in full", !got.bar.shown && got.bar.listShown, got.bar);
       check("its caret points down at the cards", got.caret === "down", got.caret);
     }
     check("a lone span-1 section fills the width", got.loneCols === 1, got.loneCols);

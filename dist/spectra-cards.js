@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.135.1";
+const VERSION = "0.136.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -17240,7 +17240,7 @@ const PANEL_SHEET = `
 :host { display:block; --pn-gap:16px; --pn-col-gap:20px; --pn-row-gap:20px;
   --pn-min:var(--ha-view-sections-column-min-width, 320px);
   --pn-max:var(--ha-view-sections-column-max-width, 500px); }
-.panel { display:flex; flex-direction:column; box-sizing:border-box;
+.panel { display:flex; flex-direction:column; box-sizing:border-box; position:relative;
   height:calc(100dvh - var(--pn-top, 0px)); overflow:hidden;
   padding:12px var(--pn-gap) 0; gap:12px; }
 .needs { flex:none; max-height:var(--pn-needs-max, 36%); overflow-y:auto;
@@ -17282,6 +17282,35 @@ const PANEL_SHEET = `
   --sp-dock-edge:bottom; }
 .panel.phone .scroll { order:1; padding-bottom:12px; }
 .panel.phone .main { gap:6px; }
+/* A phone: Needs you folds to one line. The bar says how many and the
+   most urgent, in words, and wears the loudest level the way a card
+   does -- border, ring, ground -- so it is the same promise at a glance.
+   Pressed, the full list opens over the cards; pressed again, or the
+   cards behind it, and it folds. */
+.needsbar { display:none; flex:none; align-items:center; gap:10px; width:100%;
+  box-sizing:border-box; min-height:44px; padding:8px 12px; margin:0;
+  font:inherit; text-align:left; cursor:pointer; color:var(--sp-ink);
+  background:var(--sp-surface); border:2px solid var(--sp-edge); border-radius:6px; }
+.panel.phone.folds .needsbar { display:flex; }
+.panel.phone.folds .needs { display:none; }
+.needsbar .nbcount { flex:none; font-weight:600; font-size:13px; letter-spacing:.04em; }
+.needsbar .nbfirst { flex:1 1 auto; min-width:0; font-size:13px; color:var(--sp-ink-2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.needsbar ha-icon { flex:none; --mdc-icon-size:20px; color:var(--sp-ink-2); transition:transform .2s; }
+.needsbar.lv-attention { border-color:var(--sp-attention); }
+.needsbar.lv-attention .nbcount { color:var(--sp-attention-on); }
+.needsbar.lv-waiting { border-color:var(--sp-waiting); box-shadow:inset 0 0 0 1px var(--sp-waiting); }
+.needsbar.lv-waiting .nbcount { color:var(--sp-waiting-on); }
+.needsbar.lv-critical { border-color:var(--sp-critical); box-shadow:inset 0 0 0 1px var(--sp-critical);
+  background:var(--sp-critical-soft); }
+.needsbar.lv-critical .nbcount, .needsbar.lv-critical .nbfirst { color:var(--sp-critical-on); }
+.panel.phone.folds.open .needsbar ha-icon { transform:rotate(180deg); }
+.panel.phone.folds.open .needsbar { position:relative; z-index:6; }
+.panel.phone.folds.open .needs { display:block; position:absolute; z-index:5;
+  left:var(--pn-gap); right:var(--pn-gap); top:var(--pn-drop, 64px); max-height:70%;
+  box-shadow:0 12px 32px rgba(0,0,0,.35); border-radius:8px; }
+.scrim { display:none; position:absolute; inset:0; z-index:4; background:rgba(0,0,0,.35); }
+.panel.phone.folds.open .scrim { display:block; }
 .panel.side .needs { width:var(--pn-needs-width, 340px); max-height:none;
   align-self:stretch; padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)); }
 
@@ -17296,7 +17325,10 @@ class SpectraPanel extends HTMLElement {
     root.appendChild(style);
     this._panel = document.createElement("div");
     this._panel.className = "panel";
-    this._panel.innerHTML = '<div class="needs gone"></div>'
+    this._panel.innerHTML = '<button class="needsbar" type="button" aria-expanded="false">'
+      + '<span class="nbcount"></span><span class="nbfirst"></span>'
+      + '<ha-icon icon="mdi:chevron-down"></ha-icon></button>'
+      + '<div class="scrim"></div><div class="needs gone"></div>'
       + '<div class="main"><div class="rail gone"></div>'
       + '<div class="scroll"><div class="grid"></div></div></div>';
     root.appendChild(this._panel);
@@ -17307,6 +17339,13 @@ class SpectraPanel extends HTMLElement {
     this._rail = this._panel.querySelector(".rail");
     this._scroll = this._panel.querySelector(".scroll");
     this._grid = this._panel.querySelector(".grid");
+    this._bar = this._panel.querySelector(".needsbar");
+    const toggle = (open) => {
+      this._panel.classList.toggle("open", open);
+      this._bar.setAttribute("aria-expanded", String(open));
+    };
+    this._bar.addEventListener("click", () => toggle(!this._panel.classList.contains("open")));
+    this._panel.querySelector(".scrim").addEventListener("click", () => toggle(false));
     this._config = {};
     this._sections = [];
     this._wrappers = [];
@@ -17350,7 +17389,10 @@ class SpectraPanel extends HTMLElement {
      so a view that has some does not throw. */
   set cards(v) { this._cards = v; }
   set badges(v) { this._badges = v; }
-  set hass(v) { this._hass = v; }
+  set hass(v) {
+    this._hass = v;
+    this._updateBar();
+  }
   get hass() { return this._hass; }
   set narrow(v) { this._narrow = v; }
   set lovelace(v) { this._lovelace = v; }
@@ -17431,6 +17473,7 @@ class SpectraPanel extends HTMLElement {
     this._panel.classList.toggle("side", side);
     const phoneMax = Number(this._config.phone_max_width) || 600;
     this._panel.classList.toggle("phone", !side && width <= phoneMax);
+    this._updateBar();
 
     /* `spectra_slot: side` sections live under Needs you in a column and
        in the grid, in their written order, in a strip. Only moved when the
@@ -17476,6 +17519,36 @@ class SpectraPanel extends HTMLElement {
       this._shown = signature;
       this._scroll.scrollTop = 0;
     }
+  }
+
+  /* The folded Needs you bar, from `needs_entity`: its state is the count
+     and its `items` the jobs, each with a `title` and a `level`. Without
+     one the panel cannot say anything in a line, so it does not fold. */
+  _updateBar() {
+    const id = this._config && this._config.needs_entity;
+    const state = id && this._hass && this._hass.states ? this._hass.states[id] : undefined;
+    const items = state && Array.isArray(state.attributes && state.attributes.items)
+      ? state.attributes.items.filter((i) => i) : [];
+    const count = items.length || Number(state && state.state) || 0;
+    const folds = Boolean(state) && count > 0;
+    this._panel.classList.toggle("folds", folds);
+    if (!folds) {
+      this._panel.classList.remove("open");
+      this._bar.setAttribute("aria-expanded", "false");
+      return;
+    }
+    const rank = { attention: 1, waiting: 2, critical: 3 };
+    let top = null;
+    for (const item of items) {
+      if (!top || (rank[item.level] || 0) > (rank[top.level] || 0)) top = item;
+    }
+    const level = top && rank[top.level] ? top.level : "";
+    this._bar.className = `needsbar${level ? ` lv-${level}` : ""}`;
+    this._bar.querySelector(".nbcount").textContent = `${count} to do`;
+    this._bar.querySelector(".nbfirst").textContent = top ? String(firstOf(top.title, top.name, "")) : "";
+    /* The list opens just under the bar. */
+    const drop = this._bar.offsetTop + this._bar.offsetHeight + 8;
+    if (drop > 8) this.style.setProperty("--pn-drop", `${drop}px`);
   }
 
   /* Masonry: how many 4px rows each section needs, gap included. The

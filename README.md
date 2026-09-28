@@ -2403,6 +2403,7 @@ views:
     needs_max_height: 36      # optional: upright cap on Needs you, % of height
     side_min_width: 900       # optional: narrowest width that goes sideways
     phone_max_width: 600      # optional: widest screen that gets the phone rail
+    needs_entity: sensor.needs_you  # optional: lets Needs you fold to a bar on a phone
     column_min_width: 280     # optional: narrowest column, px (default 320)
     masonry: true             # optional: pack sections with no row gaps
     sections:
@@ -2430,6 +2431,15 @@ The rail itself turns icons-only whenever it is narrower than 560px,
 wherever it is placed: eight labels cannot share a phone's width. The
 words are not lost — each button reads its label and summary to a screen
 reader, and anything the house wants done is spelled out in Needs you.
+
+**On a phone Needs you folds to one line.** Given `needs_entity` — a sensor
+whose state is the count and whose `items` are the jobs, each with a
+`title` and a `level`, as `home_signals` publishes them — a phone shows a
+single bar instead of the list: "3 to do" and the most urgent job's title,
+wearing the loudest level the way a card does (border, ring, ground). Press
+it and the full list opens over the cards; press it again, or the cards
+behind it, and it folds. With nothing to do there is no bar. Without
+`needs_entity` the list is shown in full, as on a tablet.
 
 **Upright, Needs you goes across the top; sideways, down the left.** A strip
 across the top spends the scarce dimension of a landscape screen on a list,
