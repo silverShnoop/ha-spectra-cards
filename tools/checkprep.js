@@ -76,7 +76,8 @@ const js = fs.readFileSync(file);
     ];
     const index = [
       { recipe_id: "r1", slug: "fajitas", name: "Fajitas", prep: { mode: "split", checked: true, steps: [
-        { ahead_max: 24, ahead_min: 1, keeps: "Fridge", minutes: 10 }, { ahead_max: 48, minutes: 10 }] } },
+        { ahead_max: 24, ahead_min: 1, keeps: "Fridge", minutes: 10 }, { ahead_max: 48, minutes: 10 }] },
+        sections: [{ n: 1, title: "The filling" }] },
       { recipe_id: "r2", slug: "chilli", name: "Chilli", prep: { mode: "split", checked: true, steps: [{ ahead_max: 72, minutes: 40 }] } },
       { recipe_id: "r3", slug: "sea-bass", name: "Sea bass", prep: null },
       { recipe_id: "r4", slug: "pie", name: "Pie", prep: { mode: "split", checked: true, steps: [{ ahead_max: 24 }] } },
@@ -180,7 +181,8 @@ const js = fs.readFileSync(file);
     const first = sheet && sheet.querySelector("[data-pp-at='0']");
     check("joining the sitting already on Home Tasks comes first", first && text(first).startsWith("Join")
       && text(first).includes("Chilli") && first.getAttribute("aria-pressed") === "true", text(first));
-    check("each part has its window", sheet && sheet.querySelectorAll(".ppgroup").length === 2
+    check("a titled section is one part, named by its title, with its window", sheet && sheet.querySelectorAll(".ppgroup").length === 1
+      && text(sheet.querySelector(".ppgroup .top")) === "The filling2 steps · 20 min"
       && text(sheet.querySelector(".ppgroup .how")).startsWith("From"), text(sheet && sheet.querySelector(".ppgroup")));
     check("and it says no new task", text(sheet.querySelector(".ppdue")).includes("no new task")
       && text(sheet.querySelector(".ppdue")).includes("Prep: Chilli and Fajitas"), text(sheet.querySelector(".ppdue")));
@@ -200,6 +202,8 @@ const js = fs.readFileSync(file);
     const week = q(".confirmwrap .ppweek");
     const sits = week ? [...week.querySelectorAll(".ppsess .h b")].map(text) : [];
     check("the week fits in one sitting", sits.length === 1 && /19:30$/.test(sits[0]), sits.join(" | "));
+    check("the week names a meal's prep by its section", [...week.querySelectorAll(".ppsess li > span")].some((x) => text(x) === "Fajitas: The filling"),
+      [...week.querySelectorAll(".ppsess li > span")].map(text).join(" | "));
     check("the button says how many tasks", text(week && week.querySelector("[data-pp-save]")) === "Save 1 task",
       text(week && week.querySelector("[data-pp-save]")));
     check("prep that was done is not asked about again", !text(week).includes("Pie"), text(week));
