@@ -7946,6 +7946,18 @@ function prepPlan(split, texts) {
   return { inPlace: true, all: texts, ahead, cook, cookAt };
 }
 
+/* The recipe's section titles that are headings. A title that is only its
+   step again, or reads as a sentence, is not one: Mealie's reading of a
+   video fills every step's title that way. */
+function recipeSections(sections, texts) {
+  const bare = (s) => String(s || "").trim().replace(/[.!]+$/, "").toLowerCase();
+  const list = Array.isArray(texts) ? texts : [];
+  return (Array.isArray(sections) ? sections : [])
+    .filter((s) => s && Number(s.n) >= 1 && Number(s.n) <= list.length && !isBlank(s.title)
+      && !/[.!]$/.test(String(s.title).trim()) && bare(s.title) !== bare(list[Number(s.n) - 1]))
+    .map((s) => ({ n: Number(s.n), title: String(s.title).trim() }));
+}
+
 /* The section a step of the method is in: the last title at or before it. */
 function sectionAt(sections, n) {
   let title = "";
@@ -8013,9 +8025,7 @@ function recipeMethodMarkup(texts, split, prov, sections) {
   /* The groups: the recipe's titled sections. Without titles, a run of
      steps that can be done ahead is a group of its own, named by its steps,
      so what is ahead is still said once, at the group. */
-  const titles = new Map((Array.isArray(sections) ? sections : [])
-    .filter((s) => Number(s.n) >= 1 && Number(s.n) <= texts.length && !isBlank(s.title))
-    .map((s) => [Number(s.n), String(s.title)]));
+  const titles = new Map(recipeSections(sections, texts).map((s) => [s.n, s.title]));
   const starts = new Map(titles);
   if (!titles.size && notes.size) {
     const range = (a, b) => (a === b ? `Step ${a}` : `Steps ${a}–${b}`);
@@ -15303,6 +15313,7 @@ class SpectraCard extends HTMLElement {
       sections = known && Array.isArray(known.sections) ? known.sections
         : (Array.isArray(r.instructions) ? r.instructions : []).filter((x) => x && !isBlank(x.text))
           .map((x, k) => ({ n: k + 1, title: x.title })).filter((x) => !isBlank(x.title) && !["Prep ahead", "To cook"].includes(x.title));
+      sections = recipeSections(sections, method);
       stepAt = method.map((_, k) => k + 1);
       plan = split ? prepPlan(split, steps) : null;
       /* An older split moved its prep to the front, and reads in two halves

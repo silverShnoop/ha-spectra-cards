@@ -286,7 +286,9 @@ const js = fs.readFileSync(file);
         events: [{ id: 1, what: "read", by: "Mealie", at: "2026-09-01T10:00:00+00:00" },
           { id: 2, what: "split", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:01:00+00:00" }],
         marks: { 3: { mark: "interpreted", event: 1 } } },
-      sections: [{ n: 1, title: "The sauce" }, { n: 2, title: "The chicken" }] });
+      /* The third is how Mealie's video reading titles every step: the step
+         again, as a sentence. It is not a heading. */
+      sections: [{ n: 1, title: "The sauce" }, { n: 2, title: "The chicken" }, { n: 3, title: "Serve with rice." }] });
     method.r5 = ["Make the curry sauce.", "Bread and fry the chicken.", "Serve with rice."];
     await card._recipeIndex("e1", true);
     card._mealRecipe("e1", katsu, 6, { save: "home_signals.save_recipe" }, {});
