@@ -76,7 +76,8 @@ const js = fs.readFileSync(file);
     ];
     const index = [
       { recipe_id: "r1", slug: "fajitas", name: "Fajitas", prep: { mode: "split", checked: true, steps: [
-        { ahead_max: 24, ahead_min: 1, keeps: "Fridge", minutes: 10 }, { ahead_max: 48, minutes: 10 }] } },
+        { ahead_max: 24, ahead_min: 1, keeps: "Fridge", minutes: 10 }, { ahead_max: 48, minutes: 10 }] },
+        sections: [{ n: 1, title: "The filling" }] },
       { recipe_id: "r2", slug: "chilli", name: "Chilli", prep: { mode: "split", checked: true, steps: [{ ahead_max: 72, minutes: 40 }] } },
       { recipe_id: "r3", slug: "sea-bass", name: "Sea bass", prep: null },
       { recipe_id: "r4", slug: "pie", name: "Pie", prep: { mode: "split", checked: true, steps: [{ ahead_max: 24 }] } },
@@ -180,7 +181,8 @@ const js = fs.readFileSync(file);
     const first = sheet && sheet.querySelector("[data-pp-at='0']");
     check("joining the sitting already on Home Tasks comes first", first && text(first).startsWith("Join")
       && text(first).includes("Chilli") && first.getAttribute("aria-pressed") === "true", text(first));
-    check("each part has its window", sheet && sheet.querySelectorAll(".ppgroup").length === 2
+    check("a titled section is one part, named by its title, with its window", sheet && sheet.querySelectorAll(".ppgroup").length === 1
+      && text(sheet.querySelector(".ppgroup .top")) === "The filling2 steps · 20 min"
       && text(sheet.querySelector(".ppgroup .how")).startsWith("From"), text(sheet && sheet.querySelector(".ppgroup")));
     check("and it says no new task", text(sheet.querySelector(".ppdue")).includes("no new task")
       && text(sheet.querySelector(".ppdue")).includes("Prep: Chilli and Fajitas"), text(sheet.querySelector(".ppdue")));
@@ -200,6 +202,8 @@ const js = fs.readFileSync(file);
     const week = q(".confirmwrap .ppweek");
     const sits = week ? [...week.querySelectorAll(".ppsess .h b")].map(text) : [];
     check("the week fits in one sitting", sits.length === 1 && /19:30$/.test(sits[0]), sits.join(" | "));
+    check("the week names a meal's prep by its section", [...week.querySelectorAll(".ppsess li > span")].some((x) => text(x) === "Fajitas: The filling"),
+      [...week.querySelectorAll(".ppsess li > span")].map(text).join(" | "));
     check("the button says how many tasks", text(week && week.querySelector("[data-pp-save]")) === "Save 1 task",
       text(week && week.querySelector("[data-pp-save]")));
     check("prep that was done is not asked about again", !text(week).includes("Pie"), text(week));
@@ -284,7 +288,9 @@ const js = fs.readFileSync(file);
         { n: 2, ahead_max: 24, minutes: 10, ahead: "Bread the chicken.", cook: "Fry the chicken until golden.", if_ahead: "Pat it dry first." }] },
       provenance: { source: { kind: "page", url: "https://example.com/katsu" },
         events: [{ id: 1, what: "read", by: "Mealie", at: "2026-09-01T10:00:00+00:00" },
-          { id: 2, what: "split", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:01:00+00:00" }],
+          { id: 2, what: "split", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:00:30+00:00", note: "Nothing worth doing ahead" },
+          { id: 3, what: "tagged", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:00:40+00:00", note: "Dinner, Japanese" },
+          { id: 4, what: "split", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:01:00+00:00" }],
         marks: { 3: { mark: "interpreted", event: 1 } } },
       /* The third is how Mealie's video reading titles every step: the step
          again, as a sentence. It is not a heading. */
@@ -321,6 +327,12 @@ const js = fs.readFileSync(file);
       && text(lis[2].querySelector(".rmnote")).includes("Mealie"), text(lis[2].querySelector(".rmnote")));
     check("About this recipe is folded away", r.querySelector("details.rmabout") && !r.querySelector("details.rmabout").open,
       r.querySelector("details.rmabout") && r.querySelector("details.rmabout").outerHTML);
+    {
+      const came = [...r.querySelectorAll(".rmabout p")].map((p) => text(p.querySelector(".rmcame")));
+      check("each AI run says what came of it, nothing included; the latest split reads the prep as it stands",
+        came.join(" | ") === " |  | Nothing worth doing ahead | Dinner, Japanese | 2 steps can be done ahead, then reheated",
+        came.join(" | "));
+    }
     r.querySelector("[data-cook]").click();
     await settle();
     check("Cook asks whether it was prepped", text(q(".mlcook .rmask")) === "Did you prep ahead?", text(q(".mlcook")));

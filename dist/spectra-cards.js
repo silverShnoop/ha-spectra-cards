@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.130.2";
+const VERSION = "0.130.3";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2264,6 +2264,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .rmabout summary::-webkit-details-marker { display:none; }
 .rmabout p { display:flex; gap:8px; align-items:flex-start; margin:6px 0 0; line-height:1.4; }
 .rmabout .mdi { width:16px; height:16px; flex:none; color:var(--sp-ink-3); margin-top:1px; }
+.rmabout .rmcame { display:block; margin-top:1px; font-size:12.5px; color:var(--sp-ink-3); }
 .ppnote { margin:10px 0 0; padding:10px 12px; border-radius:10px; background:var(--sp-sink); font-size:13px; color:var(--sp-ink-2); line-height:1.4; }
 .ppnote .mdi { width:16px; height:16px; vertical-align:-3px; color:var(--accent); }
 /* Two choices side by side, each the same width whichever is pressed, so
@@ -8025,6 +8026,45 @@ function recipeSections(sections, texts) {
     .map((s) => ({ n: Number(s.n), title: String(s.title).trim() }));
 }
 
+/* A recipe's titled sections: from the index, else from Mealie's own step
+   titles. */
+function recipeSectionsOf(known, instructions, texts) {
+  const raw = known && Array.isArray(known.sections) ? known.sections
+    : (Array.isArray(instructions) ? instructions : []).filter((x) => x && !isBlank(x.text))
+      .map((x, k) => ({ n: k + 1, title: x.title })).filter((x) => !isBlank(x.title) && !["Prep ahead", "To cook"].includes(x.title));
+  return recipeSections(raw, texts);
+}
+
+/* The prep of a recipe as the parts a person schedules: a titled section
+   is one part, whatever its steps, with the window of what it makes (its
+   last step's) and the longest wait any of it needs. An untitled step is a
+   part of its own. */
+function prepParts(ahead, sections) {
+  const parts = [];
+  (Array.isArray(ahead) ? ahead : []).forEach((x) => {
+    const title = Number(x.n) >= 1 ? sectionAt(sections, Number(x.n)) : "";
+    const last = parts[parts.length - 1];
+    if (title && last && last.title === title) last.of.push(x);
+    else parts.push({ title, of: [x] });
+  });
+  return parts.map(({ title, of }) => {
+    const back = [...of].reverse();
+    const pick = (key) => (back.find((x) => Number(x[key]) > 0) || {})[key];
+    const mins = of.map((x) => Number(x.ahead_min)).filter((v) => v > 0);
+    return {
+      title,
+      /* Untitled, a step is named by its first sentence, whole. */
+      text: title || String(of[0].text).split(/(?<=[.;])\s/)[0].replace(/[.;]$/, ""),
+      label: title || prepShort(of[0].text),
+      steps: of.map((x) => String(x.text)),
+      ahead_max: pick("ahead_max") || null,
+      ahead_min: mins.length ? Math.max(...mins) : null,
+      keeps: (back.find((x) => !isBlank(x.keeps)) || {}).keeps,
+      minutes: prepMinutes(of),
+    };
+  });
+}
+
 /* The section a step of the method is in: the last title at or before it. */
 function sectionAt(sections, n) {
   let title = "";
@@ -8233,8 +8273,11 @@ function recipeMethodMarkup(texts, split, prov, sections) {
 }
 
 /* Where a recipe came from and what AI did to it, folded away under the
-   method: facts for whoever wonders, never in the way. */
-function recipeAboutMarkup(prov, r) {
+   method: facts for whoever wonders, never in the way. Each time AI ran
+   says what came of it, even when that was nothing: "nothing worth doing
+   ahead" is an answer, and a run that shows no trace looks like one that
+   never happened. */
+function recipeAboutMarkup(prov, r, prep) {
   const src = (prov && prov.source) || {};
   const lines = [];
   const host = (u) => String(u || "").replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
@@ -8245,13 +8288,25 @@ function recipeAboutMarkup(prov, r) {
     lines.push([src.kind === "page" || src.kind === "video" ? "mdi:link" : "mdi:information-outline",
       `Added${added ? ` ${added.replace(/, \d\d:\d\d$/, "")}` : ""}${src.kind ? ` ${KIND[src.kind] || ""}` : ""}`]);
   }
-  ((prov && prov.events) || []).forEach((e) => {
+  const events = (prov && prov.events) || [];
+  const lastSplit = [...events].reverse().find((e) => e.what === "split");
+  /* What the latest split left, when it did not say: read off the prep as
+     it stands. An older split's answer has been replaced, so it says none. */
+  const splitNow = () => {
+    if (!prep || !prep.mode) return "";
+    if (prep.mode === "none") return "Nothing worth doing ahead";
+    const n = Array.isArray(prep.steps) ? prep.steps.length : 0;
+    if (!n) return "";
+    return `${n === 1 ? "1 step" : `${n} steps`} can be done ahead${isBlank(prep.reheat) ? "" : ", then reheated"}`;
+  };
+  events.forEach((e) => {
     const icon = e.what === "split" ? "mdi:knife" : (e.what === "tagged" ? "mdi:tag-outline" : (e.what === "wrote" ? "mdi:creation" : (e.what === "read" ? "mdi:eye-outline" : "mdi:check")));
-    lines.push([icon, `${AI_EVENTS[e.what] || "Changed by"} ${e.what === "checked" ? "a person" : aiName(e.by)}${aiWhen(e.at) ? ` \u00b7 ${aiWhen(e.at)}` : ""}`]);
+    const came = !isBlank(e.note) ? String(e.note) : (e === lastSplit ? splitNow() : "");
+    lines.push([icon, `${AI_EVENTS[e.what] || "Changed by"} ${e.what === "checked" ? "a person" : aiName(e.by)}${aiWhen(e.at) ? ` \u00b7 ${aiWhen(e.at)}` : ""}`, came]);
   });
   if (!lines.length) return "";
   return `<details class="rmabout"><summary>${iconMarkup("mdi:information-outline")}<span>About this recipe</span></summary>`
-    + lines.map(([icon, text]) => `<p>${iconMarkup(icon)}<span>${esc(text)}</span></p>`).join("") + `</details>`;
+    + lines.map(([icon, text, came]) => `<p>${iconMarkup(icon)}<span>${esc(text)}${came ? `<small class="rmcame">${esc(came)}</small>` : ""}</span></p>`).join("") + `</details>`;
 }
 
 function prepAheadWords(hours) {
@@ -15455,10 +15510,7 @@ class SpectraCard extends HTMLElement {
       const known = indexed();
       const prov = known && known.provenance ? known.provenance : null;
       /* Titled groups: from the index, else from Mealie's own step titles. */
-      sections = known && Array.isArray(known.sections) ? known.sections
-        : (Array.isArray(r.instructions) ? r.instructions : []).filter((x) => x && !isBlank(x.text))
-          .map((x, k) => ({ n: k + 1, title: x.title })).filter((x) => !isBlank(x.title) && !["Prep ahead", "To cook"].includes(x.title));
-      sections = recipeSections(sections, method);
+      sections = recipeSectionsOf(known, r.instructions, method);
       stepAt = method.map((_, k) => k + 1);
       plan = split ? prepPlan(split, steps) : null;
       /* An older split moved its prep to the front, and reads in two halves
@@ -15489,7 +15541,7 @@ class SpectraCard extends HTMLElement {
         + (steps.length ? methodHtml : "")
         + (!ingredients.length && !steps.length
           ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : "")
-        + recipeAboutMarkup(prov, full);
+        + recipeAboutMarkup(prov, full, known && known.prep);
       fill(body);
     }, (error) => {
       LOGGER_WARN("spectra-card: could not open the recipe", error);
@@ -15566,15 +15618,15 @@ class SpectraCard extends HTMLElement {
     if (!hit || hit.promise !== read) RECIPE_FULL.set(key, { at: Date.now(), promise: read });
     read.catch(() => RECIPE_FULL.delete(key));
     return read.then((r) => {
-      const known = (RECIPE_INDEX.get(entry) || {}).list || [];
-      const split = prepSplit(known.find((x) => String(x.recipe_id) === rid));
+      const known = ((RECIPE_INDEX.get(entry) || {}).list || []).find((x) => String(x.recipe_id) === rid);
+      const split = prepSplit(known);
       const texts = (Array.isArray(r.instructions) ? r.instructions : [])
         .map((i) => (i && !isBlank(i.text) ? String(i.text) : "")).filter((x) => !isBlank(x));
       const plan = prepPlan(split, texts);
       return {
         recipe: r,
         split: plan ? split : null,
-        prep: plan ? plan.ahead : [],
+        prep: plan ? prepParts(plan.ahead, recipeSectionsOf(known, r.instructions, texts)) : [],
         cook: plan ? plan.cook : texts,
       };
     });
@@ -15714,14 +15766,15 @@ class SpectraCard extends HTMLElement {
               ? `Joins the ${esc(prepWhenIn(at))} session already on Home Tasks, so no new task: it becomes <b>${esc(title)}</b>, due <b>${esc(prepWhenIn(at))}</b>.`
               : `One Home Tasks item, <b>${esc(title)}</b>, due <b>${esc(prepWhenIn(at))}</b>.`);
           if (left.length) {
-            say += ` ${esc(left.map((p) => prepShort(p.text)).join("; "))}: left to the day, `
+            say += ` ${esc(left.map((p) => p.label).join("; "))}: left to the day, `
               + (left.every((p) => at < p.win.from) ? "it would not keep that long." : "it needs longer than that.");
           }
         } else if (at) say = "Nothing can be done ahead at that time. Pick another.";
         const mins = prepMinutes(fitting);
         const inner = `<p class="confirmtext">${esc(kind)} is ${esc(prepWhenIn(mealAt, true))}. Each part can be done inside its window; the time you pick goes on Home Tasks as its deadline.</p>`
-          + parts.map((p) => `<div class="ppgroup"><div class="top"><b>${esc(prepShort(p.text))}</b>`
-            + `<span>${Number(p.minutes) > 0 ? `${esc(p.minutes)} min` : ""}</span></div>`
+          + parts.map((p) => `<div class="ppgroup"><div class="top"><b>${esc(p.text)}</b>`
+            + `<span>${esc([p.title && p.steps.length > 1 ? `${p.steps.length} steps` : "",
+              Number(p.minutes) > 0 ? `${p.minutes} min` : ""].filter(Boolean).join(" · "))}</span></div>`
             + `<div class="how">From ${esc(prepWhenIn(p.win.from))} to ${esc(prepWhenIn(p.win.to))}`
             + `${p.win.to <= now ? " · too late now" : ""}</div></div>`).join("")
           + `<h4>Do it</h4><div class="mlchoose">`
@@ -15752,7 +15805,7 @@ class SpectraCard extends HTMLElement {
         }
         const item = () => ({
           date: day, entry_type: type, name, recipe_id: rid, slug: entry.recipe.slug,
-          steps: fitting.map((p) => p.text), minutes: prepMinutes(fitting),
+          steps: fitting.flatMap((p) => p.steps), minutes: prepMinutes(fitting),
         });
         const without = (s) => s.items.filter((i) => prepItemKey(i) !== key);
         const go = (changes, said) => {
@@ -15941,7 +15994,7 @@ class SpectraCard extends HTMLElement {
       const draw = () => {
         const sittings = [...new Set(rows.filter((r) => r.t).map((r) => r.t))].sort((a, b) => a - b);
         const choices = (r) => cands.filter((c) => r.parts.every((p) => inside(c, p)));
-        const row = (r) => `<li><span>${esc(mealName(r.m.e))}: ${esc(r.parts.map((p) => prepShort(p.text).toLowerCase()).join(", "))}</span>`
+        const row = (r) => `<li><span>${esc(mealName(r.m.e))}: ${esc(r.parts.map((p) => (p.title ? p.title : p.label.toLowerCase())).join(", "))}</span>`
           + `<select data-pp-row="${rows.indexOf(r)}" aria-label="When">`
           + choices(r).map((c) => `<option value="${c.getTime()}"${c.getTime() === r.t ? " selected" : ""}>${esc(prepWhen(c, true))}</option>`).join("")
           + `<option value="0"${r.t ? "" : " selected"}>On the day</option></select>`
@@ -15986,7 +16039,7 @@ class SpectraCard extends HTMLElement {
           for (const t of sittings) {
             const items = rows.filter((r) => r.t === t).map((r) => ({
               date: r.m.day, entry_type: r.m.type, name: mealName(r.m.e), recipe_id: r.m.rid, slug: r.m.e.recipe.slug,
-              steps: r.parts.map((p) => p.text), minutes: prepMinutes(r.parts),
+              steps: r.parts.flatMap((p) => p.steps), minutes: prepMinutes(r.parts),
             }));
             const same = open.find((s) => new Date(s.due).getTime() === t && !reused.has(s.id));
             if (same) { reused.add(same.id); changes.push({ id: same.id, due: same.due, items: [...outside(same), ...items] }); } else changes.push({ due: new Date(t), items });
