@@ -20,7 +20,7 @@
  * Recipes card's + and its tabs and its own selection.
  *
  * And entering or leaving selection moves nothing on the grid: the
- * selection's bar is the week bar's height, and the ticks sit on top of the
+ * selection's bar takes the week bar's room, and the ticks sit on top of the
  * cells and day heads rather than beside them.
  *
  *   node tools/checkjumps.js [path/to/spectra-cards.js]
@@ -351,8 +351,8 @@ const js = fs.readFileSync(file);
         seen.push(`${name}: ${n} pressed`);
       }
       /* Entering and leaving selection moves nothing: every meal, every
-         day head and the grid stay where they were, and the selection's bar
-         is the week bar's height. By the menu, by a real mouse hold, by a
+         day head and the grid stay where they were, the selection's bar takes
+         the week bar's room, and Plan sits in the same place on both. By the menu, by a real mouse hold, by a
          right-click, ticking, and by the bar's ×. */
       {
         const name = "selection moves nothing";
@@ -365,7 +365,14 @@ const js = fs.readFileSync(file);
           r.querySelectorAll(".mlgridview, .mldayview, .mlslots").forEach((el, i) => add(`grid ${el.className.split(" ")[0]}#${i}`, el));
           return m;
         };
-        const barH = () => { const f = r.querySelector(".mlfoot"); return f ? Math.round(f.getBoundingClientRect().height * 10) / 10 : -1; };
+        /* The room a bar takes: its box and the margin under it. The
+           selection's bar is tinted over the top 44px only, so its box is
+           shorter and its margin longer, and the week below stays put. */
+        const barH = () => {
+          const f = r.querySelector(".mlfoot");
+          if (!f) return -1;
+          return Math.round((f.getBoundingClientRect().height + parseFloat(getComputedStyle(f).marginBottom || "0")) * 10) / 10;
+        };
         const base = places();
         const weekBar = barH();
         const planY = () => { const b = r.querySelector(".mlfoot [data-meal-plan]"); if (!b) return null; const x = b.getBoundingClientRect(); return [Math.round(x.top), Math.round(x.height)]; };
@@ -389,7 +396,7 @@ const js = fs.readFileSync(file);
           await press(r, "[data-meal-menu]", 200);
           await press(r, "[data-meal-select]", 300);
           if (!inSel()) throw new Error("the menu's Select meals did not start selecting");
-          if (barH() !== weekBar) problems.push(`${w}px, ${name}: the selection bar is ${barH()}px, the week bar ${weekBar}px`);
+          if (barH() !== weekBar) problems.push(`${w}px, ${name}: the selection bar takes ${barH()}px, the week bar ${weekBar}px`);
           compare("selecting from the menu");
           const selPlan = planY();
           if (!weekPlan || !selPlan || weekPlan.join() !== selPlan.join()) {
