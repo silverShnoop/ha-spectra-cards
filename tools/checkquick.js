@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 /* Picking flexibly: quick picks, ideas for a slot, and Undo.
  *
- *   - an empty slot's quick picks plan a note in one tap, and Leftovers
- *     names yesterday's dinner
- *   - Ideas lists suggestions with a reason and plans the one tapped;
- *     More ideas asks again without the ones already shown
+ *   - tapping an empty slot opens its Plan sheet straight on Choose, whose
+ *     quick picks plan a note in one tap, and Leftovers names yesterday's
+ *     dinner
+ *   - the Plan sheet's Suggest tab is the slot's ideas: suggestions with a
+ *     reason, the one tapped is planned, More ideas asks again without the
+ *     ones already shown; the tab used last is remembered
  *   - planning, clearing and moving can each be undone for a few seconds:
  *     Undo re-plans what was there, or empties a slot that was empty
- *   - Fill's suggestions carry a reason under each row
+ *   - Plan's Suggest (the week) runs the week script, and its suggestions
+ *     carry a reason under each row
  *
  *   node tools/checkquick.js [path/to/spectra-cards.js]
  */
@@ -81,6 +84,9 @@ const js = fs.readFileSync(file);
             : [{ name: "Mushroom risotto", recipe_id: "r3", reason: "Not had since August." },
               { name: "Fish tacos", recipe_id: "", reason: "Quick, and something new." }] } });
         }
+        if (msg.service === "get_recipes") {
+          return Promise.resolve({ response: { recipes: { items: [{ recipe_id: "r1", name: "Chicken fajitas", slug: "chicken-fajitas" }] } } });
+        }
         if (msg.service === "meal_plan_move") return Promise.resolve({ response: { moved: "Chicken fajitas", swapped: "" } });
         if (msg.service === "meal_plan_week") {
           return Promise.resolve({ response: { planned: [{ date: day(3), meal: "Chilli", recipe_id: "", reason: "Quick for a weeknight." }] } });
@@ -97,6 +103,7 @@ const js = fs.readFileSync(file);
       move: { script: "script.meal_plan_move" },
       ideas: { script: "script.meal_slot_ideas" },
       week: { script: "script.meal_plan_week" },
+      recipes: {},
     } });
     card.hass = hass;
     await settle();
@@ -106,16 +113,24 @@ const js = fs.readFileSync(file);
     const open = async (slot) => { q(`.mlgridview [data-meal="${slot}"]`).click(); await settle(); };
     const calls = (svc) => asked.filter((m) => m.service === svc);
 
-    /* ---- quick picks ---- */
+    /* ---- quick picks, on the Plan sheet's Choose tab ---- */
     await open(`${day(0)}|dinner`);
-    const quick = all(".mldetail [data-meal-quick]").map((b) => b.getAttribute("data-meal-quick"));
+    const planSheet = q(".confirmwrap");
+    check("an empty slot opens its Plan sheet, not a tray", planSheet && !q(".mldetail")
+      && text(planSheet.querySelector(".confirmhead")).startsWith("Plan "), planSheet && text(planSheet.querySelector(".confirmhead")));
+    const onTab = q(".plantabs [data-plantab].on");
+    check("on Choose for one slot", onTab && onTab.getAttribute("data-plantab") === "choose"
+      && onTab.getAttribute("aria-selected") === "true", onTab && onTab.getAttribute("data-plantab"));
+    check("with Suggest beside it", Boolean(q(".plantabs [data-plantab='suggest']")),
+      all(".plantabs [data-plantab]").map((b) => b.getAttribute("data-plantab")).join("|"));
+    const quick = all(".confirmwrap [data-quick]").map((b) => b.getAttribute("data-quick"));
     check("an empty dinner offers quick picks", quick.includes("Takeaway") && quick.includes("Eating out")
       && quick.includes("From the freezer"), quick.join("|"));
     check("and Leftovers names yesterday's dinner", quick[0] === "Leftover chilli con carne", quick[0]);
-    q(".mldetail [data-meal-quick='Takeaway']").click();
+    q(".confirmwrap [data-quick='Takeaway']").click();
     await settle();
     const put = calls("meal_plan_set").pop();
-    check("one tap plans it as a note", put && put.service_data.title === "Takeaway"
+    check("one tap plans it as a note", !q(".confirmwrap") && put && put.service_data.title === "Takeaway"
       && put.service_data.date === day(0) && put.service_data.entry_type === "dinner", put && JSON.stringify(put.service_data));
     const toast = q(".mltoast.undo");
     check("and offers Undo", toast && text(toast).includes("Takeaway planned") && toast.querySelector("[data-undo]"),
@@ -157,12 +172,15 @@ const js = fs.readFileSync(file);
     check("Undo moves it back", moveBack && moveBack.service_data.from_date === day(3) && moveBack.service_data.to_date === day(1),
       moveBack && JSON.stringify(moveBack.service_data));
 
-    /* ---- ideas ---- */
+    /* ---- ideas: the Plan sheet's Suggest tab ---- */
     card._mealPick = null;
     await open(`${day(3)}|dinner`);
-    q(".mldetail [data-meal-ideas]").click();
+    q(".confirmwrap [data-plantab='suggest']").click();
     await settle();
     const sheet = q(".confirmwrap");
+    check("a tab swaps the sheet in place", all(".confirmwrap").length === 1 && sheet.classList.contains("still")
+      && q(".plantabs [data-plantab].on").getAttribute("data-plantab") === "suggest",
+      all(".confirmwrap").length + " " + (sheet && sheet.className));
     const rows = sheet ? [...sheet.querySelectorAll("[data-idea]")] : [];
     check("Ideas lists suggestions with why", rows.length === 2 && text(rows[0]).includes("Not had since August")
       && text(rows[0]).includes("Recipe") && text(rows[1]).includes("Idea"), rows.map(text).join(" | "));
@@ -176,12 +194,25 @@ const js = fs.readFileSync(file);
     const idea = calls("meal_plan_set").pop();
     check("tapping one plans it", !q(".confirmwrap") && idea && idea.service_data.title === "Lamb tagine"
       && idea.service_data.date === day(3), idea && JSON.stringify(idea.service_data));
+    card._mealPick = null;
+    await open(`${day(3)}|dinner`);
+    const again2 = q(".plantabs [data-plantab].on");
+    check("the next empty slot opens on the tab used last", again2 && again2.getAttribute("data-plantab") === "suggest",
+      again2 && again2.getAttribute("data-plantab"));
+    q(".confirmwrap [data-no]").click();
+    await settle();
 
     /* ---- reasons on Fill ---- */
     card._mealPick = null;
-    card._mealPropose(card._model ? card._model.body : { week: { script: "script.meal_plan_week" }, place: { script: "script.meal_plan_set" } },
-      ["dinner"], { start_date: day(0), days: 4 }, 6);
+    q(".mlfoot [data-meal-plan]").click();
     await settle();
+    const fillTab = q(".plantabs [data-plantab].on");
+    check("Plan opens on Suggest for the week", fillTab && fillTab.getAttribute("data-plantab") === "suggest"
+      && !q(".confirmwrap [data-src]") && text(q(".confirmwrap [data-yes]")) === "Suggest meals",
+      fillTab && fillTab.getAttribute("data-plantab") + " " + text(q(".confirmwrap [data-yes]")));
+    q(".confirmwrap [data-yes]").click();
+    await settle();
+    check("which asks the week script", calls("meal_plan_week").length > 0, asked.map((m) => m.service).join("|"));
     const why = q(".confirmwrap .mlpwhy small");
     check("each suggestion says why", why && text(why) === "Quick for a weeknight.", why && text(why));
     return problems;
@@ -192,5 +223,5 @@ const js = fs.readFileSync(file);
     console.log(`FAILED (${fails.length})`);
     process.exit(1);
   }
-  console.log("OK (picking flexibly: quick picks, ideas, undo and reasons)");
+  console.log("OK (picking flexibly: the Plan sheet's quick picks and ideas, undo and reasons)");
 })();

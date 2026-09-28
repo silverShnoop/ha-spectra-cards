@@ -4,12 +4,17 @@
  *   - Home's shape: Today and Tomorrow, four meals, and the one due next
  *     says "Up next" by the clock
  *   - an empty cell is a plus, not a sentence
- *   - a cell opens its controls under the grid, and Pick is only offered
- *     for the meals `pick.types` names
+ *   - a planned cell opens its facts and tiles under the grid; the tray
+ *     has no mic, typing, quick picks or Surprise me any more
  *   - the Kitchen's shape: Monday to Sunday, fetched from Monday, days gone
- *     faded and read-only, and a switch to next week
- *   - Fill empty asks which meals, then plans one kind at a time, from
- *     today, over the days left in the week shown
+ *     faded and read-only, and a ‹ This week › switch to next week
+ *   - the week's bar is one Plan button and a ⋮ menu (shop the week,
+ *     select, recipe box); the old Fill / words / fridge buttons are gone
+ *   - Plan opens the Plan sheet for the week shown, on its Suggest tab:
+ *     which meals, then one suggestion call per kind, from today, over the
+ *     days left in the week shown, and Plan N meals writes them
+ *   - an empty day ahead goes straight to the Plan sheet for that slot;
+ *     an empty day gone opens nothing
  *   - on a narrow card the week becomes one day at a time
  *
  *   node tools/checkmealgrid.js [path/to/spectra-cards.js]
@@ -95,8 +100,10 @@ const shots = process.env.SHOTS || "";
           const { start_date: a, end_date: z } = msg.service_data;
           return Promise.resolve({ response: { mealplan: plan.filter((e) => e.mealplan_date >= a && e.mealplan_date <= z) } });
         }
+        if (msg.service === "get_recipes") return Promise.resolve({ response: { recipes: { items: [] } } });
         if (msg.service === "meal_plan_week") {
-          return Promise.resolve({ response: { planned: [{ date: "x", meal: "A" }, { date: "y", meal: "B" }] } });
+          const d = msg.service_data;
+          return Promise.resolve({ response: { planned: [{ date: d.start_date, meal: `A ${d.entry_type}`, recipe_id: "" }] } });
         }
         return Promise.resolve({ response: {} });
       },
@@ -185,9 +192,11 @@ const shots = process.env.SHOTS || "";
       detail && detail.querySelector(".mltile[data-meal-move]") && !detail.querySelector("[data-meal-more]"), "missing");
     q(home, `[data-meal="${day(0)}|breakfast"]`).click();
     await settle();
-    check("but no Pick for breakfast, which pick.types leaves out",
-      q(home, ".mldetail") && !q(home, ".mldetail [data-meal-pick]") && q(home, ".mldetail [data-meal-say]"),
-      q(home, ".mldetail") && q(home, ".mldetail").innerHTML.slice(0, 200));
+    const gone = ["[data-meal-say]", "[data-meal-typed]", "[data-meal-send]", "[data-meal-quick]",
+      "[data-meal-pick]", "[data-meal-ideas]", "[data-meal-choose]", "[data-meal-another]"];
+    check("another cell's tray is facts and tiles: no mic, typing, quick picks or Surprise me",
+      q(home, ".mldetail .mltray") && gone.every((s) => !q(home, `.mldetail ${s}`)),
+      q(home, ".mldetail") && gone.filter((s) => q(home, `.mldetail ${s}`)).join(" "));
     q(home, `[data-meal="${day(0)}|breakfast"]`).click();
     await settle();
     check("the same cell again shuts it", !q(home, ".mldetail"), "still open");
@@ -199,6 +208,7 @@ const shots = process.env.SHOTS || "";
       say: { script: "script.meal_plan_say" },
       pick: { script: "script.meal_plan_pick", types: ["lunch", "dinner"] },
       week: { script: "script.meal_plan_week", types: ["dinner"] },
+      place: { script: "script.meal_plan_set" },
       shop_week: { script: "script.meal_week_to_items", list: "todo.phoenix" },
       recipes: { save: "home_signals.save_recipe" },
     });
@@ -218,35 +228,107 @@ const shots = process.env.SHOTS || "";
       q(week, `.mlgridview [data-meal="${day(-1)}|dinner"]`).click();
       await settle();
       check("a day gone can be read but not planned",
-        q(week, ".mldetail [data-meal-recipe]") && !q(week, ".mldetail [data-meal-say]")
-        && !q(week, ".mldetail [data-meal-pick]") && !q(week, ".mldetail [data-meal-clear]"),
+        q(week, ".mldetail [data-meal-recipe]") && !q(week, ".mldetail [data-meal-change]")
+        && !q(week, ".mldetail [data-meal-move]") && !q(week, ".mldetail [data-meal-clear]"),
         q(week, ".mldetail") && text(q(week, ".mldetail")));
       q(week, `.mlgridview [data-meal="${day(-1)}|dinner"]`).click();
       await settle();
+      const emptyGone = TYPES.map((t) => `${day(-1)}|${t}`)
+        .find((k) => !plan.some((e) => `${e.mealplan_date}|${e.entry_type}` === k));
+      if (emptyGone) {
+        q(week, `.mlgridview [data-meal="${emptyGone}"]`).click();
+        await settle();
+        check("an empty day gone opens nothing", !R_(week).querySelector(".confirmwrap") && !q(week, ".mldetail"),
+          text(R_(week).querySelector(".confirmwrap")));
+      }
     }
-
-    /* Fill empty: which meals, then one kind at a time. */
-    q(week, "[data-meal-week]").click();
-    await settle();
     const sheet = () => R_(week).querySelector(".confirmwrap:last-of-type");
+    const shut = async () => {
+      R_(week).querySelectorAll(".confirmwrap").forEach((w) => w.remove());
+      await settle();
+    };
+
+    /* The week's bar: which week, how full, Plan, and a menu. */
+    check("the bar names the week shown, and This week is the one disabled",
+      text(q(week, ".mlfoot .mlweekname")) === "This week"
+      && q(week, '[data-meal-weekto="0"]').disabled && !q(week, '[data-meal-weekto="1"]').disabled,
+      text(q(week, ".mlfoot .mlweekname")));
+    check("one Plan button", all(week, ".mlfoot [data-meal-plan]").length === 1
+      && text(q(week, ".mlfoot [data-meal-plan]")) === "Plan", all(week, ".mlfoot [data-meal-plan]").length);
+    check("and none of the old bar",
+      ["[data-meal-week]", "[data-meal-words]", "[data-meal-fridge]", ".mlacts", ".mlweek", ".mllong", ".mlshort"]
+        .every((s) => !q(week, s)),
+      ["[data-meal-week]", "[data-meal-words]", "[data-meal-fridge]", ".mlacts", ".mlweek", ".mllong", ".mlshort"]
+        .filter((s) => q(week, s)).join(" "));
+    check("the menu is shut to begin with", !q(week, ".mlmenu"), "open");
+    q(week, "[data-meal-menu]").click();
+    await settle();
+    const items = all(week, ".mlmenu [role=menuitem]").map((b) => b.getAttributeNames().find((a) => a.startsWith("data-meal-")));
+    check("⋮ opens the menu: shop the week, select, the recipe box, meals shown",
+      items.join(",") === "data-meal-shopweek,data-meal-select,data-meal-box,data-meal-shown", items.join(","));
+    q(week, "[data-meal-menushut]").click();
+    await settle();
+    check("and pressing beside it shuts it", !q(week, ".mlmenu"), "still open");
+
+    /* Plan: the week shown, on the Suggest tab -- which meals, then one kind at a time. */
+    q(week, "[data-meal-plan]").click();
+    await settle();
+    check("Plan opens the Plan sheet for this week",
+      sheet() && text(sheet().querySelector(".confirmhead")) === "Plan this week",
+      sheet() && text(sheet().querySelector(".confirmhead")));
+    const tabs = Array.from(sheet().querySelectorAll(".plantabs [data-plantab]"));
+    check("with a tab for each way the card can plan, Suggest on",
+      tabs.map((t) => t.getAttribute("data-plantab")).join(",") === "suggest,choose,copy"
+      && sheet().querySelector('[data-plantab="suggest"]').classList.contains("on")
+      && sheet().querySelector('[data-plantab="suggest"]').getAttribute("aria-selected") === "true",
+      tabs.map((t) => `${t.getAttribute("data-plantab")}:${t.getAttribute("aria-selected")}`).join(","));
+    check("Suggest has no where-from choice any more", !sheet().querySelector("[data-src]"), "a source");
     const chips = () => Array.from(sheet().querySelectorAll("[data-type]"));
-    check("Fill asks which meals, with dinner already on",
+    check("and asks which meals, with dinner already on",
       chips().map((c) => `${c.getAttribute("data-type")}:${c.getAttribute("aria-pressed")}`).join(",")
         === "breakfast:false,lunch:false,dinner:true,snack:false",
       chips().map((c) => `${c.getAttribute("data-type")}:${c.getAttribute("aria-pressed")}`).join(","));
     chips()[1].click();
+    check("its button suggests", text(sheet().querySelector("[data-yes]")) === "Suggest meals",
+      text(sheet().querySelector("[data-yes]")));
     sheet().querySelector("[data-yes]").click();
     await settle();
     await settle();
     const fills = asked.filter((m) => m.service === "meal_plan_week");
-    check("one call per meal, lunch then dinner",
-      fills.map((m) => m.service_data.entry_type).join(",") === "lunch,dinner",
-      fills.map((m) => m.service_data.entry_type).join(","));
+    check("one suggestion call per meal, lunch then dinner",
+      fills.map((m) => m.service_data.entry_type).join(",") === "lunch,dinner"
+      && fills.every((m) => m.service_data.suggest === true),
+      JSON.stringify(fills.map((m) => m.service_data)));
     check("from today, over the days left in the week",
       fills.every((m) => m.service_data.start_date === day(0) && m.service_data.days === 7 - back),
       JSON.stringify(fills.map((m) => m.service_data)));
-    check("and says what it planned", text(q(week, ".mlfoot .tdvoicesay")) === "2 lunches, 2 dinners planned",
+    check("and nothing is written before Plan these",
+      !asked.some((m) => m.service === "meal_plan_set") && text(sheet().querySelector("[data-yes]")) === "Plan 2 meals",
+      sheet() && text(sheet().querySelector("[data-yes]")));
+    sheet().querySelector("[data-yes]").click();
+    await settle();
+    await settle();
+    const sets = asked.filter((m) => m.service === "meal_plan_set");
+    check("then each is written, only if its slot is still empty",
+      sets.map((m) => `${m.service_data.entry_type}:${m.service_data.date}:${m.service_data.only_if_empty}`).join(",")
+        === `lunch:${day(0)}:true,dinner:${day(0)}:true`,
+      JSON.stringify(sets.map((m) => m.service_data)));
+    check("and says what it planned", text(q(week, ".mlfoot .tdvoicesay")) === "2 meals planned",
       text(q(week, ".mlfoot .tdvoicesay")));
+    week._voiceSay("idle", "");
+    await shut();
+
+    /* An empty day ahead goes straight to Plan, for that one slot. */
+    q(week, `.mlgridview [data-meal="${day(0)}|snack"]`).click();
+    await settle();
+    check("an empty meal ahead opens the Plan sheet for that slot",
+      sheet() && text(sheet().querySelector(".confirmhead")) === "Plan today's snack" && !q(week, ".mldetail"),
+      sheet() && text(sheet().querySelector(".confirmhead")));
+    check("on Choose, the box, with quick notes for an empty slot",
+      sheet() && sheet().querySelector('[data-plantab="choose"].on') && sheet().querySelector('[data-quick="Takeaway"]'),
+      sheet() && Array.from(sheet().querySelectorAll("[data-plantab], [data-quick]")).map(text).join("|"));
+    await shut();
+    week._mealPick = null;
     week._voiceSay("idle", "");
 
     /* Next week. */
@@ -256,12 +338,18 @@ const shots = process.env.SHOTS || "";
       q(week, ".mlgridview .mlcell").getAttribute("data-meal") === `${monday(1)}|breakfast`,
       q(week, ".mlgridview .mlcell").getAttribute("data-meal"));
     check("with nothing faded", !q(week, ".mlgridview .mlhead.past") && !q(week, ".mlhead.today"), "faded");
+    check("and the bar says so", text(q(week, ".mlfoot .mlweekname")) === "Next week"
+      && q(week, '[data-meal-weekto="1"]').disabled && !q(week, '[data-meal-weekto="0"]').disabled,
+      text(q(week, ".mlfoot .mlweekname")));
     check("and its meals", text(q(week, `.mlgridview [data-meal="${day(-back + 13)}|dinner"]`)).includes("Mushroom risotto"),
       text(q(week, `.mlgridview [data-meal="${day(-back + 13)}|dinner"]`)));
-    q(week, "[data-meal-shopweek]").click();
+    q(week, "[data-meal-menu]").click();
     await settle();
+    q(week, ".mlmenu [data-meal-shopweek]").click();
+    await settle();
+    check("a menu item shuts the menu", !q(week, ".mlmenu"), "still open");
     const shop = asked.filter((m) => m.service === "meal_week_to_items").pop();
-    check("Shop for the week shops next week",
+    check("Add the week to shopping list shops next week",
       shop && shop.service_data.start_date === monday(1) && shop.service_data.days === 7,
       shop && JSON.stringify(shop.service_data));
     week._voiceSay("idle", "");

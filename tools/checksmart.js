@@ -1,15 +1,21 @@
 #!/usr/bin/env node
-/* A smarter Fill, the week in words, and the fridge.
+/* The Plan sheet's tabs: Suggest, Describe, Copy, and the fridge.
  *
- *   - Fill asks where from: the box and new ideas, only the box, or only
- *     new ideas, and passes it on
+ *   - Plan's Suggest tab asks for the box and new ideas, only the box, or
+ *     only new ideas, and passes it on
  *   - the suggestions sheet says how the week leans, as a fact, and can
  *     write recipes for the new ideas kept: drafted, saved, tagged and
  *     planned in place of the note
- *   - Plan in words sends the sentence and shows what came back on the
- *     suggestions sheet
- *   - the fridge takes up to four photos into tiles of a fixed size, with
- *     which meals, how many days and anything to bear in mind
+ *   - the Describe tab sends the week in a sentence and shows what came
+ *     back on the suggestions sheet
+ *   - the Copy tab reads last week and offers it again, shifted a week, on
+ *     the suggestions sheet
+ *   - for one slot (Change on a planned meal), Describe sends what was
+ *     typed to the say script with the date and meal, and Undo puts back
+ *     what was there
+ *   - Suggest's "Use what's in the fridge" takes up to four photos into
+ *     tiles of a fixed size, with which meals, how many days and anything
+ *     to bear in mind
  *
  *   node tools/checksmart.js [path/to/spectra-cards.js]
  */
@@ -71,6 +77,8 @@ const js = fs.readFileSync(file);
         asked.push(msg);
         const d = msg.service_data || {};
         if (msg.service === "get_mealplan") return Promise.resolve({ response: { mealplan: plan } });
+        if (msg.service === "get_recipes") return Promise.resolve({ response: { recipes: { items: [] } } });
+        if (msg.service === "meal_plan_say") return Promise.resolve({ response: { planned: "Fish pie" } });
         if (msg.service === "meal_plan_week") {
           return Promise.resolve({ response: { planned: [
             { date: day(2), meal: "Penne arrabbiata", recipe_id: "", reason: "Something new." },
@@ -116,14 +124,26 @@ const js = fs.readFileSync(file);
     const all = (sel) => [...root.querySelectorAll(sel)];
     const calls = (svc) => asked.filter((m) => m.service === svc);
 
-    /* ---- Fill: where from ---- */
-    q("[data-meal-week]").click();
+    const tab = async (k) => {
+      if (!q(`.confirmwrap [data-plantab="${k}"].on`)) {
+        q(`.confirmwrap [data-plantab="${k}"]`).click();
+        await settle();
+      }
+    };
+    const shut = async () => { all(".confirmwrap").forEach((w) => w.remove()); await settle(); };
+
+    /* ---- Plan, Suggest: where from ---- */
+    q("[data-meal-plan]").click();
     await settle();
+    check("Plan opens on Suggest, with every way this card has",
+      all(".confirmwrap [data-plantab]").map((b) => b.getAttribute("data-plantab")).join(",") === "suggest,describe,choose,copy"
+      && q('.confirmwrap [data-plantab="suggest"].on'),
+      all(".confirmwrap [data-plantab]").map((b) => b.getAttribute("data-plantab")).join(","));
     q(".confirmwrap [data-mix='new']").click();
     q(".confirmwrap [data-yes]").click();
     await settle();
     const fill = calls("meal_plan_week").pop();
-    check("Fill passes where the suggestions come from", fill && fill.service_data.mix === "new", fill && JSON.stringify(fill.service_data));
+    check("Suggest passes where the suggestions come from", fill && fill.service_data.mix === "new", fill && JSON.stringify(fill.service_data));
 
     /* ---- balance ---- */
     check("the sheet says how the week leans", text(q(".confirmwrap .mlbalance")) === "This week's dinners: Pasta 3 times.",
@@ -154,9 +174,15 @@ const js = fs.readFileSync(file);
     const pointed = calls("meal_plan_set").filter((m) => m.service_data.recipe_id === "new9");
     check("and the slot pointed at the new recipe", pointed.length === 2, pointed.length);
 
-    /* ---- plan in words ---- */
-    q("[data-meal-words]").click();
+    await shut();
+
+    /* ---- Plan, Describe: the week in words ---- */
+    q("[data-meal-plan]").click();
     await settle();
+    await tab("describe");
+    check("a tab swaps the sheet in place, without the rise", all(".confirmwrap").length === 1
+      && q(".confirmwrap.still") && q('.confirmwrap [data-plantab="describe"]').getAttribute("aria-selected") === "true"
+      && text(q(".confirmwrap [data-yes]")) === "Suggest meals", text(q(".confirmwrap")));
     const box = q(".confirmwrap [data-words]");
     q(".confirmwrap [data-add='Fish twice']").click();
     check("an example is added to the words", box.value === "Fish twice", box.value);
@@ -171,8 +197,61 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-no]").click();
     await settle();
 
-    /* ---- the fridge ---- */
-    q("[data-meal-fridge]").click();
+    /* ---- Plan, Copy: last week again ---- */
+    q("[data-meal-plan]").click();
+    await settle();
+    check("Plan remembers the last tab", Boolean(q('.confirmwrap [data-plantab="describe"].on')), text(q(".confirmwrap .plantabs .on")));
+    await tab("copy");
+    const srcs = all(".confirmwrap [data-src]").map((b) => `${b.getAttribute("data-src")}:${b.getAttribute("aria-pressed")}`);
+    check("Copy offers last week (on) or two weeks ago, and nothing to bear in mind",
+      srcs.join(",") === "1:true,2:false" && !q(".confirmwrap [data-request]") && !q(".confirmwrap [data-mix]")
+      && text(q(".confirmwrap [data-yes]")) === "Copy them", srcs.join(",") + " " + text(q(".confirmwrap [data-yes]")));
+    const readsBefore = calls("get_mealplan").length;
+    const setsBefore = calls("meal_plan_set").length;
+    q(".confirmwrap [data-yes]").click();
+    await settle();
+    const read = calls("get_mealplan").slice(readsBefore)[0];
+    check("it reads the week before", read && read.service_data.start_date === day(-7) && read.service_data.end_date === day(-3),
+      read && JSON.stringify(read.service_data));
+    const copied = all(".confirmwrap .mlprow .mlpname").map(text);
+    check("and offers it a week on, on the suggestions sheet, writing nothing yet",
+      copied.join(",") === "Spaghetti bolognese,Lasagne" && calls("meal_plan_set").length === setsBefore,
+      copied.join(","));
+    await shut();
+
+    /* ---- one slot, Describe: said or typed, with Undo ---- */
+    q(`[data-meal="${day(1)}|dinner"]`).click();
+    await settle();
+    q(".mldetail [data-meal-change]").click();
+    await settle();
+    check("Change on one meal offers Describe", all(".confirmwrap [data-plantab]").map((b) => b.getAttribute("data-plantab")).join(",")
+      === "describe,choose", all(".confirmwrap [data-plantab]").map((b) => b.getAttribute("data-plantab")).join(","));
+    await tab("describe");
+    check("a box to type in, a mic, and Plan it", q(".confirmwrap [data-said]") && q(".confirmwrap [data-said-mic]")
+      && text(q(".confirmwrap [data-yes]")) === "Plan it" && text(q(".confirmwrap")).includes("Replaces Lasagne."),
+      text(q(".confirmwrap")));
+    q(".confirmwrap [data-said]").value = "fish pie";
+    q(".confirmwrap [data-yes]").click();
+    await settle();
+    const said = calls("meal_plan_say").pop();
+    check("what was typed goes to the say script, with the date and the meal",
+      said && JSON.stringify(said.service_data) === JSON.stringify({ transcript: "fish pie", date: day(1), entry_type: "dinner" }),
+      said && JSON.stringify(said.service_data));
+    check("and Undo is offered", Boolean(q(".mltoast [data-undo]")), "no undo");
+    q(".mltoast [data-undo]").click();
+    await settle();
+    const back = calls("meal_plan_set").pop();
+    check("which puts the note back", back && back.service_data.title === "Lasagne" && back.service_data.date === day(1)
+      && back.service_data.entry_type === "dinner", back && JSON.stringify(back.service_data));
+    card._voiceSay("idle", "");
+    card._mealPick = null;
+    await settle();
+
+    /* ---- the fridge, from Suggest ---- */
+    q("[data-meal-plan]").click();
+    await settle();
+    await tab("suggest");
+    q(".confirmwrap [data-fridge]").click();
     await settle();
     const tiles = all(".confirmwrap [data-shot]");
     check("four photo tiles", tiles.length === 4, tiles.length);
@@ -217,5 +296,5 @@ const js = fs.readFileSync(file);
     console.log(`FAILED (${fails.length})`);
     process.exit(1);
   }
-  console.log("OK (smarter planning: where from, balance, written ideas, words and the fridge)");
+  console.log("OK (smarter planning: where from, balance, written ideas, words, copy, one slot said, and the fridge)");
 })();

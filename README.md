@@ -1736,78 +1736,98 @@ make one. Each needs a script that answers in a fixed shape:
     script: script.meal_fridge_ideas             # suggests meals from it
 ```
 
-- **With `place`, Fill empty suggests before it writes.** It asks `week`
-  for each meal chosen with `suggest: true`, and lists the answers by day.
-  Each row says whether it is a saved **Recipe** or only an **Idea**. Untick
-  what isn't wanted. **Another** (the circular arrow) asks again for that
-  one slot, sending `avoid` with everything already listed. Nothing is
-  written until **Plan N meals**, and then each row goes to `place` with
-  `only_if_empty: true`, because the plan may have changed while the list
-  was being read. This is Skylight's Sidekick, with the review the house
-  asked for.
-- **Make it a recipe**, in the tray of a meal that is only a name. `write`
-  drafts a recipe (`{name, total_time, servings, ingredients[],
-  method[]}`), the edit form opens with it under **Check the recipe, then
-  save**, and once it is saved the slot is pointed at the new recipe.
-- **Choose a recipe**, in any open slot's tray. The box opens headed with
-  the slot ("Tomorrow's lunch: choose a recipe"), and a name goes straight
-  in.
-- **Plan it**, on a recipe sheet opened from the week. It offers the
-  card's meals and the coming seven days as buttons.
-- **What's in the fridge?** takes a photo, sends it to `fridge.save`, and
-  hands the photo's media id to `fridge.script`. That script answers
-  `{seen, planned: [{date, entry_type, meal, recipe_id}]}`, and the
-  suggestions open on the same sheet as Fill empty, headed with what was
-  seen.
+**One button plans; everything else is a fact or a menu.** The card's
+controls follow the patterns people already know from a photo gallery or
+a mail app:
+
+- **Plan** is the one button on the week's bar. It opens the Plan sheet
+  for whatever is in hand: one slot, the meals selected, or, with nothing
+  selected, the empty meals of the week shown.
+- **Tap opens, hold selects.** Tapping a planned meal opens it; tapping an
+  empty day ahead goes straight to Plan for that slot. Holding any meal
+  down (or right-clicking it) starts selecting, with that meal ticked.
+- **Actions follow the selection.** While meals are selected the week's
+  bar becomes the selection's bar, with the same verbs every time.
+- **⋮** holds the whole-week things and this device's settings.
+
+The week's bar, at the top of the week:
+
+| Control | Shown when | Does |
+| --- | --- | --- |
+| **‹ This week ›** | `start: monday` | the week shown, and how full it is (*9 of 28 planned*) |
+| **Plan** | any of `week`, `sentence`, `ideas` or a recipe box with `place` | opens the Plan sheet |
+| **⋮ → Add the week to shopping list** | `shop_week` is set | every planned recipe's items combined, on the review sheet |
+| **⋮ → Prep for the week** | the week has prep | the week's prep sittings; says how many meals are not in one |
+| **⋮ → Select meals** | `place` is set | starts selecting with nothing ticked |
+| **⋮ → Recipe box** | `recipes` is set | the whole box, by name |
+| **⋮ → Meals shown here** | more than one meal type | which meals this device shows |
+
+**The Plan sheet** has a tab for each way of planning. Each tab is shown
+only when its script is set, and the last one used is remembered:
+
+| Tab | For several meals | For one slot |
+| --- | --- | --- |
+| **Suggest** | `week.script` with `suggest: true`, the meals chosen and **Anything to bear in mind?** (typed, or hint chips like *Quick* or *No fish*). **Use what's in the fridge** takes up to four photos first (`fridge.save`, then `fridge.script`) | `ideas.script`: a few ideas for that slot, one tap to plan |
+| **Describe** | the week in a sentence, said or typed (`sentence.script`) | said or typed (`say.script`, with `transcript`, `date` and `entry_type`) |
+| **Choose** | tick recipes in the box; `arrange.script` places them sensibly. With meals selected, one recipe goes into all of them | the box, headed with the slot, plus quick notes: *Leftover fajitas*, *Takeaway*, *Eating out*, *From the freezer*. Opened from Change, **Keep … too** adds the recipe beside what is there |
+| **Copy** | the same meals as last week, or two weeks ago | — |
+
+**Nothing for several meals is written unseen.** Suggest, Describe, Choose
+and Copy all end on **Suggested meals**: each row says whether it is a
+saved **Recipe** or only an **Idea**, can be unticked, moved to another
+day (onto a planned day, the two swap) or asked again (the circular
+arrow sends `avoid` with everything already listed). **Plan N meals**
+sends each row to `place` with `only_if_empty: true`, because the plan
+may have changed while the list was being read. One slot is planned
+straight away, with Undo.
 
 A photo is shrunk to 1600px on its long edge and sent as a JPEG before
 anything else happens. A websocket message is limited to a few
 megabytes, and a model reads a fridge no better at twelve megapixels.
 
 **The slots come from `days` and `types`, not from the plan.** A day with
-nothing planned still has its slot, greyed and saying `Nothing planned`.
-That is the fact that sends somebody to the mic, so the card never hides
-itself just because the week is empty. It stands down only while the plan
-has not arrived yet.
+nothing planned still has its slot, as a faint plus, so the card never
+hides itself just because the week is empty. It stands down only while
+the plan has not arrived yet.
 
-**Tap a slot to open it.** Its controls are all optional, and each appears
-only when it has something to do:
-
-| Control | Shown when | Does |
-| --- | --- | --- |
-| mic | `say` is set | records, hands the words to `say.script` with the day and meal, and says back what was planned |
-| **Ingredients to list** | the meal is a recipe and `shop` is set | `shop.script` reads the recipe and returns items, which go on the list's own review sheet |
-| **Recipe** | the meal is a recipe | opens it on a sheet over the card: time, servings, ingredients, method. Set `recipe: false` to hide it |
-| **Pick one** / **Pick another** | `pick` is set | `pick.script` fills the slot from the recipe box at random |
-| **Move** | the slot holds anything and `move` is set | the card asks for a day; tap one and `move.script` moves the meal there, swapping if that day was planned. Tap the same day, or Cancel, to leave it |
-| **Clear** | the slot holds anything | asks, then deletes that entry |
-
-**Typing is saying.** Beside the mic is a box for the same thing typed
-(16px, so a phone does not zoom in to it). What is typed goes to
-`say.script` exactly as a spoken take would, with `transcript`, `date` and
-`entry_type`. It is for a quiet room, or a panel with the tap running.
-
-**The tray leads with the one or two things usually wanted**: Recipe,
-Ingredients to list, Make it a recipe, or Choose a recipe for an empty slot.
-Choose another, Pick, Move and Clear change a plan rather than read it, so
-they wait behind **More**.
-
-Under the last day are the week's own controls:
+**Tap a planned meal to open it.** Under the week, what it is, and the
+same verbs the selection's bar uses, each shown only when it has
+something to do:
 
 | Control | Shown when | Does |
 | --- | --- | --- |
-| **Fill empty days** | `week` is set | asks which meals, and **Anything to bear in mind?** (typed, or from hint chips like *Quick* or *No fish*), sent as `request`. Then `week.script` plans every empty day in `days`, never a planned one, and says how many |
-| **Shop for the week** | `shop_week` is set | `shop_week.script` returns every planned recipe's items combined; they go on the review sheet |
-| **Recipes** | `recipes` is set | the whole recipe box, by name. Each opens its recipe; **New recipe** opens an empty form |
+| **Open recipe** | the meal is a recipe | opens it on a sheet over the card. Set `recipe: false` to hide it |
+| **Change** | `place` and a way to plan are set | the Plan sheet for this slot |
+| **Add to shopping list** | the meal is a recipe and `shop` is set | `shop.script` reads the recipe; its items go on the list's review sheet |
+| **Prep** | the recipe has prep not yet planned | the prep sheet for this meal |
+| **Write a recipe** | the meal is only a name and `write` is set | `write.script` drafts a recipe; the edit form opens under **Check the recipe, then save**, and the slot is pointed at it once saved |
+| **Move** | `move` is set | the card asks for a day; tap one and `move.script` moves the meal there, swapping if that day was planned |
+| **Clear** | always | deletes the meal, with Undo |
 
-A whole-week answer ("3 days planned") is written under the week rather
-than in a tray, because it belongs to no one day. On a phone that line
-can be a screen away from the button that asked, so when it is out of
-sight the answer is also shown for a moment at the bottom of the screen.
+**Selecting several.** Hold a meal down, or ⋮ → Select meals. Every meal
+from today on has a checkbox, and so does each day's heading and each
+meal's row label, which select the whole day or every dinner. The bar
+counts them (*5 selected · 3 empty*) and offers:
 
-**On a narrow card the week's buttons shed their words**: Fill, Shop,
-Fridge, Recipes, in one row that scrolls sideways rather than stacking
-four deep. Each keeps its full name for a screen reader.
+| Control | Does |
+| --- | --- |
+| **Plan** | the Plan sheet for the selection; only the empty ones are filled |
+| **Add to shopping list** | `shop_week.script` with the selected meals' `slots` |
+| **Move** | with exactly one planned meal selected: asks for a day |
+| **Clear** | clears the planned ones, with one Undo for the lot |
+| **×** | stops selecting |
+
+The selection's bar is the week's bar in place, at the same height, and a
+day's checkbox sits beside its name, so selecting moves nothing.
+
+**On the panel's grid, drag a meal to another day.** A mouse drags as soon
+as it moves. A finger holds, then keeps moving; let go without moving and
+the meal is selected instead. Dropped on a planned day, the two swap.
+
+A whole-week answer ("3 days planned") is written on the week's bar,
+because it belongs to no one day. On a phone that line can be a screen
+away from the button that asked, so when it is out of sight the answer
+is also shown for a moment at the bottom of the screen.
 
 **On a phone, swipe between days.** The one-day view takes a sideways
 swipe as the next or previous day. Only a mostly-sideways one, so a
@@ -1815,8 +1835,9 @@ scroll down the page that drifts is still a scroll.
 
 **A wall panel goes back to today.** Two minutes after the last touch,
 with no sheet open, nothing being typed and the mic idle, an open slot
-shuts, More folds, Next week goes back to This week and the chosen day
-goes back to today. The next person to look expects today.
+shuts, the menu and any selection close, Next week goes back to This
+week and the chosen day goes back to today. The next person to look
+expects today.
 
 ### Prep ahead
 
@@ -1963,9 +1984,11 @@ body:
     dictate: script.meal_recipe_from_speech
     tag: script.meal_recipe_tag            # optional: AI tags a new recipe nobody tagged
   ask: {script: script.meal_recipe_ask}    # optional: "Ask" the box, and suggestions for a slot
-  import: {script: script.meal_import_recipe, split: script.meal_recipe_split}   # optional: "From a link"; split: check its prep once
-  schedule: {script: script.meal_plan_set, types: [breakfast, lunch, dinner, snack]}  # optional: "Plan it"
-  photo: {save: home_signals.save_photo, script: script.meal_recipe_from_photo}      # optional: "From a photo"
+  import: {script: script.meal_import_recipe, split: script.meal_recipe_split}   # optional: + → "From a link"; split: check its prep once
+  schedule: {script: script.meal_plan_set, types: [breakfast, lunch, dinner, snack]}  # optional: "Plan"
+  arrange: {script: script.meal_place_several}                                       # optional: several recipes placed sensibly
+  shop: {script: script.meal_ingredients_to_items, list: todo.phoenix}               # optional: "Add to shopping list"
+  photo: {save: home_signals.save_photo, script: script.meal_recipe_from_photo}      # optional: + → "From a photo"
   planned: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}             # optional: "Tue" beside a recipe
   images: true                                                                       # optional: photos. See "Recipe photos"
 ```
@@ -1975,20 +1998,29 @@ body:
 coming up?", not "list the fortnight". It is the same plan source as the
 meals card's `plan`.
 
-A name opens its recipe on the same sheet the meals card uses, with Edit and
-Delete in the same places. **New recipe** opens an empty form. **From a
-link** takes a pasted address. The whole message can be pasted, because the
-first link in it is the one sent. The card expects the script to answer
-`{recipe}`, and when the page has no recipe on it the sheet says so and
-stays open.
+A name opens its recipe on the same sheet the meals card uses: **Plan** and
+**Cook**, with Edit, Add to shopping list and Plan prep under **⋮**.
 
-**From a photo** reads a cookbook page or a handwritten card into the
-new-recipe form, for checking before it is saved. **Plan it** on a recipe
-puts it on a day and a meal.
+**+** beside the search adds a recipe, on one sheet with a tab for each
+way in, remembering the last one used:
 
-**From a link is hidden on a wide touch screen**, which is the wall panel:
-a panel has no clipboard to paste from, and the phone's share sheet is how
-a link arrives there.
+- **From a link** takes a pasted address. The whole message can be
+  pasted, because the first link in it is the one sent. The card expects
+  the script to answer `{recipe}`, and when the page has no recipe on it
+  the sheet says so and stays open.
+- **From a photo** reads a cookbook page or a handwritten card into the
+  new-recipe form, for checking before it is saved.
+- **Type it** opens the empty form.
+
+From a link is left off the wall panel: a panel has no clipboard to paste
+from, and the phone's share sheet is how a link arrives there.
+
+**Hold a recipe down to select it** (or right-click it). The search row
+gives way to the selection's bar: **Plan** (one recipe: which days; several:
+into the coming week's empty dinners, through Suggested meals), **Add to
+shopping list** (needs `shop`; the recipes' items combined, on one review
+sheet) and **Delete** (asked once; meals planned with them stay on the plan
+as notes).
 
 ### The picker
 
