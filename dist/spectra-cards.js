@@ -12589,6 +12589,9 @@ class SpectraCard extends HTMLElement {
         const was = Boolean(this._mealMenu);
         this._mealMenu = false;
         run(was);
+        /* A menu item that opens a sheet draws nothing itself; the menu
+           still has to go. */
+        if (was && !this._mealMenu) { this._signature = null; this._update(); }
       };
       el.addEventListener("click", go);
       el.addEventListener("keydown", (event) => {
