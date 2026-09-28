@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.130.1";
+const VERSION = "0.130.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2071,7 +2071,7 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
   color:var(--sp-ink); background:var(--sp-paper); border:1px solid var(--sp-edge);
   border-radius:4px; padding:8px 10px;
 }
-.mlform textarea { min-height:110px; resize:vertical; line-height:1.45; }
+.mlform textarea { min-height:140px; resize:none; overflow:hidden; line-height:1.45; }
 .mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
 .mlform .mldictate { display:flex; align-items:center; gap:10px; margin-top:10px; }
 .mlbear > span {
@@ -16530,6 +16530,23 @@ class SpectraCard extends HTMLElement {
       + `<button type="button" class="confirmyes" data-yes>Save</button></div></div>`;
 
     const field = (name) => wrap.querySelector(`[data-f="${name}"]`);
+    /* The recipe's two long fields are as tall as what is in them: the
+       sheet scrolls, never a box inside it. */
+    const fit = (ta) => {
+      if (!ta || ta.tagName !== "TEXTAREA" || !ta.isConnected) return;
+      ta.style.height = "auto";
+      ta.style.height = `${ta.scrollHeight + ta.offsetHeight - ta.clientHeight}px`;
+    };
+    const fitAll = () => wrap.querySelectorAll(".mlform textarea").forEach(fit);
+    wrap.addEventListener("input", (e) => fit(e.target));
+    /* A narrower sheet wraps more lines: a phone turned on its side. */
+    if (typeof ResizeObserver === "function") {
+      let wide = 0;
+      new ResizeObserver((seen) => {
+        const w = Math.round(seen[0].contentRect.width);
+        if (w && w !== wide) { wide = w; fitAll(); }
+      }).observe(wrap);
+    }
     const status = (text) => { wrap.querySelector("[data-status]").textContent = text; };
     const stepLines = () => field("method").value.split("\n").map((x) => x.trim()).filter(Boolean);
     const timed = (text) => {
@@ -16747,7 +16764,7 @@ class SpectraCard extends HTMLElement {
             mic.classList.remove("thinking");
             const got = (result && result.response) || {};
             const put = (key, value) => {
-              if (!isBlank(value)) field(key).value = Array.isArray(value) ? value.join("\n") : String(value);
+              if (!isBlank(value)) { field(key).value = Array.isArray(value) ? value.join("\n") : String(value); fit(field(key)); }
             };
             put("name", got.name);
             put("total_time", got.total_time);
@@ -16772,6 +16789,7 @@ class SpectraCard extends HTMLElement {
     document.addEventListener("keydown", onKey, true);
     this._editing = true;
     this._holder.appendChild(wrap);
+    fitAll();
     const first = field("name");
     /* Straight into the name with a mouse and keyboard. Not on a touch
        screen: on the wall panel the keyboard would cover the form before

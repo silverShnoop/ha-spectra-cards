@@ -375,6 +375,27 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-no]").click();
     await settle();
 
+    /* ---- the form's long fields are as tall as their text ---- */
+    card._mealEdit("e1", { recipe_id: "r2", slug: "chilli", name: "Chilli",
+      ingredients: Array.from({ length: 14 }, (_, i) => ({ display: `${i + 1} things` })),
+      instructions: [{ text: "Make the chilli." }] }, 6, { save: "home_signals.save_recipe" });
+    await settle();
+    {
+      const w = q(".confirmwrap");
+      const ing = w.querySelector("#mling");
+      const meth = w.querySelector("#mlmethod");
+      const whole = (ta) => ta.scrollHeight <= ta.clientHeight + 1;
+      const short = meth.offsetHeight;
+      meth.value = Array.from({ length: 12 }, (_, i) => `Step ${i + 1} of a long method that wraps onto a second line of the box.`).join("\n");
+      meth.dispatchEvent(new Event("input", { bubbles: true }));
+      const cs = getComputedStyle(ing);
+      check("ingredients open showing every line, and the method grows as it is typed, with no handle",
+        whole(ing) && ing.offsetHeight > 300 && whole(meth) && meth.offsetHeight > short * 2 && cs.resize === "none",
+        `${ing.scrollHeight}/${ing.clientHeight} ${meth.scrollHeight}/${meth.clientHeight} ${short} ${cs.resize}`);
+      w.querySelector("[data-no]").click();
+      await settle();
+    }
+
     /* ---- the form ---- */
     asked.length = 0;
     card._mealEdit("e1", { recipe_id: "r2", slug: "chilli", name: "Chilli",
