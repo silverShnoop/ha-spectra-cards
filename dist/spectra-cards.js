@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.133.0";
+const VERSION = "0.134.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6855,7 +6855,10 @@ const BODIES = {
     return out;
   },
   list(b) {
-    const rows = Array.isArray(b.rows) ? b.rows : [];
+    /* A row that resolved to nothing -- a `cases` with no branch true and no
+       `else` -- is not there, rather than an empty stripe. That is what lets
+       a fixed list of rows say only the ones that apply today. */
+    const rows = (Array.isArray(b.rows) ? b.rows : []).filter((r) => r !== null && r !== undefined);
     /* Tiles rather than a column. A wall panel is mostly much wider than a
        phone, and a list of three alerts stacked down the left of a 1280px
        screen leaves two thirds of the row empty. Flowed, they fill it, and
@@ -6951,7 +6954,7 @@ function bodyIsEmpty(type, b) {
       return !(Array.isArray(b.networks) && b.networks.length)
         && !(Array.isArray(b.problems) && b.problems.length);
     case "list":
-      return !Array.isArray(b.rows) || b.rows.length === 0;
+      return !Array.isArray(b.rows) || !b.rows.some((r) => r !== null && r !== undefined);
     case "stat":
       return isBlank(b.hero) && isBlank(b.sub)
         && (!Array.isArray(b.hero_parts) || b.hero_parts.length === 0)
