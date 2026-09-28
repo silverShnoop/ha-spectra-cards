@@ -294,22 +294,24 @@ const js = fs.readFileSync(file);
     card._mealRecipe("e1", katsu, 6, { save: "home_signals.save_recipe" }, {});
     await settle();
     r = q(".confirmwrap:last-of-type");
-    const lis = r ? [...r.querySelectorAll(".rmsteps > li")] : [];
-    check("in place: one method, in the recipe's order", lis.length === 3
-      && [...r.querySelectorAll(".ppsec h4")].map(text).join() === "Method", r && text(r));
-    check("a split step shows both halves, the second in the On the day lane", lis[1] && lis[1].querySelectorAll(".rmtext").length === 2
+    const lis = r ? [...r.querySelectorAll(".rmsteps > li[data-step]")] : [];
+    const phases = [...r.querySelectorAll(".rmlanehead")].map(text);
+    check("in place: the recipe's order, in its phases, each a section of its own",
+      lis.length === 3 && phases.join(" | ") === "Prep1 step · 25 min | Cook2 steps" && !r.querySelector(".ppsec"), phases.join(" | "));
+    check("a split step shows both halves, the second in the Cook phase", lis[1] && lis[1].querySelectorAll(".rmtext").length === 2
       && text(lis[1].querySelector(".rmline.day")) === "Fry the chicken until golden."
-      && lis[1].querySelector(".rmline.day .rmlane").getAttribute("aria-label") === "On the day", lis[1] && lis[1].innerHTML);
-    check("the two lanes are said once, in a key", [...r.querySelectorAll(".rmkey .rmk")].map(text).join() === "Ahead,On the day",
-      text(r.querySelector(".rmkey")));
-    check("each step's number is in its lane", lis.map((l) => l.className).join() === "ahead,ahead,day", lis.map((l) => l.className).join());
-    const ifs = [...r.querySelectorAll(".rmprep")].map((p) => [...p.querySelectorAll(".rmline")].map((l) => `${l.classList.contains("ahead") ? "A" : "D"}:${text(l)}`).join(" / "));
-    check("a group made ahead says how it keeps, and its day, once, under its steps",
-      ifs[0] === "A:Cool, cover and chill. / D:Warm the sauce through.", ifs.join(" | "));
-    check("a day line alone is in the day's lane", ifs[1] === "D:Pat it dry first.", ifs.join(" | "));
-    const ghead = [...r.querySelectorAll(".rmghead")].map((h) => [text(h.querySelector(".rmsec")), ...[...h.querySelectorAll(".ppchip")].map(text)].join(" / "));
-    check("groups are titled, and what can go ahead sits beside the title",
-      ghead[0] === "The sauce / Up to 3 days ahead / Fridge" && ghead[1] === "The chicken / Step 2 ahead / Up to 24 h ahead", ghead.join(" | "));
+      && lis[1].querySelector(".rmline.day .rmlane").getAttribute("aria-label") === "Cook", lis[1] && lis[1].innerHTML);
+    check("the three signs are said once, in a key at the top", [...r.querySelectorAll(".rmkey > span")].map(text).join() === "Prep,Cook,If made ahead"
+      && r.querySelector(".rmkey").compareDocumentPosition(r.querySelector(".rmmethod")) === 4, text(r.querySelector(".rmkey")));
+    check("each step's number is in its phase", lis.map((l) => l.className).join() === "ahead,ahead,day", lis.map((l) => l.className).join());
+    const ifs = [...r.querySelectorAll(".rmifstep")].map((p) => [...p.querySelectorAll(".rmline")].map((l) => `${l.classList.contains("ahead") ? "P" : "C"}:${text(l)}`).join(" / "));
+    check("what applies if made ahead is one more step, marked by the clock, each line in its phase",
+      ifs[0] === "P:Cool, cover and chill. / C:Warm the sauce through." && r.querySelector(".rmifstep > .rmifmark[aria-label='If made ahead']"), ifs.join(" | "));
+    check("a cooking line alone is in the Cook phase", ifs[1] === "C:Pat it dry first.", ifs.join(" | "));
+    const ghead = [...r.querySelectorAll(".rmghead")].map((h) => [text(h.querySelector(".rmsec")), text(h.querySelector(".rmgmeta"))].join(" / "));
+    check("groups are titled, and how far ahead sits beside the title, the clock after it",
+      ghead[0] === "The sauce / Up to 3 days ahead · Fridge" && ghead[1] === "The chicken / Step 2 · Up to 24 h ahead"
+      && r.querySelector(".rmgmeta").lastElementChild.classList.contains("rmifmark"), ghead.join(" | "));
     check("and never on a step", !r.querySelector(".rmsteps .ppkeep") && !r.querySelector(".rmblock"), r.innerHTML.slice(0, 300));
     check("each AI change carries its mark", Boolean(lis[2] && lis[2].querySelector(".aimark[aria-label^='Interpreted']"))
       && Boolean(lis[1] && lis[1].querySelector(".aimark[aria-label^='Enhanced']")), lis[2] && lis[2].innerHTML);
@@ -352,6 +354,24 @@ const js = fs.readFileSync(file);
       night.join(" | "));
     check("each still in its part of the dish", parts.join() === "The sauce,The chicken,The chicken", parts.join());
     q(".mlcook [data-cook-done]").click();
+    q(".confirmwrap [data-no]").click();
+    await settle();
+
+    /* ---- a step done partly ahead, before a Cook section ---- */
+    index.push({ recipe_id: "r6", slug: "raita", name: "Raita", prep: { mode: "split", checked: true, in_place: true, steps: [
+      { n: 1, ahead_max: 24, keeps: "Fridge", ahead: "Stir the cucumber into the yogurt.", cook: "Scatter with mint." }] },
+      sections: [{ n: 1, title: "The raita" }, { n: 2, title: "To serve" }] });
+    method.r6 = ["Stir the cucumber into the yogurt, then scatter with mint.", "Serve with the curry."];
+    await card._recipeIndex("e1", true);
+    card._mealRecipe("e1", { recipe_id: "r6", slug: "raita", name: "Raita" }, 6, { save: "home_signals.save_recipe" }, {});
+    await settle();
+    r = q(".confirmwrap:last-of-type");
+    const cookSec = r && r.querySelectorAll(".rmphase")[1];
+    check("its cooking half is cooked in the Cook section: 1a in Prep, 1b at the head of Cook",
+      text(r.querySelector(".rmphase.ahead .rmsteps li[data-step='1'] > b")) === "1a"
+      && !r.querySelector(".rmphase.ahead .rmline.day")
+      && cookSec && text(cookSec.querySelector(".rmsteps li")) === "1bScatter with mint."
+      && text(cookSec.querySelector(".rmlanehead small")) === "2 steps", r && text(r));
     q(".confirmwrap [data-no]").click();
     await settle();
 
