@@ -357,6 +357,24 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-no]").click();
     await settle();
 
+    /* ---- a step done partly ahead, before a Cook section ---- */
+    index.push({ recipe_id: "r6", slug: "raita", name: "Raita", prep: { mode: "split", checked: true, in_place: true, steps: [
+      { n: 1, ahead_max: 24, keeps: "Fridge", ahead: "Stir the cucumber into the yogurt.", cook: "Scatter with mint." }] },
+      sections: [{ n: 1, title: "The raita" }, { n: 2, title: "To serve" }] });
+    method.r6 = ["Stir the cucumber into the yogurt, then scatter with mint.", "Serve with the curry."];
+    await card._recipeIndex("e1", true);
+    card._mealRecipe("e1", { recipe_id: "r6", slug: "raita", name: "Raita" }, 6, { save: "home_signals.save_recipe" }, {});
+    await settle();
+    r = q(".confirmwrap:last-of-type");
+    const cookSec = r && r.querySelectorAll(".rmphase")[1];
+    check("its cooking half is cooked in the Cook section: 1a in Prep, 1b at the head of Cook",
+      text(r.querySelector(".rmphase.ahead .rmsteps li[data-step='1'] > b")) === "1a"
+      && !r.querySelector(".rmphase.ahead .rmline.day")
+      && cookSec && text(cookSec.querySelector(".rmsteps li")) === "1bScatter with mint."
+      && text(cookSec.querySelector(".rmlanehead small")) === "2 steps", r && text(r));
+    q(".confirmwrap [data-no]").click();
+    await settle();
+
     /* ---- the form ---- */
     asked.length = 0;
     card._mealEdit("e1", { recipe_id: "r2", slug: "chilli", name: "Chilli",

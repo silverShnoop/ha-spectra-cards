@@ -1871,8 +1871,10 @@ alone after that:
 **Doing ahead belongs to a group, not a step**, and a group can be a single
 step. A group made ahead is used when cooking, never only by another group
 made ahead: the onion chopped for a sauce is part of the sauce, and keeps
-as the sauce does. A step that is part ahead and part cooking shows both
-halves, the second with the flame. A group only partly done ahead (an older
+as the sauce does. A step that is part ahead and part cooking is two
+halves: *5a* in its Prep group, and *5b* at the head of the next Cook
+section, where it is cooked (the halves stay together, the second with the
+flame, when no Cook section follows). A group only partly done ahead (an older
 split) says which steps.
 
 Cooking shows the group beside the step count (*Step 3 of 8 · The sauce*),
