@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.128.0";
+const VERSION = "0.128.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2247,8 +2247,8 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .pptray { font-size:13px; color:var(--sp-ink-2); margin:0; display:flex; gap:8px; align-items:center; }
 .pptray .mdi { width:16px; height:16px; color:var(--accent); flex:none; }
 .ppbanner { border-radius:10px; padding:10px 12px; font-size:14px; line-height:1.4; display:grid; gap:4px; margin:0 0 8px; }
-.ppbanner.ok { background:var(--accent-soft); color:var(--sp-ink); }
-.ppbanner.no { background:var(--sp-sink); color:var(--sp-ink); }
+.ppbanner.ppok { background:var(--accent-soft); color:var(--sp-ink); }
+.ppbanner.ppno { background:var(--sp-sink); color:var(--sp-ink); }
 .ppbanner b { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--accent-on); }
 .ppbanner .mdi { width:16px; height:16px; vertical-align:-3px; }
 .confirmbox.ppweek { max-width:900px; }
@@ -7921,6 +7921,14 @@ function prepPlan(split, texts) {
   const by = new Map(split.steps.map((x) => [Number(x.n), x]));
   const ahead = [];
   const cook = [];
+  /* A part made ahead in one run (the sauce): on the night its reheat is
+     all there is of it, so its steps' storing lines stay with the prep. */
+  let blockTo = 0;
+  if (!isBlank(split.reheat) && by.has(Number(split.reheat_at))) {
+    blockTo = Number(split.reheat_at);
+    while (by.has(blockTo + 1) && isBlank(by.get(blockTo + 1).ahead)) blockTo += 1;
+  }
+  const inBlock = (n) => blockTo && n >= Number(split.reheat_at) && n <= blockTo;
   texts.forEach((t, i) => {
     const n = i + 1;
     if (!isBlank(split.reheat) && n === Number(split.reheat_at)) cook.push(String(split.reheat));
@@ -7928,7 +7936,10 @@ function prepPlan(split, texts) {
     if (!x) { cook.push(t); return; }
     const text = isBlank(x.ahead) ? t : String(x.ahead);
     ahead.push(Object.assign({}, x, { text: isBlank(x.if_ahead) ? text : `${text} ${x.if_ahead}` }));
-    if (!isBlank(x.cook)) cook.push(String(x.cook));
+    /* What only applies when made ahead is said on the night too, where the
+       step was: taking a marinade out of the fridge, pouring off the water. */
+    const night = [inBlock(n) ? "" : x.if_ahead, x.cook].filter((s) => !isBlank(s)).map(String);
+    if (night.length) cook.push(night.join(" "));
   });
   return { inPlace: true, all: texts, ahead, cook };
 }
@@ -15014,9 +15025,9 @@ class SpectraCard extends HTMLElement {
         /* Cooking knows whether the prep was done: ticked, it starts at
            the first cook step and says what is ready; not, the prep comes
            first and says what that costs. */
-        + (flag === "ok" && i === Math.min(ahead, steps.length - 1) ? `<div class="ppbanner ok"><b>Prepped</b><span>${iconMarkup("mdi:check-circle")} `
+        + (flag === "ok" && i === Math.min(ahead, steps.length - 1) ? `<div class="ppbanner ppok"><b>Prepped</b><span>${iconMarkup("mdi:check-circle")} `
           + `${esc(ahead >= steps.length ? "All of it was done ahead." : steps.slice(0, ahead).map(prepShort).join(" \u00b7 "))}</span></div>` : "")
-        + (flag === "no" && i === 0 ? `<div class="ppbanner no"><b>Not prepped</b><span>${iconMarkup("mdi:alert-circle-outline")} `
+        + (flag === "no" && i === 0 ? `<div class="ppbanner ppno"><b>Not prepped</b><span>${iconMarkup("mdi:alert-circle-outline")} `
           + `The prep comes first${prepMinutes(split && split.steps) ? `: it adds about ${prepMinutes(split.steps)} minutes` : ""}`
           + `${split && split.steps.some((x) => Number(x.ahead_min) > 0) ? ", and anything that needs time to sit gets less of it" : ""}.</span></div>` : "")
         /* The ingredients take the step's place rather than pushing it
