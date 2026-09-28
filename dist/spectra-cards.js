@@ -2187,10 +2187,26 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .rmprep { margin:10px 0 0 34px; padding:8px 12px; border-radius:10px; background:var(--sp-sink); display:grid; gap:4px;
   font-size:13.5px; line-height:1.4; color:var(--sp-ink-2); }
 .rmprep b { font-weight:600; color:var(--accent-on); }
-.rmthen { color:var(--sp-ink); }
-.rmthen > b { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent-on); margin-right:6px; }
+/* Two lanes: what can be done ahead, and what is done on the day. Each is
+   an icon and a colour, said once in the key; the colour is never alone. */
+.rmmethod.lanes { --rm-ahead:var(--sp-a4); --rm-ahead-soft:var(--sp-a4-soft); --rm-ahead-on:var(--sp-a4-on);
+  --rm-day:var(--accent); --rm-day-soft:var(--accent-soft); --rm-day-on:var(--accent-on); }
+.rmkey { display:flex; flex-wrap:wrap; gap:6px 16px; margin:2px 0 14px; font-size:12.5px; color:var(--sp-ink-2); }
+.rmk { display:inline-flex; align-items:center; gap:6px; }
+.rmlane { display:inline-grid; place-items:center; width:20px; height:20px; border-radius:50%; flex:none; color:var(--sp-ink-2); }
+.rmlane .mdi { width:13px; height:13px; }
+.rmline { display:flex; align-items:flex-start; gap:8px; }
+.rmline > .rmlane { margin-top:1px; }
+.lanes .rmlane.ahead, .lanes .rmsteps li.ahead > b, .lanes .rmghead .ppchip.a { background:var(--rm-ahead-soft); color:var(--rm-ahead-on); }
+.lanes .rmlane.day, .lanes .rmsteps li.day > b { background:var(--rm-day-soft); color:var(--rm-day-on); }
+/* The lines only for making it ahead sit in the steps' own column, each
+   marked by its lane's icon where a step has its number. */
+.lanes .rmprep { background:none; padding:0; margin:12px 0 0; gap:10px; font-size:14.5px; line-height:1.45; color:var(--sp-ink-2); }
+.lanes .rmprep .rmline { display:grid; grid-template-columns:24px minmax(0,1fr); gap:10px; }
+.lanes .rmprep .rmline > .rmlane { width:24px; height:24px; margin:0; }
+.lanes .rmprep .rmline > .rmlane .mdi { width:14px; height:14px; }
 .rmahead { display:flex; align-items:center; gap:8px; margin:10px 0 4px; padding:9px 12px; border-radius:10px;
-  background:var(--accent-soft); color:var(--accent-on); font-size:13.5px; }
+  background:var(--sp-a4-soft); color:var(--sp-a4-on); font-size:13.5px; }
 .rmahead .mdi { width:18px; height:18px; flex:none; }
 .mlrecipe h4.rmask { margin:6px 0 4px; font-size:17px; font-weight:600; text-transform:none; letter-spacing:0; color:var(--sp-ink); }
 /* A step AI read, wrote or changed: a small quiet mark at its end. */
@@ -2252,7 +2268,8 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .pptray { font-size:13px; color:var(--sp-ink-2); margin:0; display:flex; gap:8px; align-items:center; }
 .pptray .mdi { width:16px; height:16px; color:var(--accent); flex:none; }
 .ppbanner { border-radius:10px; padding:10px 12px; font-size:14px; line-height:1.4; display:grid; gap:4px; margin:0 0 8px; }
-.ppbanner.ppok { background:var(--accent-soft); color:var(--sp-ink); }
+.ppbanner.ppok { background:var(--sp-a4-soft); color:var(--sp-ink); }
+.ppbanner.ppok b { color:var(--sp-a4-on); }
 .ppbanner.ppno { background:var(--sp-sink); color:var(--sp-ink); }
 .ppbanner b { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--accent-on); }
 .ppbanner .mdi { width:16px; height:16px; vertical-align:-3px; }
@@ -3269,6 +3286,7 @@ const WEATHER_ICONS = {
 const MDI_INLINE = {
   "mdi:clock-outline": "M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z",
   "mdi:knife": "M20.62,2C23.97,7.61 12.47,20.15 12.47,20.15L9.6,17.28L4.91,22L2.77,19.86L20.62,2Z",
+  "mdi:fire": "M17.66 11.2C17.43 10.9 17.15 10.64 16.89 10.38C16.22 9.78 15.46 9.35 14.82 8.72C13.33 7.26 13 4.85 13.95 3C13 3.23 12.17 3.75 11.46 4.32C8.87 6.4 7.85 10.07 9.07 13.22C9.11 13.32 9.15 13.42 9.15 13.55C9.15 13.77 9 13.97 8.8 14.05C8.57 14.15 8.33 14.09 8.14 13.93C8.08 13.88 8.04 13.83 8 13.76C6.87 12.33 6.69 10.28 7.45 8.64C5.78 10 4.87 12.3 5 14.47C5.06 14.97 5.12 15.47 5.29 15.97C5.43 16.57 5.7 17.17 6 17.7C7.08 19.43 8.95 20.67 10.96 20.92C13.1 21.19 15.39 20.8 17.03 19.32C18.86 17.66 19.5 15 18.56 12.72L18.43 12.46C18.22 12 17.66 11.2 17.66 11.2M14.5 17.5C14.22 17.74 13.76 18 13.4 18.1C12.28 18.5 11.16 17.94 10.5 17.28C11.69 17 12.4 16.12 12.61 15.23C12.78 14.43 12.46 13.77 12.33 13C12.21 12.26 12.23 11.63 12.5 10.94C12.69 11.32 12.89 11.7 13.13 12C13.9 13 15.11 13.44 15.37 14.8C15.41 14.94 15.43 15.08 15.43 15.23C15.46 16.05 15.1 16.95 14.5 17.5H14.5Z",
   "mdi:calendar-clock": "M15,13H16.5V15.82L18.94,17.23L18.19,18.53L15,16.69V13M19,8H5V19H9.67C9.24,18.09 9,17.07 9,16A7,7 0 0,1 16,9C17.07,9 18.09,9.24 19,9.67V8M5,21C3.89,21 3,20.1 3,19V5C3,3.89 3.89,3 5,3H6V1H8V3H16V1H18V3H19A2,2 0 0,1 21,5V11.1C22.24,12.36 23,14.09 23,16A7,7 0 0,1 16,23C14.09,23 12.36,22.24 11.1,21H5M16,11.15A4.85,4.85 0 0,0 11.15,16C11.15,18.68 13.32,20.85 16,20.85A4.85,4.85 0 0,0 20.85,16C20.85,13.32 18.68,11.15 16,11.15Z",
   "mdi:check-circle": "M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z",
   "mdi:alert-circle-outline": "M11,15H13V17H11V15M11,7H13V13H11V7M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20Z",
@@ -8058,33 +8076,40 @@ function recipeMethodMarkup(texts, split, prov, sections) {
     const night = [reheat, ...got.map((x) => x.if_ahead)].filter((s) => !isBlank(s)).join(" ");
     return { all, some, store, night };
   };
+  /* Two lanes, each an icon and a colour, said once in a key: what can be
+     done ahead, and what is done on the day. Colour is never the only
+     sign: every line and every step's number carries its lane's icon or
+     sits under a group that does. */
+  const lane = { ahead: ["mdi:knife", "Ahead"], day: ["mdi:fire", "On the day"] };
+  const laneIcon = (k) => `<span class="rmlane ${k}" role="img" aria-label="${lane[k][1]}">${iconMarkup(lane[k][0])}</span>`;
   const note = (p, key) => {
     if (isBlank(p.store) && isBlank(p.night)) return "";
-    const line = (label, text, k) => `<span><b>${label}</b> ${esc(text)}${aiMark("created", splitEvent, `${k}${key}`)}</span>`;
-    return `<p class="rmprep">${isBlank(p.store) ? "" : line("If made ahead:", p.store, "k")}`
-      + `${isBlank(p.store) || isBlank(p.night) ? "" : " "}${isBlank(p.night) ? "" : line(isBlank(p.store) ? "If made ahead, on the night:" : "On the night:", p.night, "i")}</p>`;
+    const line = (k, text, m) => `<span class="rmline ${k}">${laneIcon(k)}<span>${esc(text)}${aiMark("created", splitEvent, `${m}${key}`)}</span></span>`;
+    return `<p class="rmprep">${isBlank(p.store) ? "" : line("ahead", p.store, "k")}`
+      + `${isBlank(p.store) || isBlank(p.night) ? "" : " "}${isBlank(p.night) ? "" : line("day", p.night, "i")}</p>`;
   };
-  const li = (t, n, tint) => {
+  const li = (t, n, k) => {
     const x = notes.get(n);
-    /* A step done partly ahead: its two halves, the second said to be on
-       the night, since the group already says the rest can be done ahead. */
+    /* A step done partly ahead: its two halves, each in its lane. */
     const inner = x && !isBlank(x.ahead) && !isBlank(x.cook)
       ? `<span class="rmtext">${esc(x.ahead)}${aiMark("enhanced", splitEvent, `h${n}`)}</span>`
-        + `<span class="rmtext rmthen"><b>On the night</b> ${esc(x.cook)}${aiMark("enhanced", splitEvent, `c${n}`)}</span>`
+        + `<span class="rmtext rmline day">${laneIcon("day")}<span>${esc(x.cook)}${aiMark("enhanced", splitEvent, `c${n}`)}</span></span>`
       : `<span class="rmtext">${esc(t)}${mark(n)}</span>`;
-    return `<li class="${tint && x ? "ahead" : ""}" data-step="${n}"><b>${n}</b><div>${inner}<span class="rmnote" data-ai-note hidden></span></div></li>`;
+    return `<li class="${k}" data-step="${n}"><b>${n}</b><div>${inner}<span class="rmnote" data-ai-note hidden></span></div></li>`;
   };
-  return groups.map((g, i) => {
+  const key = plan ? `<p class="rmkey">${["ahead", "day"].map((k) => `<span class="rmk ${k}">${laneIcon(k)}${lane[k][1]}</span>`).join("")}</p>` : "";
+  return `<div class="rmmethod${plan ? " lanes" : ""}">${key}` + groups.map((g, i) => {
     const p = plan ? prepOf(g) : null;
     const chips = p ? prepChips(p.all) : "";
     const which = p && p.some ? `<span class="ppchip a">${p.some.length === 1 ? `Step ${p.some[0]}` : `Steps ${p.some.join(", ")}`} ahead</span>` : "";
+    const k = p && !p.some ? "ahead" : "day";
     const head = g.title || chips
       ? `<div class="rmghead">${g.title ? `<h5 class="rmsec">${esc(g.title)}</h5> ` : ""}${which || chips ? `<span class="ppkeep">${which}${chips.replace(/^<span class="ppkeep">|<\/span>$/g, "")}</span>` : ""}</div>`
       : "";
     const steps = [];
-    for (let n = g.from; n <= g.to; n += 1) steps.push(li(texts[n - 1], n, Boolean(p && p.some)));
-    return `<section class="rmgroup${p ? " ahead" : ""}" data-from="${g.from}">${head}<ol class="rmsteps">${steps.join("")}</ol>${p ? note(p, i) : ""}</section>`;
-  }).join("");
+    for (let n = g.from; n <= g.to; n += 1) steps.push(li(texts[n - 1], n, plan ? (notes.has(n) ? "ahead" : "day") : ""));
+    return `<section class="rmgroup${plan ? ` ${k}` : ""}" data-from="${g.from}">${head}<ol class="rmsteps">${steps.join("")}</ol>${p ? note(p, i) : ""}</section>`;
+  }).join("") + `</div>`;
 }
 
 /* Where a recipe came from and what AI did to it, folded away under the

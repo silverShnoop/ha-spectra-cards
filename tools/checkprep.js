@@ -297,12 +297,16 @@ const js = fs.readFileSync(file);
     const lis = r ? [...r.querySelectorAll(".rmsteps > li")] : [];
     check("in place: one method, in the recipe's order", lis.length === 3
       && [...r.querySelectorAll(".ppsec h4")].map(text).join() === "Method", r && text(r));
-    check("a split step shows both halves, the second on the night", lis[1] && lis[1].querySelectorAll(".rmtext").length === 2
-      && text(lis[1].querySelector(".rmthen")) === "On the night Fry the chicken until golden.", lis[1] && lis[1].innerHTML);
-    const ifs = [...r.querySelectorAll(".rmprep")].map(text);
-    check("a group made ahead says how it keeps, and its night, once, under its steps",
-      ifs[0] === "If made ahead: Cool, cover and chill. On the night: Warm the sauce through.", ifs.join(" | "));
-    check("a night line alone is said as the night's", ifs[1] === "If made ahead, on the night: Pat it dry first.", ifs.join(" | "));
+    check("a split step shows both halves, the second in the On the day lane", lis[1] && lis[1].querySelectorAll(".rmtext").length === 2
+      && text(lis[1].querySelector(".rmline.day")) === "Fry the chicken until golden."
+      && lis[1].querySelector(".rmline.day .rmlane").getAttribute("aria-label") === "On the day", lis[1] && lis[1].innerHTML);
+    check("the two lanes are said once, in a key", [...r.querySelectorAll(".rmkey .rmk")].map(text).join() === "Ahead,On the day",
+      text(r.querySelector(".rmkey")));
+    check("each step's number is in its lane", lis.map((l) => l.className).join() === "ahead,ahead,day", lis.map((l) => l.className).join());
+    const ifs = [...r.querySelectorAll(".rmprep")].map((p) => [...p.querySelectorAll(".rmline")].map((l) => `${l.classList.contains("ahead") ? "A" : "D"}:${text(l)}`).join(" / "));
+    check("a group made ahead says how it keeps, and its day, once, under its steps",
+      ifs[0] === "A:Cool, cover and chill. / D:Warm the sauce through.", ifs.join(" | "));
+    check("a day line alone is in the day's lane", ifs[1] === "D:Pat it dry first.", ifs.join(" | "));
     const ghead = [...r.querySelectorAll(".rmghead")].map((h) => [text(h.querySelector(".rmsec")), ...[...h.querySelectorAll(".ppchip")].map(text)].join(" / "));
     check("groups are titled, and what can go ahead sits beside the title",
       ghead[0] === "The sauce / Up to 3 days ahead / Fridge" && ghead[1] === "The chicken / Step 2 ahead / Up to 24 h ahead", ghead.join(" | "));
