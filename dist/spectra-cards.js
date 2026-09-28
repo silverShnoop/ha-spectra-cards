@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.130.3";
+const VERSION = "0.131.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3046,7 +3046,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    lives inside each pop-up. */
 .dock { display:flex; flex-wrap:wrap; gap:10px; }
 .dockbtn {
-  flex:1 1 130px; min-width:0; position:relative;
+  flex:1 1 var(--sp-dock-basis, 130px); min-width:0; position:relative;
   background:var(--sp-surface); border:2px solid var(--sp-edge);
   border-radius:6px; padding:9px 10px; cursor:pointer;
 }
@@ -17177,6 +17177,235 @@ if (!window.customCards.some((c) => c.type === "spectra-dock")) {
     preview: false,
     documentationURL: "https://github.com/silverShnoop/ha-spectra-cards",
   });
+}
+
+/* ------------------------------------------------------------------ *
+ * spectra-panel — a view that keeps Needs you and the rail on screen
+ *
+ *   type: custom:spectra-panel     (on the view, in place of `sections`)
+ *
+ * The view's `sections` stay exactly as they were written for a sections
+ * view. Two of them are chrome and are lifted out of the scroll:
+ *
+ *   - `spectra_slot: needs` on a section: Needs you
+ *   - `spectra_slot: rail` on a section, or else the section holding a
+ *     spectra-dock: the rail
+ *
+ * Everything else scrolls, on its own, underneath them. The page never
+ * scrolls, so neither can the chrome, and nothing has to guess how tall
+ * Home Assistant's header is to pin something below it.
+ *
+ * Upright, Needs you sits across the top and is capped, scrolling inside
+ * itself, so a busy morning cannot push the rail off the bottom. Held
+ * sideways, a strip across the top is the worst place for a list -- it
+ * spends the scarce dimension on it -- so it becomes a column down the
+ * left and runs the full height, one job per line.
+ *
+ * The rest are laid out the way the sections view lays them out -- the
+ * same column arithmetic, the same `column_span`, the same 12-column
+ * grid inside each section -- so a section written for one reads the same
+ * in the other.
+ * ------------------------------------------------------------------ */
+
+const PANEL_SHEET = `
+:host { display:block; --pn-gap:16px; --pn-col-gap:20px; --pn-row-gap:20px;
+  --pn-min:var(--ha-view-sections-column-min-width, 320px);
+  --pn-max:var(--ha-view-sections-column-max-width, 500px); }
+.panel { display:flex; flex-direction:column; box-sizing:border-box;
+  height:calc(100dvh - var(--pn-top, 0px)); overflow:hidden;
+  padding:12px var(--pn-gap) 0; gap:12px; }
+.needs { flex:none; max-height:var(--pn-needs-max, 36%); overflow-y:auto;
+  overscroll-behavior:contain; scrollbar-width:thin; }
+.needs.gone { display:none; }
+.main { flex:1 1 auto; min-height:0; min-width:0; display:flex; flex-direction:column; gap:12px; }
+/* Room below the rail for the caret that hangs off the selected button. */
+.rail { flex:none; padding-bottom:6px; --sp-dock-basis:80px; }
+.rail.gone { display:none; }
+.scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch; scrollbar-width:thin;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom, 0px)); }
+.grid { display:grid; grid-auto-flow:row dense; align-items:start;
+  grid-template-columns:repeat(var(--pn-cols, 1), minmax(0, 1fr));
+  gap:var(--pn-row-gap) var(--pn-col-gap); margin:0 auto;
+  max-width:calc(var(--pn-cols, 1) * var(--pn-max) + (var(--pn-cols, 1) - 1) * var(--pn-col-gap)); }
+.section { position:relative; min-width:0; grid-column:span var(--column-span, 1); }
+.section:has(> [hidden]) { display:none; }
+.section > hui-section { position:relative; }
+.section.bg { padding:8px; border-radius:var(--ha-section-border-radius, 16px); }
+.sbg { position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:var(--pn-bg, var(--ha-section-background-color, var(--secondary-background-color)));
+  opacity:var(--pn-bg-opacity, 1); }
+
+/* Sideways: Needs you down the left, full height. */
+.panel.side { flex-direction:row; padding-bottom:0; gap:var(--pn-gap); }
+.panel.side .needs { width:var(--pn-needs-width, 340px); max-height:none;
+  align-self:stretch; padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)); }
+
+`;
+
+class SpectraPanel extends HTMLElement {
+  constructor() {
+    super();
+    const root = this.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    style.textContent = PANEL_SHEET;
+    root.appendChild(style);
+    this._panel = document.createElement("div");
+    this._panel.className = "panel";
+    this._panel.innerHTML = '<div class="needs gone"></div>'
+      + '<div class="main"><div class="rail gone"></div>'
+      + '<div class="scroll"><div class="grid"></div></div></div>';
+    root.appendChild(this._panel);
+    this._needs = this._panel.querySelector(".needs");
+    this._rail = this._panel.querySelector(".rail");
+    this._scroll = this._panel.querySelector(".scroll");
+    this._grid = this._panel.querySelector(".grid");
+    this._config = {};
+    this._sections = [];
+    this._wrappers = [];
+    this._shown = "";
+    this._relayout = () => this._layout();
+    this._onVisibility = () => {
+      if (this._visTimer) return;
+      this._visTimer = RAF(() => {
+        this._visTimer = null;
+        this._layout();
+      });
+    };
+    this.addEventListener("section-visibility-changed", this._onVisibility);
+    this.addEventListener("card-visibility-changed", this._onVisibility);
+  }
+
+  setConfig(config) {
+    this._config = config || {};
+    const set = (name, value, unit) => {
+      if (value === undefined || value === null || value === "") this.style.removeProperty(name);
+      else this.style.setProperty(name, typeof value === "number" ? `${value}${unit}` : String(value));
+    };
+    set("--pn-needs-width", this._config.needs_width, "px");
+    set("--pn-needs-max", this._config.needs_max_height, "%");
+    this._layout();
+  }
+
+  set sections(list) {
+    this._sections = Array.isArray(list) ? list : [];
+    this._place();
+  }
+
+  get sections() {
+    return this._sections;
+  }
+
+  /* hui-view hands every view these. The panel has no use for loose cards
+     or badges -- everything on it lives in a section -- but it takes them
+     so a view that has some does not throw. */
+  set cards(v) { this._cards = v; }
+  set badges(v) { this._badges = v; }
+  set hass(v) { this._hass = v; }
+  get hass() { return this._hass; }
+  set narrow(v) { this._narrow = v; }
+  set lovelace(v) { this._lovelace = v; }
+  set index(v) { this._index = v; }
+  set isStrategy(v) { this._isStrategy = v; }
+
+  static slotOf(section) {
+    const config = (section && section.config) || {};
+    if (config.spectra_slot === "needs" || config.spectra_slot === "rail") return config.spectra_slot;
+    const cards = Array.isArray(config.cards) ? config.cards : [];
+    if (cards.some((c) => c && c.type === "custom:spectra-dock")) return "rail";
+    return null;
+  }
+
+  _place() {
+    this._needs.replaceChildren();
+    this._rail.replaceChildren();
+    this._grid.replaceChildren();
+    this._wrappers = [];
+    for (const section of this._sections) {
+      const slot = SpectraPanel.slotOf(section);
+      if (slot === "needs") { this._needs.appendChild(section); continue; }
+      if (slot === "rail") { this._rail.appendChild(section); continue; }
+      const wrap = document.createElement("div");
+      wrap.className = "section";
+      const bg = section.config && section.config.background;
+      if (bg) {
+        wrap.classList.add("bg");
+        const fill = document.createElement("div");
+        fill.className = "sbg";
+        if (bg && typeof bg === "object") {
+          if (bg.color) fill.style.setProperty("--pn-bg", String(bg.color));
+          if (bg.opacity !== undefined) fill.style.setProperty("--pn-bg-opacity", `${Number(bg.opacity) / 100}`);
+        }
+        wrap.appendChild(fill);
+      }
+      wrap.appendChild(section);
+      this._grid.appendChild(wrap);
+      this._wrappers.push({ wrap, section });
+    }
+    this._layout();
+  }
+
+  connectedCallback() {
+    if (!this._observer && typeof ResizeObserver !== "undefined") {
+      this._observer = new ResizeObserver(this._relayout);
+      this._observer.observe(this);
+    }
+    window.addEventListener("resize", this._relayout);
+    this._layout();
+  }
+
+  disconnectedCallback() {
+    if (this._observer) { this._observer.disconnect(); this._observer = null; }
+    window.removeEventListener("resize", this._relayout);
+  }
+
+  _layout() {
+    if (!this.isConnected) return;
+    /* Where the view starts on the page: under Home Assistant's header when
+       there is one, at the top when kiosk mode has taken it away. Measured,
+       not assumed, so the panel is exactly the height that is left. */
+    const top = Math.max(0, Math.round(this.getBoundingClientRect().top + window.scrollY));
+    this.style.setProperty("--pn-top", `${top}px`);
+
+    const width = this.clientWidth || window.innerWidth;
+    const height = window.innerHeight;
+    const sideMin = Number(this._config.side_min_width) || 900;
+    this._panel.classList.toggle("side", width > height && width >= sideMin);
+
+    const hidden = (el) => !el || el.hidden || el.hasAttribute("hidden");
+    this._needs.classList.toggle("gone", [...this._needs.children].every(hidden));
+    this._rail.classList.toggle("gone", [...this._rail.children].every(hidden));
+
+    /* The sections view's arithmetic: as many minimum-width columns as fit,
+       never more than max_columns, never more than the visible sections can
+       fill -- so a lone section is not stranded in a third of the screen. */
+    const shown = this._wrappers.filter((w) => !hidden(w.section));
+    const spanOf = (w) => Math.max(1, Number(w.section.config && w.section.config.column_span) || 1);
+    const style = getComputedStyle(this);
+    const gap = parseFloat(style.getPropertyValue("--pn-col-gap")) || 20;
+    const min = parseFloat(style.getPropertyValue("--pn-min")) || 320;
+    const inner = this._scroll.clientWidth || width;
+    const fit = Math.max(1, Math.floor((inner + gap) / (min + gap)));
+    const most = Math.max(1, Number(this._config.max_columns) || 3);
+    const total = shown.reduce((sum, w) => sum + spanOf(w), 0);
+    const cols = Math.max(1, Math.min(fit, most, total || 1));
+    this._grid.style.setProperty("--pn-cols", String(cols));
+    for (const w of this._wrappers) {
+      w.wrap.style.setProperty("--column-span", String(Math.min(spanOf(w), cols)));
+    }
+
+    /* A different set of sections is a different tab. Start it at the top
+       rather than wherever the last one was left. */
+    const signature = shown.map((w) => this._wrappers.indexOf(w)).join(",");
+    if (signature !== this._shown) {
+      this._shown = signature;
+      this._scroll.scrollTop = 0;
+    }
+  }
+}
+
+if (!customElements.get("spectra-panel")) {
+  customElements.define("spectra-panel", SpectraPanel);
 }
 
 console.info(
