@@ -309,6 +309,18 @@ right, in order of precedence, an action button, a `pill`, a `bar`, or a
 `value`. `title` and `detail` are accepted as aliases of `name` and `sub`, so
 a row coming straight from `home_signals`' `items` contract renders as-is.
 
+**A row that resolves to nothing is not drawn.** Write a row as a `cases`
+with no `else` and it appears only while its case is true — which is how
+a fixed list of breakfast, lunch and dinner shows just the meals planned
+today. A list whose every row is nothing counts as empty and hides.
+
+```yaml
+rows:
+  - cases:
+      - when: {entity: calendar.mealie_dinner, map: {on: true}, default: false}
+        then: {name: Dinner, value: {entity: calendar.mealie_dinner, attribute: message}}
+```
+
 A row with a tone takes its soft wash, which **overrides zebra** — never
 both. That is step 4 on the emphasis ladder; zebra is step 2 and carries no
 meaning at all.
