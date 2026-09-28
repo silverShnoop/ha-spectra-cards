@@ -254,7 +254,7 @@ const js = fs.readFileSync(file);
     check("and ⋮ again shuts it", more.hidden, "still open");
     r.querySelector("[data-cook]").click();
     await settle();
-    check("not prepped: the prep comes first, and says so", text(q(".mlcook .ppbanner.no")).includes("Not prepped")
+    check("not prepped: the prep comes first, and says so", text(q(".mlcook .ppbanner.ppno")).includes("Not prepped")
       && text(q(".mlcook .mlcookof")).includes("Step 1 of 3"), text(q(".mlcook")));
     q(".mlcook [data-cook-skip]").click();
     await settle();
@@ -267,7 +267,11 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-cook]").click();
     await settle();
     check("prepped: cooking starts at the first cook step", text(q(".mlcook .mlcookof")).startsWith("Step 2 of 2")
-      && text(q(".mlcook .ppbanner.ok")).includes("Make the filling"), text(q(".mlcook")));
+      && text(q(".mlcook .ppbanner.ppok")).includes("Make the filling"), text(q(".mlcook")));
+    /* The global .ok is a 13px tick: a banner wearing it was squashed to a
+       column one word wide. */
+    check("and the banner spans the sheet", q(".mlcook .ppbanner").getBoundingClientRect().width
+      > q(".mlcook").getBoundingClientRect().width * 0.8, String(q(".mlcook .ppbanner").getBoundingClientRect().width));
     q(".mlcook [data-cook-done]").click();
     q(".confirmwrap [data-no]").click();
     await settle();
@@ -277,7 +281,7 @@ const js = fs.readFileSync(file);
     index.push({ recipe_id: "r5", slug: "katsu", name: "Katsu", prep: { mode: "split", checked: true, in_place: true,
       reheat: "Warm the sauce through.", reheat_at: 1, steps: [
         { n: 1, ahead_max: 72, keeps: "Fridge", minutes: 25, if_ahead: "Cool, cover and chill." },
-        { n: 2, ahead_max: 24, minutes: 10, ahead: "Bread the chicken.", cook: "Fry the chicken until golden." }] },
+        { n: 2, ahead_max: 24, minutes: 10, ahead: "Bread the chicken.", cook: "Fry the chicken until golden.", if_ahead: "Pat it dry first." }] },
       provenance: { source: { kind: "page", url: "https://example.com/katsu" },
         events: [{ id: 1, what: "read", by: "Mealie", at: "2026-09-01T10:00:00+00:00" },
           { id: 2, what: "split", by: "Claude", model: "ai_task.recipes", at: "2026-09-01T10:01:00+00:00" }],
@@ -308,6 +312,26 @@ const js = fs.readFileSync(file);
     await settle();
     check("no: the whole method, in order", text(q(".mlcook .mlcookof")).startsWith("Step 1 of 3")
       && !q(".mlcook .ppbanner"), text(q(".mlcook")));
+    q(".mlcook [data-cook-done]").click();
+    q(".confirmwrap [data-no]").click();
+    await settle();
+    card._mealRecipe("e1", katsu, 6, { save: "home_signals.save_recipe" }, {});
+    await settle();
+    q(".confirmwrap [data-cook]").click();
+    await settle();
+    q(".mlcook [data-cook-prepped]").click();
+    await settle();
+    const night = [];
+    for (let i = 0; i < 6; i += 1) {
+      night.push(text(q(".mlcook .mlcookstep")));
+      const next = q(".mlcook [data-cook-next]");
+      if (!next || next.disabled) break;
+      next.click();
+      await settle();
+    }
+    check("yes: the night's steps, with what only applies when made ahead",
+      night.join(" | ") === "Warm the sauce through. | Pat it dry first. Fry the chicken until golden. | Serve with rice.",
+      night.join(" | "));
     q(".mlcook [data-cook-done]").click();
     q(".confirmwrap [data-no]").click();
     await settle();
