@@ -221,12 +221,15 @@ customElements.define("fake-section", FakeSection);
   /* Masonry: a short section must not hold open a row as tall as its
      neighbour. Three columns; the first section is short, the next two are
      tall, and the fourth has to land directly under the short one. */
-  {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  for (const zoom of [1, 1.5]) {
+    const page = await browser.newPage({ viewport: { width: Math.round(1280 * zoom), height: Math.round(800 * zoom) } });
     page.on("pageerror", (e) => problems.push(`masonry: PAGEERROR ${e.message}`));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.waitForFunction(() => !!customElements.get("spectra-panel"));
-    const got = await page.evaluate(async () => {
+    const got = await page.evaluate(async (zoom) => {
+      /* A tablet at 1.5x is rendered here with CSS zoom, which is where
+         a rect-based measurement spanned 1.5x too many rows. */
+      document.body.style.zoom = String(zoom);
       window.HASS = { states: {}, themes: { darkMode: true }, callService: () => Promise.resolve() };
       const card = (title, rows) => ({
         type: "custom:spectra-card", title, accent: 4,
@@ -247,17 +250,17 @@ customElements.define("fake-section", FakeSection);
       const rowGap = parseFloat(getComputedStyle(view).getPropertyValue("--pn-row-gap"));
       return {
         cols: Number(view.shadowRoot.querySelector(".grid").style.getPropertyValue("--pn-cols")),
-        firstBottom: box(0).bottom, fourthTop: box(3).top, fourthX: box(3).x, firstX: box(0).x, rowGap,
+        firstBottom: box(0).bottom, fourthTop: box(3).top, fourthX: box(3).x, firstX: box(0).x, rowGap: rowGap * zoom,
       };
-    });
+    }, zoom);
     const check = (label, ok, detail) => {
-      console.log(`${ok ? "ok  " : "FAIL"} masonry: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
-      if (!ok) problems.push(`masonry: ${label}`);
+      console.log(`${ok ? "ok  " : "FAIL"} masonry x${zoom}: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`masonry x${zoom}: ${label}`);
     };
     check("column_min_width lets a 1280 landscape take three", got.cols === 3, got);
     check("the fourth lands under the short first", Math.abs(got.fourthX - got.firstX) < 1, got);
     check("with no more than a gap between them",
-      got.fourthTop - got.firstBottom >= got.rowGap - 1 && got.fourthTop - got.firstBottom <= got.rowGap + 4, got);
+      got.fourthTop - got.firstBottom >= got.rowGap - 1 && got.fourthTop - got.firstBottom <= got.rowGap + 4 * zoom + 1, got);
     await page.close();
   }
 

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.135.0";
+const VERSION = "0.135.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -17248,7 +17248,7 @@ const PANEL_SHEET = `
 .needs.gone { display:none; }
 .main { flex:1 1 auto; min-height:0; min-width:0; display:flex; flex-direction:column; gap:12px; }
 /* Room below the rail for the caret that hangs off the selected button. */
-.rail { flex:none; padding-bottom:6px; --sp-dock-basis:80px; }
+.rail { flex:none; padding-bottom:6px; --sp-dock-basis:70px; }
 .rail.gone { display:none; }
 .scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch; scrollbar-width:thin;
@@ -17485,7 +17485,10 @@ class SpectraPanel extends HTMLElement {
     if (!this._config.masonry) return;
     const gap = parseFloat(getComputedStyle(this).getPropertyValue("--pn-row-gap")) || 20;
     for (const w of this._wrappers) {
-      const h = w.wrap.getBoundingClientRect().height;
+      /* offsetHeight, not getBoundingClientRect: under CSS zoom the rect
+         is in zoomed pixels and the 4px rows are not, so every section
+         spanned zoom-times its height and left a gap beneath it. */
+      const h = w.wrap.offsetHeight;
       const rows = h > 0 ? Math.ceil((h + gap) / 4) : 1;
       if (w.wrap.style.getPropertyValue("--pn-rows") !== String(rows)) {
         w.wrap.style.setProperty("--pn-rows", String(rows));
