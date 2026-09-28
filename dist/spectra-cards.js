@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.132.0";
+const VERSION = "0.133.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -17243,6 +17243,11 @@ const PANEL_SHEET = `
 
 /* Sideways: Needs you down the left, full height. */
 .panel.side { flex-direction:row; padding-bottom:0; gap:var(--pn-gap); }
+/* Sections that ride under Needs you when it is a column, and join the
+   grid when it is a strip. */
+.sidebox { display:none; flex-direction:column; gap:var(--pn-row-gap); }
+.panel.side .sidebox { display:flex; margin-top:12px; }
+.sidebox > .section { grid-row-end:auto; }
 .panel.side .needs { width:var(--pn-needs-width, 340px); max-height:none;
   align-self:stretch; padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)); }
 
@@ -17262,6 +17267,9 @@ class SpectraPanel extends HTMLElement {
       + '<div class="scroll"><div class="grid"></div></div></div>';
     root.appendChild(this._panel);
     this._needs = this._panel.querySelector(".needs");
+    this._needs.innerHTML = '<div class="needsbox"></div><div class="sidebox"></div>';
+    this._needsBox = this._needs.querySelector(".needsbox");
+    this._sideBox = this._needs.querySelector(".sidebox");
     this._rail = this._panel.querySelector(".rail");
     this._scroll = this._panel.querySelector(".scroll");
     this._grid = this._panel.querySelector(".grid");
@@ -17317,20 +17325,22 @@ class SpectraPanel extends HTMLElement {
 
   static slotOf(section) {
     const config = (section && section.config) || {};
-    if (config.spectra_slot === "needs" || config.spectra_slot === "rail") return config.spectra_slot;
+    if (["needs", "rail", "side"].includes(config.spectra_slot)) return config.spectra_slot;
     const cards = Array.isArray(config.cards) ? config.cards : [];
     if (cards.some((c) => c && c.type === "custom:spectra-dock")) return "rail";
     return null;
   }
 
   _place() {
-    this._needs.replaceChildren();
+    this._sideMode = undefined;
+    this._needsBox.replaceChildren();
+    this._sideBox.replaceChildren();
     this._rail.replaceChildren();
     this._grid.replaceChildren();
     this._wrappers = [];
     for (const section of this._sections) {
       const slot = SpectraPanel.slotOf(section);
-      if (slot === "needs") { this._needs.appendChild(section); continue; }
+      if (slot === "needs") { this._needsBox.appendChild(section); continue; }
       if (slot === "rail") { this._rail.appendChild(section); continue; }
       const wrap = document.createElement("div");
       wrap.className = "section";
@@ -17347,7 +17357,7 @@ class SpectraPanel extends HTMLElement {
       }
       wrap.appendChild(section);
       this._grid.appendChild(wrap);
-      this._wrappers.push({ wrap, section });
+      this._wrappers.push({ wrap, section, side: slot === "side" });
       if (this._sizer) this._sizer.observe(wrap);
     }
     this._layout();
@@ -17383,16 +17393,30 @@ class SpectraPanel extends HTMLElement {
     const width = this.clientWidth || window.innerWidth;
     const height = window.innerHeight;
     const sideMin = Number(this._config.side_min_width) || 900;
-    this._panel.classList.toggle("side", width > height && width >= sideMin);
+    const side = width > height && width >= sideMin;
+    this._panel.classList.toggle("side", side);
+
+    /* `spectra_slot: side` sections live under Needs you in a column and
+       in the grid, in their written order, in a strip. Only moved when the
+       mode changes -- a rotation, not every relayout. */
+    if (this._sideMode !== side) {
+      this._sideMode = side;
+      for (const w of this._wrappers) {
+        if (w.side && side) this._sideBox.appendChild(w.wrap);
+        else this._grid.appendChild(w.wrap);
+      }
+    }
 
     const hidden = (el) => !el || el.hidden || el.hasAttribute("hidden");
-    this._needs.classList.toggle("gone", [...this._needs.children].every(hidden));
+    const inSide = side ? this._wrappers.filter((w) => w.side && !hidden(w.section)) : [];
+    this._needs.classList.toggle("gone",
+      [...this._needsBox.children].every(hidden) && !inSide.length);
     this._rail.classList.toggle("gone", [...this._rail.children].every(hidden));
 
     /* The sections view's arithmetic: as many minimum-width columns as fit,
        never more than max_columns, never more than the visible sections can
        fill -- so a lone section is not stranded in a third of the screen. */
-    const shown = this._wrappers.filter((w) => !hidden(w.section));
+    const shown = this._wrappers.filter((w) => !hidden(w.section) && !(side && w.side));
     const spanOf = (w) => Math.max(1, Number(w.section.config && w.section.config.column_span) || 1);
     const style = getComputedStyle(this);
     const gap = parseFloat(style.getPropertyValue("--pn-col-gap")) || 20;
