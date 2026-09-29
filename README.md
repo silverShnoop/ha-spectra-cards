@@ -2267,8 +2267,16 @@ Colour on this rail means **status**, and nothing else:
 | | Device | For |
 |---|---|---|
 | `live` | accent on the edge | something is happening in here |
-| `fill` | accent as the background | this domain's state is the reason the button exists |
-| *selected* | no colour at all | which set of cards is on screen |
+| `fill` | accent on the edge, with an inset ring | this domain's state is the reason the button exists |
+| *selected* | no colour at all, and the only ground on the rail | which set of cards is on screen |
+
+**The rail has no coloured grounds.** `fill` used to paint the button's
+background, and three amber blocks across the top of the panel pulled the
+eye away from Needs you — which is where the job actually is, and the one
+thing that says what to do. So a filled button now says its state on its
+edge and a ring, one step louder than `live`, and the ground went to the
+Needs you tiles instead. The only filled button on the rail is the page
+you are on, in a neutral ground that no level ever wears.
 
 `fill` is the loud one, and it is **earned where the reassuring state is
 itself information**. Security filled green is not decoration: "everything

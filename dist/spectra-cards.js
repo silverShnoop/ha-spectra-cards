@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.138.0";
+const VERSION = "0.139.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2862,9 +2862,10 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   grid-template-columns:repeat(auto-fit, minmax(258px, 1fr)); }
 .flow .row.tile { border:2px solid var(--sp-edge); border-radius:6px;
   padding:10px 12px; min-height:0; align-items:flex-start; }
-/* An accented tile carries its accent on the edge, where a row carried it as
-   a wash. A wash inside a bordered tile reads as two boxes. */
-.flow .row.tile.wash { background:none; border-color:var(--accent); }
+/* An accented tile carries its accent on the edge and as its ground. It
+   used to be the edge alone, while the rail filled its buttons; the loud
+   one should be the list that says what to do, so the ground moved here. */
+.flow .row.tile.wash { background:var(--accent-soft); border-color:var(--accent); }
 /* Rows arrive and leave; they do not blink in and out.
 
    This belongs to the LIST, not to whatever caused the change. A row that
@@ -3148,7 +3149,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    them reads as a colour, so all three survive a button that is also filled
    red, and all three survive being looked at in the dark. */
 .dockbtn.selected { border-color:var(--sp-ink-3); }
-.dockbtn.selected:not(.fill) { background:var(--sp-sink); }
+.dockbtn.selected { background:var(--sp-sink); }
 .dockbtn.selected:not(.fill) .dockhead h4 { color:var(--sp-ink); }
 .dockbtn.selected:not(.fill) .docksum { color:var(--sp-ink); }
 .dockbtn.selected .dockhead h4 { font-weight:700; }
@@ -3159,7 +3160,13 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    the reason the button exists at all -- spend it on every button and the
    rail is a fruit salad that means nothing. The summary text still says the
    same thing in words, because colour never carries it alone. */
-.dockbtn.fill { background:var(--accent-soft); border-color:var(--accent); }
+/* ...but not as a ground any more. Filled buttons along the rail competed
+   with Needs you, which is where a job actually is: three amber blocks
+   across the top drew the eye away from the list that says what to do.
+   The rail now says it on the edge -- a border and an inset ring, one step
+   louder than "live" -- and Needs you carries the ground. The only filled
+   button on the rail is the one you are on. */
+.dockbtn.fill { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
 .dockbtn.fill .dockhead h4, .dockbtn.fill .docksum { color:var(--accent-on); }
 /* The rail reuses the shared press animation but feeds it the firmer value,
    because here the flash lands on a lifted or filled surface rather than on a
