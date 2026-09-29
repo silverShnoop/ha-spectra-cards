@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.136.1";
+const VERSION = "0.137.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1065,12 +1065,35 @@ ha-icon { display:inline-flex; line-height:0; }
    button on it, the one just pressed included. */
 .confirmbox.tall { height:min(100%, 820px); }
 .confirmbox.tall > .confirmbtns { margin-top:auto; }
+/* In a sheet of fixed height only the body gives way. The tabs, the
+   quick picks and the head used to shrink with it, and at 800px tall the
+   Plan sheet's tabs were clipped to half height under the search. */
+.confirmbox.tall > :not(.mlrecipe):not(.mlplist) { flex-shrink:0; }
+/* The suggestions list is the sheet's body, so it takes the room and
+   scrolls, rather than a short scroller of its own above an empty gap. */
+.confirmbox.tall > .mlplist { flex:1 1 auto; min-height:0; max-height:none; }
 @media (max-width: 600px) { .confirmbox.tall { height:92%; } }
 .confirmbox > .confirmbtns {
   position:sticky; bottom:0; flex:none; background:var(--sp-surface);
   padding:10px 0 12px; margin-top:6px; border-top:1px solid var(--sp-sink);
 }
 @keyframes sheetfade { from { opacity:0; } to { opacity:1; } }
+/* A tablet is wide, and the long sheets were a 460px strip down the
+   middle of it -- a recipe read as a column of short lines with two
+   thirds of the screen dimmed either side. On a wide screen the long
+   sheets take the width, and each one lays itself out across it (below):
+   the recipe in two columns, the box as a grid, the form side by side,
+   cooking with the ingredients beside the step. Measured on the sheet,
+   not the window, so a sheet laid out for its own width stays right
+   whatever the card that opened it thinks. */
+.confirmwrap { container:sheetwrap / inline-size; }
+.confirmbox.tall { container:sheet / inline-size; }
+@container sheetwrap (min-width: 960px) {
+  .confirmwrap > .confirmbox.tall { max-width:min(1200px, 100%); height:min(100%, 980px); padding:18px 24px 0; }
+  /* The suggestions are a list of days, each with its rows: one column
+     reads in order, and a day never breaks from its heading. */
+  .confirmwrap > .confirmbox.tall.mlpropose { max-width:min(860px, 100%); }
+}
 .confirmwrap.still, .confirmwrap.still .confirmbox, .confirmbox.still, .mldetail.still, .mlmoving.still { animation:none; }
 @keyframes sheetrise { from { transform:translateY(24px); opacity:.6; } to { transform:none; opacity:1; } }
 @media (max-width: 600px) {
@@ -2073,6 +2096,16 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 }
 .mlform textarea { min-height:140px; resize:none; overflow:hidden; line-height:1.45; }
 .mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
+/* On a wide sheet the recipe form puts its two long fields side by side,
+   ingredients left and method right, so neither is a long scroll below
+   the other. Everything else still runs the full width. */
+@container sheet (min-width: 820px) {
+  .mlform:has(> #mling) { display:grid; grid-template-columns:minmax(0, 2fr) minmax(0, 3fr);
+    column-gap:24px; grid-auto-flow:row dense; align-content:start; align-items:start; }
+  .mlform:has(> #mling) > * { grid-column:1 / -1; }
+  .mlform:has(> #mling) > [for="mling"], .mlform:has(> #mling) > #mling { grid-column:1; }
+  .mlform:has(> #mling) > [for="mlmethod"], .mlform:has(> #mling) > #mlmethod { grid-column:2; }
+}
 .mlform .mldictate { display:flex; align-items:center; gap:10px; margin-top:10px; }
 .mlbear > span {
   display:block; margin:14px 0 4px; font-size:11px; font-weight:600;
@@ -2100,7 +2133,7 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .mltype-in .mlsend:disabled { opacity:.4; cursor:default; }
 .mltype-in input:disabled { opacity:.6; }
 .mltype-in .mdi { width:20px; height:20px; }
-.mlideas { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.mlideas, .mlrecipe .mlideas { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
 .mlcell .mlalso { font-size:12.5px; color:var(--sp-ink-2); -webkit-line-clamp:1; }
 .mlcell.next .mlalso { color:var(--sp-surface); opacity:.85; }
 .mltwo { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
@@ -2247,6 +2280,23 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .rmahead { display:flex; align-items:center; gap:8px; margin:10px 0 4px; padding:9px 12px; border-radius:10px;
   background:var(--sp-a4-soft); color:var(--sp-a4-on); font-size:13.5px; }
 .rmahead .mdi { width:18px; height:18px; flex:none; }
+/* The recipe across a wide sheet: the photo, the facts and the
+   ingredients in a column on the left that stays put, and the method
+   running down the right. What you need to hand never scrolls away from
+   the step you are reading. */
+.rmside, .rmmain { min-width:0; }
+.rmmain > :first-child { margin-top:0; }
+@container sheet (min-width: 820px) {
+  .mlrecipe:has(> .rmside) { display:grid; grid-template-columns:minmax(280px, 36%) minmax(0, 1fr);
+    grid-template-rows:auto 1fr; column-gap:32px; align-items:start; }
+  .mlrecipe:has(> .rmside) > .mlhero { grid-column:1; grid-row:1; height:220px; }
+  .mlrecipe:has(> .rmside) > .rmside { grid-column:1; grid-row:2; position:sticky; top:0; }
+  .mlrecipe:has(> .rmside) > .rmmain { grid-column:2; grid-row:1 / span 2; }
+  .mlrecipe:has(> .rmside) > .rmside > .rmpanel:first-child { margin-top:8px; }
+  .mlrecipe:has(> .rmside) > .rmmain > .rmphase:first-child,
+  .mlrecipe:has(> .rmside) > .rmmain > .rmpanel:first-child,
+  .mlrecipe:has(> .rmside) > .rmmain > .rmkey + .rmphase { margin-top:8px; }
+}
 .mlrecipe h4.rmask { margin:6px 0 4px; font-size:17px; font-weight:600; text-transform:none; letter-spacing:0; color:var(--sp-ink); }
 /* A step AI read, wrote or changed: a small quiet mark at its end. */
 .aimark { display:inline-grid; place-items:center; width:22px; height:22px; margin:0 0 0 4px; padding:0; border:none;
@@ -2410,6 +2460,19 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .mlcookstep .mlcooking li { font-size:clamp(16px, 2.4vw, 22px); }
 .mlbtn[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-on); }
 .mlcook { max-width:760px; }
+/* Cooking on a wide sheet: the step large on the left, the ingredients
+   always beside it on the right, so there is nothing to tap to see them. */
+.mlcookbody { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+.mlcookside { display:none; }
+@container sheet (min-width: 820px) {
+  .mlcookbody { flex-direction:row; gap:28px; align-items:flex-start; }
+  .mlcookbody > .mlcookstep { flex:1 1 auto; min-width:0; }
+  .mlcookside { display:block; flex:0 0 34%; max-height:100%; overflow-y:auto; }
+  .mlcookside h4 { margin:8px 0 8px; font-size:11.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
+  .mlsideing { margin:0; padding:10px 12px 10px 28px; border-radius:10px; background:var(--sp-sink); }
+  .mlsideing li { font-size:16px; line-height:1.45; color:var(--sp-ink); margin:0 0 4px; }
+  .mlcook [data-cook-ing] { display:none; }
+}
 .confirmbtns .mdi { width:20px; height:20px; vertical-align:-5px; }
 .tdadd { margin-top:10px; }
 .tdaddsay { margin:6px 2px 0; min-height:1.3em; font-size:13px; line-height:1.35; color:var(--sp-ink-2); }
@@ -2453,6 +2516,11 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .rp li.pinned + li:not(.pinned) { border-top:1px solid var(--sp-edge); margin-top:4px; }
 .rpbox { max-width:620px; }
 .rpbox .rclist { max-height:none; overflow:visible; }
+/* A wide box is a grid of recipes rather than one long column of them. */
+@container sheet (min-width: 820px) {
+  .rclist { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); column-gap:18px; align-content:start; }
+  .mlideas { grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); column-gap:14px; }
+}
 .confirmbtns .mlseveral { min-width:150px; }
 .rpbox.ticking .rp li { position:relative; }
 .rpbox.ticking .rp li [data-recipe-open] { padding-right:40px; }
@@ -15304,8 +15372,12 @@ class SpectraCard extends HTMLElement {
           + `${split && split.steps.some((x) => Number(x.ahead_min) > 0) ? ", and anything that needs time to sit gets less of it" : ""}.</span></div>` : "")
         /* The ingredients take the step's place rather than pushing it
            down: Back and Next stay where the thumb already is. */
+        + `<div class="mlcookbody">`
         + (showing ? `<div class="mlrecipe mlcookstep"><ul class="mlcooking">${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`
           : `<div class="mlrecipe mlcookstep" aria-live="polite">${esc(steps[i])}</div>`)
+        + (ingredients.length && !showing ? `<aside class="mlcookside" aria-label="Ingredients"><h4>Ingredients</h4>`
+          + `<ul class="mlsideing">${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></aside>` : "")
+        + `</div>`
         + `<div class="confirmbtns">`
         + `<button type="button" class="confirmno" data-cook-done>Done</button>`
         + `<button type="button" class="confirmno" data-cook-prev${i === 0 ? " disabled" : ""}>`
@@ -15561,15 +15633,21 @@ class SpectraCard extends HTMLElement {
           + numbered(steps.slice(0, ahead), 0, "", (n) => prepChips(split.steps[n]))
           + (steps.length > ahead ? `<div class="ppsec"><h4>To cook</h4><span></span></div>`
             + numbered(steps.slice(ahead), ahead, "cook") : "");
-      body = (facts || early ? `<p class="confirmtext">${esc([facts, early ? `${early} min of it can be done ahead` : ""].filter(Boolean).join(" \u00b7 "))}</p>` : "")
-        + (inPlace ? recipeKeyMarkup() : "")
+      /* Two halves: what you need (the facts and the ingredients) and
+         what you do (the method and how it was made). One after the
+         other on a phone; side by side on a wide sheet. */
+      body = `<div class="rmside">`
+        + (facts || early ? `<p class="confirmtext">${esc([facts, early ? `${early} min of it can be done ahead` : ""].filter(Boolean).join(" \u00b7 "))}</p>` : "")
         + (ingredients.length
           ? panel("Ingredients", count(ingredients.length, "item", "items"),
             `<ul class="rming">${ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`, "mdi:format-list-bulleted") : "")
+        + `</div><div class="rmmain">`
+        + (inPlace ? recipeKeyMarkup() : "")
         + (steps.length ? methodHtml : "")
         + (!ingredients.length && !steps.length
           ? `<p class="confirmtext">This recipe has no ingredients or method saved.</p>` : "")
-        + recipeAboutMarkup(prov, full, known && known.prep);
+        + recipeAboutMarkup(prov, full, known && known.prep)
+        + `</div>`;
       fill(body);
     }, (error) => {
       LOGGER_WARN("spectra-card: could not open the recipe", error);
