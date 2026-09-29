@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.139.1";
+const VERSION = "0.140.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1946,6 +1946,14 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .mlrecbtns .mlrecmore { margin-right:auto; }
 .rcbox { container-type:inline-size; container-name:recipes; }
 @container recipes (min-width: 560px) { .rcselbar .mlselact span { display:inline; } }
+/* A recipes card given the width of a tablet -- three columns on the
+   Kitchen tab -- lays its recipes out as a grid rather than one long
+   column of short rows with the rest of each line empty. Narrower, a
+   column or a phone, it is the list it always was. */
+@container recipes (min-width: 720px) {
+  .rcbox .rclist { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+    column-gap:18px; align-content:start; }
+}
 .rcbox.selecting .rchead { display:none; }
 .rcselbar { margin-bottom:8px; }
 .rcselbar[hidden] { display:none; }
