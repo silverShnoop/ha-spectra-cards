@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.139.0";
+const VERSION = "0.139.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -7284,9 +7284,14 @@ function sheetsEnterOnce(holder) {
         if (!n.classList) return;
         if (n.classList.contains("confirmwrap")) {
           const others = [...holder.children].some((c) => c !== n && c.classList && c.classList.contains("confirmwrap"));
+          /* Its own word for "making its entrance". It used to be marked
+             "entering", which is also the class that grows a list row in:
+             the sheet played the row's animation, and when the mark came
+             off its own fade started again from nothing -- every popup
+             opened, vanished, and came back. */
           if (others || now - closed < 400) n.classList.add("still");
-          else n.classList.add("entering");
-          setTimeout(() => n.classList.remove("entering"), 450);
+          else n.classList.add("sheetin");
+          setTimeout(() => n.classList.remove("sheetin"), 450);
         } else if (n.classList.contains("confirmbox") && rec.target.classList
           && rec.target.classList.contains("confirmwrap")) {
           /* A second fill of a sheet already on screen: its entrance has
