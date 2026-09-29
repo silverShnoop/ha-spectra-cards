@@ -64,7 +64,7 @@ number in `outline` buys nothing at all.
 | Level | Timeline | Treatment | Light | Dark |
 | --- | --- | --- | --- | --- |
 | `attention` | today or tomorrow | 2px border | `#B6862A` | `#D9A63F` |
-| `waiting` | the next 30 minutes | border + 1px inset ring | `#B0512C` | `#E08054` |
+| `waiting` | the next 30 minutes | border + 1px inset ring | `#B0512C` | `#EC6124` |
 | `critical` | now | ring + soft ground | `#8E0C14` | `#E2333F` |
 
 The levels are ordered and the accents are not, which is why the levels are

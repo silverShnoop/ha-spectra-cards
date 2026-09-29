@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.142.1";
+const VERSION = "0.142.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -147,7 +147,12 @@ const TOKENS_DARK = `
   --sp-ramp-0:#5A9CBF; --sp-ramp-1:#86BFAE; --sp-ramp-2:#DECB78;
   --sp-ramp-3:#E3A15C; --sp-ramp-4:#D0614B; --sp-ramp-5:#A63A3A;
   --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
-  --sp-waiting:#E08054;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
+  /* Waiting was #E08054, a soft salmon that sat ΔE 21 from attention and
+     did not stand out beside it on the hall panel. #EC6124 is the same
+     orange with half as much chroma again: ΔE 26 from attention, still
+     16.4 from critical, over the 15 floor. The deutan step to attention
+     stays small (8.0) whatever the hue, which is what the ring is for. */
+  --sp-waiting:#EC6124;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
   --sp-critical:#E2333F;  --sp-critical-soft:#3A1618;  --sp-critical-on:#F0949B;
 `;
 
