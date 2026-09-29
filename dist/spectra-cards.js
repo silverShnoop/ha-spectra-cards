@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.136.0";
+const VERSION = "0.136.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -17507,7 +17507,13 @@ class SpectraPanel extends HTMLElement {
     const cols = Math.max(1, Math.min(fit, most, total || 1));
     this._grid.style.setProperty("--pn-cols", String(cols));
     for (const w of this._wrappers) {
-      w.wrap.style.setProperty("--column-span", String(Math.min(spanOf(w), cols)));
+      const span = Math.min(spanOf(w), cols);
+      w.wrap.style.setProperty("--column-span", String(span));
+      /* `column: N` pins a section to that column, so a tab reads the way
+         it was written rather than wherever the packing put it. A screen
+         too narrow to have that column places it as usual. */
+      const at = Number(w.section.config && w.section.config.column);
+      w.wrap.style.gridColumn = Number.isInteger(at) && at >= 1 && at + span - 1 <= cols ? `${at} / span ${span}` : "";
     }
 
     this._spanRows();

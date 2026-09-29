@@ -287,6 +287,51 @@ customElements.define("fake-section", FakeSection);
     await page.close();
   }
 
+  /* Pinned columns: a section with `column: N` sits in column N, in the
+     order written, whatever the packing would have done; a screen without
+     that column places it as usual. */
+  for (const [width, cols] of [[1600, 4], [700, 2]]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    page.on("pageerror", (e) => problems.push(`columns: PAGEERROR ${e.message}`));
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.waitForFunction(() => !!customElements.get("spectra-panel"));
+    const got = await page.evaluate(async () => {
+      window.HASS = { states: {}, themes: { darkMode: true }, callService: () => Promise.resolve() };
+      const card = (title, rows) => ({ type: "custom:spectra-card", title, accent: 4,
+        body: { type: "list", rows: Array.from({ length: rows }, (_, i) => ({ name: `${title} ${i + 1}`, value: "x" })) } });
+      /* Written so that packing alone would scatter them. */
+      const plan = [["A", 1, 1], ["B", 6, 4], ["C", 2, 1], ["D", 1, 4], ["E", 3, 2]];
+      const sections = plan.map(([name, rows, column]) => {
+        const s = document.createElement("fake-section");
+        s.config = { type: "grid", column, cards: [card(name, rows)] };
+        return s;
+      });
+      const view = document.createElement("spectra-panel");
+      view.setConfig({ type: "custom:spectra-panel", masonry: true, max_columns: 4, column_min_width: 280 });
+      document.getElementById("a").appendChild(view);
+      view.sections = sections;
+      await new Promise((r) => setTimeout(r, 300));
+      const grid = view.shadowRoot.querySelector(".grid");
+      const gx = grid.getBoundingClientRect().x;
+      const colW = (grid.getBoundingClientRect().width + 20) / Number(grid.style.getPropertyValue("--pn-cols"));
+      return { cols: Number(grid.style.getPropertyValue("--pn-cols")),
+        at: sections.map((s) => Math.round((s.parentElement.getBoundingClientRect().x - gx) / colW) + 1),
+        y: sections.map((s) => Math.round(s.parentElement.getBoundingClientRect().y)) };
+    });
+    const check = (label, ok, detail) => {
+      console.log(`${ok ? "ok  " : "FAIL"} columns @${width}: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`columns @${width}: ${label}`);
+    };
+    check(`${cols} columns`, got.cols === cols, got);
+    if (cols === 4) {
+      check("each section sits in its column", JSON.stringify(got.at) === JSON.stringify([1, 4, 1, 4, 2]), got.at);
+      check("and in the order written", got.y[0] < got.y[2] && got.y[1] < got.y[3], got.y);
+    } else {
+      check("a column the screen lacks is placed as usual", got.at[1] <= 2 && got.at[3] <= 2, got.at);
+    }
+    await page.close();
+  }
+
   await browser.close();
   server.close();
   if (problems.length) {
