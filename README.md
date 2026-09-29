@@ -1678,6 +1678,25 @@ columns. On a card a third of the panel wide, that leaves each dinner about
 fifty pixels, enough for "Sea". One row per day keeps the whole name, and
 the name is the only thing on the card anybody reads.
 
+### Today, at a glance
+
+`layout: today` is the read-only summary for a Home tab: today's meals, one
+line each, with the recipe's photo beside it (`images: true`). A meal with
+no photo — a note, or a recipe Mealie has no picture for — shows its
+type's icon, so the column of pictures has no gaps. Nothing planned today
+and the card hides. Planning stays on the full card.
+
+```yaml
+body:
+  type: meals
+  layout: today
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 1}
+  types: [breakfast, lunch, dinner, snack]
+  images: true
+```
+
+`tools/checkmealtoday.js` pins it.
+
 ### The grid: a column per day, a row per meal
 
 `layout: grid` lays the plan out the way a calendar does. It suits two
