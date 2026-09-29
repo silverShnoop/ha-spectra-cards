@@ -2141,6 +2141,34 @@ still works on names. The box is kept once per Mealie for every card on the
 page, reread on the same timer as the plan and straight after anything the
 card saves, deletes or imports.
 
+## Long sheets on a wide screen
+
+The long sheets — a recipe, the box, the suggestions, the Plan sheet, the
+form, cooking — were a 460px strip down the middle of a tablet, with two
+thirds of the screen dimmed either side. On a screen at least 960px wide
+they take the width (up to 1200px) and lay themselves out across it:
+
+- **a recipe** in two columns: the photo, the facts and the ingredients
+  on the left, staying put, and the method down the right;
+- **the box and the Plan sheet's Choose** as a grid of recipes;
+- **the ideas** as a grid of cards;
+- **the form** with Ingredients and Method side by side;
+- **cooking** with the ingredients always beside the step, so there is
+  nothing to tap to see them.
+
+The suggestions stay one column, in a narrower sheet, so a day never
+breaks from its heading. The switch is a container query on the sheet,
+not a media query on the window, so each layout answers to the width it
+actually has. On a phone nothing changes.
+
+`tools/shotsheets.js` opens every long sheet with realistic data at
+1280×800, 1920×1080 and 800×1280 and saves a screenshot of each, plus an
+outline of each sheet's DOM, for a before-and-after look:
+
+```
+node tools/shotsheets.js [path/to/spectra-cards.js] --out DIR [--sizes 1280x800,1920x1080]
+```
+
 ## Confirming an action
 
 Any `action` anywhere can carry a `confirm`, and the card asks before
