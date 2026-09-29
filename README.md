@@ -2147,8 +2147,10 @@ A `clock` or `quote` given two columns — Today and the affirmation on a
 tablet's Home tab — sizes itself from its own width, instead of sitting
 small in the corner of a wide empty card: the time, day and date grow
 with the card, and a quote grows and balances its lines. At one column
-both are exactly the size they always were. `tools/checkwide.js` pins
-both halves.
+both are exactly the size they always were. A `recipes` card 720px or
+wider — three columns on the Kitchen tab — lays its recipes out as a
+grid; narrower, it is the list it always was. `tools/checkwide.js` pins
+all of it, the narrow halves included.
 
 ## Long sheets on a wide screen
 

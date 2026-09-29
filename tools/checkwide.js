@@ -61,6 +61,42 @@ const js = fs.readFileSync(file);
   check("given two columns the clock grows to use them", wideClock > 100, wideClock);
   check("at one column the quote is its old 22px", quote === 22, quote);
   check("given two columns the quote grows too", wideQuote > 26, wideQuote);
+  /* The recipes card: a grid across three columns, a list in one. */
+  const recipes = await page.evaluate(async () => {
+    document.body.innerHTML = '<div id="w" style="width:1150px"></div><div id="n" style="width:380px"></div>';
+    const list = Array.from({ length: 9 }, (_, i) => ({ recipe_id: `r${i}`, slug: `r${i}`, name: `Recipe ${i + 1}`, tags: [], ingredients: [] }));
+    const hass = {
+      states: {},
+      services: { home_signals: { recipe_index: {} } },
+      callService: () => Promise.resolve(),
+      callWS: (msg) => {
+        if (msg.type === "config_entries/get") return Promise.resolve([{ entry_id: "e1", state: "loaded" }]);
+        if (msg.service === "recipe_index") return Promise.resolve({ response: { recipes: list, tags: [] } });
+        return Promise.resolve({ response: {} });
+      },
+    };
+    const mk = (host) => {
+      const c = document.createElement("spectra-card");
+      document.getElementById(host).appendChild(c);
+      c.setConfig({ type: "custom:spectra-card", title: "Recipes", body: { type: "recipes", box: { mealie: "e1", recipes: true } } });
+      c.hass = hass;
+      return c;
+    };
+    const cards = [mk("w"), mk("n")];
+    for (let i = 0; i < 40; i += 1) {
+      await new Promise((r) => setTimeout(r, 25));
+      if (cards.every((c) => c.shadowRoot.querySelectorAll(".rclist li").length >= 9)) break;
+    }
+    return cards.map((c) => {
+      const rows = [...c.shadowRoot.querySelectorAll(".rclist li")];
+      return new Set(rows.map((r) => Math.round(r.getBoundingClientRect().top))).size && rows.length
+        ? { rows: rows.length, lines: new Set(rows.map((r) => Math.round(r.getBoundingClientRect().top))).size } : null;
+    });
+  });
+  const [wideBox, narrowBox] = recipes;
+  check("a wide recipes card lays its recipes out as a grid", wideBox && wideBox.lines <= Math.ceil(wideBox.rows / 3), wideBox);
+  check("a one-column recipes card is still a list", narrowBox && narrowBox.lines === narrowBox.rows, narrowBox);
+
   await browser.close();
   server.close();
   if (problems.length) {
