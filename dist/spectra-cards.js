@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.137.0";
+const VERSION = "0.138.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -395,6 +395,15 @@ ha-icon { display:inline-flex; line-height:0; }
   letter-spacing:.11em; text-transform:uppercase; color:var(--sp-ink);
 }
 .clockdate { margin:3px 0 0; font-size:14px; color:var(--sp-ink-2); }
+/* Given more width -- two columns on a tablet -- the time grows to use it
+   instead of sitting small in the corner of a wide empty card. Measured on
+   the clock, so at one column it is exactly the size it always was. */
+.clock { container:clock / inline-size; }
+@supports (font-size:1cqi) {
+  .clocktime { font-size:clamp(64px, 17cqi, 168px); }
+  .clockday { font-size:clamp(19px, 3.6cqi, 34px); }
+  .clockdate { font-size:clamp(14px, 2.5cqi, 22px); }
+}
 .clocknote { margin:10px 0 0; font-size:12px; color:var(--sp-ink-2); }
 
 /* The day's shape, which is the one thing a digital clock cannot say: how
@@ -421,6 +430,14 @@ ha-icon { display:inline-flex; line-height:0; }
 .quote { margin:0; font-size:22px; line-height:1.36; color:var(--sp-ink);
   max-width:34ch; text-wrap:pretty; }
 .quoteby { margin:9px 0 0; font-size:12px; color:var(--sp-ink-3); }
+/* A wide quote card reads as a quote: the sentence grows with the card, its
+   lines are balanced so a short one does not leave half the card empty,
+   and it is given room above and below. At one column, unchanged. */
+.quotebox { container:quote / inline-size; }
+@container quote (min-width: 560px) {
+  .quote { font-size:clamp(22px, 4.2cqi, 40px); line-height:1.3; text-wrap:balance; max-width:30ch; padding:8px 0 6px; }
+  .quoteby { font-size:14px; }
+}
 
 /* Weather art. Same glyphs as ha-icon drew, at the same sizes, so nothing
    above them had to move. These are filled shapes, not strokes — mdi draws
@@ -4983,11 +5000,11 @@ const BODIES = {
   /* What is worth reading today? */
   quote(b) {
     if (!b || isBlank(b.text)) return "";
-    let out = `<p class="quote">${esc(b.text)}</p>`;
+    let out = `<div class="quotebox"><p class="quote">${esc(b.text)}</p>`;
     /* Not every sentence has an author, and an empty dash under one that does
        not is worse than nothing. */
     if (!isBlank(b.by)) out += `<p class="quoteby">${esc(b.by)}</p>`;
-    return out;
+    return out + `</div>`;
   },
 
   /* What time is it, and what day? */
