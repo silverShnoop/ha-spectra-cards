@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.140.0";
+const VERSION = "0.141.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2438,6 +2438,14 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 /* Recipe photos. Small and square beside a name; across the top of a
    grid cell, where a picture is quicker to find from across the room
    than a word. */
+.mltoday { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.mltoday li { display:flex; align-items:center; gap:12px; min-width:0; }
+.mltpic { width:52px; height:52px; flex:none; border-radius:8px; object-fit:cover; display:block; background:var(--sp-sink); }
+.mltpic.none { display:grid; place-items:center; color:var(--accent); }
+.mltpic.none .mdi { width:24px; height:24px; }
+.mlttext { display:grid; gap:1px; min-width:0; }
+.mltword { font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--sp-ink-3); }
+.mltname { font-size:15px; color:var(--sp-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mlthumb, .rcthumb {
   width:40px; height:40px; flex:none; border-radius:8px; object-fit:cover;
   background:var(--sp-sink); align-self:center;
@@ -5356,6 +5364,7 @@ const BODIES = {
     if (String(b.layout || "").toLowerCase() === "grid") {
       return mealGrid(b, dates, types, plan, picked, moving);
     }
+    if (String(b.layout || "").toLowerCase() === "today") return mealToday(b, types, plan);
     const labelled = types.length > 1;
     const today = localDay(0);
 
@@ -7125,7 +7134,13 @@ function bodyIsEmpty(type, b) {
     /* An unplanned week is not empty: its empty days are what the card is
        for. Only a plan that has not arrived yet is nothing to show. */
     case "meals":
-      return !Array.isArray(b.plan);
+      if (!Array.isArray(b.plan)) return true;
+      /* Today's summary with nothing planned today has nothing to say. */
+      if (String(b.layout || "").toLowerCase() === "today") {
+        const types = (Array.isArray(b.types) && b.types.length ? b.types : ["dinner"]).map((t) => String(t).toLowerCase());
+        return mealTodayRows(b, types, b.plan.filter((e) => e && typeof e === "object" && !isBlank(e.mealplan_date))).length === 0;
+      }
+      return false;
     /* One point is not a shape. A fortnight chart drawn on the house's
        first day put a single dot in an empty box, because a length of one
        counted as data -- so the threshold is two, which is the fewest that
@@ -7739,6 +7754,33 @@ function recipeThumb(b, recipe, cls) {
   const id = recipe && !isBlank(recipe.recipe_id) ? String(recipe.recipe_id) : "";
   const url = id && b && b.thumbs && typeof b.thumbs === "object" ? b.thumbs[id] : "";
   return url ? `<img class="${cls}" data-thumb src="${esc(url)}" alt="" loading="lazy" decoding="async">` : "";
+}
+
+/* Today's meals at a glance: one line each, the recipe's photo beside it.
+   Read-only on purpose -- it is the Home tab's summary of the Kitchen tab's
+   card, and planning happens there. A meal with no photo shows its type's
+   icon, so the column of pictures never has a gap. */
+function mealTodayRows(b, types, plan) {
+  const day = localDay(0);
+  const rows = [];
+  for (const type of types) {
+    for (const entry of mealsAt(plan, day, type)) {
+      const name = mealName(entry);
+      if (name) rows.push({ type, name, recipe: entry.recipe && typeof entry.recipe === "object" ? entry.recipe : null });
+    }
+  }
+  return rows;
+}
+
+function mealToday(b, types, plan) {
+  const rows = mealTodayRows(b, types, plan);
+  if (!rows.length) return "";
+  return `<ul class="mltoday">${rows.map((r) => {
+    const mt = mealType(r.type);
+    const pic = recipeThumb(b, r.recipe, "mltpic") || `<span class="mltpic none">${iconMarkup(mt.icon)}</span>`;
+    return `<li>${pic}<span class="mlttext"><span class="mltword">${esc(mt.word)}</span>`
+      + `<span class="mltname">${esc(r.name)}</span></span></li>`;
+  }).join("")}</ul>`;
 }
 
 /* When a recipe is next on the plan, from today on: "Today", "Tomorrow",
