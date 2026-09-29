@@ -2462,6 +2462,13 @@ underneath it there — a clock, who is home — and joins the grid in its
 written place when the screen is upright. The column scrolls if a busy
 morning makes it overflow, and goes altogether when it has nothing in it.
 
+**`column: N` on a section pins it to that column.** Packing alone puts
+each section wherever it fits first, which on a busy tab reads as a
+jumble; pinned, a tab reads the way it was written — the clock and the
+weather in the first column, the calendar in the third — and sections in
+one column keep their written order. A screen too narrow to have column
+N places the section as usual, so the same view still works on a phone.
+
 **`masonry: true` packs instead of aligning rows.** A sections view lines
 its sections up in rows, so a clock beside the week's weather holds open a
 gap as tall as the weather. With masonry each section takes exactly its own
