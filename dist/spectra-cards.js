@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.142.0";
+const VERSION = "0.142.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -9783,6 +9783,15 @@ class SpectraCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    /* A tab switch takes the card off the page with its drawer still open,
+       which would leave the module holding a slot no one can close.
+
+       This was a second disconnectedCallback further down the class, calling
+       super to reach this one -- but a class keeps only the LAST definition of
+       a name, and super is HTMLElement. So the drawer was released and none
+       of the rest below ever ran. tools/checkstrip.js now refuses a class
+       with any method defined twice. */
+    releaseDrawer(this);
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
@@ -10520,13 +10529,6 @@ class SpectraCard extends HTMLElement {
      got to so the things that are supposed to move can move. Everything else
      simply swaps: for a word being replaced by another word there is nothing
      to interpolate, and the title bar's fade covers it. */
-  disconnectedCallback() {
-    /* A tab switch takes the card off the page with its drawer still open,
-       which would leave the module holding a slot no one can close. */
-    releaseDrawer(this);
-    if (super.disconnectedCallback) super.disconnectedCallback();
-  }
-
   /* Swap the markup, and let the rows that changed say so.
 
      Whether a row is arriving or leaving is decided HERE, by comparing the
@@ -15023,7 +15025,7 @@ class SpectraCard extends HTMLElement {
       if (sel.has(id)) sel.delete(id); else sel.set(id, r);
       show();
     };
-    this._bindPicker(this._holder, box, {
+    this._bindRecipePicker(this._holder, box, {
       state: this._rpState,
       planned: recipePlanned(body.planned),
       askSpec: body.ask && !isBlank(body.ask.script) ? body.ask : null,
@@ -16406,7 +16408,7 @@ class SpectraCard extends HTMLElement {
       const images = this._imagesOn();
       const meal = pick ? pick.slot[1] : "";
       fill(pickerMarkup(box, { meal, planned, images, ask: !!askSpec }));
-      this._bindPicker(wrap, box, {
+      this._bindRecipePicker(wrap, box, {
         state: {}, meal, date: pick ? pick.slot[0] : "", planned, askSpec, images,
         onOpen: (r, li) => {
           if (ticking) {
@@ -16489,7 +16491,7 @@ class SpectraCard extends HTMLElement {
      move and hide the rows already there; nothing is redrawn. `o.state`
      is the caller's, so a Recipes card keeps its filters across a
      repaint while a sheet starts afresh each time it opens. */
-  _bindPicker(root, list, o) {
+  _bindRecipePicker(root, list, o) {
     const box = root.querySelector("[data-picker]");
     if (!box) return;
     const st = o.state;
