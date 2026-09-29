@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.142.2";
+const VERSION = "0.143.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1289,6 +1289,11 @@ ha-icon { display:inline-flex; line-height:0; }
 .slide.off .nowline { opacity:1; }
 /* Leading the body, where the lights card puts its scene strip. */
 .slide.lead { margin:0 0 9px; }
+/* A room with no schedule leads with its scene bands instead, so they take
+   the schedule strip's place and its height: the same band at the top of
+   every lights card, whatever is behind it. */
+.scenetrack.lead { margin:0; }
+.scenetrack.lead .bands, .scenetrack.lead .bandmark { height:30px; }
 /* The lens hangs above the track and always will: a finger covers what is
    below it, and a readout under a thumb is a readout nobody can read. On a
    leading stripe that means it clears the card's own top edge, so the gap
@@ -1410,16 +1415,14 @@ ha-icon { display:inline-flex; line-height:0; }
    the same gesture until you declare otherwise, and losing the drag to the
    page scroll makes the control feel broken rather than absent.
 
-   The height change no longer needs defending against a no-animation
-   invariant — MORGAN lifted that rule — but the restraint it produced is
-   worth keeping as a choice rather than a constraint: the bar grows because
-   a finger is on it and stops when the finger leaves. A wall panel is read
-   from across a room, and motion nobody caused is motion that pulls an eye
-   away from whatever it was actually doing. */
+   One height, pressed or not. It used to sit at 16px and grow to 30 under
+   a finger, which meant the thing you were aiming at changed size as you
+   touched it and shoved the row below it down the card. the owner asked for the
+   pressed height all the time: a bar read from across a room is better the
+   size it is when it is being used. */
 .picker { position:relative; touch-action:none; cursor:pointer; }
 .picker .striphold { position:relative; }
-.picker .strip { height:16px; transition:height 120ms ease-out; }
-.picker.picking .strip { height:30px; }
+.picker .strip { height:30px; }
 /* Every segment carries the ring, transparent until it is the chosen one, so
    there are two colours to move between rather than a ring that blinks into
    existence. What does the moving is _paint, not a transition: see the note
@@ -2675,7 +2678,6 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 @media (prefers-reduced-motion: reduce) {
   .pressed { animation:none; box-shadow:inset 0 0 0 999px var(--sp-press); }
   .swap .metagroup { animation:none; }
-  .picker .strip { transition:none; }
   .bandmark, .dimfill, .dimthumb, .chev ha-icon { transition:none; }
   .spinner { animation-duration:2.4s; }
 }
@@ -6614,6 +6616,11 @@ const BODIES = {
       + `<span data-lensname></span>`
       + `<span class="dot" data-lensdot></span></span></div>`
       + `</div>`;
+    /* No schedule, so no strip -- and the room's scenes take its place at
+       the top rather than waiting in the drawer. The drawer is then only
+       the brightness. */
+    const lead = state ? "" : leadTrackMarkup("picker", b);
+    out += lead;
 
     const chosen = state && !offSchedule ? segments[current] : null;
     /* The scene the room is on. With a schedule that is whichever block is
@@ -6698,7 +6705,7 @@ const BODIES = {
     /* The markup always says closed -- whether this card is the one holding
        the drawer open is the element's business, re-applied after the render
        rather than baked into it. */
-    const drawer = drawerMarkup("picker", b);
+    const drawer = drawerMarkup("picker", b, lead ? { scenes: false } : null);
     if (drawer) out += chevronMarkup("picker", false);
 
     return out + `</span></div>` + drawer;
@@ -7562,7 +7569,7 @@ function slideLens() {
     + `<span data-lensname></span></span>`;
 }
 
-function sceneTrackMarkup(key, scenes, activeName, lit) {
+function sceneTrackMarkup(key, scenes, activeName, lit, lead) {
   const active = isBlank(activeName) ? null : String(activeName).toLowerCase();
   const bands = scenes.map((scene, index) => {
     const name = firstOf(scene.name, "");
@@ -7590,12 +7597,15 @@ function sceneTrackMarkup(key, scenes, activeName, lit) {
      allowed it -- it never stops being tabbable and never says disabled --
      and a drawer that refused the same press was the odd one out. So `off`
      dulls it and nothing more, which is all it means up there too. */
-  return `<div class="slide scenetrack${lit ? "" : " off"}`
+  /* Leading the card it needs no caption, for the same reason the schedule
+     strip has none: it is the first thing on the card, and what it is for
+     is what the title bar above it names. */
+  return `<div class="slide scenetrack${lead ? " lead" : ""}${lit ? "" : " off"}`
     + `" data-track="${esc(key)}" role="slider"`
     + ` tabindex="0" aria-label="Scene" aria-valuemin="0"`
     + ` aria-valuemax="${Math.max(0, scenes.length - 1)}"`
     + ` aria-valuenow="${at < 0 ? 0 : at}">`
-    + `<p class="slidelabel">Scenes</p>`
+    + (lead ? "" : `<p class="slidelabel">Scenes</p>`)
     + `<div class="slidehold"><div class="bands">${bands}</div>`
     + `<span class="bandmark${at < 0 ? " gone" : ""}" data-bandmark`
     + ` style="width:${width.toFixed(4)}%;left:${((at < 0 ? 0 : at) * width).toFixed(4)}%">`
@@ -9451,7 +9461,27 @@ function lockDisc(b, word) {
     + `</span></div>`;
 }
 
-function drawerMarkup(key, body) {
+/* The scenes a room offers outside its schedule -- all of them, for a room
+   that has none. */
+function drawerScenes(body) {
+  return Array.isArray(body.drawer_scenes)
+    ? body.drawer_scenes.filter((scene) => scene
+      && !isBlank(scene.entity) && !scene.scheduled && !scene.smart)
+    : [];
+}
+
+/* The scene bands leading a lights card that has no schedule strip to lead
+   with. `picked` before `active`, for the reason drawerMarkup gives. */
+function leadTrackMarkup(key, body) {
+  const scenes = drawerScenes(body);
+  if (!scenes.length) return "";
+  const lit = body.on === undefined ? true : Boolean(body.on);
+  return sceneTrackMarkup(key, scenes, firstOf(body.picked, body.active), lit, true);
+}
+
+/* `opts.scenes === false` leaves the scene bands out, for a card that
+   already leads with them. */
+function drawerMarkup(key, body, opts) {
   /* Only the scenes the schedule does not already drive.
 
      A scheduled scene is on the strip above, placed where the clock puts it.
@@ -9459,10 +9489,7 @@ function drawerMarkup(key, body) {
      would stop the drawer being what it says it is: the ones you cannot
      otherwise reach. The room reports which is which, so neither this nor
      the config has to know. */
-  const scenes = Array.isArray(body.drawer_scenes)
-    ? body.drawer_scenes.filter((scene) => scene
-      && !isBlank(scene.entity) && !scene.scheduled && !scene.smart)
-    : [];
+  const scenes = opts && opts.scenes === false ? [] : drawerScenes(body);
   const light = firstOf(body.light, "");
   const lit = body.on === undefined ? true : Boolean(body.on);
   const parts = [];
