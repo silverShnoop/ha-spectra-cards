@@ -2141,6 +2141,15 @@ still works on names. The box is kept once per Mealie for every card on the
 page, reread on the same timer as the plan and straight after anything the
 card saves, deletes or imports.
 
+## Wide cards
+
+A `clock` or `quote` given two columns — Today and the affirmation on a
+tablet's Home tab — sizes itself from its own width, instead of sitting
+small in the corner of a wide empty card: the time, day and date grow
+with the card, and a quote grows and balances its lines. At one column
+both are exactly the size they always were. `tools/checkwide.js` pins
+both halves.
+
 ## Long sheets on a wide screen
 
 The long sheets — a recipe, the box, the suggestions, the Plan sheet, the
