@@ -2552,6 +2552,29 @@ the content to the bottom, and fails if Needs you or the rail moved a pixel
 or the page scrolled at all. It also checks that under masonry a section
 lands directly beneath a short one, a gap and no more below it.
 
+**It says why the page loaded.** Each page load writes one line to the Home
+Assistant log under the logger `spectra.panel`, and so does each websocket
+reconnect:
+
+```
+spectra panel: load=reload discarded=no from=- prev=pagehide prev_quiet=4s
+  prev_lived=2830s prev_ws_drops=0 device=Android 14 Chrome 154 webview user=Panel
+```
+
+- `load` — the browser's own word: `reload` (somebody, or the app, reloaded
+  it) or `navigate` (a fresh open, or a redirect back from login)
+- `discarded=yes` — the browser threw the tab away to free memory and
+  rebuilt it
+- `prev` — how the page before this one ended: `pagehide` is an ordinary
+  unload; `visible` means it stopped while on screen with no unload at all,
+  which is a crash or a killed WebView
+- `prev_quiet`, `prev_lived`, `prev_ws_drops` — how long ago that was, how
+  long that page had been up, and how often its connection dropped
+
+It is read from a heartbeat the bundle keeps in `localStorage` every 30
+seconds. Set `no_load_report: true` on the view to turn it off.
+`tools/checkloadreport.js` covers it.
+
 ## Rows from a collection
 
 A `list` (or any array) can be built one row per item:

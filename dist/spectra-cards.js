@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.141.0";
+const VERSION = "0.142.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -17549,6 +17549,7 @@ class SpectraPanel extends HTMLElement {
   set hass(v) {
     this._hass = v;
     this._updateBar();
+    if (!this._config.no_load_report) loadReport.see(v);
   }
   get hass() { return this._hass; }
   set narrow(v) { this._narrow = v; }
@@ -17732,6 +17733,124 @@ class SpectraPanel extends HTMLElement {
     }
   }
 }
+
+/* Why the page loaded. A wall panel that reloads now and then leaves almost
+   nothing behind: the server sees only a fresh connection. The browser,
+   though, knows most of it -- whether this load was a reload or a fresh
+   navigation, whether Android threw the tab away to free memory -- and a
+   heartbeat left in localStorage says what the page before it was doing
+   when it stopped. One line per load goes to the Home Assistant log under
+   `spectra.panel`, and one per websocket drop, so the causes can be read
+   back afterwards instead of guessed at.
+
+     load=reload      somebody (or the app) reloaded it
+     discarded=yes    the browser dropped the tab and rebuilt it
+     prev=visible     the last page stopped while on screen with no pagehide:
+                      a crash, or the WebView killed underneath it
+     prev=pagehide    the last page was unloaded in the ordinary way
+
+   All of it is best effort: nothing here may break the panel. */
+const LOAD_KEY = "spectra-panel-heartbeat";
+const loadReport = {
+  started: false,
+  sent: false,
+  conn: null,
+  drops: 0,
+  down: 0,
+  line: "",
+  beat(extra) {
+    try {
+      const prev = this.now || {};
+      this.now = Object.assign({}, prev, {
+        t: Date.now(),
+        vis: document.visibilityState,
+        drops: this.drops,
+      }, extra || {});
+      localStorage.setItem(LOAD_KEY, JSON.stringify(this.now));
+    } catch (e) { /* storage may be unavailable */ }
+  },
+  start() {
+    if (this.started) return;
+    this.started = true;
+    try {
+      let prev = null;
+      try { prev = JSON.parse(localStorage.getItem(LOAD_KEY) || "null"); } catch (e) { prev = null; }
+      const nav = (performance.getEntriesByType && performance.getEntriesByType("navigation")[0]) || {};
+      const ua = navigator.userAgent || "";
+      const android = (ua.match(/Android [\d.]+/) || [""])[0];
+      const chrome = (ua.match(/Chrome\/(\d+)/) || ["", ""])[1];
+      const from = (() => {
+        try { return document.referrer ? new URL(document.referrer).pathname : "-"; } catch (e) { return "?"; }
+      })();
+      const secs = (ms) => `${Math.max(0, Math.round(ms / 1000))}s`;
+      const parts = [
+        `load=${nav.type || "unknown"}`,
+        `discarded=${document.wasDiscarded ? "yes" : "no"}`,
+        `from=${from}`,
+      ];
+      if (prev && prev.t) {
+        const state = prev.hid && prev.hid >= prev.t - 1 ? "pagehide" : (prev.vis || "?");
+        parts.push(`prev=${state}`, `prev_quiet=${secs(Date.now() - prev.t)}`);
+        if (prev.up) parts.push(`prev_lived=${secs(prev.t - prev.up)}`);
+        parts.push(`prev_ws_drops=${prev.drops || 0}`);
+      } else {
+        parts.push("prev=none");
+      }
+      parts.push(`device=${[android, chrome && `Chrome ${chrome}`, /; wv\)/.test(ua) ? "webview" : ""]
+        .filter(Boolean).join(" ") || ua.slice(0, 60)}`);
+      this.line = parts.join(" ");
+      this.now = { up: Date.now() };
+      this.beat();
+      setInterval(() => this.beat(), 30000);
+      document.addEventListener("visibilitychange", () => this.beat());
+      window.addEventListener("pagehide", (ev) => this.beat({ hid: Date.now(), persisted: !!ev.persisted }));
+      window.addEventListener("pageshow", (ev) => { if (ev.persisted) this.beat({ hid: 0 }); });
+    } catch (e) {
+      this.line = `load=unknown error=${e && e.message}`;
+    }
+  },
+  write(hass, message) {
+    try {
+      const who = (hass.user && hass.user.name) || "?";
+      const p = hass.callService("system_log", "write", {
+        message: `spectra panel: ${message} user=${who}`,
+        level: "warning",
+        logger: "spectra.panel",
+      });
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) { /* never break the panel over a log line */ }
+  },
+  see(hass) {
+    if (!hass) return;
+    this.start();
+    try {
+      const conn = hass.connection;
+      if (conn && conn !== this.conn && conn.addEventListener) {
+        this.conn = conn;
+        conn.addEventListener("disconnected", () => {
+          this.drops += 1;
+          this.down = Date.now();
+          this.beat();
+        });
+        conn.addEventListener("ready", () => {
+          if (!this.down) return;
+          const gone = Math.round((Date.now() - this.down) / 1000);
+          this.down = 0;
+          if (this._hass) this.write(this._hass, `websocket back after ${gone}s (drop ${this.drops} this load)`);
+        });
+      }
+    } catch (e) { /* ignore */ }
+    this._hass = hass;
+    if (!this.sent && hass.connected !== false) {
+      this.sent = true;
+      this.write(hass, this.line);
+    }
+  },
+};
+
+/* Started with the module, not the first panel, so the heartbeat runs on
+   every page that loads the bundle and the next load always has one. */
+loadReport.start();
 
 if (!customElements.get("spectra-panel")) {
   customElements.define("spectra-panel", SpectraPanel);
