@@ -1052,7 +1052,8 @@ body:
     - name: Morgan
       state: {entity: person.morgan}
       picture: {entity: person.morgan, attribute: entity_picture}
-      since: {entity: person.morgan, attribute: last_changed, format: since}
+      since: {entity: sensor.people_status, attribute: presence,
+              key: [person.morgan, since], format: since}
   places:                             # optional; a zone's name → badge icon and sketch
     Work: {icon: mdi:briefcase, art: office}
     Allotment: {art: none}
@@ -1085,6 +1086,12 @@ The sketches are a **depiction**, like `--sp-sun`: slate, lawn and sky,
 and never yellow, orange or red, which belong to the levels. The ink is
 `--sp-ink`, so it turns light on a dark panel, and the washes step back
 further than the ink does there.
+
+`since` comes from `home_signals`, not from the person. A person's own
+`last_changed` is reset by every Home Assistant restart, so reading it
+told the panel everybody had just walked in. `key` picks one entry out
+of an attribute that holds a map; it is a list so an entity id, dot and
+all, can be one step.
 
 The meta counts **the people on the card**, not `zone.home`. The zone
 counts everybody in the house, including anyone deliberately left off.
