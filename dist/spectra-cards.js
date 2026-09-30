@@ -2190,6 +2190,8 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 }
 .mlform textarea { min-height:140px; resize:none; overflow:hidden; line-height:1.45; }
 .mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
+/* The card's own camera: the picture as big as the sheet allows. */
+.camvideo { width:100%; max-height:60vh; background:#000; border-radius:6px; object-fit:contain; display:block; }
 /* The recipe's photo: small, because the form is for the words. */
 .mlform .mlphoto { display:flex; align-items:center; gap:12px; margin-top:4px; }
 .mlphoto .mlpic {
@@ -8648,11 +8650,17 @@ function shrinkPhoto(file, side) {
 }
 
 /* A photo picker, made on the press because a browser only opens a camera
-   from inside a tap. `camera` asks for the camera outright: without it a
-   phone may offer only its gallery, and the Home Assistant app on Android
-   does exactly that. Resolves the file, or null when nothing was chosen. */
+   from inside a tap. Resolves the file, or null when nothing was chosen.
+
+   `camera` asks for the camera. The file input's own way of asking,
+   `capture`, is ignored by the Home Assistant app on Android: it opens
+   the gallery for every file input whatever the page says. The app does
+   grant a page the camera itself, so a camera photo is taken here, in a
+   sheet with the live picture and a shutter. Only where the page cannot
+   have the camera (refused, or no camera) does it fall back to the input,
+   which on a browser still opens the camera. */
 function pickPhoto(holder, camera) {
-  return new Promise((resolve) => {
+  const byInput = () => new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
@@ -8665,6 +8673,57 @@ function pickPhoto(holder, camera) {
     });
     holder.appendChild(input);
     input.click();
+  });
+  const media = typeof navigator !== "undefined" && navigator.mediaDevices;
+  if (!camera || !media || typeof media.getUserMedia !== "function") return byInput();
+  return media.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
+    .then((stream) => cameraSheet(holder, stream), (error) => {
+      LOGGER_WARN("spectra-card: no camera, choosing a photo instead", error);
+      return byInput();
+    });
+}
+
+/* The live picture and a shutter. Resolves a JPEG file of the frame, or
+   null on Cancel. The camera is let go however the sheet closes. */
+function cameraSheet(holder, stream) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement("div");
+    wrap.className = "confirmwrap";
+    wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Take a photo">`
+      + `<div class="confirmhead">${iconMarkup("mdi:camera")}<span>Take a photo</span></div>`
+      + `<video class="camvideo" autoplay playsinline muted></video>`
+      + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button>`
+      + `<button type="button" class="confirmyes" data-shoot disabled>${iconMarkup("mdi:camera-iris")} Take</button></div></div>`;
+    const video = wrap.querySelector("video");
+    const shoot = wrap.querySelector("[data-shoot]");
+    let done = false;
+    const finish = (file) => {
+      if (done) return;
+      done = true;
+      stream.getTracks().forEach((t) => t.stop());
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      resolve(file);
+    };
+    const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(null); } };
+    video.srcObject = stream;
+    video.addEventListener("loadedmetadata", () => { shoot.disabled = false; });
+    const play = video.play && video.play();
+    if (play && play.catch) play.catch(() => {});
+    wrap.querySelector("[data-no]").addEventListener("click", () => finish(null));
+    shoot.addEventListener("click", () => {
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+      shoot.disabled = true;
+      canvas.toBlob((blob) => finish(blob ? new File([blob], "photo.jpg", { type: "image/jpeg" }) : null), "image/jpeg", 0.92);
+    });
+    document.addEventListener("keydown", onKey, true);
+    holder.appendChild(wrap);
   });
 }
 

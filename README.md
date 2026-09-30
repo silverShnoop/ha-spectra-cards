@@ -2160,10 +2160,12 @@ way in, remembering the last one used:
   the script to answer `{recipe}`, and when the page has no recipe on it
   the sheet says so and stays open.
 - **From a photo** reads a cookbook page or a handwritten card into the
-  new-recipe form, for checking before it is saved. **Take a photo** asks
-  for the camera outright and **Choose a photo** for one already taken: a
-  single button left it to the phone, and the Home Assistant app on Android
-  offers only the gallery. When the script's answer has `dish`
+  new-recipe form, for checking before it is saved. **Take a photo** opens
+  the camera in the card, with a live picture and a shutter, and **Choose a
+  photo** picks one already taken. The camera is the card's own because the
+  Home Assistant app on Android opens the gallery for every file picker,
+  whatever the page asks for; where the camera cannot be had, Take falls
+  back to the picker. When the script's answer has `dish`
   (`{left, top, right, bottom}`, each 0–100 per cent of the photo), that
   part of the photo is cut out and becomes the recipe's photo; with none,
   the recipe has no photo until one is given.
