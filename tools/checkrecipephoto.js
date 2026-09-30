@@ -172,6 +172,11 @@ const js = fs.readFileSync(file);
     const shutter = q(".confirmwrap [data-shoot]");
     await until(() => !shutter.disabled);
     check("the shutter works once the picture is live", !shutter.disabled, "still disabled");
+    /* Seen, not just there: it once had no accent, so no fill and dark words on a dark sheet. */
+    const look = getComputedStyle(shutter);
+    const clear = (c) => c === "transparent" || /rgba\(.*,\s*0\)$/.test(c);
+    check("and can be seen: it has the accent's fill", !clear(look.backgroundColor) && look.backgroundColor !== look.color,
+      `${look.backgroundColor} on ${look.color}`);
     shutter.click();
     await until(() => q(".confirmwrap [data-pic]"));
     const shot = q(".confirmwrap [data-pic]");
