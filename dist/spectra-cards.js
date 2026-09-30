@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.144.1";
+const VERSION = "0.145.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2190,6 +2190,22 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 }
 .mlform textarea { min-height:140px; resize:none; overflow:hidden; line-height:1.45; }
 .mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
+/* The recipe's photo: small, because the form is for the words. */
+.mlform .mlphoto { display:flex; align-items:center; gap:12px; margin-top:4px; }
+.mlphoto .mlpic {
+  width:96px; height:72px; flex:none; border-radius:4px; border:1px solid var(--sp-edge);
+  background:var(--sp-paper) center / cover no-repeat; display:grid; place-items:center;
+  color:var(--sp-ink-3);
+}
+.mlphoto .mlpic .mdi { width:24px; height:24px; }
+.mlphoto .mlpic.has .mdi { display:none; }
+.mlphoto .mlpicbtns { display:flex; flex-wrap:wrap; gap:8px; }
+.mlphoto .mlpicbtns button {
+  font:inherit; font-size:13px; min-height:36px; padding:0 12px; border-radius:4px;
+  border:1px solid var(--sp-edge); background:var(--sp-paper); color:var(--sp-ink); cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.mlphoto .mlpicbtns .mdi { width:18px; height:18px; }
 /* On a wide sheet the recipe form puts its two long fields side by side,
    ingredients left and method right, so neither is a long scroll below
    the other. Everything else still runs the full width. */
@@ -8521,6 +8537,61 @@ function shrinkPhoto(file, side) {
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("not an image")); };
     img.src = url;
   });
+}
+
+/* A photo picker, made on the press because a browser only opens a camera
+   from inside a tap. `camera` asks for the camera outright: without it a
+   phone may offer only its gallery, and the Home Assistant app on Android
+   does exactly that. Resolves the file, or null when nothing was chosen. */
+function pickPhoto(holder, camera) {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    if (camera) input.setAttribute("capture", "environment");
+    input.style.display = "none";
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (input.parentNode) input.parentNode.removeChild(input);
+      resolve(file || null);
+    });
+    holder.appendChild(input);
+    input.click();
+  });
+}
+
+/* The part of a photo inside `box` ({left, top, right, bottom}, each 0 to
+   100 per cent of the photo), as a JPEG data URL at most `side` pixels on
+   its long edge. The dish on a cookbook page, found by the model that read
+   it. Null when the box is not a box. */
+function cropPhoto(file, box, side) {
+  const n = (k) => Number(box && box[k]);
+  const [l, t, r, b] = ["left", "top", "right", "bottom"].map(n);
+  if (![l, t, r, b].every((x) => Number.isFinite(x) && x >= 0 && x <= 100)) return Promise.resolve(null);
+  /* A sliver is a misreading, not a dish. */
+  if (r - l < 10 || b - t < 10) return Promise.resolve(null);
+  const max = side || 1200;
+  const load = typeof createImageBitmap === "function"
+    ? createImageBitmap(file, { imageOrientation: "from-image" }).then((bm) => [bm, bm.width, bm.height])
+    : new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve([img, img.naturalWidth, img.naturalHeight]); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("not an image")); };
+      img.src = url;
+    });
+  return load.then(([source, w, h]) => {
+    const sx = (l / 100) * w;
+    const sy = (t / 100) * h;
+    const sw = ((r - l) / 100) * w;
+    const sh = ((b - t) / 100) * h;
+    const scale = Math.min(1, max / Math.max(sw, sh));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(sw * scale));
+    canvas.height = Math.max(1, Math.round(sh * scale));
+    canvas.getContext("2d").drawImage(source, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.85);
+  }, () => null);
 }
 
 /* What a Fill or a Shop should cover: the days shown that have not gone,
@@ -15158,28 +15229,18 @@ class SpectraCard extends HTMLElement {
      see it. Resolves the saved photo's media id, or null when nothing was
      chosen. The file input is made on the press, because a browser only
      opens a camera from inside a tap. */
-  _mealPhoto(save, folder) {
-    return new Promise((resolve, reject) => {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = "image/*";
-      input.style.display = "none";
-      input.addEventListener("change", () => {
-        const file = input.files && input.files[0];
-        if (input.parentNode) input.parentNode.removeChild(input);
-        if (!file) { resolve(null); return; }
-        this._voiceSay("thinking", "Looking at the photo…");
-        shrinkPhoto(file).then((image) => this._mealCall(save, { image, folder }))
-          .then((r) => resolve(r.media_content_id ? r : null), reject);
-      });
-      this._holder.appendChild(input);
-      input.click();
+  _mealPhoto(save, folder, camera) {
+    return pickPhoto(this._holder, camera).then((file) => {
+      if (!file) return null;
+      this._voiceSay("thinking", "Looking at the photo…");
+      return shrinkPhoto(file).then((image) => this._mealCall(save, { image, folder }))
+        .then((r) => (r.media_content_id ? Object.assign({}, r, { file }) : null));
     });
   }
 
   /* A cookbook page, or a handwritten card, into the new-recipe form. */
-  _recipeFromPhoto(spec, entry, accent, edit) {
-    this._mealPhoto(spec.save, "cookbook").then((photo) => {
+  _recipeFromPhoto(spec, entry, accent, edit, camera) {
+    this._mealPhoto(spec.save, "cookbook", camera).then((photo) => {
       if (!photo) return null;
       this._voiceSay("thinking", "Reading the recipe…");
       return this._mealCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type })
@@ -15187,9 +15248,12 @@ class SpectraCard extends HTMLElement {
           this._voiceSay("idle", "");
           if (isBlank(got.name) && !(Array.isArray(got.ingredients) && got.ingredients.length)) {
             this._voiceSay("idle", "No recipe could be read from that photo.");
-            return;
+            return null;
           }
-          this._mealEdit(entry, null, accent, edit, {
+          /* The dish, where the page has a picture of it: cut out of the
+             photo as it was taken, not the shrunk copy the model read. */
+          return (got.dish ? cropPhoto(photo.file, got.dish) : Promise.resolve(null)).then((image) => this._mealEdit(entry, null, accent, edit, {
+            image,
             heading: "Check the recipe, then save",
             made: { source: { kind: "photo" },
               ai: { what: "read", by: got.made_by || "", model: got.model || "", mark: "interpreted", note: "Read from a photo" } },
@@ -15200,7 +15264,7 @@ class SpectraCard extends HTMLElement {
               ingredients: (got.ingredients || []).map((x) => ({ display: String(x) })),
               instructions: (got.method || []).map((x) => ({ text: String(x) })),
             },
-          });
+          }));
         });
     }).catch((error) => {
       LOGGER_WARN("spectra-card: could not read the photo", error);
@@ -15746,8 +15810,10 @@ class SpectraCard extends HTMLElement {
     wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Add a recipe">`
       + `<div class="confirmhead">${iconMarkup("mdi:plus")}<span>Add a recipe</span></div>`
       + `<p class="confirmtext">A cookbook page, a card or a handwritten recipe. It is read into the form for you to check before it is saved.</p>`
-      + `<button type="button" class="planrow" data-take>${iconMarkup("mdi:camera")}<span><b>Take or choose a photo</b>`
+      + `<button type="button" class="planrow" data-take="camera">${iconMarkup("mdi:camera")}<span><b>Take a photo</b>`
       + `<small>One page at a time</small></span>${iconMarkup("mdi:chevron-right")}</button>`
+      + `<button type="button" class="planrow" data-take="">${iconMarkup("mdi:image-outline")}<span><b>Choose a photo</b>`
+      + `<small>One already taken</small></span>${iconMarkup("mdi:chevron-right")}</button>`
       + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button></div></div>`;
     let done = false;
     const finish = () => {
@@ -15759,10 +15825,10 @@ class SpectraCard extends HTMLElement {
     const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(); } };
     this._planStrip(wrap, ctx, finish);
     wrap.querySelector("[data-no]").addEventListener("click", finish);
-    wrap.querySelector("[data-take]").addEventListener("click", () => {
+    wrap.querySelectorAll("[data-take]").forEach((b) => b.addEventListener("click", () => {
       finish();
-      this._recipeFromPhoto(body.photo, source.entry, model.accent, edit);
-    });
+      this._recipeFromPhoto(body.photo, source.entry, model.accent, edit, b.getAttribute("data-take") === "camera");
+    }));
     wrap.addEventListener("click", (event) => { if (event.target === wrap) finish(); });
     document.addEventListener("keydown", onKey, true);
     this._holder.appendChild(wrap);
@@ -17402,6 +17468,10 @@ class SpectraCard extends HTMLElement {
         + `${iconMarkup("mdi:microphone")}</button><span class="tdvoicesay" data-said>`
         + `${esc(recipe ? "Or read it out" : "Read the recipe out, or type it")}</span></div>` : "")
       + `<label for="mlname">Name</label><input id="mlname" data-f="name" value="${esc(r.name || "")}">`
+      + `<label>Photo</label><div class="mlphoto"><span class="mlpic" data-pic role="img" aria-label="The recipe's photo">${iconMarkup("mdi:image-outline")}</span>`
+      + `<span class="mlpicbtns"><button type="button" data-pic-take="camera">${iconMarkup("mdi:camera")}Take</button>`
+      + `<button type="button" data-pic-take="">${iconMarkup("mdi:image-outline")}Choose</button>`
+      + `<button type="button" data-pic-drop hidden>Remove</button></span></div>`
       + recipeTagChips(tagsBefore)
       + `<div class="mlpair"><div><label for="mltime">Time</label>`
       + `<input id="mltime" data-f="total_time" placeholder="45 minutes" value="${esc(r.total_time || "")}"></div>`
@@ -17444,6 +17514,30 @@ class SpectraCard extends HTMLElement {
       }).observe(wrap);
     }
     const status = (text) => { wrap.querySelector("[data-status]").textContent = text; };
+    /* The photo: the one it has, drawn once signed, or a new one waiting
+       for Save. Only a new one can be removed; Mealie's stays until
+       replaced. */
+    let picNew = (opts && opts.image) || "";
+    const pic = wrap.querySelector("[data-pic]");
+    const picDrop = wrap.querySelector("[data-pic-drop]");
+    let picHad = "";
+    const drawPic = () => {
+      const url = picNew || picHad;
+      pic.style.backgroundImage = url ? `url("${url}")` : "";
+      pic.classList.toggle("has", Boolean(url));
+      picDrop.hidden = !picNew;
+    };
+    if (recipe && !isBlank(recipe.image) && !isBlank(recipe.recipe_id)) {
+      this._signImage(String(recipe.recipe_id), "min").then((url) => { picHad = url; drawPic(); });
+    }
+    wrap.querySelectorAll("[data-pic-take]").forEach((b) => b.addEventListener("click", () => {
+      pickPhoto(this._holder, b.getAttribute("data-pic-take") === "camera").then((file) => {
+        if (!file) return null;
+        return shrinkPhoto(file, 1200).then((image) => { picNew = image; drawPic(); });
+      }).catch(() => status("That photo could not be read."));
+    }));
+    picDrop.addEventListener("click", () => { picNew = ""; drawPic(); });
+    drawPic();
     const stepLines = () => field("method").value.split("\n").map((x) => x.trim()).filter(Boolean);
     const timed = (text) => {
       if (!timing.has(text)) timing.set(text, { prep: false });
@@ -17568,6 +17662,7 @@ class SpectraCard extends HTMLElement {
         if (data.ai.mark === undefined) delete data.ai.mark;
       }
       if (!recipe && madeNow && madeNow.source) data.source = madeNow.source;
+      if (picNew) data.image = picNew;
       data.config_entry_id = entry;
       yes.disabled = true;
       status("Saving\u2026");
@@ -17576,7 +17671,13 @@ class SpectraCard extends HTMLElement {
         finish();
         this._voiceSay("idle", `${firstOf(saved.name, name, "Recipe")} saved`);
         if (data.prep && recipe) RECIPE_FULL.delete(`${entry}|${recipe.recipe_id}`);
-        if (data.prep) this._recipeIndex(entry, true).then(() => { this._signature = null; this._update(); }, () => {});
+        /* A new photo: the old one's signed address would still be drawn,
+           and the index would still say there was none. */
+        if (data.image && this._imageCache) {
+          [...this._imageCache.keys()].filter((k) => k.includes(`/${firstOf(recipe && recipe.recipe_id, saved.recipe_id)}/`))
+            .forEach((k) => this._imageCache.delete(k));
+        }
+        if (data.prep || data.image) this._recipeIndex(entry, true).then(() => { this._signature = null; this._update(); }, () => {});
         this._refetchMeals();
         if (onSaved) onSaved(saved);
         /* A new recipe nobody tagged is tagged by AI, in the background:
