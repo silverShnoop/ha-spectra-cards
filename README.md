@@ -2543,6 +2543,32 @@ what lets a tab of eleven small cards fit one screen. It is measured, and
 re-measured whenever a section changes height. It suits a tab of one-card
 sections; a span-3 group reads the same either way.
 
+**Tabs belong to the browser, not the house.** A rail button with `tab`
+switches the panel in *this* browser and calls nothing:
+
+```yaml
+views:
+  - type: custom:spectra-panel
+    default_tab: Home          # shown until this browser has chosen one
+    sections:
+      - type: grid
+        cards:
+          - type: custom:spectra-dock
+            buttons:
+              - {label: Home, icon: mdi:home, tab: Home}
+              - {label: Lights, icon: mdi:lightbulb-group, tab: Lights}
+      - type: grid
+        spectra_tab: Lights    # or a list; none means every tab
+        cards: [...]
+```
+
+This used to be an `input_select` that every section's `visibility` read,
+and the rail wrote. A helper is one value for the whole house, so choosing
+Lights on a phone switched the wall panel to Lights as well. The choice is
+now kept in the browser's localStorage, one per dashboard page, so it still
+survives a reload but each screen has its own. A rail without `tab`
+buttons behaves as before, `selected` and `tap_action` included.
+
 Switching tab starts the new tab at the top. There is no edit mode for this
 view in the dashboard editor; switch the view's `type` to `sections` to edit
 it there, and back.

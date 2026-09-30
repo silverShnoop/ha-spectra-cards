@@ -332,6 +332,83 @@ customElements.define("fake-section", FakeSection);
     await page.close();
   }
 
+  /* Tabs belong to the browser. The rail's `tab` buttons switch which
+     sections this browser shows and touch nothing in the house, so a phone
+     changing tab cannot change the wall panel's. Two contexts are two
+     browsers: separate localStorage, the same page. */
+  {
+    const build = async (page) => {
+      await page.goto(`http://127.0.0.1:${server.address().port}/`);
+      await page.waitForFunction(() => !!customElements.get("spectra-panel"));
+      await page.evaluate(async () => {
+        window.CALLS = [];
+        window.HASS = { states: {}, themes: { darkMode: true },
+          callService: (...a) => { window.CALLS.push(a); return Promise.resolve(); } };
+        const card = (title) => ({ type: "custom:spectra-card", title, accent: 4,
+          body: { type: "list", rows: [{ name: title, value: "x" }] } });
+        const configs = [
+          { type: "grid", cards: [{ type: "custom:spectra-dock",
+            buttons: ["Home", "Lights", "Climate"].map((label) => ({ label, tab: label, summary: "Fine" })) }] },
+          { type: "grid", spectra_tab: "Home", cards: [card("H")] },
+          { type: "grid", spectra_tab: "Lights", cards: [card("L")] },
+          { type: "grid", spectra_tab: ["Lights", "Climate"], cards: [card("LC")] },
+          { type: "grid", cards: [card("Every")] },
+        ];
+        const sections = configs.map((c) => { const s = document.createElement("fake-section"); s.config = c; return s; });
+        const view = document.createElement("spectra-panel");
+        view.setConfig({ type: "custom:spectra-panel", default_tab: "Home" });
+        view.hass = window.HASS;
+        document.getElementById("a").appendChild(view);
+        view.sections = sections;
+        window.VIEW = view;
+        window.SECTIONS = sections;
+        await new Promise((r) => setTimeout(r, 300));
+      });
+    };
+    const state = (page) => page.evaluate(() => {
+      const dock = window.VIEW.shadowRoot.querySelector("spectra-dock");
+      const sel = dock.shadowRoot.querySelector(".dockbtn.selected h4");
+      return {
+        shown: window.SECTIONS.slice(1).filter((s) => getComputedStyle(s.parentElement).display !== "none")
+          .map((s) => s.config.cards[0].title),
+        selected: sel ? sel.textContent : null,
+        calls: window.CALLS.filter((c) => c[0] !== "system_log").length,
+      };
+    });
+    const press = (page, label) => page.evaluate(async (label) => {
+      const dock = window.VIEW.shadowRoot.querySelector("spectra-dock");
+      [...dock.shadowRoot.querySelectorAll(".dockbtn")].find((b) => b.querySelector("h4").textContent === label).click();
+      await new Promise((r) => setTimeout(r, 1200));
+    }, label);
+    const check = (label, ok, detail) => {
+      console.log(`${ok ? "ok  " : "FAIL"} tabs: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`tabs: ${label}`);
+    };
+    const phoneCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const wallCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const phone = await phoneCtx.newPage();
+    const wall = await wallCtx.newPage();
+    for (const p of [phone, wall]) p.on("pageerror", (e) => problems.push(`tabs: PAGEERROR ${e.message}`));
+    await build(phone);
+    await build(wall);
+    let got = await state(phone);
+    check("the default tab shows first", JSON.stringify(got.shown) === '["H","Every"]' && got.selected === "Home", got);
+    await press(phone, "Lights");
+    got = await state(phone);
+    check("a press switches the tab", JSON.stringify(got.shown) === '["L","LC","Every"]' && got.selected === "Lights", got);
+    check("and calls nothing in the house", got.calls === 0, got);
+    got = await state(wall);
+    check("another browser keeps its own tab", JSON.stringify(got.shown) === '["H","Every"]' && got.selected === "Home", got);
+    await press(wall, "Climate");
+    got = await state(phone);
+    check("and changing it leaves the first alone", got.selected === "Lights", got);
+    await build(phone);
+    got = await state(phone);
+    check("a reload keeps this browser's tab", JSON.stringify(got.shown) === '["L","LC","Every"]' && got.selected === "Lights", got);
+    await phoneCtx.close();
+    await wallCtx.close();
+  }
+
   await browser.close();
   server.close();
   if (problems.length) {
