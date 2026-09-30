@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.145.0";
+const VERSION = "0.146.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2920,6 +2920,21 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devmap .lwhat { fill:var(--sp-ink-2); font-size:11px; }
 .devmap .lfor { fill:var(--sp-ink-3); font-family:var(--sp-mono); font-size:10.5px; }
 .devmap .lmore { fill:var(--sp-ink-2); font-size:11.5px; }
+.devmap.phone .hubname { font-size:10.5px; }
+.devmap.phone .hubof { font-size:10px; }
+.devmap.phone { margin:2px 0 4px; }
+.devmark circle { stroke-width:1.5; }
+.devmark text { font-size:9.5px; font-weight:600; font-family:var(--sp-mono); }
+.devmark.offline circle { fill:var(--sp-attention); stroke:var(--sp-attention); }
+.devmark.offline text { fill:var(--sp-surface); }
+.devmark.partial circle { fill:var(--sp-surface); stroke:var(--sp-attention); }
+.devmark.partial text { fill:var(--sp-attention-on); }
+.devnum { flex:0 0 auto; width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center;
+  justify-content:center; font-family:var(--sp-mono); font-size:10.5px; font-weight:600; }
+.devnum.offline { background:var(--sp-attention); color:var(--sp-surface); }
+.devnum.partial { box-shadow:inset 0 0 0 1.5px var(--sp-attention); color:var(--sp-attention-on); }
+.devrow .who { min-width:0; }
+.devrow .room { margin:0; font-size:11px; color:var(--sp-ink-3); }
 
 /* control — the one body you touch rather than read. Same row metrics as
    list, so a panel of controls and a panel of readings sit at the same
@@ -5537,6 +5552,123 @@ function planHeat(b) {
   return out;
 }
 
+/* The network map for a phone: the same map drawn in a 420x330 box, with a
+   number on each problem dot instead of a name, and the names as a numbered
+   list underneath.
+
+   A problem dot takes the seats of its cluster that face away from the
+   middle, and its number sits just outside the cluster on the same side, so
+   the numbers never land on another network. Numbers in one cluster are
+   spread round it until they clear each other. The list is grouped by
+   network in the map's order, offline first, so reading down it walks the
+   map. A problem whose network is not on the map still gets its row, under
+   "Other", without a number -- the list may never be shorter than the Needs
+   you row behind it. */
+function devicesPhone(networks, problems, what, stateOf) {
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  const W = 420, H = 330, cx = 210, cy = 165;
+  const HUB = [88, 80], CL = [146, 124], MR = 7.5;
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const f = (v) => v.toFixed(1);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const pol = ([rx, ry], a) => [cx + rx * Math.cos(a), cy + ry * Math.sin(a)];
+  const biggest = Math.max(1, ...networks.map((n) => num(n.online) + num(n.offline) + num(n.partial)));
+  const S = Math.min(4.2, 28 / Math.sqrt(biggest));
+  const rank = (p) => (p.state === "offline" ? 0 : 1);
+  const wrap = (t) => Math.atan2(Math.sin(t), Math.cos(t));
+
+  let spokes = "", seats = "", marks = "", hubs = "", list = "";
+  let n0 = 0;
+  const placed = new Set();
+  networks.forEach((n, i) => {
+    const a = Math.PI + (2 * Math.PI * i) / networks.length;
+    const on = num(n.online), off = num(n.offline), part = num(n.partial);
+    const hot = off + part > 0;
+    const [hx, hy] = pol(HUB, a), [kx, ky] = pol(CL, a);
+    spokes += `<path class="spoke${hot ? " hot" : ""}" d="M${cx},${cy} L${f(hx)},${f(hy)} L${f(kx)},${f(ky)}"/>`;
+
+    const mine = problems.filter((p) => String(p.network) === String(n.name))
+      .sort((p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name)));
+    mine.forEach((p) => placed.add(p));
+    const count = Math.max(on + off + part, mine.length);
+    const all = Array.from({ length: count }, (_, k) => {
+      const r = S * Math.sqrt(k + 0.5) + 2, t = k * golden;
+      return { x: kx + r * Math.cos(t), y: ky + r * Math.sin(t) };
+    });
+    const R = S * Math.sqrt(count) + 2;
+    const out = Math.atan2(ky - cy, kx - cx);
+    const facing = [...all].sort((p, q) =>
+      ((q.x - kx) * Math.cos(out) + (q.y - ky) * Math.sin(out))
+      - ((p.x - kx) * Math.cos(out) + (p.y - ky) * Math.sin(out))).slice(0, mine.length);
+    const taken = new Set(facing);
+    for (const s of all) if (!taken.has(s)) seats += `<circle class="on" cx="${f(s.x)}" cy="${f(s.y)}" r="2.8"/>`;
+
+    /* Numbers round the outside, in angle order, pushed apart and recentred. */
+    /* Far enough out to clear the cluster, and to fit every number of a
+       small cluster with many problems within half a turn. */
+    const Rm = Math.max(R + MR + 4, (mine.length * (2 * MR + 4)) / Math.PI), gap = (2 * MR + 4) / Rm;
+    const byAngle = facing.map((s) => ({ s, t: wrap(Math.atan2(s.y - ky, s.x - kx) - out) }))
+      .sort((p, q) => p.t - q.t);
+    for (let k = 1; k < byAngle.length; k++) byAngle[k].t = Math.max(byAngle[k].t, byAngle[k - 1].t + gap);
+    if (byAngle.length) {
+      const was = facing.reduce((sum, s) => sum + wrap(Math.atan2(s.y - ky, s.x - kx) - out), 0) / facing.length;
+      const now = byAngle.reduce((sum, m) => sum + m.t, 0) / byAngle.length;
+      for (const m of byAngle) m.t += was - now;
+    }
+    /* The seats go to problems in angle order, so number order runs round the cluster. */
+    const rows = [];
+    byAngle.forEach((m, k) => {
+      const p = mine[k], st = stateOf(p), label = n0 + k + 1;
+      const mx = clamp(kx + Rm * Math.cos(out + m.t), MR + 1, W - MR - 1);
+      const my = clamp(ky + Rm * Math.sin(out + m.t), MR + 1, H - MR - 1);
+      seats += `<circle class="halo" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="5.5"/>`
+        + (st === "offline"
+          ? `<circle class="off" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="3.2"/>`
+          : `<circle class="part" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="2.6"/>`);
+      marks += `<path class="leader" d="M${f(m.s.x)},${f(m.s.y)} L${f(mx)},${f(my)}"/>`
+        + `<g class="devmark ${st}"><circle cx="${f(mx)}" cy="${f(my)}" r="${MR}"/>`
+        + `<text x="${f(mx)}" y="${f(my + 3.3)}" text-anchor="middle">${label}</text></g>`;
+      rows.push({ p, label });
+    });
+    n0 += mine.length;
+
+    const of = `${on}/${on + off + part}`;
+    const w = String(n.name).length * 6.3 + of.length * 6.3 + 26;
+    const h = hot ? " hot" : "";
+    hubs += `<rect class="hub${h}" x="${f(hx - w / 2)}" y="${f(hy - 11.5)}" width="${f(w)}" height="23" rx="11.5"/>`
+      + `<text class="hubname${h}" x="${f(hx - w / 2 + 10)}" y="${f(hy + 4)}">${esc(n.name)}</text>`
+      + `<text class="hubof${h}" x="${f(hx + w / 2 - 10)}" y="${f(hy + 4)}" text-anchor="end">${of}</text>`;
+
+    if (rows.length) {
+      list += `<p class="devroom">${esc(n.name)}</p>`;
+      for (const r of rows.sort((p, q) => p.label - q.label)) list += devPhoneRow(r.p, r.label, what, stateOf);
+    }
+  });
+  const other = problems.filter((p) => !placed.has(p));
+  if (other.length) {
+    list += `<p class="devroom">Other</p>`;
+    for (const p of other) list += devPhoneRow(p, null, what, stateOf);
+  }
+
+  const svg = `<svg class="devmap phone" viewBox="0 0 ${W} ${H}" role="img" `
+    + `aria-label="${esc(`${networks.length} networks, ${n0} device${n0 === 1 ? "" : "s"} numbered`)}">`
+    + spokes + seats + hubs + marks
+    + `<rect class="core" x="${cx - 30}" y="${cy - 12}" width="60" height="24" rx="4"/>`
+    + `<text class="coretxt" x="${cx}" y="${cy + 3.5}" text-anchor="middle">HOME</text></svg>`;
+  return svg + list;
+}
+
+/* A numbered problem row: the number as the map draws it, the name with its
+   room under it, and what is missing with how long on the right. */
+function devPhoneRow(p, label, what, stateOf) {
+  const st = stateOf(p);
+  const since = isBlank(p.since) ? null : shortSince(p.since);
+  const room = isBlank(p.area) ? "No room" : String(p.area);
+  const badge = label === null ? `<span class="devdot ${st}"></span>` : `<span class="devnum ${st}">${label}</span>`;
+  return `<div class="devrow">${badge}<div class="who"><p class="name">${esc(p.name)}</p><p class="room">${esc(room)}</p></div>`
+    + `<span class="what">${esc(what(p))}${since ? ` <span class="for">· ${esc(since)}</span>` : ""}</span></div>`;
+}
+
 /* The network map, drawn in a fixed 960x440 box that scales with the card.
 
    Networks sit evenly round an ellipse in the sensor's order, the first
@@ -7577,10 +7709,12 @@ const BODIES = {
      to its dot -- so five dead speakers read as one sick Cast cluster and
      one dead Wi-Fi as a whole cluster gone, without a word of explanation.
 
-     On a narrow card the labels would be too small to read, so it keeps the
-     list: every problem under the room it is in -- the room is where you
-     walk to -- then a bar per network. Both are in the markup; a container
-     query picks one, so the card never has to be told how wide it is.
+     On a narrow card -- a phone -- the side labels would be too small to
+     read, so the same map is drawn tighter and each problem dot carries a
+     number instead of a name. The numbers are a list under the map, grouped
+     by network, each row saying what is missing, for how long and in which
+     room. Both views are in the markup; a container query picks one, so the
+     card never has to be told how wide it is.
 
      "How long" is the sensor's, remembered across restarts. A device whose
      time is unknown just says what is wrong: Home Assistant's own
@@ -7611,34 +7745,11 @@ const BODIES = {
 
     if (networks.length) out += `<div class="devwide">${devicesMap(networks, problems, what, stateOf)}</div>`;
 
-    out += `<div class="devnarrow">`;
-    let room = null;
-    for (const p of problems) {
-      const here = isBlank(p.area) ? "No room" : String(p.area);
-      if (here !== room) {
-        room = here;
-        out += `<p class="devroom">${esc(room)}</p>`;
-      }
-      const since = isBlank(p.since) ? null : shortSince(p.since);
-      out += `<div class="devrow"><span class="devdot ${stateOf(p)}"></span>`
-        + `<p class="name">${esc(p.name)}</p>`
-        + `<span class="what">${esc(what(p))}${since ? ` <span class="for">· ${esc(since)}</span>` : ""}</span></div>`;
-    }
-
-    if (networks.length) {
-      out += `<p class="devhead">By network</p><div class="devnets">`;
-      for (const n of networks) {
-        const on = num(n.online), off = num(n.offline), part = num(n.partial);
-        const all = on + off + part;
-        const seg = (k, cls) => (k ? `<i class="${cls}" style="flex:${k} 0 0"></i>` : "");
-        out += `<span class="label">${esc(n.name)}</span>`
-          + `<span class="devbar" role="img" aria-label="${esc(`${n.name}: ${on} of ${all} answering`)}">`
-          + `${seg(off, "offline")}${seg(part, "partial")}${seg(on, "online")}</span>`
-          + `<span class="of${off + part ? " lvl" : ""}">${on}/${all}</span>`;
-      }
-      out += `</div>`;
-    }
-    return out + `</div></div>`;
+    if (networks.length) out += `<div class="devnarrow">${devicesPhone(networks, problems, what, stateOf)}</div>`;
+    /* No networks means no map to draw at either width -- but the problems
+       are still true, so they are still rows. */
+    else out += problems.map((p) => devPhoneRow(p, null, what, stateOf)).join("");
+    return out + `</div>`;
   },
   list(b) {
     /* A row that resolved to nothing -- a `cases` with no branch true and no
