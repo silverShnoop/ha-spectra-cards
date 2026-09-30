@@ -2155,8 +2155,19 @@ way in, remembering the last one used:
   the script to answer `{recipe}`, and when the page has no recipe on it
   the sheet says so and stays open.
 - **From a photo** reads a cookbook page or a handwritten card into the
-  new-recipe form, for checking before it is saved.
+  new-recipe form, for checking before it is saved. **Take a photo** asks
+  for the camera outright and **Choose a photo** for one already taken: a
+  single button left it to the phone, and the Home Assistant app on Android
+  offers only the gallery. When the script's answer has `dish`
+  (`{left, top, right, bottom}`, each 0–100 per cent of the photo), that
+  part of the photo is cut out and becomes the recipe's photo; with none,
+  the recipe has no photo until one is given.
 - **Type it** opens the empty form.
+
+The recipe form has a **Photo** row: the photo the recipe has, and **Take**
+or **Choose** for a new one, sent with Save (`home_signals.save_recipe`'s
+`image`, home_signals 0.17.0 or later). A new photo can be removed before
+saving; Mealie's own stays until it is replaced.
 
 From a link is left off the wall panel: a panel has no clipboard to paste
 from, and the phone's share sheet is how a link arrives there.
