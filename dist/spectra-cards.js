@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.145.1";
+const VERSION = "0.145.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4044,6 +4044,17 @@ function readEntity(hass, spec) {
     if (!spec.attribute) v = state.state;
     else if (STATE_FIELDS.has(spec.attribute)) v = state[spec.attribute];
     else v = state.attributes[spec.attribute];
+  }
+  /* One entry out of an attribute that holds a map. `key` is a list so an
+     entity id -- which has a dot in it -- can be one step of the path:
+     `attribute: presence, key: [person.james, since]`. Added for the Who's
+     home card, whose "3h ago" lives on sensor.people_status because a
+     person's own last_changed is reset by every restart. */
+  if (v !== null && v !== undefined && spec.key !== undefined) {
+    for (const step of (Array.isArray(spec.key) ? spec.key : [spec.key])) {
+      v = v !== null && typeof v === "object" ? v[step] : undefined;
+      if (v === undefined) break;
+    }
   }
   if (v === undefined || v === "unknown" || v === "unavailable") v = null;
   const out = v === null ? null : applyFormat(v, spec);
