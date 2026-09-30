@@ -2161,7 +2161,10 @@ way in, remembering the last one used:
   the sheet says so and stays open.
 - **From a photo** reads a cookbook page or a handwritten card into the
   new-recipe form, for checking before it is saved. **Take a photo** opens
-  the camera in the card, with a live picture and a shutter, and **Choose a
+  the card's own camera, laid out like the phone's: the picture full screen,
+  a round shutter, the gallery to its left and a flip where there are two
+  cameras. The shutter shows the photo first, with **Retake** and **Use
+  photo**, so a blurred page is caught before it is read. And **Choose a
   photo** picks one already taken. The camera is the card's own because the
   Home Assistant app on Android opens the gallery for every file picker,
   whatever the page asks for; where the camera cannot be had, Take falls

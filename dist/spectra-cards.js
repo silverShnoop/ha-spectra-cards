@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.146.1";
+const VERSION = "0.146.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2191,7 +2191,43 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .mlform textarea { min-height:140px; resize:none; overflow:hidden; line-height:1.45; }
 .mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
 /* The card's own camera: the picture as big as the sheet allows. */
-.camvideo { width:100%; max-height:60vh; background:#000; border-radius:6px; object-fit:contain; display:block; }
+.camwrap {
+  position:fixed; left:0; right:0; top:var(--sp-vvtop, 0px); height:var(--sp-vvh, 100dvh);
+  z-index:1001; background:#000; color:#fff; display:flex; flex-direction:column;
+  padding:env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  box-sizing:border-box; animation:sheetfade .16s ease-out;
+}
+.camtop { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; }
+.camhint { font-size:13px; color:rgba(255,255,255,.72); }
+.camview { flex:1; min-height:0; position:relative; }
+.camview video, .camview img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+.camview [hidden] { display:none; }
+.cambar {
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; justify-items:center;
+  padding:18px 24px 22px;
+}
+.cambar[hidden] { display:none; }
+.cambar[data-review] { grid-template-columns:1fr 1fr; gap:12px; }
+.camicon {
+  width:48px; height:48px; border-radius:50%; border:none; padding:0; cursor:pointer;
+  background:rgba(255,255,255,.14); color:#fff; display:grid; place-items:center;
+}
+span.camicon { background:none; }
+.camicon[hidden] { visibility:hidden; display:grid; }
+.camicon .mdi, .camicon ha-icon { width:24px; height:24px; --mdc-icon-size:24px; }
+.camshutter {
+  width:76px; height:76px; border-radius:50%; cursor:pointer; padding:0;
+  background:#fff; border:4px solid #000; box-shadow:0 0 0 4px #fff;
+  transition:transform .08s ease-out;
+}
+.camshutter:active { transform:scale(.92); }
+.camshutter:disabled { opacity:.4; cursor:default; }
+.camtext {
+  width:100%; min-height:48px; border-radius:24px; font:inherit; font-size:15px; font-weight:600;
+  cursor:pointer; border:1px solid rgba(255,255,255,.4); background:none; color:#fff;
+}
+.camtext.camuse { border-color:var(--accent); background:var(--accent); color:var(--sp-surface); }
+@media (prefers-reduced-motion: reduce) { .camwrap { animation:none; } .camshutter { transition:none; } }
 /* The recipe's photo: small, because the form is for the words. */
 .mlform .mlphoto { display:flex; align-items:center; gap:12px; margin-top:4px; }
 .mlphoto .mlpic {
@@ -3643,6 +3679,7 @@ const MDI_INLINE = {
   "mdi:cart-outline": "M17,18A2,2 0 0,1 19,20A2,2 0 0,1 17,22C15.89,22 15,21.1 15,20C15,18.89 15.89,18 17,18M1,2H4.27L5.21,4H20A1,1 0 0,1 21,5C21,5.17 20.95,5.34 20.88,5.5L17.3,11.97C16.96,12.58 16.3,13 15.55,13H8.1L7.2,14.63L7.17,14.75A0.25,0.25 0 0,0 7.42,15H19V17H7C5.89,17 5,16.1 5,15C5,14.65 5.09,14.32 5.24,14.04L6.6,11.59L3,4H1V2M7,18A2,2 0 0,1 9,20A2,2 0 0,1 7,22C5.89,22 5,21.1 5,20C5,18.89 5.89,18 7,18M16,11L18.78,6H6.14L8.5,11H16Z",
   "mdi:chevron-left": "M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z",
   "mdi:chevron-right": "M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z",
+  "mdi:image-outline": "M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z",
   "mdi:close": "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z",
   "mdi:dots-horizontal": "M16,12A2,2 0 0,1 18,10A2,2 0 0,1 20,12A2,2 0 0,1 18,14A2,2 0 0,1 16,12M10,12A2,2 0 0,1 12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12M4,12A2,2 0 0,1 6,10A2,2 0 0,1 8,12A2,2 0 0,1 6,14A2,2 0 0,1 4,12Z",
   "mdi:keyboard-outline": "M4,5A2,2 0 0,0 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7A2,2 0 0,0 20,5H4M4,7H20V17H4V7M5,8V10H7V8H5M8,8V10H10V8H8M11,8V10H13V8H11M14,8V10H16V8H14M17,8V10H19V8H17M5,11V13H7V11H5M8,11V13H10V11H8M11,11V13H13V11H11M14,11V13H16V11H14M17,11V13H19V11H17M8,14V16H16V14H8Z",
@@ -8655,16 +8692,16 @@ function shrinkPhoto(file, side) {
    `camera` asks for the camera. The file input's own way of asking,
    `capture`, is ignored by the Home Assistant app on Android: it opens
    the gallery for every file input whatever the page says. The app does
-   grant a page the camera itself, so a camera photo is taken here, in a
-   sheet with the live picture and a shutter. Only where the page cannot
-   have the camera (refused, or no camera) does it fall back to the input,
-   which on a browser still opens the camera. */
+   grant a page the camera itself, so a camera photo is taken here, in the
+   card's own camera. Only where the page cannot have the camera (refused,
+   or no camera) does it fall back to the input, which on a browser still
+   opens the camera. */
 function pickPhoto(holder, camera, accent) {
-  const byInput = () => new Promise((resolve) => {
+  const byInput = (capture) => new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    if (camera) input.setAttribute("capture", "environment");
+    if (capture) input.setAttribute("capture", "environment");
     input.style.display = "none";
     input.addEventListener("change", () => {
       const file = input.files && input.files[0];
@@ -8675,52 +8712,99 @@ function pickPhoto(holder, camera, accent) {
     input.click();
   });
   const media = typeof navigator !== "undefined" && navigator.mediaDevices;
-  if (!camera || !media || typeof media.getUserMedia !== "function") return byInput();
-  return media.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
-    .then((stream) => cameraSheet(holder, stream, accent), (error) => {
+  if (!camera || !media || typeof media.getUserMedia !== "function") return byInput(camera);
+  return cameraOpen(media, "environment")
+    .then((stream) => cameraSheet(holder, media, stream, accent, () => byInput(false)), (error) => {
       LOGGER_WARN("spectra-card: no camera, choosing a photo instead", error);
-      return byInput();
+      return byInput(true);
     });
 }
 
-/* The live picture and a shutter. Resolves a JPEG file of the frame, or
-   null on Cancel. The camera is let go however the sheet closes.
+function cameraOpen(media, facing) {
+  return media.getUserMedia({
+    video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false,
+  });
+}
 
-   It wears the card's accent like every other sheet: the shutter is a
-   confirmyes, painted in the accent, and without one it was drawn in
-   nothing at all -- there, beside Cancel, and invisible. */
-function cameraSheet(holder, stream, accent) {
+/* The card's camera, laid out like the phone's own: the picture full
+   screen on black, a round shutter in the middle of the bottom row, the
+   gallery to its left and, where there are two cameras, a flip to its
+   right; close at the top. Black in both themes, because a viewfinder is
+   judged by the picture and anything lighter around it reads as glare.
+
+   The shutter shows the photo before it is used -- Retake or Use photo --
+   because what happens next is a model reading the page, and a blurred
+   page is found out there, a minute later, as a recipe it could not read.
+
+   Resolves a JPEG file, the file chosen from the gallery, or null. The
+   camera is let go however it closes. It wears the card's accent: Use
+   photo is filled with it. */
+function cameraSheet(holder, media, stream, accent, gallery) {
   return new Promise((resolve) => {
     const wrap = document.createElement("div");
-    wrap.className = "confirmwrap";
+    wrap.className = "camwrap";
     const a = accentNumber(accent) || 4;
     wrap.style.setProperty("--accent", `var(--sp-a${a})`);
-    wrap.style.setProperty("--accent-soft", `var(--sp-a${a}-soft)`);
     wrap.style.setProperty("--accent-on", `var(--sp-a${a}-on)`);
-    wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Take a photo">`
-      + `<div class="confirmhead">${iconMarkup("mdi:camera")}<span>Take a photo</span></div>`
-      + `<video class="camvideo" autoplay playsinline muted></video>`
-      + `<div class="confirmbtns"><button type="button" class="confirmno" data-no>Cancel</button>`
-      + `<button type="button" class="confirmyes" data-shoot disabled>${iconMarkup("mdi:camera-iris")} Take</button></div></div>`;
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-label", "Take a photo");
+    wrap.innerHTML = `<div class="camtop"><button type="button" class="camicon" data-no aria-label="Close">${iconMarkup("mdi:close")}</button>`
+      + `<span class="camhint">Fit the whole page in</span><span class="camicon" aria-hidden="true"></span></div>`
+      + `<div class="camview"><video autoplay playsinline muted></video><img alt="The photo taken" hidden></div>`
+      + `<div class="cambar" data-live>`
+      + `<button type="button" class="camicon" data-gallery aria-label="Choose from the gallery">${iconMarkup("mdi:image-outline")}</button>`
+      + `<button type="button" class="camshutter" data-shoot aria-label="Take the photo" disabled></button>`
+      + `<button type="button" class="camicon" data-flip aria-label="Switch camera" hidden>${iconMarkup("mdi:camera-flip-outline")}</button></div>`
+      + `<div class="cambar" data-review hidden>`
+      + `<button type="button" class="camtext" data-retake>Retake</button>`
+      + `<button type="button" class="camtext camuse" data-use>Use photo</button></div>`;
     const video = wrap.querySelector("video");
+    const still = wrap.querySelector("img");
     const shoot = wrap.querySelector("[data-shoot]");
+    const flip = wrap.querySelector("[data-flip]");
+    const liveBar = wrap.querySelector("[data-live]");
+    const reviewBar = wrap.querySelector("[data-review]");
+    let facing = "environment";
+    let shot = null;
     let done = false;
+    const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; };
     const finish = (file) => {
       if (done) return;
       done = true;
-      stream.getTracks().forEach((t) => t.stop());
+      stop();
+      if (still.src) URL.revokeObjectURL(still.src);
       document.removeEventListener("keydown", onKey, true);
       if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
       resolve(file);
     };
     const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(null); } };
-    video.srcObject = stream;
+    const show = (s) => {
+      stream = s;
+      shoot.disabled = true;
+      video.srcObject = s;
+      const play = video.play && video.play();
+      if (play && play.catch) play.catch(() => {});
+    };
     const live = () => { if (video.videoWidth) shoot.disabled = false; };
     video.addEventListener("loadedmetadata", live);
     video.addEventListener("playing", live);
-    const play = video.play && video.play();
-    if (play && play.catch) play.catch(() => {});
+    show(stream);
+    if (typeof media.enumerateDevices === "function") {
+      media.enumerateDevices().then((all) => {
+        if (all.filter((d) => d.kind === "videoinput").length > 1) flip.hidden = false;
+      }, () => {});
+    }
     wrap.querySelector("[data-no]").addEventListener("click", () => finish(null));
+    wrap.querySelector("[data-gallery]").addEventListener("click", () => {
+      stop();
+      gallery().then((file) => (file ? finish(file) : cameraOpen(media, facing).then(show, () => finish(null))));
+    });
+    flip.addEventListener("click", () => {
+      facing = facing === "environment" ? "user" : "environment";
+      stop();
+      cameraOpen(media, facing).then(show, () => finish(null));
+    });
     shoot.addEventListener("click", () => {
       const w = video.videoWidth;
       const h = video.videoHeight;
@@ -8730,8 +8814,27 @@ function cameraSheet(holder, stream, accent) {
       canvas.height = h;
       canvas.getContext("2d").drawImage(video, 0, 0, w, h);
       shoot.disabled = true;
-      canvas.toBlob((blob) => finish(blob ? new File([blob], "photo.jpg", { type: "image/jpeg" }) : null), "image/jpeg", 0.92);
+      canvas.toBlob((blob) => {
+        if (!blob) { shoot.disabled = false; return; }
+        shot = new File([blob], "photo.jpg", { type: "image/jpeg" });
+        still.src = URL.createObjectURL(blob);
+        still.hidden = false;
+        video.hidden = true;
+        liveBar.hidden = true;
+        reviewBar.hidden = false;
+      }, "image/jpeg", 0.92);
     });
+    wrap.querySelector("[data-retake]").addEventListener("click", () => {
+      shot = null;
+      if (still.src) URL.revokeObjectURL(still.src);
+      still.removeAttribute("src");
+      still.hidden = true;
+      video.hidden = false;
+      reviewBar.hidden = true;
+      liveBar.hidden = false;
+      live();
+    });
+    wrap.querySelector("[data-use]").addEventListener("click", () => { if (shot) finish(shot); });
     document.addEventListener("keydown", onKey, true);
     holder.appendChild(wrap);
   });
