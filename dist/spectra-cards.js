@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.146.3";
+const VERSION = "0.147.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -637,6 +637,49 @@ ha-icon { display:inline-flex; line-height:0; }
 .scenetrack.picking .bands i.on { opacity:.3; }
 .scenetrack.picking .bands i.at { opacity:1; }
 .bands i { transition:opacity 160ms linear; }
+/* The scene the room was on until something else took it. Hue forgets it
+   the moment one of its bulbs is switched or recoloured by anything but the
+   scene -- a lamp's own zone, usually; dimming does not count -- and does
+   not bring it back when the lamp goes off again.
+   So it is kept, and marked in a dash: not selected, which the ring would
+   claim, but the one press that puts the room back. */
+.scenetrack .bands i.was { opacity:.7; outline:2px dashed var(--sp-ink-2); outline-offset:-2px; }
+
+/* A lamp inside its room.
+
+   A lamp that is also a Hue zone of its own -- one bulb out of this room --
+   used to be a card of its own, beside the room it sits in. The two were
+   never independent: a lamp scene ends the room's scene, a room scene
+   overwrites the lamp. Put side by side they read as two rooms, and the
+   thing a person most needed to see -- that pressing one undid the other --
+   was on neither.
+
+   One line each: what it is, what it is showing, its switch. The line
+   opens the lamp's own scenes and brightness beneath it, the same fold as
+   the room's drawer and sharing its one-open-at-a-time rule. */
+.lamps { display:flex; flex-direction:column; margin-top:8px; border-top:1px solid var(--sp-edge); }
+.lamprow {
+  display:flex; align-items:center; gap:8px; min-height:36px;
+  cursor:pointer; border-radius:4px;
+}
+.lamprow:focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
+.lamprow .name {
+  margin:0; font-size:13px; flex:1 1 auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.lamprow[aria-expanded="true"] .name { font-weight:600; }
+.lampscene {
+  display:flex; align-items:center; gap:5px; font-size:12px;
+  color:var(--sp-ink-2); white-space:nowrap;
+}
+.lampscene.quiet { color:var(--sp-ink-3); }
+.lampscene .dot { width:8px; height:8px; }
+/* The title bar's switch, drawn to the same line height for the same
+   reason -- see .titlebar > .switch. */
+.lamprow > .switch { width:34px; height:22px; flex:none; }
+.lamprow > .switch > i { width:16px; height:16px; }
+.lamprow > .switch.on > i { left:13px; }
+.lamps .drawerbody { padding:4px 0 10px; }
 
 /* The ring is one element that MOVES rather than a border handed from band
    to band. Handing it over can only cross-fade; a thing that slides is the
@@ -5206,7 +5249,18 @@ const BODY_STATUS = {
     if (!isBlank(wanted)) label = String(wanted);
     else if (b.manual) label = "Manual";
     else if (state) label = String(state.segments[state.current].label);
-    if (label === null) return null;
+    if (label === null) {
+      /* On no scene, but it was on one a moment ago: say which, because
+         that is the scene one press brings back. And who took it, unless it
+         was one of this card's own lamps -- that lamp's line already says
+         so, directly underneath. */
+      const lost = lostScene(b);
+      if (lost === null) return null;
+      const by = isBlank(b.ended_by) ? null : String(b.ended_by);
+      const ours = by !== null && (Array.isArray(b.lamps) ? b.lamps : []).some((lamp) =>
+        lamp && (String(firstOf(lamp.group, "")) === by || String(firstOf(lamp.name, "")) === by));
+      return { text: `Was ${lost}` + (by !== null && !ours ? ` \u00b7 ${by}` : "") };
+    }
 
     let colour = null;
     if (state) {
@@ -7429,6 +7483,7 @@ const BODIES = {
        the brightness. */
     const lead = state ? "" : leadTrackMarkup("picker", b);
     out += lead;
+    out += lampsMarkup(b);
 
     const chosen = state && !offSchedule ? segments[current] : null;
     /* The scene the room is on. With a schedule that is whichever block is
@@ -8367,17 +8422,19 @@ function slideLens() {
     + `<span data-lensname></span></span>`;
 }
 
-function sceneTrackMarkup(key, scenes, activeName, lit, lead) {
+function sceneTrackMarkup(key, scenes, activeName, lit, lead, wasName) {
   const active = isBlank(activeName) ? null : String(activeName).toLowerCase();
+  const was = isBlank(wasName) ? null : String(wasName).toLowerCase();
   const bands = scenes.map((scene, index) => {
     const name = firstOf(scene.name, "");
     const on = active !== null && String(name).toLowerCase() === active;
+    const lost = !on && was !== null && String(name).toLowerCase() === was;
     const colour = cssColor(scene.color) || "var(--sp-sink)";
     return `<i data-cell="${index}" data-label="${esc(name)}"`
       + ` data-entity="${esc(firstOf(scene.entity, ""))}"`
       + ` data-icon="${esc(firstOf(scene.icon, ""))}"`
       + ` data-color="${esc(colour)}"`
-      + ` class="${on ? "on" : ""}" style="flex:1 1 0;background:${colour};`
+      + ` class="${on ? "on" : (lost ? "was" : "")}" style="flex:1 1 0;background:${colour};`
       + `color:${textOn(colour)}">`
       + (isBlank(scene.icon) ? "" : `<ha-icon icon="${esc(scene.icon)}"></ha-icon>`)
       + `</i>`;
@@ -10462,7 +10519,61 @@ function leadTrackMarkup(key, body) {
   const scenes = drawerScenes(body);
   if (!scenes.length) return "";
   const lit = body.on === undefined ? true : Boolean(body.on);
-  return sceneTrackMarkup(key, scenes, firstOf(body.picked, body.active), lit, true);
+  return sceneTrackMarkup(key, scenes, firstOf(body.picked, body.active), lit, true,
+    lostScene(body));
+}
+
+/* The scene a room lost, while it is on none and still lit. A dark room was
+   switched off, which is somebody's decision rather than something to put
+   back; and a room showing a scene has nothing to restore. */
+function lostScene(body) {
+  const lit = body.on === undefined ? true : Boolean(body.on);
+  if (!lit || !isBlank(firstOf(body.picked, body.active))) return null;
+  return isBlank(body.previous) ? null : String(body.previous);
+}
+
+/* The lamps that sit inside this room: one line each, and each line opens
+   that lamp's own scenes and brightness. `lamp-N` keys the drawer, so a
+   lamp's controls share the room drawer's one-open-at-a-time rule and are
+   told apart from it wherever a press has to find its way back. */
+function lampsMarkup(b) {
+  const lamps = Array.isArray(b.lamps) ? b.lamps : [];
+  const roomScene = !isBlank(firstOf(b.picked, b.active));
+  const rows = lamps.map((lamp, index) => {
+    if (!lamp || typeof lamp !== "object" || isBlank(lamp.light)) return "";
+    const key = `lamp-${index}`;
+    const name = firstOf(lamp.name, lamp.light);
+    const lit = lamp.on === undefined ? true : Boolean(lamp.on);
+    const own = firstOf(lamp.picked, lamp.active);
+    /* Three answers to "what is it showing". Its own scene, named as the
+       room's is, in its colour. Otherwise whatever the room set it to --
+       the lamp's own zone reports nothing then, because a room scene is
+       not the zone's -- or, with the room on none as well, nothing at all. */
+    let status;
+    if (!lit) {
+      status = `<span class="lampscene quiet">Off</span>`;
+    } else if (!isBlank(own)) {
+      const scene = sceneCatalogue(lamp).find((sc) => sc && String(sc.name) === String(own));
+      const colour = scene ? cssColor(scene.color) : null;
+      status = `<span class="lampscene">${esc(own)}`
+        + (colour ? `<span class="dot" style="background:${colour}"></span>` : "")
+        + `</span>`;
+    } else {
+      status = `<span class="lampscene quiet">${roomScene ? "Room scene" : "No scene"}</span>`;
+    }
+    const drawer = drawerMarkup(key, lamp);
+    return `<div class="lamprow"`
+      + (drawer
+        ? ` role="button" tabindex="0" data-chev="${key}" aria-expanded="false"`
+          + ` aria-label="${esc(name)}: scenes and brightness"`
+        : "")
+      + `><p class="name">${esc(name)}</p>${status}`
+      + `<span class="switch${lit ? " on" : ""}" role="switch"`
+      + ` aria-checked="${lit ? "true" : "false"}" aria-label="${esc(name)}"`
+      + ` tabindex="0" data-lamppower="${index}"><i></i></span></div>`
+      + drawer;
+  }).join("");
+  return rows ? `<div class="lamps">${rows}</div>` : "";
 }
 
 /* `opts.scenes === false` leaves the scene bands out, for a card that
@@ -10486,7 +10597,7 @@ function drawerMarkup(key, body, opts) {
        is exactly the wait the optimistic contract exists to hide -- and the
        strip above has honoured it since it was written. */
     parts.push(sceneTrackMarkup(key, scenes,
-      firstOf(body.picked, body.active), lit));
+      firstOf(body.picked, body.active), lit, false, lostScene(body)));
   }
   if (!isBlank(light) && body.brightness !== undefined) {
     parts.push(dimmerMarkup(key, light, body.brightness, lit));
@@ -11399,13 +11510,32 @@ class SpectraCard extends HTMLElement {
 
     const pick = this._pick;
     if (pick && model.body) {
-      const active = model.body.active;
-      if (!isBlank(active) && String(active) === String(pick.label)) {
+      const lampAt = /^lamp-(\d+)$/.exec(pick.key || "");
+      const target = lampAt
+        ? (Array.isArray(model.body.lamps) ? model.body.lamps[Number(lampAt[1])] : null)
+        : model.body;
+      const active = target ? target.active : null;
+      if (!target || (!isBlank(active) && String(active) === String(pick.label))) {
         this._pick = null;
         if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
       } else {
-        model.body.picked = pick.label;
+        target.picked = pick.label;
+        /* The spinner is the card's, whichever control asked. */
         model.body.pending = true;
+      }
+    }
+
+    /* A lamp's switch, held until the lamp agrees -- the room switch's
+       contract, one lamp at a time. */
+    const lampWant = this._lampPower;
+    if (lampWant && model.body && Array.isArray(model.body.lamps)) {
+      for (const lamp of model.body.lamps) {
+        if (!lamp || !(lamp.light in lampWant)) continue;
+        if (lamp.on !== undefined && Boolean(lamp.on) === lampWant[lamp.light]) {
+          delete lampWant[lamp.light];
+        } else {
+          lamp.on = lampWant[lamp.light];
+        }
       }
     }
 
@@ -11418,7 +11548,8 @@ class SpectraCard extends HTMLElement {
     const dim = this._dim;
     if (dim) {
       const holder = model.body || {};
-      const targets = Array.isArray(holder.rows) ? holder.rows : [holder];
+      const targets = Array.isArray(holder.rows) ? holder.rows
+        : [holder, ...(Array.isArray(holder.lamps) ? holder.lamps : [])];
       for (const row of targets) {
         if (!row || row.light !== dim.light) continue;
         const live = Math.round((Number(row.brightness) / 255) * 100);
@@ -12139,6 +12270,17 @@ class SpectraCard extends HTMLElement {
   /* The switch shows what you asked for until the light reports it. Given up
      on after twelve seconds, so a call that never lands leaves a switch
      telling the truth rather than one stuck on a promise. */
+  _wantLamp(light, want) {
+    if (!this._lampPower) this._lampPower = {};
+    this._lampPower[light] = Boolean(want);
+    if (this._lampGiveUp) clearTimeout(this._lampGiveUp);
+    this._lampGiveUp = setTimeout(() => {
+      this._lampPower = null;
+      this._signature = null;
+      this._update();
+    }, 12000);
+  }
+
   _wantPower(want, giveUp) {
     if (this._powerGiveUp) clearTimeout(this._powerGiveUp);
     this._power = { want: Boolean(want) };
@@ -13317,7 +13459,7 @@ class SpectraCard extends HTMLElement {
       },
       commit: (v) => {
         const entity = cells[v].getAttribute("data-entity");
-        if (entity) this._choose(cells[v].getAttribute("data-label"), entity);
+        if (entity) this._choose(cells[v].getAttribute("data-label"), entity, key);
       },
     });
   }
@@ -13482,9 +13624,13 @@ class SpectraCard extends HTMLElement {
     });
   }
 
-  _choose(label, entity) {
+  /* `key` says which control chose: a lamp's track is `lamp-N`, and its
+     choice is that lamp's to show, not the room's. A lamp and its room
+     share scene names -- Read, Relax -- so claiming a lamp's press for the
+     room would ring the wrong strip. */
+  _choose(label, entity, key) {
     if (this._pickGiveUp) clearTimeout(this._pickGiveUp);
-    this._pick = { label: label, at: Date.now() };
+    this._pick = { label: label, at: Date.now(), key: key || "" };
     this._pickGiveUp = setTimeout(() => {
       this._pick = null;
       this._signature = null;
@@ -13966,6 +14112,32 @@ class SpectraCard extends HTMLElement {
         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
       });
     }
+
+    this._holder.querySelectorAll("[data-lamppower]").forEach((el) => {
+      const lamps = (model.body && model.body.lamps) || [];
+      const lamp = lamps[Number(el.getAttribute("data-lamppower"))];
+      if (!lamp || isBlank(lamp.light)) return;
+      const on = lamp.on === undefined || Boolean(lamp.on);
+      const run = (event) => {
+        /* The switch sits inside the line that opens the lamp's drawer, and
+           a switch that also opened a drawer would be two answers to one
+           press. */
+        event.stopPropagation();
+        el.classList.toggle("on", !on);
+        el.setAttribute("aria-checked", on ? "false" : "true");
+        this._pressedAt = Date.now();
+        this._wantLamp(lamp.light, !on);
+        flashPress(el);
+        this._work(() => this._callAction({
+          service: on ? "light.turn_off" : "light.turn_on",
+          target: { entity_id: lamp.light },
+        }));
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
 
     this._holder.querySelectorAll("[data-pickmode]").forEach((el) => {
       const mode = el.getAttribute("data-pickmode");
