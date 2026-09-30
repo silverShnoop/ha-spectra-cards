@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.146.0";
+const VERSION = "0.146.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -8659,7 +8659,7 @@ function shrinkPhoto(file, side) {
    sheet with the live picture and a shutter. Only where the page cannot
    have the camera (refused, or no camera) does it fall back to the input,
    which on a browser still opens the camera. */
-function pickPhoto(holder, camera) {
+function pickPhoto(holder, camera, accent) {
   const byInput = () => new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
@@ -8677,18 +8677,26 @@ function pickPhoto(holder, camera) {
   const media = typeof navigator !== "undefined" && navigator.mediaDevices;
   if (!camera || !media || typeof media.getUserMedia !== "function") return byInput();
   return media.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
-    .then((stream) => cameraSheet(holder, stream), (error) => {
+    .then((stream) => cameraSheet(holder, stream, accent), (error) => {
       LOGGER_WARN("spectra-card: no camera, choosing a photo instead", error);
       return byInput();
     });
 }
 
 /* The live picture and a shutter. Resolves a JPEG file of the frame, or
-   null on Cancel. The camera is let go however the sheet closes. */
-function cameraSheet(holder, stream) {
+   null on Cancel. The camera is let go however the sheet closes.
+
+   It wears the card's accent like every other sheet: the shutter is a
+   confirmyes, painted in the accent, and without one it was drawn in
+   nothing at all -- there, beside Cancel, and invisible. */
+function cameraSheet(holder, stream, accent) {
   return new Promise((resolve) => {
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
+    const a = accentNumber(accent) || 4;
+    wrap.style.setProperty("--accent", `var(--sp-a${a})`);
+    wrap.style.setProperty("--accent-soft", `var(--sp-a${a}-soft)`);
+    wrap.style.setProperty("--accent-on", `var(--sp-a${a}-on)`);
     wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="Take a photo">`
       + `<div class="confirmhead">${iconMarkup("mdi:camera")}<span>Take a photo</span></div>`
       + `<video class="camvideo" autoplay playsinline muted></video>`
@@ -8707,7 +8715,9 @@ function cameraSheet(holder, stream) {
     };
     const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(null); } };
     video.srcObject = stream;
-    video.addEventListener("loadedmetadata", () => { shoot.disabled = false; });
+    const live = () => { if (video.videoWidth) shoot.disabled = false; };
+    video.addEventListener("loadedmetadata", live);
+    video.addEventListener("playing", live);
     const play = video.play && video.play();
     if (play && play.catch) play.catch(() => {});
     wrap.querySelector("[data-no]").addEventListener("click", () => finish(null));
@@ -15396,8 +15406,8 @@ class SpectraCard extends HTMLElement {
      see it. Resolves the saved photo's media id, or null when nothing was
      chosen. The file input is made on the press, because a browser only
      opens a camera from inside a tap. */
-  _mealPhoto(save, folder, camera) {
-    return pickPhoto(this._holder, camera).then((file) => {
+  _mealPhoto(save, folder, camera, accent) {
+    return pickPhoto(this._holder, camera, accent).then((file) => {
       if (!file) return null;
       this._voiceSay("thinking", "Looking at the photo…");
       return shrinkPhoto(file).then((image) => this._mealCall(save, { image, folder }))
@@ -15407,7 +15417,7 @@ class SpectraCard extends HTMLElement {
 
   /* A cookbook page, or a handwritten card, into the new-recipe form. */
   _recipeFromPhoto(spec, entry, accent, edit, camera) {
-    this._mealPhoto(spec.save, "cookbook", camera).then((photo) => {
+    this._mealPhoto(spec.save, "cookbook", camera, accent).then((photo) => {
       if (!photo) return null;
       this._voiceSay("thinking", "Reading the recipe…");
       return this._mealCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type })
@@ -17698,7 +17708,7 @@ class SpectraCard extends HTMLElement {
       this._signImage(String(recipe.recipe_id), "min").then((url) => { picHad = url; drawPic(); });
     }
     wrap.querySelectorAll("[data-pic-take]").forEach((b) => b.addEventListener("click", () => {
-      pickPhoto(this._holder, b.getAttribute("data-pic-take") === "camera").then((file) => {
+      pickPhoto(this._holder, b.getAttribute("data-pic-take") === "camera", accent).then((file) => {
         if (!file) return null;
         return shrinkPhoto(file, 1200).then((image) => { picNew = image; drawPic(); });
       }).catch(() => status("That photo could not be read."));
