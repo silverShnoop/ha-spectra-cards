@@ -624,17 +624,39 @@ body:
 ```
 
 Three numbers first — connected, offline, partly offline — because they are
-the part read from the doorway. Then every device not fully answering, under
-the room it is in, with what is missing (`offline`, `No temperature`, `5 of 8
-missing`) and **how long**: `offline · 3d`. Last, a bar per network, which is
-what tells five dead speakers apart from one dead Wi-Fi.
+the part read from the doorway.
+
+**On a card 700px wide or more, a network map.** Home Assistant in the middle,
+a hub per network with its `53/56`, and a dot per device clustered past it.
+Every device not fully answering is **named at the side of the map** with a
+line back to its dot: its name, how long, what is missing and its room. Five
+dead speakers read as one sick Cast cluster without a word of explanation.
+Give the section `column_span: 2` or more; it is drawn for that width.
+
+The labels keep three rules, and `tools/checkdevices.js` holds them: a label
+sits in the gutter on its dot's side, so no leader crosses the middle; a
+problem device takes the seats in its cluster that face that gutter; and each
+side is sorted by height and pushed apart, so labels never overlap and leaders
+never cross. About eleven fit a side. A side with more names the offline ones
+first and ends `+ N more` — the `Needs you` row still names them all.
+
+Networks sit evenly round the map in the sensor's order, the first on the
+left.
+
+**Narrower, the list.** The labels would be too small to read, so a phone gets
+every device not fully answering under the room it is in, with what is
+missing (`offline`, `No temperature`, `5 of 8 missing`) and **how long**:
+`offline · 3d`. Last, a bar per network. A container query picks the view, so
+the card never has to be told how wide it is.
 
 The time is the sensor's, remembered across restarts. A problem whose time is
 unknown shows none: Home Assistant's own `last_changed` would say it died at
 the last reboot, and a confident wrong number is worse than no number.
 
 Offline and partial wear `attention`, because the offline row in `Needs you`
-stands behind them. With everything answering there is no yellow on the card.
+stands behind them — a dot, its leader, and the hub of a network with one.
+With everything answering there is no yellow on the card, and no key either:
+the key is only there to decode the yellow.
 
 ### `forecast` — what will it be like later?
 
