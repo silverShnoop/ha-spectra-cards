@@ -1743,8 +1743,10 @@ the name is the only thing on the card anybody reads.
 `layout: today` is the read-only summary for a Home tab: today's meals, one
 line each, with the recipe's photo beside it (`images: true`). A meal with
 no photo — a note, or a recipe Mealie has no picture for — shows its
-type's icon, so the column of pictures has no gaps. Nothing planned today
-and the card hides. Planning stays on the full card.
+type's icon, so the column of pictures has no gaps. With nothing planned
+today the card stays and says **Nothing planned today** (`empty:` changes
+the words) -- an unplanned day is worth knowing about. Planning stays on
+the full card.
 
 ```yaml
 body:
