@@ -959,6 +959,60 @@ Text colour on a chip is the one colour the theme does not choose. It sits on
 that scene's own hex, so relative luminance decides whether it is ink or
 paper.
 
+### A room's lamps, inside the room's `picker`
+
+A lamp that is a Hue zone of one bulb out of a room is not a room of its
+own, and a card of its own beside the room said it was. The two cannot be
+changed separately. Switching a lamp on or off, changing its colour, or
+recalling its own scene ends the room's scene, and the room stays on no scene
+when the lamp goes back. Dimming a lamp is the exception: brightness is an
+adjustment the scene survives. All of this was tested live in the Bedroom. A room scene works
+the other way and overwrites the lamp.
+
+So the lamps go on the room's card, as `lamps`. Each one is shaped like a
+small room:
+
+```yaml
+body:
+  type: picker
+  light: light.bedroom
+  active: {entity: sensor.bedroom_active_scene, attribute: effective_scene}
+  previous: {entity: sensor.bedroom_active_scene, attribute: previous_scene}
+  ended_by: {entity: sensor.bedroom_active_scene, attribute: ended_by}
+  # ...on, brightness, drawer_scenes as for any room
+  lamps:
+    - name: Far light
+      light: light.bedroom_far_light
+      on: {entity: light.bedroom_far_light, map: {on: true, off: false}}
+      active: {entity: sensor.bedroom_far_light_active_scene, attribute: effective_scene}
+      group: {entity: sensor.bedroom_far_light_active_scene, attribute: group_name}
+      brightness: {entity: light.bedroom_far_light, attribute: brightness}
+      drawer_scenes: {from: {entity: sensor.bedroom_far_light_active_scene, attribute: scenes}, each: ...}
+```
+
+Each lamp gets one line under the room's scenes: its name, what it is
+showing and its switch. It shows its own scene in that scene's colour,
+otherwise **Room scene** (or **No scene** while the room is on none), or
+**Off**. Tapping the line opens the lamp's own scenes and brightness beneath
+it. This uses the same fold as the room's drawer, and only one drawer is open
+at a time. A lamp's press is the lamp's. Its scene is claimed on its own line
+and never rings the room's strip, which matters because the two often share
+scene names.
+
+`previous` and `ended_by` come from `hue_active_scene` 0.6.0. While the room
+is lit and on no scene, the title bar says **Was Dimmed** and the room's strip
+rings Dimmed in a dash. The dash is not a claim that Dimmed is selected. It
+marks the one press that puts the room back. When the scene was ended by
+something other than one of the card's own lamps, that is named too:
+**Was Dimmed · Upstairs**. A lamp is recognised by its `group` (the Hue
+zone's name, which the sensor reports as `group_name`) or its `name`. A room
+that is switched off shows **Off** and rings nothing, because someone
+switching a room off is not a lost scene.
+
+Only a zone whose bulbs all sit in one room belongs here. A zone that
+crosses rooms has no single room to sit in. It gets a card of its own, and
+the rooms it touches name it through `ended_by`.
+
 ### `lock` — is it shut, and what do I do about it?
 
 ```yaml
