@@ -17213,6 +17213,41 @@ if (!window.customCards.some((c) => c.type === "spectra-card")) {
  * status bar you can press.
  * ------------------------------------------------------------------ */
 
+/* Which tab a panel is showing. It belongs to the browser, not the house:
+   a phone switching to Lights must not switch the wall panel with it, so
+   it is kept in this browser's localStorage and never in a helper. It is
+   kept per page, so two dashboards do not share one, and survives a
+   reload, which a wall panel does now and then.
+
+   The rail writes it and the panel reads it; they live in different
+   shadow roots, so they hear each other through one window event. */
+const TAB_EVENT = "spectra-tab";
+const tabStore = {
+  mem: {},
+  defaults: {},
+  key() { return `spectra-cards:tab:${location.pathname}`; },
+  get() {
+    const key = this.key();
+    let v = this.mem[key];
+    if (v === undefined) {
+      try { v = localStorage.getItem(key); } catch (e) { v = null; }
+    }
+    return v || this.defaults[key] || null;
+  },
+  set(tab) {
+    const key = this.key();
+    this.mem[key] = String(tab);
+    try { localStorage.setItem(key, String(tab)); } catch (e) { /* a private window: kept for this page */ }
+    window.dispatchEvent(new CustomEvent(TAB_EVENT));
+  },
+  setDefault(tab) {
+    const key = this.key();
+    if (isBlank(tab)) delete this.defaults[key];
+    else this.defaults[key] = String(tab);
+    window.dispatchEvent(new CustomEvent(TAB_EVENT));
+  },
+};
+
 class SpectraDock extends HTMLElement {
   static getStubConfig() {
     return { buttons: [{ icon: "mdi:lightbulb-group", label: "Lights" }] };
@@ -17229,6 +17264,15 @@ class SpectraDock extends HTMLElement {
     this._signature = null;
     this._sources = [];
     this._watched = {};
+    this._onTab = () => {
+      this._signature = null;
+      if (this._hass && this._config) this._update();
+    };
+  }
+
+  connectedCallback() {
+    window.addEventListener(TAB_EVENT, this._onTab);
+    this._onTab();
   }
 
   setConfig(config) {
@@ -17272,7 +17316,9 @@ class SpectraDock extends HTMLElement {
     /* One resolver for the whole rail rather than a flag on each button: the
        alternative is every button carrying a map of every other button's
        name, and the day a name changes five of the six are quietly wrong. */
-    const selected = resolveValue(this._hass, this._config.selected, {});
+    const selected = this._tabbed()
+      ? (tabStore.get() || firstOf(...this._config.buttons.map((b) => b && b.tab), null))
+      : resolveValue(this._hass, this._config.selected, {});
     const model = { buttons: buttons, selected: selected };
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
@@ -17294,11 +17340,19 @@ class SpectraDock extends HTMLElement {
     this._render(buttons, selected);
   }
 
+  /* A rail whose buttons name a `tab` switches this browser's panel and
+     nothing else. Without one it is the old rail: `selected` read from the
+     house, and a press is whatever `tap_action` says. */
+  _tabbed() {
+    return this._config.buttons.some((b) => b && !isBlank(b.tab));
+  }
+
   _render(buttons, selected) {
     const here = isBlank(selected) ? null : String(selected);
+    const tabbed = this._tabbed();
     this._holder.innerHTML = `<div class="dockwrap"><div class="dock">${buttons.map((button, index) => {
       const b = button || {};
-      const on = here !== null && String(b.label) === here;
+      const on = here !== null && String(tabbed ? b.tab : b.label) === here;
       return `<div class="dockbtn${b.live ? " live" : ""}${b.fill ? " fill" : ""}${on ? " selected" : ""}"`
         + ` role="button" tabindex="0" aria-current="${on ? "page" : "false"}"`
         + ` aria-label="${esc([b.label, firstOf(b.summary, "")].filter((t) => !isBlank(t)).join(": "))}"`
@@ -17334,7 +17388,8 @@ class SpectraDock extends HTMLElement {
            selected. That press changes nothing, but it was still heard, and a
            control that ignores you is indistinguishable from a broken one. */
         RAF(() => flashPress(el));
-        this._open(config && config.tap_action);
+        if (config && !isBlank(config.tab)) tabStore.set(config.tab);
+        else this._open(config && config.tap_action);
       };
       el.addEventListener("click", open);
       el.addEventListener("keydown", (event) => {
@@ -17370,6 +17425,7 @@ class SpectraDock extends HTMLElement {
   }
 
   disconnectedCallback() {
+    window.removeEventListener(TAB_EVENT, this._onTab);
     if (this._pressTimer) {
       clearTimeout(this._pressTimer);
       this._pressTimer = null;
@@ -17455,6 +17511,7 @@ const PANEL_SHEET = `
 .grid.masonry { grid-auto-rows:4px; row-gap:0; }
 .grid.masonry > .section { grid-row-end:span var(--pn-rows, 1); }
 .section:has(> [hidden]) { display:none; }
+.section.offtab { display:none; }
 .section > hui-section { position:relative; }
 .section.bg { padding:8px; border-radius:var(--ha-section-border-radius, 16px); }
 .sbg { position:absolute; inset:0; border-radius:inherit; pointer-events:none;
@@ -17549,6 +17606,10 @@ class SpectraPanel extends HTMLElement {
         this._layout();
       });
     };
+    this._onTab = () => {
+      this._applyTab();
+      this._layout();
+    };
     this.addEventListener("section-visibility-changed", this._onVisibility);
     this.addEventListener("card-visibility-changed", this._onVisibility);
   }
@@ -17562,6 +17623,7 @@ class SpectraPanel extends HTMLElement {
     set("--pn-needs-width", this._config.needs_width, "px");
     set("--pn-needs-max", this._config.needs_max_height, "%");
     set("--pn-min", this._config.column_min_width, "px");
+    tabStore.setDefault(this._config.default_tab);
     this._grid.classList.toggle("masonry", Boolean(this._config.masonry));
     this._layout();
   }
@@ -17625,13 +17687,34 @@ class SpectraPanel extends HTMLElement {
       }
       wrap.appendChild(section);
       this._grid.appendChild(wrap);
-      this._wrappers.push({ wrap, section, side: slot === "side" });
+      this._wrappers.push({ wrap, section, side: slot === "side", tabs: SpectraPanel.tabsOf(section) });
       if (this._sizer) this._sizer.observe(wrap);
     }
+    this._applyTab();
     this._layout();
   }
 
+  /* `spectra_tab` on a section: the tab, or tabs, it is shown on. A section
+     without one is on every tab. */
+  static tabsOf(section) {
+    const t = section && section.config && section.config.spectra_tab;
+    if (isBlank(t)) return null;
+    return (Array.isArray(t) ? t : [t]).map(String);
+  }
+
+  /* This browser's tab, from the rail. Nothing chosen yet: `default_tab`,
+     or else the first tab any section names. */
+  _applyTab() {
+    const first = this._wrappers.find((w) => w.tabs);
+    const tab = tabStore.get() || (first ? first.tabs[0] : null);
+    for (const w of this._wrappers) {
+      w.wrap.classList.toggle("offtab", Boolean(w.tabs) && !w.tabs.includes(tab));
+    }
+  }
+
   connectedCallback() {
+    window.addEventListener(TAB_EVENT, this._onTab);
+    this._applyTab();
     if (!this._observer && typeof ResizeObserver !== "undefined") {
       this._observer = new ResizeObserver(this._relayout);
       this._observer.observe(this);
@@ -17645,6 +17728,7 @@ class SpectraPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    window.removeEventListener(TAB_EVENT, this._onTab);
     if (this._observer) { this._observer.disconnect(); this._observer = null; }
     if (this._sizer) { this._sizer.disconnect(); this._sizer = null; }
     window.removeEventListener("resize", this._relayout);
@@ -17679,7 +17763,8 @@ class SpectraPanel extends HTMLElement {
     }
 
     const hidden = (el) => !el || el.hidden || el.hasAttribute("hidden");
-    const inSide = side ? this._wrappers.filter((w) => w.side && !hidden(w.section)) : [];
+    const off = (w) => hidden(w.section) || w.wrap.classList.contains("offtab");
+    const inSide = side ? this._wrappers.filter((w) => w.side && !off(w)) : [];
     this._needs.classList.toggle("gone",
       [...this._needsBox.children].every(hidden) && !inSide.length);
     this._rail.classList.toggle("gone", [...this._rail.children].every(hidden));
@@ -17687,7 +17772,7 @@ class SpectraPanel extends HTMLElement {
     /* The sections view's arithmetic: as many minimum-width columns as fit,
        never more than max_columns, never more than the visible sections can
        fill -- so a lone section is not stranded in a third of the screen. */
-    const shown = this._wrappers.filter((w) => !hidden(w.section) && !(side && w.side));
+    const shown = this._wrappers.filter((w) => !off(w) && !(side && w.side));
     const spanOf = (w) => Math.max(1, Number(w.section.config && w.section.config.column_span) || 1);
     const style = getComputedStyle(this);
     const gap = parseFloat(style.getPropertyValue("--pn-col-gap")) || 20;
