@@ -1042,12 +1042,49 @@ locked, then amber and red as the Needs-you row escalates.
 ### `people` — who is in, who is out, and who nobody can say
 
 ```yaml
+meta: {count: [person.james, person.jaina], state: home, suffix: " home"}
 body:
   type: people
-  rows:
-    from: {entity: sensor.household, attribute: people}
-    each: {name: {field: name}, state: {field: state}, since: {field: since}}
+  rows:                               # one per person; leave anyone out by not listing them
+    - name: James
+      state: {entity: person.james}
+      picture: {entity: person.james, attribute: entity_picture}
+      since: {entity: person.james, attribute: last_changed, format: since}
+  places:                             # optional; a zone's name → badge icon and sketch
+    Work: {icon: mdi:briefcase, art: office}
+    Allotment: {art: none}
 ```
+
+Each person is a **drum**, the way the washer is: a soft track, a band in
+the state's colour, a paper face with their photo or initial, and a small
+circle on the rim saying where they are. The tile itself stays plain
+whatever the state. It used to be washed green for home, and two green
+tiles beside the one that needed a look made the good news the loudest
+thing on the card.
+
+Behind each ring is a **sketch of the place**, drawn the way an architect
+sketches: straight ink lines that overrun their corners, loose washes that
+miss their edges, fading out before the words. The ring sits on a clean
+halo of the tile's own ground, so none of the drawing shows inside it.
+
+| Where | Badge | Sketch |
+| --- | --- | --- |
+| `home` | `mdi:home` | `house` |
+| any other zone | `mdi:map-marker`, or `places.<zone>.icon` | `plan` (a site plan with a pin), or `places.<zone>.art` |
+| `not_home` | `mdi:walk` | none — out is not a place |
+| unknown | `mdi:help` | `fog` — a drawing never finished |
+
+Sketches are `house`, `office`, `plan` and `fog`; `art: none` turns one
+off. `places` keys match the zone's name as the person entity reports it,
+case-insensitively. A row can also carry `icon` to override its badge.
+
+The sketches are a **depiction**, like `--sp-sun`: slate, lawn and sky,
+and never yellow, orange or red, which belong to the levels. The ink is
+`--sp-ink`, so it turns light on a dark panel, and the washes step back
+further than the ink does there.
+
+The meta counts **the people on the card**, not `zone.home`. The zone
+counts everybody in the house, including anyone deliberately left off.
 
 **Home is the moss role, not the card's accent.** Three states means
 three *meanings* — in, out, no idea — and a meaning wears a role colour
@@ -1060,13 +1097,14 @@ that is not this house. "Unknown" is the *absence* of a reading: the
 trackers have gone quiet and nobody knows anything at all. Drawn alike,
 the second reads as the first, and the card ends up telling you somebody
 went out when it does not know that and cannot know it. So out is grey
-and unknown is ochre, the warning role, because the thing to do about it
-is not to expect them home — it is to find out why the tracker stopped
-reporting.
+and unknown is ochre, the attention level, because the thing to do about
+it is not to expect them home — it is to find out why the tracker stopped
+reporting. That is a job, so it has a `sensor.people_status` row, and on
+the tab that owns it the card takes `outline` from that sensor's `level`.
 
-The unknown circle is also drawn as a **dashed ring rather than a fill**.
-A gap in the line says *missing* in a way no solid shape does, and it
-still says it to somebody who cannot tell the ochre from the grey.
+The unknown ring is also drawn **dashed rather than solid**. A gap in the
+line says *missing* in a way no solid shape does, and it still says it to
+somebody who cannot tell the ochre from the grey.
 
 **The colour follows the state, never the label.** `status` can override
 the words on a tile, and the one way this rots is a tile reading

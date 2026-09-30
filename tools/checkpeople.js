@@ -58,10 +58,10 @@ const js = fs.readFileSync(file);
     document.getElementById("a").appendChild(el);
     const root = () => el.shadowRoot || el;
 
-    const show = async (rows, accent) => {
+    const show = async (rows, accent, places) => {
       el.setConfig({
         type: "custom:spectra-card", accent: accent || 4, title: "Who's home",
-        body: { type: "people", rows },
+        body: { type: "people", rows, places },
       });
       el._signature = null;
       el.hass = { states: {} };
@@ -78,7 +78,18 @@ const js = fs.readFileSync(file);
     const people = () => Array.from(root().querySelectorAll(".person"));
     const at = (i) => people()[i];
     const label = (i) => (at(i).querySelector(".sub") || {}).textContent || "";
-    const paint = (i) => getComputedStyle(at(i)).backgroundColor;
+    /* The state's colour lives on the ring now, not on the tile: the band,
+       and the badge on its rim. */
+    const band = (i) => {
+      const s = getComputedStyle(at(i).querySelector(".pband"));
+      return `${s.stroke}|${s.strokeDasharray}`;
+    };
+    const badge = (i) => getComputedStyle(at(i).querySelector(".pbadge")).backgroundColor;
+    const tile = (i) => getComputedStyle(at(i)).backgroundColor;
+    const sketch = (i) => {
+      const art = at(i).querySelector(".partart");
+      return art ? art.innerHTML : "";
+    };
 
     check("four people, four tiles", people().length === 4, people().length);
 
@@ -91,51 +102,51 @@ const js = fs.readFileSync(file);
     check("and so does a blank one, which is how it actually arrives",
       /Unknown/.test(label(3)), label(3));
 
-    /* Home is the moss role, not the card's accent. Three meanings --
-       in, out, no idea -- and a meaning wears a role colour, the way
-       the security light does. Painted from the accent, "home" said
-       "good" in whatever colour the card happened to be set to, and
-       re-accenting the card would have silently restated it. */
+    /* Three meanings, three rings. Asserted on the band AND the badge,
+       because those are the two things carrying it from across a room. */
     check("out does not wear the colour for home",
-      paint(1) !== paint(0), `${paint(1)} vs ${paint(0)}`);
+      band(1) !== band(0) && badge(1) !== badge(0), `${band(1)} vs ${band(0)}`);
     check("unknown does not wear the colour for out",
-      paint(2) !== paint(1), `${paint(2)} vs ${paint(1)}`);
+      band(2) !== band(1) && badge(2) !== badge(1), `${band(2)} vs ${band(1)}`);
     check("nor the colour for home",
-      paint(2) !== paint(0), `${paint(2)} vs ${paint(0)}`);
+      band(2) !== band(0), `${band(2)} vs ${band(0)}`);
     check("and a blank one is painted the same as an explicit unknown",
-      paint(3) === paint(2), `${paint(3)} vs ${paint(2)}`);
+      band(3) === band(2) && badge(3) === badge(2), `${band(3)} vs ${band(2)}`);
+    check("unknown is the one drawn as a gap, not a line",
+      !/none/.test(band(2)) && /none/.test(band(0)), band(2));
 
-    /* The avatar carries presence from across the room, where the
-       label is too small to read. It has to differ three ways too. */
-    const ring = (i) => {
-      const s = getComputedStyle(at(i).querySelector(".avatar"));
-      return `${s.backgroundColor}|${s.borderStyle}`;
-    };
-    check("the circle tells the three apart as well as the panel does",
-      new Set([ring(0), ring(1), ring(2)]).size === 3,
-      [ring(0), ring(1), ring(2)].join(" / "));
-    check("and unknown is the one drawn as a gap, not a fill",
-      getComputedStyle(at(2).querySelector(".avatar")).borderStyle === "dashed",
-      getComputedStyle(at(2).querySelector(".avatar")).borderStyle);
+    /* The tile does not shout. Two green tiles beside the one that needed
+       a look was the thing this design replaced. */
+    check("the tile ground is the same whatever the state",
+      tile(0) === tile(1) && tile(1) === tile(2), [tile(0), tile(1), tile(2)].join(" / "));
 
-    /* Home is the moss role, not the card's accent. Three meanings --
-       in, out, no idea -- and a meaning wears a role colour here, the
-       way the security light does. Painted from the accent, "home"
-       said "good" in whatever colour the card happened to be set to,
-       and re-accenting the card would have silently restated it.
+    /* The sketch behind each person. Home is the house; unknown is the fog;
+       out is no sketch at all, because out is not a place. */
+    check("home is drawn as the house", /M118 14c14-10/.test(sketch(0)), sketch(0).slice(0, 60));
+    check("out has no sketch -- it is not a place", sketch(1) === "", sketch(1).slice(0, 60));
+    check("unknown is drawn as the fog", sketch(2) !== "" && sketch(2) !== sketch(0),
+      sketch(2).slice(0, 60));
+    check("the sketch is ink in the theme's colour, not a fixed black",
+      at(0).querySelector(".partart g[filter='url(#sp-ink)']").getAttribute("stroke") === "currentColor",
+      "fixed ink");
 
-       Asserted by MOVING the accent, which is the only way to tell a
-       green that means something from a green that is a coincidence. */
-    const HOUSE = [{ name: "James", state: "home" }, { name: "Sam", state: "not_home" }];
-    await show(HOUSE, 4);
-    const homeOnTeal = paint(0);
-    await show(HOUSE, 1);
-    const homeOnTerracotta = paint(0);
-    check("home keeps its colour when the card's accent changes under it",
-      homeOnTeal === homeOnTerracotta,
-      `${homeOnTeal} vs ${homeOnTerracotta}`);
-    check("and it is not simply the same grey as out",
-      homeOnTeal !== paint(1), `${homeOnTeal} vs ${paint(1)}`);
+    /* A zone the card was never told about still draws -- as a site plan --
+       and a zone it WAS told about takes its own sketch and badge. */
+    await show([
+      { name: "James", state: "Work" },
+      { name: "Sam", state: "Gym" },
+      { name: "Alex", state: "Allotment" },
+    ], 4, { work: { icon: "mdi:briefcase", art: "office" }, Gym: { art: "none" } });
+    check("a configured zone takes its own sketch, matched case-insensitively",
+      at(0).querySelector("#sp-osd") !== null,
+      sketch(0).slice(0, 60));
+    check("and its own badge",
+      /briefcase/.test(at(0).querySelector(".pbadge").innerHTML),
+      at(0).querySelector(".pbadge").innerHTML);
+    check("art: none opts a zone out", sketch(1) === "", sketch(1).slice(0, 60));
+    check("an unconfigured zone falls back to the site plan",
+      at(2).querySelector("#sp-m60") !== null, sketch(2).slice(0, 60));
+    check("and says the zone's name", /Allotment/.test(label(2)), label(2));
 
     /* The one real failure mode: a card told to say something else
        must not then be painted from the word it was told to say.
@@ -145,7 +156,17 @@ const js = fs.readFileSync(file);
       { name: "Alex", state: "unknown", status: "At the office" },
     ]);
     check("two people described alike are still painted by what is known",
-      paint(0) !== paint(1), `${paint(0)} vs ${paint(1)}`);
+      band(0) !== band(1), `${band(0)} vs ${band(1)}`);
+
+    /* Home is the moss role, not the card's accent. Asserted by MOVING
+       the accent, which is the only way to tell a green that means
+       something from a green that is a coincidence. */
+    const HOUSE = [{ name: "James", state: "home" }, { name: "Sam", state: "not_home" }];
+    await show(HOUSE, 4);
+    const homeOnTeal = band(0);
+    await show(HOUSE, 1);
+    check("home keeps its colour when the card's accent changes under it",
+      homeOnTeal === band(0), `${homeOnTeal} vs ${band(0)}`);
 
     return problems;
   });
