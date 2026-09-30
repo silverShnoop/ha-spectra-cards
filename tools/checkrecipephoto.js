@@ -161,34 +161,84 @@ const js = fs.readFileSync(file);
       stream.getTracks()[0].addEventListener("ended", () => clearInterval(t));
       return Promise.resolve(stream);
     };
+    const realEnum = navigator.mediaDevices.enumerateDevices;
+    let cameras = 1;
+    navigator.mediaDevices.enumerateDevices = () => Promise.resolve(
+      Array.from({ length: cameras }, (_, i) => ({ kind: "videoinput", deviceId: `c${i}` })));
+    const released = () => stream.getTracks().every((t) => t.readyState === "ended");
+    const cam = (sel) => q(`.camwrap ${sel}`);
+    const open = async () => {
+      card._recipeAdd(body, { accent: 6 }, "photo");
+      await settle();
+      q(".confirmwrap [data-take='camera']").click();
+      await until(() => cam("video"));
+    };
     dish = { left: 50, top: 0, right: 100, bottom: 50 };
     const picksBefore = picks.length;
-    card._recipeAdd(body, { accent: 6 }, "photo");
-    await settle();
-    q(".confirmwrap [data-take='camera']").click();
-    await until(() => q(".confirmwrap video"));
-    check("Take opens the camera in the card", Boolean(q(".confirmwrap video")) && picks.length === picksBefore, `${!!q(".confirmwrap video")} ${picks.length - picksBefore} file inputs`);
+    await open();
+    check("Take opens the camera in the card, full screen", Boolean(cam("video")) && picks.length === picksBefore
+      && Math.abs(q(".camwrap").getBoundingClientRect().height - innerHeight) < 2, `${!!cam("video")} ${picks.length - picksBefore} file inputs`);
     check("the back camera is asked for", stream && JSON.stringify(stream.asked.video.facingMode) === '{"ideal":"environment"}', stream && JSON.stringify(stream.asked));
-    const shutter = q(".confirmwrap [data-shoot]");
+    const shutter = cam("[data-shoot]");
     await until(() => !shutter.disabled);
     check("the shutter works once the picture is live", !shutter.disabled, "still disabled");
+    /* Seen, not just there: it once had no fill, and was invisible. */
+    const look = getComputedStyle(shutter);
+    const clear = (c) => c === "transparent" || /rgba\(.*,\s*0\)$/.test(c);
+    const sb = shutter.getBoundingClientRect();
+    check("the shutter is a round, filled button in the middle of the bottom row", !clear(look.backgroundColor)
+      && Math.abs(sb.left + sb.width / 2 - innerWidth / 2) < 2 && sb.width >= 64 && look.borderRadius === "50%",
+      `${look.backgroundColor} ${sb.left} ${sb.width} ${look.borderRadius}`);
+    check("one camera: no flip", cam("[data-flip]").hidden, "flip shown");
     shutter.click();
+    await until(() => cam("[data-review]") && !cam("[data-review]").hidden);
+    check("the shutter shows the photo first, with Retake and Use photo", !cam("img").hidden && cam("video").hidden
+      && cam("[data-live]").hidden && Boolean(cam("[data-retake]")) && Boolean(cam("[data-use]")), "no review");
+    const use = getComputedStyle(cam("[data-use]"));
+    check("Use photo wears the card's accent", !clear(use.backgroundColor) && use.backgroundColor !== use.color, `${use.backgroundColor} on ${use.color}`);
+    check("nothing is read before Use photo", !q(".confirmwrap [data-pic]"), "read already");
+    cam("[data-retake]").click();
+    await settle();
+    check("Retake goes back to the live picture", !cam("video").hidden && cam("img").hidden && !cam("[data-live]").hidden && !shutter.disabled, "not live");
+    shutter.click();
+    await until(() => cam("[data-review]") && !cam("[data-review]").hidden);
+    cam("[data-use]").click();
     await until(() => q(".confirmwrap [data-pic]"));
     const shot = q(".confirmwrap [data-pic]");
     await until(() => shot.classList.contains("has"));
-    check("the photo taken is read, and its dish is cut out", shot.classList.contains("has"), "no photo on the form");
-    check("and the camera is let go", stream.getTracks().every((t) => t.readyState === "ended"), stream.getTracks().map((t) => t.readyState).join(","));
+    check("the photo used is read, and its dish is cut out", shot.classList.contains("has"), "no photo on the form");
+    check("and the camera is let go", released() && !q(".camwrap"), stream.getTracks().map((t) => t.readyState).join(","));
     q(".confirmwrap [data-no]").click();
     await settle();
 
-    /* ---- Cancel on the camera lets it go too ---- */
-    card._recipeAdd(body, { accent: 6 }, "photo");
+    /* ---- two cameras: a flip, which asks for the other one ---- */
+    cameras = 2;
+    await open();
     await settle();
-    q(".confirmwrap [data-take='camera']").click();
-    await until(() => q(".confirmwrap video"));
+    check("two cameras: a flip", !cam("[data-flip]").hidden, "no flip");
+    const first = stream;
+    cam("[data-flip]").click();
+    await until(() => stream !== first);
+    await settle();
+    check("flip lets the back camera go and asks for the front", first.getTracks().every((t) => t.readyState === "ended")
+      && JSON.stringify(stream.asked.video.facingMode) === '{"ideal":"user"}', JSON.stringify(stream.asked));
+
+    /* ---- the gallery, from the camera ---- */
+    const beforeGallery = picks.length;
+    cam("[data-gallery]").click();
+    await until(() => q(".confirmwrap [data-pic]"));
+    check("the gallery button chooses a photo instead, without capture", picks.length === beforeGallery + 1
+      && picks[picks.length - 1].capture === null && !q(".camwrap") && released(), JSON.stringify(picks.slice(-1)));
     q(".confirmwrap [data-no]").click();
     await settle();
-    check("Cancel closes the camera and lets it go", !q(".confirmwrap video") && stream.getTracks().every((t) => t.readyState === "ended"), "still open");
+    cameras = 1;
+
+    /* ---- Close on the camera lets it go too ---- */
+    await open();
+    cam("[data-no]").click();
+    await settle();
+    check("Close shuts the camera and lets it go", !q(".camwrap") && released(), "still open");
+    navigator.mediaDevices.enumerateDevices = realEnum;
     if (realGUM) navigator.mediaDevices.getUserMedia = realGUM;
 
     /* ---- editing: the photo it has, and a new one ---- */
