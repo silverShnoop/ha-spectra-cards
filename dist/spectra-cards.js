@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.143.0";
+const VERSION = "0.144.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1530,48 +1530,103 @@ ha-icon { display:inline-flex; line-height:0; }
 @media (prefers-color-scheme: dark) {
   :host(:not([data-theme="light"])) .planimg { filter:brightness(.72) saturate(.85); }
 }
-.people { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-.person { padding:8px; border-radius:4px; background:var(--sp-zebra); }
-/* Home is the moss role, not the card's accent.
-   Three states, three MEANINGS -- in, out, no idea -- and meanings
-   wear role colours here, the same way the security light does. On
-   the card's accent, home was teal because the card happens to be
-   teal, so the one tile that says "good" said it in whatever colour
-   the card was set to, and changing the card's accent would have
-   silently restated it. */
-.person.here { background:var(--sp-a3-soft); }
-.person.here .avatar { background:var(--sp-a3); color:var(--sp-surface); }
-.person.here .sub { color:var(--sp-a3-on); }
-.avatar {
-  width:38px; height:38px; border-radius:50%; margin-bottom:6px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:15px; font-weight:500; background:var(--accent); color:var(--sp-surface);
-}
-/* A photo fills the same circle the initial would have. */
-img.avatar { object-fit:cover; display:block; }
-/* Two people whose names begin alike get the same letter, so the circle was
-   drawing attention without telling you anything. It carries presence
-   instead — filled for in, sunk for out — which is the one thing this card
-   exists to answer, and is legible from across the room where a letter is
-   not. The label still says Home or Out; the colour only agrees with it. */
-.person:not(.here) .avatar { background:var(--sp-sink); color:var(--sp-ink-3); }
-.person:not(.here) img.avatar { opacity:.55; }
-/* Out is grey because it is a reading, and a reading that is simply not
+/* Who's home. Each person is a drum, the way a washer is: a soft track, a
+   band in the state's colour, a paper face, and one small circle on the rim
+   that says where. The colour lives on the ring and the badge only. The tile
+   used to be washed green for home, and two green tiles beside the one that
+   needed a look made the good news the loudest thing on the card.
+
+   Home is the moss role, not the card's accent. Three states, three
+   MEANINGS -- in, out, no idea -- and meanings wear role colours here, the
+   same way the security light does. On the card's accent, home was teal
+   because the card happens to be teal, and changing the accent would have
+   silently restated it.
+
+   Out is grey because it is a reading, and a reading that is simply not
    this house. Unknown is the ATTENTION level because it is the absence of
-   one, and because there is a dark_<entity> row behind it: the
-   phone has stopped reporting and somebody may want to know why. Drawn
-   grey alongside Out, it read as "they went out", which is a thing the
-   card did not know. The ring is dashed for the same reason the colour
-   is warmer -- a gap in the line says missing in a way no solid shape
-   does, and it survives being looked at by somebody who cannot tell the
-   ochre from the grey. */
-.person.adrift { background:var(--sp-attention-soft); }
-.person.adrift .avatar {
-  background:transparent; color:var(--sp-attention-on);
-  border:2px dashed var(--sp-attention); box-sizing:border-box;
+   one, and because there is a dark_<entity> row behind it: the phone has
+   stopped reporting and somebody may want to know why. Drawn grey
+   alongside Out, it read as "they went out", which is a thing the card
+   did not know. The ring is dashed for the same reason the colour is
+   warmer -- a gap in the line says missing in a way no solid shape does,
+   and it survives being looked at by somebody who cannot tell the ochre
+   from the grey. */
+.people { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.person {
+  --tone:var(--sp-ink-3); --tone-soft:var(--sp-sink); --tone-on:var(--sp-ink-2);
+  position:relative; overflow:hidden; min-width:0;
+  display:flex; flex-direction:column; align-items:flex-start; gap:8px;
+  padding:10px; border-radius:4px; background:var(--sp-zebra);
 }
-.person.adrift img.avatar { opacity:.45; }
-.person.adrift .sub { color:var(--sp-attention-on); }
+.person.here { --tone:var(--sp-a3); --tone-soft:var(--sp-a3-soft); --tone-on:var(--sp-a3-on); }
+.person.adrift {
+  --tone:var(--sp-attention); --tone-soft:var(--sp-attention-soft); --tone-on:var(--sp-attention-on);
+}
+/* The place, drawn the way an architect sketches one: straight ink lines
+   that run past their corners, and loose washes that miss their edges. It
+   washes across the top of the tile and fades out before the words.
+
+   A DEPICTION, like --sp-sun: the colours are what a slate roof and a lawn
+   look like, and none of them is yellow, orange or red, which belong to the
+   levels. The ink is --sp-ink so it turns light on a dark panel rather than
+   vanishing into it. */
+.partart {
+  position:absolute; inset:0; pointer-events:none;
+  color:var(--sp-ink); opacity:.78;
+  -webkit-mask-image:linear-gradient(to bottom,#000 30%,transparent 80%);
+          mask-image:linear-gradient(to bottom,#000 30%,transparent 80%);
+}
+.partart svg { display:block; width:100%; height:100%; }
+/* On a dark ground the washes turn from tint into slabs of grey, so they
+   step back further than the ink does. */
+:host([data-theme="dark"]) .partart { opacity:.6; filter:saturate(.8) brightness(.85); }
+:host([data-theme="dark"]) .partart .pwash { opacity:.45; }
+@media (prefers-color-scheme: dark) {
+  :host(:not([data-theme="light"])) .partart { opacity:.6; filter:saturate(.8) brightness(.85); }
+  :host(:not([data-theme="light"])) .partart .pwash { opacity:.45; }
+}
+/* The ring sits on a clean halo of the tile's own ground, so no part of the
+   drawing ever shows inside it. */
+.pring { position:relative; flex:none; width:64px; height:64px; }
+.pring::before {
+  content:""; position:absolute; inset:-4px; border-radius:50%;
+  background:var(--sp-zebra);
+}
+.pring svg { position:relative; display:block; }
+.ptrack { fill:none; stroke:var(--tone-soft); stroke-width:5; }
+.pband { fill:none; stroke:var(--tone); stroke-width:5; }
+.person.adrift .pband { stroke-dasharray:6 5; }
+.pdisc { fill:var(--sp-paper); }
+.pface {
+  position:absolute; inset:9px; border-radius:50%; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px; font-weight:600; color:var(--tone-on);
+}
+.pface img { width:100%; height:100%; object-fit:cover; display:block; }
+.person:not(.here) .pface img { opacity:.55; }
+.person.adrift .pface img { opacity:.45; }
+/* Where they are, on the rim. Filled with the state's colour so it reads as
+   part of the ring, and ringed in the tile's ground so it reads as its own
+   circle rather than a bump on the band. */
+.pbadge {
+  position:absolute; right:-3px; bottom:-3px; width:24px; height:24px;
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:var(--tone); color:var(--sp-surface);
+  box-shadow:0 0 0 2px var(--sp-zebra);
+}
+.pbadge ha-icon, .pbadge .mdi { --mdc-icon-size:14px; width:14px; height:14px; }
+.pinfo { position:relative; min-width:0; }
+.pinfo .name { font-size:14px; font-weight:600; }
+.pplace {
+  display:flex; align-items:center; gap:4px; margin:3px 0 0;
+  font-size:12px; color:var(--tone-on);
+}
+.pplace ha-icon, .pplace .mdi { --mdc-icon-size:13px; width:13px; height:13px; color:var(--tone); flex:none; }
+.psince {
+  margin:2px 0 0; font-family:var(--sp-mono); font-size:11px;
+  color:var(--sp-ink-3); font-variant-numeric:tabular-nums;
+}
+.person.adrift .psince { color:var(--sp-attention-on); }
 
 /* agenda */
 .dayhead {
@@ -4158,6 +4213,391 @@ function initialsOf(name) {
   return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
 }
 
+/* The sketches behind a person, one per kind of place. Generated rather than
+   drawn by hand: every line is a straight stroke that overruns its corners
+   by a random few units, the way a pen does against a rule, and the washes
+   are separate loose shapes that deliberately miss the ink. Ink is
+   currentColor so the theme decides it. 240x120, anchored top-right, so the
+   left of the tile -- where the ring sits -- is the part that crops away. */
+const PLACE_ART = {
+  house:
+    "<g class='pwash' filter='url(#sp-wash)'>" +
+    "<path d='M118 14c14-10 40-8 56-4 18-6 44-6 66 2v28c-18 8-30 2-44 6-20 4-38-2-52 0-14 0-26-6-26-14 0-8-6-12 0-18z' fill='#A9C9D2' opacity='.55'/>" +
+    "<path d='M150 50l58-8 26 24-58 6z' fill='#7C8DAF' opacity='.55'/>" +
+    "<path d='M130 70l30-24 20 24z' fill='#8C9CBB' opacity='.45'/>" +
+    "<path d='M178 72l52-5v32l-52 6z' fill='#C9BCA3' opacity='.55'/>" +
+    "<path d='M134 68l42 3v34l-42-5z' fill='#EFE5CE' opacity='.7'/>" +
+    "<path d='M0 104c60-8 160-10 240-8v24H0z' fill='#A9C084' opacity='.55'/>" +
+    "<circle cx='104' cy='76' r='15' fill='#88A765' opacity='.55'/>" +
+    "<circle cx='90' cy='86' r='9' fill='#9CB67A' opacity='.5'/>" +
+    "<path d='M150 104c-4 6-8 11-14 16h22c0-6 1-11 2-16z' fill='#DCD1BA' opacity='.6'/></g>" +
+    "<g filter='url(#sp-ink)' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='.7' opacity='0.8'>" +
+    "<path d='M14.0 104.6L246.6 98.8' stroke-width='0.6'/><path d='M132.6 99.7L179.7 104.4'/>" +
+    "<path d='M176.0 107.3L176.0 66.3'/><path d='M177.6 70.1L133.4 66.8'/>" +
+    "<path d='M136.0 63.2L136.0 103.1'/><path d='M172.4 104.4L229.8 97.8'/>" +
+    "<path d='M228.0 100.6L228.0 63.9'/><path d='M230.8 65.8L173.1 70.2'/>" +
+    "<path d='M176.0 68.5L176.0 106.0'/><path d='M130.3 69.4L158.8 45.6'/>" +
+    "<path d='M153.6 45.7L181.4 72.3'/><path d='M152.6 48.3L211.8 43.9'/>" +
+    "<path d='M207.9 41.8L233.2 68.3'/><path d='M178.5 71.1L235.6 66.7'/>" +
+    "<path d='M157.5 49.5L178.5 69.5' stroke-width='0.4' opacity='0.6'/>" +
+    "<path d='M146.4 102.2L161.4 104.1'/><path d='M159.0 105.3L159.0 81.5'/>" +
+    "<path d='M160.9 84.2L146.9 82.8'/><path d='M149.0 81.7L149.0 105.0'/>" +
+    "<path d='M140.4 75.9L151.9 76.6' stroke-width='0.55'/>" +
+    "<path d='M150.0 74.7L150.0 87.1' stroke-width='0.55'/>" +
+    "<path d='M151.2 86.1L141.1 85.4' stroke-width='0.55'/>" +
+    "<path d='M142.0 86.4L142.0 75.2' stroke-width='0.55'/>" +
+    "<path d='M146.0 75.8L146.0 86.3' stroke-width='0.4'/>" +
+    "<path d='M162.2 76.9L172.6 77.7' stroke-width='0.55'/>" +
+    "<path d='M171.0 76.4L171.0 88.1' stroke-width='0.55'/>" +
+    "<path d='M172.7 87.1L161.7 86.4' stroke-width='0.55'/>" +
+    "<path d='M163.0 87.6L163.0 75.7' stroke-width='0.55'/>" +
+    "<path d='M167.0 76.8L167.0 87.1' stroke-width='0.4'/>" +
+    "<path d='M184.1 76.1L198.8 75.3' stroke-width='0.55'/>" +
+    "<path d='M198.0 73.7L198.0 87.8' stroke-width='0.55'/>" +
+    "<path d='M198.8 86.0L184.3 86.8' stroke-width='0.55'/>" +
+    "<path d='M186.0 87.9L186.0 74.6' stroke-width='0.55'/>" +
+    "<path d='M192.0 75.3L192.0 86.7' stroke-width='0.4'/>" +
+    "<path d='M185.7 81.3L198.6 80.7' stroke-width='0.4'/>" +
+    "<path d='M205.0 76.1L219.7 75.2' stroke-width='0.55'/>" +
+    "<path d='M218.0 73.4L218.0 87.9' stroke-width='0.55'/>" +
+    "<path d='M219.2 85.9L204.8 86.8' stroke-width='0.55'/>" +
+    "<path d='M206.0 88.1L206.0 74.3' stroke-width='0.55'/>" +
+    "<path d='M212.0 75.3L212.0 86.9' stroke-width='0.4'/>" +
+    "<path d='M205.4 81.3L218.6 80.7' stroke-width='0.4'/>" +
+    "<path d='M151.5 58.0L161.3 58.0' stroke-width='0.5'/>" +
+    "<path d='M160.0 57.4L160.0 64.8' stroke-width='0.5'/>" +
+    "<path d='M161.0 64.0L150.8 64.0' stroke-width='0.5'/>" +
+    "<path d='M152.0 64.8L152.0 56.8' stroke-width='0.5'/><clipPath id='sp-hsd'>" +
+    "<path d='M176 104L228 98V66L176 70z'/></clipPath><g clip-path='url(#sp-hsd)'>" +
+    "<path d='M150.8 106L176.0 64' stroke-width='0.35'/>" +
+    "<path d='M154.0 106L179.2 64' stroke-width='0.35'/>" +
+    "<path d='M157.2 106L182.4 64' stroke-width='0.35'/>" +
+    "<path d='M160.4 106L185.6 64' stroke-width='0.35'/>" +
+    "<path d='M163.6 106L188.8 64' stroke-width='0.35'/>" +
+    "<path d='M166.8 106L192.0 64' stroke-width='0.35'/>" +
+    "<path d='M170.0 106L195.2 64' stroke-width='0.35'/>" +
+    "<path d='M173.2 106L198.4 64' stroke-width='0.35'/>" +
+    "<path d='M176.4 106L201.6 64' stroke-width='0.35'/>" +
+    "<path d='M179.6 106L204.8 64' stroke-width='0.35'/>" +
+    "<path d='M182.8 106L208.0 64' stroke-width='0.35'/>" +
+    "<path d='M186.0 106L211.2 64' stroke-width='0.35'/>" +
+    "<path d='M189.2 106L214.4 64' stroke-width='0.35'/>" +
+    "<path d='M192.4 106L217.6 64' stroke-width='0.35'/>" +
+    "<path d='M195.6 106L220.8 64' stroke-width='0.35'/>" +
+    "<path d='M198.8 106L224.0 64' stroke-width='0.35'/>" +
+    "<path d='M202.0 106L227.2 64' stroke-width='0.35'/>" +
+    "<path d='M205.2 106L230.4 64' stroke-width='0.35'/>" +
+    "<path d='M208.4 106L233.6 64' stroke-width='0.35'/>" +
+    "<path d='M211.6 106L236.8 64' stroke-width='0.35'/>" +
+    "<path d='M214.8 106L240.0 64' stroke-width='0.35'/>" +
+    "<path d='M218.0 106L243.2 64' stroke-width='0.35'/>" +
+    "<path d='M221.2 106L246.4 64' stroke-width='0.35'/>" +
+    "<path d='M224.4 106L249.6 64' stroke-width='0.35'/>" +
+    "<path d='M227.6 106L252.8 64' stroke-width='0.35'/></g><clipPath id='sp-hrf'>" +
+    "<path d='M156 48L210 44L232 67L180 71z'/></clipPath>" +
+    "<path d='M158.0 49.6L182.0 70.8' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M163.2 49.2L187.2 70.4' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M168.4 48.8L192.4 70.0' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M173.6 48.4L197.6 69.6' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M178.8 48.0L202.8 69.2' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M184.0 47.6L208.0 68.8' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M189.2 47.2L213.2 68.4' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M194.4 46.8L218.4 68.0' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M199.6 46.4L223.6 67.6' stroke-width='0.3' opacity='0.55'/>" +
+    "<path d='M204.8 46.0L228.8 67.2' stroke-width='0.3' opacity='0.55'/>" +
+    "<circle cx='112.2' cy='79.0' r='8.0' stroke-width='.45'/>" +
+    "<circle cx='109.3' cy='73.8' r='6.8' stroke-width='.45'/>" +
+    "<circle cx='105.3' cy='73.1' r='9.6' stroke-width='.45'/>" +
+    "<circle cx='101.7' cy='74.4' r='9.1' stroke-width='.45'/>" +
+    "<circle cx='110.9' cy='81.0' r='7.8' stroke-width='.45'/>" +
+    "<path d='M106.0 83.0L106.0 100.2' stroke-width='0.6'/>" +
+    "<circle cx='86.9' cy='89.0' r='5.1' stroke-width='.45'/>" +
+    "<circle cx='92.0' cy='86.0' r='6.0' stroke-width='.45'/>" +
+    "<circle cx='92.0' cy='85.5' r='5.1' stroke-width='.45'/>" +
+    "<circle cx='84.0' cy='86.2' r='5.7' stroke-width='.45'/>" +
+    "<path d='M88.0 88.7L88.0 100.2' stroke-width='0.6'/>" +
+    "<circle cx='196' cy='94.5' r='1.3' stroke-width='.5'/>" +
+    "<path d='M196 96.0l0 4.5M194.2 97.5l3.6 0M196 100.5l-1.6 3M196 100.5l1.6 3' stroke-width='.5'/>" +
+    "<circle cx='201' cy='94.7' r='1.2' stroke-width='.5'/>" +
+    "<path d='M201 96.1l0 4.5M199.3 97.5l3.6 0M201 100.4l-1.6 3M201 100.4l1.6 3' stroke-width='.5'/>" +
+    "<path d='M150.5 103.3L137.6 120.5' stroke-width='0.5'/>" +
+    "<path d='M160.1 103.7L157.8 121.3' stroke-width='0.5'/>" +
+    "<path d='M17.5 24.0L62.0 24.0' stroke-width='0.3' opacity='0.5'/>" +
+    "<path d='M26.2 28.0L55.5 28.0' stroke-width='0.3' opacity='0.5'/></g>",
+  office:
+    "<g class='pwash' filter='url(#sp-wash)'>" +
+    "<path d='M70 12c20-12 60-10 90-6 30-6 60-4 80 2v44c-24 6-40-4-62 2-30 6-60 0-90 2-18 0-26-10-20-22-6-10-4-18 2-22z' fill='#AFC0DC' opacity='.55'/>" +
+    "<path d='M130 26l22-4v90l-22-2z' fill='#6D82B0' opacity='.55'/>" +
+    "<path d='M132 30l18-3v22l-18 8z' fill='#FFFFFF' opacity='.55'/>" +
+    "<path d='M154 22l30 6v80l-30 4z' fill='#4E5E88' opacity='.6'/>" +
+    "<rect x='96' y='54' width='26' height='56' fill='#B9BCC4' opacity='.55'/>" +
+    "<rect x='190' y='60' width='44' height='50' fill='#7FA8A8' opacity='.55'/>" +
+    "<path d='M0 110h240v10H0z' fill='#C2B9A6' opacity='.55'/>" +
+    "<circle cx='110' cy='97' r='10' fill='#88A765' opacity='.55'/>" +
+    "<circle cx='192' cy='99' r='9' fill='#88A765' opacity='.55'/></g>" +
+    "<g filter='url(#sp-ink)' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='.7' opacity='0.8'>" +
+    "<path d='M-3.4 110.0L244.3 110.0' stroke-width='0.6'/><path d='M124.6 109.7L155.6 112.3'/>" +
+    "<path d='M152.0 114.4L152.0 16.6'/><path d='M155.3 19.4L124.9 24.5'/>" +
+    "<path d='M128.0 20.9L128.0 113.3'/><path d='M149.6 112.3L189.2 107.6'/>" +
+    "<path d='M186.0 110.2L186.0 23.3'/><path d='M189.3 26.6L148.9 19.5'/>" +
+    "<path d='M152.0 17.8L152.0 115.8'/>" +
+    "<path d='M127.0 32.7L153.0 29.1' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M151.5 29.1L186.9 34.3' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M127.3 41.3L153.0 38.3' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M151.1 38.3L187.1 42.5' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M127.0 49.9L153.1 47.5' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M151.2 47.5L187.0 50.7' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M126.9 58.5L153.2 56.7' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M151.2 56.8L187.2 58.9' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M126.8 67.0L153.0 66.0' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M150.7 66.0L187.3 67.0' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M127.1 75.6L152.9 75.2' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M151.4 75.2L187.2 75.2' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M126.8 84.2L152.9 84.4' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M150.9 84.4L187.1 83.4' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M126.9 92.8L152.6 93.6' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M150.9 93.7L187.0 91.5' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M127.0 101.3L152.8 102.8' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M151.0 102.9L187.1 99.7' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M127.0 109.9L153.1 112.1' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M151.5 112.1L186.6 107.9' stroke-width='0.3' opacity='0.7'/>" +
+    "<path d='M134.0 22.6L134.0 111.0' stroke-width='0.3' opacity='0.6'/>" +
+    "<path d='M140.0 21.7L140.0 111.5' stroke-width='0.3' opacity='0.6'/>" +
+    "<path d='M146.0 20.5L146.0 111.8' stroke-width='0.3' opacity='0.6'/>" +
+    "<path d='M158.8 20.8L158.8 111.5' stroke-width='0.3' opacity='0.6'/>" +
+    "<path d='M165.6 22.1L165.6 110.7' stroke-width='0.3' opacity='0.6'/>" +
+    "<path d='M172.4 23.2L172.4 109.9' stroke-width='0.3' opacity='0.6'/>" +
+    "<path d='M179.2 24.5L179.2 109.1' stroke-width='0.3' opacity='0.6'/><clipPath id='sp-osd'>" +
+    "<path d='M152 112L186 108V26L152 20z'/></clipPath><g clip-path='url(#sp-osd)'>" +
+    "<path d='M102.0 114L150.0 18' stroke-width='0.3'/><path d='M105.5 114L153.5 18' stroke-width='0.3'/>" +
+    "<path d='M109.0 114L157.0 18' stroke-width='0.3'/><path d='M112.5 114L160.5 18' stroke-width='0.3'/>" +
+    "<path d='M116.0 114L164.0 18' stroke-width='0.3'/><path d='M119.5 114L167.5 18' stroke-width='0.3'/>" +
+    "<path d='M123.0 114L171.0 18' stroke-width='0.3'/><path d='M126.5 114L174.5 18' stroke-width='0.3'/>" +
+    "<path d='M130.0 114L178.0 18' stroke-width='0.3'/><path d='M133.5 114L181.5 18' stroke-width='0.3'/>" +
+    "<path d='M137.0 114L185.0 18' stroke-width='0.3'/><path d='M140.5 114L188.5 18' stroke-width='0.3'/>" +
+    "<path d='M144.0 114L192.0 18' stroke-width='0.3'/><path d='M147.5 114L195.5 18' stroke-width='0.3'/>" +
+    "<path d='M151.0 114L199.0 18' stroke-width='0.3'/><path d='M154.5 114L202.5 18' stroke-width='0.3'/>" +
+    "<path d='M158.0 114L206.0 18' stroke-width='0.3'/><path d='M161.5 114L209.5 18' stroke-width='0.3'/>" +
+    "<path d='M165.0 114L213.0 18' stroke-width='0.3'/><path d='M168.5 114L216.5 18' stroke-width='0.3'/>" +
+    "<path d='M172.0 114L220.0 18' stroke-width='0.3'/><path d='M175.5 114L223.5 18' stroke-width='0.3'/>" +
+    "<path d='M179.0 114L227.0 18' stroke-width='0.3'/><path d='M182.5 114L230.5 18' stroke-width='0.3'/>" +
+    "<path d='M186.0 114L234.0 18' stroke-width='0.3'/><path d='M189.5 114L237.5 18' stroke-width='0.3'/>" +
+    "</g><path d='M91.4 110.0L124.4 110.0'/><path d='M122.0 113.0L122.0 49.1'/>" +
+    "<path d='M124.1 52.0L90.3 52.0'/><path d='M94.0 50.5L94.0 112.5'/>" +
+    "<path d='M97.6 58.0L118.4 58.0' stroke-width='0.35'/>" +
+    "<path d='M97.7 68.0L118.6 68.0' stroke-width='0.35'/>" +
+    "<path d='M97.6 78.0L118.3 78.0' stroke-width='0.35'/>" +
+    "<path d='M97.5 88.0L118.3 88.0' stroke-width='0.35'/>" +
+    "<path d='M97.5 98.0L118.4 98.0' stroke-width='0.35'/><path d='M189.1 110.0L239.8 110.0'/>" +
+    "<path d='M236.0 113.5L236.0 59.5'/><path d='M239.5 62.0L189.0 62.0'/>" +
+    "<path d='M192.0 59.6L192.0 111.8'/><path d='M196.0 68.0L202.0 68.0' stroke-width='0.35'/>" +
+    "<path d='M206.0 68.0L212.0 68.0' stroke-width='0.35'/>" +
+    "<path d='M216.0 68.0L222.0 68.0' stroke-width='0.35'/>" +
+    "<path d='M226.0 68.0L232.0 68.0' stroke-width='0.35'/>" +
+    "<path d='M196.0 78.0L202.0 78.0' stroke-width='0.35'/>" +
+    "<path d='M206.0 78.0L212.0 78.0' stroke-width='0.35'/>" +
+    "<path d='M216.0 78.0L222.0 78.0' stroke-width='0.35'/>" +
+    "<path d='M226.0 78.0L232.0 78.0' stroke-width='0.35'/>" +
+    "<path d='M196.0 88.0L202.0 88.0' stroke-width='0.35'/>" +
+    "<path d='M206.0 88.0L212.0 88.0' stroke-width='0.35'/>" +
+    "<path d='M216.0 88.0L222.0 88.0' stroke-width='0.35'/>" +
+    "<path d='M226.0 88.0L232.0 88.0' stroke-width='0.35'/>" +
+    "<path d='M196.0 98.0L202.0 98.0' stroke-width='0.35'/>" +
+    "<path d='M206.0 98.0L212.0 98.0' stroke-width='0.35'/>" +
+    "<path d='M216.0 98.0L222.0 98.0' stroke-width='0.35'/>" +
+    "<path d='M226.0 98.0L232.0 98.0' stroke-width='0.35'/>" +
+    "<path d='M226.0 110.6L226.0 85.0' stroke-width='0.5'/>" +
+    "<path d='M226.0 86.0L231.0 84.0' stroke-width='0.5'/>" +
+    "<circle cx='112.8' cy='94.9' r='5.9' stroke-width='.45'/>" +
+    "<circle cx='116.0' cy='98.3' r='5.2' stroke-width='.45'/>" +
+    "<circle cx='111.4' cy='101.1' r='6.2' stroke-width='.45'/>" +
+    "<circle cx='112.8' cy='94.9' r='4.6' stroke-width='.45'/>" +
+    "<path d='M112.0 100.9L112.0 112.1' stroke-width='0.6'/>" +
+    "<circle cx='193.6' cy='99.8' r='4.2' stroke-width='.45'/>" +
+    "<circle cx='187.2' cy='98.2' r='4.5' stroke-width='.45'/>" +
+    "<circle cx='187.8' cy='97.8' r='4.8' stroke-width='.45'/>" +
+    "<circle cx='189.8' cy='97.2' r='3.8' stroke-width='.45'/>" +
+    "<path d='M190.0 102.1L190.0 112.7' stroke-width='0.6'/>" +
+    "<circle cx='140' cy='101.0' r='1.3' stroke-width='.5'/>" +
+    "<path d='M140 102.5l0 4.5M138.2 104.0l3.6 0M140 107.0l-1.6 3M140 107.0l1.6 3' stroke-width='.5'/>" +
+    "<circle cx='206' cy='101.0' r='1.3' stroke-width='.5'/>" +
+    "<path d='M206 102.5l0 4.5M204.2 104.0l3.6 0M206 107.0l-1.6 3M206 107.0l1.6 3' stroke-width='.5'/>" +
+    "<circle cx='210' cy='101.9' r='1.2' stroke-width='.5'/>" +
+    "<path d='M210 103.2l0 4.5M208.4 104.6l3.6 0M210 107.3l-1.6 3M210 107.3l1.6 3' stroke-width='.5'/>" +
+    "</g>",
+  plan:
+    "<g class='pwash' filter='url(#sp-wash)'><path d='M40 104l200-42v10l-200 42z' fill='#D8CFBA' opacity='.6'/>" +
+    "<path d='M0 0h120l10 60-130 30z' fill='#B7CB93' opacity='.5'/>" +
+    "<path d='M150 0h90v50l-90 18z' fill='#C9D6AE' opacity='.45'/>" +
+    "<path d='M60 0c-10 30 10 60-10 120h12c16-60-4-90 8-120z' fill='#8FC0BE' opacity='.6'/>" +
+    "<rect x='58' y='38' width='34' height='24' fill='#C9BCA3' opacity='.5'/>" +
+    "<rect x='156' y='18' width='62' height='22' fill='#C9BCA3' opacity='.45'/>" +
+    "<path d='M170 44c-6 0-9 4-9 8 0 7 9 15 9 15s9-8 9-15c0-4-3-8-9-8z' fill='#4C5D8A' opacity='.75'/>" +
+    "</g>" +
+    "<g filter='url(#sp-ink)' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='.7' opacity='0.8'>" +
+    "<path d='M36.4 100.8L243.0 57.4'/><path d='M37.1 108.6L243.6 65.2'/>" +
+    "<path d='M119.4 -3.4L140.5 123.1'/><path d='M127.3 -4.3L148.6 123.8'/>" +
+    "<path d='M58.9 40.0L91.4 40.0'/><path d='M90.0 38.3L90.0 62.5'/><path d='M92.4 60.0L58.1 60.0'/>" +
+    "<path d='M60.0 61.0L60.0 37.8'/><clipPath id='sp-m60'><rect x='60' y='40' width='30' height='20'/>" +
+    "</clipPath><g clip-path='url(#sp-m60)'><path d='M40.0 60L60.0 40' stroke-width='0.3'/>" +
+    "<path d='M42.6 60L62.6 40' stroke-width='0.3'/><path d='M45.2 60L65.2 40' stroke-width='0.3'/>" +
+    "<path d='M47.8 60L67.8 40' stroke-width='0.3'/><path d='M50.4 60L70.4 40' stroke-width='0.3'/>" +
+    "<path d='M53.0 60L73.0 40' stroke-width='0.3'/><path d='M55.6 60L75.6 40' stroke-width='0.3'/>" +
+    "<path d='M58.2 60L78.2 40' stroke-width='0.3'/><path d='M60.8 60L80.8 40' stroke-width='0.3'/>" +
+    "<path d='M63.4 60L83.4 40' stroke-width='0.3'/><path d='M66.0 60L86.0 40' stroke-width='0.3'/>" +
+    "<path d='M68.6 60L88.6 40' stroke-width='0.3'/><path d='M71.2 60L91.2 40' stroke-width='0.3'/>" +
+    "<path d='M73.8 60L93.8 40' stroke-width='0.3'/><path d='M76.4 60L96.4 40' stroke-width='0.3'/>" +
+    "<path d='M79.0 60L99.0 40' stroke-width='0.3'/><path d='M81.6 60L101.6 40' stroke-width='0.3'/>" +
+    "<path d='M84.2 60L104.2 40' stroke-width='0.3'/><path d='M86.8 60L106.8 40' stroke-width='0.3'/>" +
+    "<path d='M89.4 60L109.4 40' stroke-width='0.3'/></g><path d='M156.3 20.0L185.9 20.0'/>" +
+    "<path d='M184.0 17.9L184.0 40.0'/><path d='M185.8 38.0L155.5 38.0'/>" +
+    "<path d='M158.0 39.6L158.0 18.4'/><clipPath id='sp-m158'>" +
+    "<rect x='158' y='20' width='26' height='18'/></clipPath><g clip-path='url(#sp-m158)'>" +
+    "<path d='M140.0 38L158.0 20' stroke-width='0.3'/><path d='M142.6 38L160.6 20' stroke-width='0.3'/>" +
+    "<path d='M145.2 38L163.2 20' stroke-width='0.3'/><path d='M147.8 38L165.8 20' stroke-width='0.3'/>" +
+    "<path d='M150.4 38L168.4 20' stroke-width='0.3'/><path d='M153.0 38L171.0 20' stroke-width='0.3'/>" +
+    "<path d='M155.6 38L173.6 20' stroke-width='0.3'/><path d='M158.2 38L176.2 20' stroke-width='0.3'/>" +
+    "<path d='M160.8 38L178.8 20' stroke-width='0.3'/><path d='M163.4 38L181.4 20' stroke-width='0.3'/>" +
+    "<path d='M166.0 38L184.0 20' stroke-width='0.3'/><path d='M168.6 38L186.6 20' stroke-width='0.3'/>" +
+    "<path d='M171.2 38L189.2 20' stroke-width='0.3'/><path d='M173.8 38L191.8 20' stroke-width='0.3'/>" +
+    "<path d='M176.4 38L194.4 20' stroke-width='0.3'/><path d='M179.0 38L197.0 20' stroke-width='0.3'/>" +
+    "<path d='M181.6 38L199.6 20' stroke-width='0.3'/></g><path d='M193.6 28.0L217.3 28.0'/>" +
+    "<path d='M216.0 26.5L216.0 46.3'/><path d='M217.1 44.0L193.7 44.0'/>" +
+    "<path d='M196.0 46.1L196.0 26.3'/><clipPath id='sp-m196'>" +
+    "<rect x='196' y='28' width='20' height='16'/></clipPath><g clip-path='url(#sp-m196)'>" +
+    "<path d='M180.0 44L196.0 28' stroke-width='0.3'/><path d='M182.6 44L198.6 28' stroke-width='0.3'/>" +
+    "<path d='M185.2 44L201.2 28' stroke-width='0.3'/><path d='M187.8 44L203.8 28' stroke-width='0.3'/>" +
+    "<path d='M190.4 44L206.4 28' stroke-width='0.3'/><path d='M193.0 44L209.0 28' stroke-width='0.3'/>" +
+    "<path d='M195.6 44L211.6 28' stroke-width='0.3'/><path d='M198.2 44L214.2 28' stroke-width='0.3'/>" +
+    "<path d='M200.8 44L216.8 28' stroke-width='0.3'/><path d='M203.4 44L219.4 28' stroke-width='0.3'/>" +
+    "<path d='M206.0 44L222.0 28' stroke-width='0.3'/><path d='M208.6 44L224.6 28' stroke-width='0.3'/>" +
+    "<path d='M211.2 44L227.2 28' stroke-width='0.3'/><path d='M213.8 44L229.8 28' stroke-width='0.3'/>" +
+    "</g><path d='M158.5 86.0L192.2 86.0'/><path d='M190.0 83.5L190.0 107.2'/>" +
+    "<path d='M191.8 106.0L158.1 106.0'/><path d='M160.0 107.8L160.0 84.5'/><clipPath id='sp-m160'>" +
+    "<rect x='160' y='86' width='30' height='20'/></clipPath><g clip-path='url(#sp-m160)'>" +
+    "<path d='M140.0 106L160.0 86' stroke-width='0.3'/><path d='M142.6 106L162.6 86' stroke-width='0.3'/>" +
+    "<path d='M145.2 106L165.2 86' stroke-width='0.3'/><path d='M147.8 106L167.8 86' stroke-width='0.3'/>" +
+    "<path d='M150.4 106L170.4 86' stroke-width='0.3'/><path d='M153.0 106L173.0 86' stroke-width='0.3'/>" +
+    "<path d='M155.6 106L175.6 86' stroke-width='0.3'/><path d='M158.2 106L178.2 86' stroke-width='0.3'/>" +
+    "<path d='M160.8 106L180.8 86' stroke-width='0.3'/><path d='M163.4 106L183.4 86' stroke-width='0.3'/>" +
+    "<path d='M166.0 106L186.0 86' stroke-width='0.3'/><path d='M168.6 106L188.6 86' stroke-width='0.3'/>" +
+    "<path d='M171.2 106L191.2 86' stroke-width='0.3'/><path d='M173.8 106L193.8 86' stroke-width='0.3'/>" +
+    "<path d='M176.4 106L196.4 86' stroke-width='0.3'/><path d='M179.0 106L199.0 86' stroke-width='0.3'/>" +
+    "<path d='M181.6 106L201.6 86' stroke-width='0.3'/><path d='M184.2 106L204.2 86' stroke-width='0.3'/>" +
+    "<path d='M186.8 106L206.8 86' stroke-width='0.3'/><path d='M189.4 106L209.4 86' stroke-width='0.3'/>" +
+    "</g><circle cx='100' cy='20' r='4' stroke-width='.45'/>" +
+    "<circle cx='108' cy='26' r='4' stroke-width='.45'/>" +
+    "<circle cx='96' cy='70' r='4' stroke-width='.45'/>" +
+    "<circle cx='212' cy='94' r='4' stroke-width='.45'/>" +
+    "<circle cx='222' cy='90' r='4' stroke-width='.45'/>" +
+    "<circle cx='150' cy='60' r='4' stroke-width='.45'/>" +
+    "<path d='M228 6v14M228 6l-3 6M228 6l3 6' stroke-width='.6'/>" +
+    "<text x='225' y='28' font-size='6' fill='currentColor' stroke='none' font-family='Georgia,serif'>N</text>" +
+    "<path d='M160.0 114.0L200.0 114.0' stroke-width='0.6'/>" +
+    "<path d='M160.0 112.0L160.0 116.0' stroke-width='0.5'/>" +
+    "<path d='M180.0 112.0L180.0 116.0' stroke-width='0.5'/>" +
+    "<path d='M200.0 112.0L200.0 116.0' stroke-width='0.5'/>" +
+    "<path d='M170 44c-6 0-9 4-9 8 0 7 9 15 9 15s9-8 9-15c0-4-3-8-9-8z' stroke-width='.7'/>" +
+    "<circle cx='170' cy='52' r='3' stroke-width='.6'/></g>",
+  fog:
+    "<g class='pwash' filter='url(#sp-wash)'><path d='M0 0h240v120H0z' fill='#DCE1E4' opacity='.45'/>" +
+    "<path d='M40 70c40-14 90-16 200-4v24c-60 8-140 6-200-2z' fill='#BCC5C9' opacity='.4'/>" +
+    "<path d='M30 96c60-6 140-8 210-4v28H30z' fill='#A9B39E' opacity='.5'/>" +
+    "<path d='M164 40h44l8 8-8 8h-44z' fill='#C9BCA3' opacity='.6'/>" +
+    "<path d='M220 58h-42l-8 8 8 8h42z' fill='#B7AA92' opacity='.55'/>" +
+    "<path d='M118 120l32-18h10l-18 18z' fill='#DCD4C2' opacity='.6'/>" +
+    "<ellipse cx='150' cy='80' rx='110' ry='12' fill='#F4F5F3' opacity='.8'/></g>" +
+    "<g filter='url(#sp-ink)' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='.7' opacity='0.75'>" +
+    "<path d='M38.4 96.0L113.2 93.9' stroke-width='0.5'/>" +
+    "<path d='M127.4 93.1L152.6 92.4' stroke-width='0.4' opacity='0.6'/>" +
+    "<path d='M166.9 92.0L176.5 92.0' stroke-width='0.35' opacity='0.35'/>" +
+    "<path d='M57.7 70.6L91.3 61.7' stroke-width='0.4' opacity='0.5'/>" +
+    "<path d='M94.0 59.6L114.5 63.5' stroke-width='0.35' opacity='0.35'/>" +
+    "<path d='M190.0 101.2L190.0 36.2'/><path d='M194.0 100.2L194.0 34.3'/>" +
+    "<path d='M189.4 38.0L195.0 38.0'/><path d='M164.3 42.0L207.3 42.0'/>" +
+    "<path d='M204.5 40.7L213.8 48.7'/><path d='M213.9 47.2L204.8 55.0'/>" +
+    "<path d='M207.1 54.0L164.9 54.0'/><path d='M166.0 55.9L166.0 39.8'/>" +
+    "<path d='M220.4 60.0L178.8 60.0'/><path d='M181.3 58.9L171.9 67.0'/>" +
+    "<path d='M171.5 64.7L181.4 73.2'/><path d='M177.5 72.0L219.6 72.0'/>" +
+    "<path d='M218.0 73.1L218.0 57.9'/><path d='M118.9 120.6L151.8 103.1' stroke-width='0.5'/>" +
+    "<path d='M138.6 121.2L159.8 102.4' stroke-width='0.5'/>" +
+    "<path d='M151.2 104.6L160.8 97.4' stroke-width='0.35' opacity='0.5'/>" +
+    "<path d='M186.0 98.0L185.0 94.5' stroke-width='0.35'/>" +
+    "<path d='M188.2 98.0L187.2 94.5' stroke-width='0.35'/>" +
+    "<path d='M190.4 98.0L189.4 94.5' stroke-width='0.35'/>" +
+    "<path d='M192.6 98.0L191.6 94.5' stroke-width='0.35'/>" +
+    "<path d='M194.8 98.0L193.8 94.5' stroke-width='0.35'/></g>",
+};
+
+/* Where somebody is, as the People card draws it: the word, the glyph on
+   the ring's badge, and which sketch sits behind them.
+
+   Four kinds, not two. Home and a named zone are places. Out is a reading
+   that is not a place -- we know they are away, not where -- so it gets no
+   sketch. Unknown is not a reading at all, and gets the fog: a drawing that
+   was never finished, because nobody can say where they are.
+
+   `places` is the card's own map from a zone's name to an icon and a
+   sketch, so a zone the card was never told about still draws, as a site
+   plan with a pin. Matched on the zone's name as the person entity reports
+   it ("Work"), case-insensitively, since that is how people type it. */
+const PLACE_DEFAULT = {
+  home: { icon: "mdi:home", art: "house" },
+  zone: { icon: "mdi:map-marker", art: "plan" },
+  out: { icon: "mdi:walk", art: null },
+  unknown: { icon: "mdi:help", art: "fog" },
+};
+
+function presencePlace(state, places, rowIcon) {
+  const unknown = presenceUnknown(state);
+  const v = unknown ? "" : String(state);
+  const kind = unknown ? "unknown"
+    : v === "home" ? "home"
+    : v === "not_home" ? "out"
+    : "zone";
+  const map = places && typeof places === "object" ? places : {};
+  let own = null;
+  if (kind === "home" || kind === "zone") {
+    const key = Object.keys(map).find((k) => k.toLowerCase() === v.toLowerCase());
+    own = key !== undefined && map[key] && typeof map[key] === "object" ? map[key] : null;
+  }
+  const base = PLACE_DEFAULT[kind];
+  const icon = firstOf(rowIcon, own && own.icon, base.icon);
+  let art = own && own.art !== undefined ? own.art : base.art;
+  /* `art: none` is how a zone opts out; a name we have no sketch for is
+     treated the same way rather than drawing an empty box. */
+  if (isBlank(art) || !Object.prototype.hasOwnProperty.call(PLACE_ART, art)) art = null;
+  return { kind, icon, art };
+}
+
+/* The ink and the wash, shared by every sketch. Repeated inside each one
+   rather than hoisted, because each tile's svg has to stand on its own: an
+   ID it points at in some other element is gone the moment that element is
+   re-rendered away. Duplicate IDs with identical content resolve the same
+   whichever copy wins. */
+const PLACE_FILTERS = "<filter id='sp-ink' x='-5%' y='-5%' width='110%' height='110%'>"
+  + "<feTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='1' seed='3' result='n'/>"
+  + "<feDisplacementMap in='SourceGraphic' in2='n' scale='1.1' xChannelSelector='R' yChannelSelector='G'/>"
+  + "</filter>"
+  + "<filter id='sp-wash' x='-15%' y='-15%' width='130%' height='130%'>"
+  + "<feTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='3' seed='8' result='n'/>"
+  + "<feDisplacementMap in='SourceGraphic' in2='n' scale='9' xChannelSelector='R' yChannelSelector='G' result='d'/>"
+  + "<feGaussianBlur in='d' stdDeviation='1.1' result='b'/>"
+  + "<feMorphology in='b' operator='erode' radius='1.4' result='core'/>"
+  + "<feComposite in='b' in2='core' operator='out' result='rim'/>"
+  + "<feColorMatrix in='rim' type='matrix' values='.75 0 0 0 0 0 .75 0 0 0 0 0 .75 0 0 0 0 0 .45 0' result='rimd'/>"
+  + "<feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='2' result='g'/>"
+  + "<feColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.7 1.2' result='ga'/>"
+  + "<feComposite in='b' in2='ga' operator='in' result='grain'/>"
+  + "<feMerge><feMergeNode in='grain'/><feMergeNode in='rimd'/></feMerge>"
+  + "</filter>";
+
+function placeSketch(art) {
+  if (!art) return "";
+  return `<div class="partart"><svg viewBox="0 0 240 120" preserveAspectRatio="xMaxYMin slice"`
+    + ` aria-hidden="true"><defs>${PLACE_FILTERS}</defs>${PLACE_ART[art]}</svg></div>`;
+}
+
 /* Calendar events are fetched over a window, not read off the entity — a
    calendar's state is just "is something on right now". Same shape as a
    forecast or a to-do list. */
@@ -6483,39 +6923,47 @@ const BODIES = {
         : "");
   },
 
-  /* Who is in. Presence is a category, not a verdict — being out is not
-     worse than being in — so "here" is the soft wash and "out" is the plain
-     zebra, one step apart on the ladder rather than two accents arguing
-     about which is good news. The label says which either way, because
-     colour never carries meaning alone. */
+  /* Who is in. Presence is a category, not a verdict, so the tile itself
+     stays plain zebra whatever the state; the ring and its badge carry it,
+     and the label says it in words either way, because colour never
+     carries meaning alone. */
   people(b) {
     const rows = (Array.isArray(b.rows) ? b.rows : []).filter(Boolean);
     if (!rows.length) return "";
 
     return `<div class="people">` + rows.map((r) => {
-      const here = String(firstOf(r.state, "")) === "home";
+      const state = firstOf(r.state, "");
+      const here = String(state) === "home";
       /* Out and Unknown are not the same fact and must not look alike.
          "Out" is a reading: the phone is somewhere else. "Unknown" is
          the ABSENCE of a reading, and the thing to do about it is not
-         to expect them home — it is to go and look at why the tracker
+         to expect them home -- it is to go and look at why the tracker
          stopped reporting. Drawn from the state rather than the label
          so an overriding `status` cannot leave the two disagreeing. */
-      const adrift = !here && presenceUnknown(r.state);
+      const adrift = !here && presenceUnknown(state);
+      const place = presencePlace(state, b.places, r.icon);
       const name = firstOf(r.name, "");
-      const label = firstOf(r.status, presenceLabel(r.state));
-      /* "Home since 3h ago" is noise when the wash already says home; the
-         duration is what you actually read, so it stands beside the label. */
-      const parts = [label, r.since].filter((v) => !isBlank(v));
+      const label = firstOf(r.status, presenceLabel(state));
       const picture = safePicture(r.picture);
       const face = picture
-        ? `<img class="avatar" src="${esc(picture)}" alt="">`
-        : `<span class="avatar">${esc(initialsOf(name))}</span>`;
+        ? `<img src="${esc(picture)}" alt="">`
+        : esc(initialsOf(name));
+      const kind = here ? " here" : (adrift ? " adrift" : "");
 
-      return `<div class="person${here ? " here" : ""}${adrift ? " adrift" : ""}">`
-        + face
+      return `<div class="person${kind}" data-place="${place.kind}">`
+        + placeSketch(place.art)
+        + `<div class="pring"><svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">`
+        + `<circle class="ptrack" cx="32" cy="32" r="28"></circle>`
+        + `<circle class="pband" cx="32" cy="32" r="28"></circle>`
+        + `<circle class="pdisc" cx="32" cy="32" r="23"></circle></svg>`
+        + `<span class="pface">${face}</span>`
+        + `<span class="pbadge">${iconMarkup(place.icon)}</span></div>`
+        + `<div class="pinfo">`
         + (isBlank(name) ? "" : `<p class="name">${esc(name)}</p>`)
-        + (parts.length ? `<p class="sub">${esc(parts.join(" \u00b7 "))}</p>` : "")
-        + `</div>`;
+        + `<p class="sub pplace">${iconMarkup(adrift ? "mdi:map-marker-question" : "mdi:map-marker")}`
+        + `<span>${esc(label)}</span></p>`
+        + (isBlank(r.since) ? "" : `<p class="psince">${esc(r.since)}</p>`)
+        + `</div></div>`;
     }).join("") + `</div>`;
   },
 
