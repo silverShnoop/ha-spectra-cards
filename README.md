@@ -643,11 +643,14 @@ first and ends `+ N more` — the `Needs you` row still names them all.
 Networks sit evenly round the map in the sensor's order, the first on the
 left.
 
-**Narrower, the list.** The labels would be too small to read, so a phone gets
-every device not fully answering under the room it is in, with what is
-missing (`offline`, `No temperature`, `5 of 8 missing`) and **how long**:
-`offline · 3d`. Last, a bar per network. A container query picks the view, so
-the card never has to be told how wide it is.
+**Narrower — a phone — the same map, numbered.** Side labels would be too
+small to read, so the map is drawn tighter and each problem dot carries a
+number just outside its cluster. The numbers are a list under the map,
+grouped by network, offline first: the name, its room, what is missing
+(`offline`, `No temperature`, `5 of 8 missing`) and **how long**:
+`offline · 3d`. A problem whose network is not on the map is still a row,
+under *Other*, with a dot instead of a number. A container query picks the
+view, so the card never has to be told how wide it is.
 
 The time is the sensor's, remembered across restarts. A problem whose time is
 unknown shows none: Home Assistant's own `last_changed` would say it died at
