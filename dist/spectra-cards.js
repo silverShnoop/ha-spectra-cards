@@ -638,8 +638,9 @@ ha-icon { display:inline-flex; line-height:0; }
 .scenetrack.picking .bands i.at { opacity:1; }
 .bands i { transition:opacity 160ms linear; }
 /* The scene the room was on until something else took it. Hue forgets it
-   the moment one bulb is set by anything but the scene -- a lamp's own
-   zone, usually -- and does not bring it back when the lamp goes off again.
+   the moment one of its bulbs is switched or recoloured by anything but the
+   scene -- a lamp's own zone, usually; dimming does not count -- and does
+   not bring it back when the lamp goes off again.
    So it is kept, and marked in a dash: not selected, which the ring would
    claim, but the one press that puts the room back. */
 .scenetrack .bands i.was { opacity:.7; outline:2px dashed var(--sp-ink-2); outline-offset:-2px; }

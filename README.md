@@ -960,10 +960,10 @@ paper.
 
 A lamp that is a Hue zone of one bulb out of a room is not a room of its
 own, and a card of its own beside the room said it was. The two cannot be
-changed separately: set any bulb in a room by something other than the
-room's scene and the bridge ends that scene. In the Bedroom, recalling the
-Far light's scene dropped the room from Dimmed to no scene within 30 ms,
-every time, and it stayed there when the lamp went off. A room scene works
+changed separately. Switching a lamp on or off, changing its colour, or
+recalling its own scene ends the room's scene, and the room stays on no scene
+when the lamp goes back. Dimming a lamp is the exception: brightness is an
+adjustment the scene survives. All of this was tested live in the Bedroom. A room scene works
 the other way and overwrites the lamp.
 
 So the lamps go on the room's card, as `lamps`. Each one is shaped like a
