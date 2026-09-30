@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.144.0";
+const VERSION = "0.144.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -530,8 +530,14 @@ ha-icon { display:inline-flex; line-height:0; }
   --mdc-icon-size:0.78em; width:0.78em; height:0.78em;
   margin-right:0.2em; vertical-align:middle; position:relative; top:-0.085em;
 }
-/* pre, because the separator's spaces are the gap either side of it. */
-.herojoin { white-space:pre; }
+/* pre-wrap, because the separator's spaces are the gap either side of it
+   AND the only place the line may break. Plain pre made the whole hero one
+   unbreakable run -- every part is nowrap -- so "Cardboard + Food" ran off
+   the right edge of a panel-width card. pre-wrap keeps the spaces and lets
+   the line break after the join; the spaces before it are &nbsp; (see
+   stat()), so the "+" ends the first line rather than leading the second.
+   tools/checkhero.js holds it. */
+.herojoin { white-space:pre-wrap; }
 
 /* drawer — the second half of a light cell, folded away until asked for
 
@@ -6301,8 +6307,11 @@ const BODIES = {
       const join = isBlank(b.hero_join) ? " + " : b.hero_join;
       const parts = heroParts.map((p) =>
         `<span class="heropart">${heroIconMarkup(p.icon)}${esc(p.text)}</span>`);
+      /* The spaces before the separator are non-breaking, so a narrow card
+         breaks the line after "+" and never leaves it leading the next. */
+      const joinText = esc(join).replace(/^ +/, (sp) => "&nbsp;".repeat(sp.length));
       out += `<p class="hero">`
-        + parts.join(`<span class="herojoin">${esc(join)}</span>`)
+        + parts.join(`<span class="herojoin">${joinText}</span>`)
         + `</p>`;
     } else if (!isBlank(b.hero)) {
       /* The whole phrase from one source, for a hero that names one thing --
