@@ -7787,11 +7787,8 @@ function bodyIsEmpty(type, b) {
        for. Only a plan that has not arrived yet is nothing to show. */
     case "meals":
       if (!Array.isArray(b.plan)) return true;
-      /* Today's summary with nothing planned today has nothing to say. */
-      if (String(b.layout || "").toLowerCase() === "today") {
-        const types = (Array.isArray(b.types) && b.types.length ? b.types : ["dinner"]).map((t) => String(t).toLowerCase());
-        return mealTodayRows(b, types, b.plan.filter((e) => e && typeof e === "object" && !isBlank(e.mealplan_date))).length === 0;
-      }
+      /* Today's summary with nothing planned today still shows: an
+         unplanned day is worth knowing about, so it says so. */
       return false;
     /* One point is not a shape. A fortnight chart drawn on the house's
        first day put a single dot in an empty box, because a length of one
@@ -8429,7 +8426,7 @@ function mealTodayRows(b, types, plan) {
 
 function mealToday(b, types, plan) {
   const rows = mealTodayRows(b, types, plan);
-  if (!rows.length) return "";
+  if (!rows.length) return `<p class="sub mltempty">${esc(firstOf(b.empty, "Nothing planned today"))}</p>`;
   return `<ul class="mltoday">${rows.map((r) => {
     const mt = mealType(r.type);
     const pic = recipeThumb(b, r.recipe, "mltpic") || `<span class="mltpic none">${iconMarkup(mt.icon)}</span>`;
