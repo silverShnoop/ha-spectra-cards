@@ -5,7 +5,7 @@
  * tab's week. A meal with a recipe photo shows it; one without (a note,
  * or a recipe Mealie has no picture for) shows its type's icon, so the
  * column of pictures has no gaps. With nothing planned today the card
- * has nothing to say and hides like any empty card.
+ * stays and says so.
  *
  *   node tools/checkmealtoday.js [path/to/spectra-cards.js]
  */
@@ -71,15 +71,15 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     const empty = mk("b", []);
     for (let i = 0; i < 40; i += 1) {
       await new Promise((r) => setTimeout(r, 25));
-      if (full.shadowRoot.querySelector("img.mltpic")) break;
+      if (full.shadowRoot.querySelector("img.mltpic") && empty.shadowRoot.querySelector(".mltempty")) break;
     }
     const rows = [...full.shadowRoot.querySelectorAll(".mltoday li")];
     return {
       text: rows.map((r) => r.textContent.replace(/\s+/g, " ").trim()),
       photo: rows.map((r) => (r.querySelector("img.mltpic") ? r.querySelector("img.mltpic").getAttribute("src") : "")),
       icon: rows.map((r) => Boolean(r.querySelector(".mltpic.none"))),
-      emptyHidden: empty.hidden || getComputedStyle(empty).display === "none"
-        || !empty.shadowRoot.querySelector(".mltoday"),
+      emptyShown: !empty.hidden && getComputedStyle(empty).display !== "none",
+      emptyText: (empty.shadowRoot.querySelector(".mltempty") || {}).textContent || "",
       noControls: !full.shadowRoot.querySelector(".mltoday button, .mltoday [data-meal]"),
     };
   });
@@ -91,7 +91,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   check("a recipe with a photo shows it", /recipe_image\/0a1b2c3d-1111-2222\/tiny/.test(got.photo[1]), got.photo);
   check("a meal without one shows its type's icon", got.icon[0] && !got.icon[1], got.icon);
   check("it is read-only", got.noControls, got);
-  check("nothing planned today, nothing shown", got.emptyHidden, got);
+  check("nothing planned today, the card stays and says so", got.emptyShown && /Nothing planned today/.test(got.emptyText), got);
   await browser.close();
   server.close();
   if (problems.length) {
