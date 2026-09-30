@@ -643,11 +643,14 @@ first and ends `+ N more` — the `Needs you` row still names them all.
 Networks sit evenly round the map in the sensor's order, the first on the
 left.
 
-**Narrower, the list.** The labels would be too small to read, so a phone gets
-every device not fully answering under the room it is in, with what is
-missing (`offline`, `No temperature`, `5 of 8 missing`) and **how long**:
-`offline · 3d`. Last, a bar per network. A container query picks the view, so
-the card never has to be told how wide it is.
+**Narrower — a phone — the same map, numbered.** Side labels would be too
+small to read, so the map is drawn tighter and each problem dot carries a
+number just outside its cluster. The numbers are a list under the map,
+grouped by network, offline first: the name, its room, what is missing
+(`offline`, `No temperature`, `5 of 8 missing`) and **how long**:
+`offline · 3d`. A problem whose network is not on the map is still a row,
+under *Other*, with a dot instead of a number. A container query picks the
+view, so the card never has to be told how wide it is.
 
 The time is the sensor's, remembered across restarts. A problem whose time is
 unknown shows none: Home Assistant's own `last_changed` would say it died at
@@ -1103,7 +1106,8 @@ body:
     - name: James
       state: {entity: person.james}
       picture: {entity: person.james, attribute: entity_picture}
-      since: {entity: person.james, attribute: last_changed, format: since}
+      since: {entity: sensor.people_status, attribute: presence,
+              key: [person.james, since], format: since}
   places:                             # optional; a zone's name → badge icon and sketch
     Work: {icon: mdi:briefcase, art: office}
     Allotment: {art: none}
@@ -1136,6 +1140,12 @@ The sketches are a **depiction**, like `--sp-sun`: slate, lawn and sky,
 and never yellow, orange or red, which belong to the levels. The ink is
 `--sp-ink`, so it turns light on a dark panel, and the washes step back
 further than the ink does there.
+
+`since` comes from `home_signals`, not from the person. A person's own
+`last_changed` is reset by every Home Assistant restart, so reading it
+told the panel everybody had just walked in. `key` picks one entry out
+of an attribute that holds a map; it is a list so an entity id, dot and
+all, can be one step.
 
 The meta counts **the people on the card**, not `zone.home`. The zone
 counts everybody in the house, including anyone deliberately left off.
@@ -2211,10 +2221,15 @@ way in, remembering the last one used:
   the script to answer `{recipe}`, and when the page has no recipe on it
   the sheet says so and stays open.
 - **From a photo** reads a cookbook page or a handwritten card into the
-  new-recipe form, for checking before it is saved. **Take a photo** asks
-  for the camera outright and **Choose a photo** for one already taken: a
-  single button left it to the phone, and the Home Assistant app on Android
-  offers only the gallery. When the script's answer has `dish`
+  new-recipe form, for checking before it is saved. **Take a photo** opens
+  the card's own camera, laid out like the phone's: the picture full screen,
+  a round shutter, the gallery to its left and a flip where there are two
+  cameras. The shutter shows the photo first, with **Retake** and **Use
+  photo**, so a blurred page is caught before it is read. And **Choose a
+  photo** picks one already taken. The camera is the card's own because the
+  Home Assistant app on Android opens the gallery for every file picker,
+  whatever the page asks for; where the camera cannot be had, Take falls
+  back to the picker. When the script's answer has `dish`
   (`{left, top, right, bottom}`, each 0–100 per cent of the photo), that
   part of the photo is cut out and becomes the recipe's photo; with none,
   the recipe has no photo until one is given.

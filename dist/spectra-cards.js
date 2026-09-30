@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.146.0";
+const VERSION = "0.147.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2233,6 +2233,44 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 }
 .mlform textarea { min-height:140px; resize:none; overflow:hidden; line-height:1.45; }
 .mlform .mlpair { display:grid; grid-template-columns:2fr 1fr; gap:10px; }
+/* The card's own camera: the picture as big as the sheet allows. */
+.camwrap {
+  position:fixed; left:0; right:0; top:var(--sp-vvtop, 0px); height:var(--sp-vvh, 100dvh);
+  z-index:1001; background:#000; color:#fff; display:flex; flex-direction:column;
+  padding:env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  box-sizing:border-box; animation:sheetfade .16s ease-out;
+}
+.camtop { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; }
+.camhint { font-size:13px; color:rgba(255,255,255,.72); }
+.camview { flex:1; min-height:0; position:relative; }
+.camview video, .camview img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+.camview [hidden] { display:none; }
+.cambar {
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; justify-items:center;
+  padding:18px 24px 22px;
+}
+.cambar[hidden] { display:none; }
+.cambar[data-review] { grid-template-columns:1fr 1fr; gap:12px; }
+.camicon {
+  width:48px; height:48px; border-radius:50%; border:none; padding:0; cursor:pointer;
+  background:rgba(255,255,255,.14); color:#fff; display:grid; place-items:center;
+}
+span.camicon { background:none; }
+.camicon[hidden] { visibility:hidden; display:grid; }
+.camicon .mdi, .camicon ha-icon { width:24px; height:24px; --mdc-icon-size:24px; }
+.camshutter {
+  width:76px; height:76px; border-radius:50%; cursor:pointer; padding:0;
+  background:#fff; border:4px solid #000; box-shadow:0 0 0 4px #fff;
+  transition:transform .08s ease-out;
+}
+.camshutter:active { transform:scale(.92); }
+.camshutter:disabled { opacity:.4; cursor:default; }
+.camtext {
+  width:100%; min-height:48px; border-radius:24px; font:inherit; font-size:15px; font-weight:600;
+  cursor:pointer; border:1px solid rgba(255,255,255,.4); background:none; color:#fff;
+}
+.camtext.camuse { border-color:var(--accent); background:var(--accent); color:var(--sp-surface); }
+@media (prefers-reduced-motion: reduce) { .camwrap { animation:none; } .camshutter { transition:none; } }
 /* The recipe's photo: small, because the form is for the words. */
 .mlform .mlphoto { display:flex; align-items:center; gap:12px; margin-top:4px; }
 .mlphoto .mlpic {
@@ -2963,6 +3001,21 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devmap .lwhat { fill:var(--sp-ink-2); font-size:11px; }
 .devmap .lfor { fill:var(--sp-ink-3); font-family:var(--sp-mono); font-size:10.5px; }
 .devmap .lmore { fill:var(--sp-ink-2); font-size:11.5px; }
+.devmap.phone .hubname { font-size:10.5px; }
+.devmap.phone .hubof { font-size:10px; }
+.devmap.phone { margin:2px 0 4px; }
+.devmark circle { stroke-width:1.5; }
+.devmark text { font-size:9.5px; font-weight:600; font-family:var(--sp-mono); }
+.devmark.offline circle { fill:var(--sp-attention); stroke:var(--sp-attention); }
+.devmark.offline text { fill:var(--sp-surface); }
+.devmark.partial circle { fill:var(--sp-surface); stroke:var(--sp-attention); }
+.devmark.partial text { fill:var(--sp-attention-on); }
+.devnum { flex:0 0 auto; width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center;
+  justify-content:center; font-family:var(--sp-mono); font-size:10.5px; font-weight:600; }
+.devnum.offline { background:var(--sp-attention); color:var(--sp-surface); }
+.devnum.partial { box-shadow:inset 0 0 0 1.5px var(--sp-attention); color:var(--sp-attention-on); }
+.devrow .who { min-width:0; }
+.devrow .room { margin:0; font-size:11px; color:var(--sp-ink-3); }
 
 /* control — the one body you touch rather than read. Same row metrics as
    list, so a panel of controls and a panel of readings sit at the same
@@ -3669,6 +3722,7 @@ const MDI_INLINE = {
   "mdi:cart-outline": "M17,18A2,2 0 0,1 19,20A2,2 0 0,1 17,22C15.89,22 15,21.1 15,20C15,18.89 15.89,18 17,18M1,2H4.27L5.21,4H20A1,1 0 0,1 21,5C21,5.17 20.95,5.34 20.88,5.5L17.3,11.97C16.96,12.58 16.3,13 15.55,13H8.1L7.2,14.63L7.17,14.75A0.25,0.25 0 0,0 7.42,15H19V17H7C5.89,17 5,16.1 5,15C5,14.65 5.09,14.32 5.24,14.04L6.6,11.59L3,4H1V2M7,18A2,2 0 0,1 9,20A2,2 0 0,1 7,22C5.89,22 5,21.1 5,20C5,18.89 5.89,18 7,18M16,11L18.78,6H6.14L8.5,11H16Z",
   "mdi:chevron-left": "M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z",
   "mdi:chevron-right": "M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z",
+  "mdi:image-outline": "M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z",
   "mdi:close": "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z",
   "mdi:dots-horizontal": "M16,12A2,2 0 0,1 18,10A2,2 0 0,1 20,12A2,2 0 0,1 18,14A2,2 0 0,1 16,12M10,12A2,2 0 0,1 12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12M4,12A2,2 0 0,1 6,10A2,2 0 0,1 8,12A2,2 0 0,1 6,14A2,2 0 0,1 4,12Z",
   "mdi:keyboard-outline": "M4,5A2,2 0 0,0 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7A2,2 0 0,0 20,5H4M4,7H20V17H4V7M5,8V10H7V8H5M8,8V10H10V8H8M11,8V10H13V8H11M14,8V10H16V8H14M17,8V10H19V8H17M5,11V13H7V11H5M8,11V13H10V11H8M11,11V13H13V11H11M14,11V13H16V11H14M17,11V13H19V11H17M8,14V16H16V14H8Z",
@@ -4085,6 +4139,17 @@ function readEntity(hass, spec) {
     if (!spec.attribute) v = state.state;
     else if (STATE_FIELDS.has(spec.attribute)) v = state[spec.attribute];
     else v = state.attributes[spec.attribute];
+  }
+  /* One entry out of an attribute that holds a map. `key` is a list so an
+     entity id -- which has a dot in it -- can be one step of the path:
+     `attribute: presence, key: [person.james, since]`. Added for the Who's
+     home card, whose "3h ago" lives on sensor.people_status because a
+     person's own last_changed is reset by every restart. */
+  if (v !== null && v !== undefined && spec.key !== undefined) {
+    for (const step of (Array.isArray(spec.key) ? spec.key : [spec.key])) {
+      v = v !== null && typeof v === "object" ? v[step] : undefined;
+      if (v === undefined) break;
+    }
   }
   if (v === undefined || v === "unknown" || v === "unavailable") v = null;
   const out = v === null ? null : applyFormat(v, spec);
@@ -5589,6 +5654,123 @@ function planHeat(b) {
      arrive newest first so the first one seen already set it. */
   for (const row of out.values()) row.times.sort((x, y) => y - x);
   return out;
+}
+
+/* The network map for a phone: the same map drawn in a 420x330 box, with a
+   number on each problem dot instead of a name, and the names as a numbered
+   list underneath.
+
+   A problem dot takes the seats of its cluster that face away from the
+   middle, and its number sits just outside the cluster on the same side, so
+   the numbers never land on another network. Numbers in one cluster are
+   spread round it until they clear each other. The list is grouped by
+   network in the map's order, offline first, so reading down it walks the
+   map. A problem whose network is not on the map still gets its row, under
+   "Other", without a number -- the list may never be shorter than the Needs
+   you row behind it. */
+function devicesPhone(networks, problems, what, stateOf) {
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  const W = 420, H = 330, cx = 210, cy = 165;
+  const HUB = [88, 80], CL = [146, 124], MR = 7.5;
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const f = (v) => v.toFixed(1);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const pol = ([rx, ry], a) => [cx + rx * Math.cos(a), cy + ry * Math.sin(a)];
+  const biggest = Math.max(1, ...networks.map((n) => num(n.online) + num(n.offline) + num(n.partial)));
+  const S = Math.min(4.2, 28 / Math.sqrt(biggest));
+  const rank = (p) => (p.state === "offline" ? 0 : 1);
+  const wrap = (t) => Math.atan2(Math.sin(t), Math.cos(t));
+
+  let spokes = "", seats = "", marks = "", hubs = "", list = "";
+  let n0 = 0;
+  const placed = new Set();
+  networks.forEach((n, i) => {
+    const a = Math.PI + (2 * Math.PI * i) / networks.length;
+    const on = num(n.online), off = num(n.offline), part = num(n.partial);
+    const hot = off + part > 0;
+    const [hx, hy] = pol(HUB, a), [kx, ky] = pol(CL, a);
+    spokes += `<path class="spoke${hot ? " hot" : ""}" d="M${cx},${cy} L${f(hx)},${f(hy)} L${f(kx)},${f(ky)}"/>`;
+
+    const mine = problems.filter((p) => String(p.network) === String(n.name))
+      .sort((p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name)));
+    mine.forEach((p) => placed.add(p));
+    const count = Math.max(on + off + part, mine.length);
+    const all = Array.from({ length: count }, (_, k) => {
+      const r = S * Math.sqrt(k + 0.5) + 2, t = k * golden;
+      return { x: kx + r * Math.cos(t), y: ky + r * Math.sin(t) };
+    });
+    const R = S * Math.sqrt(count) + 2;
+    const out = Math.atan2(ky - cy, kx - cx);
+    const facing = [...all].sort((p, q) =>
+      ((q.x - kx) * Math.cos(out) + (q.y - ky) * Math.sin(out))
+      - ((p.x - kx) * Math.cos(out) + (p.y - ky) * Math.sin(out))).slice(0, mine.length);
+    const taken = new Set(facing);
+    for (const s of all) if (!taken.has(s)) seats += `<circle class="on" cx="${f(s.x)}" cy="${f(s.y)}" r="2.8"/>`;
+
+    /* Numbers round the outside, in angle order, pushed apart and recentred. */
+    /* Far enough out to clear the cluster, and to fit every number of a
+       small cluster with many problems within half a turn. */
+    const Rm = Math.max(R + MR + 4, (mine.length * (2 * MR + 4)) / Math.PI), gap = (2 * MR + 4) / Rm;
+    const byAngle = facing.map((s) => ({ s, t: wrap(Math.atan2(s.y - ky, s.x - kx) - out) }))
+      .sort((p, q) => p.t - q.t);
+    for (let k = 1; k < byAngle.length; k++) byAngle[k].t = Math.max(byAngle[k].t, byAngle[k - 1].t + gap);
+    if (byAngle.length) {
+      const was = facing.reduce((sum, s) => sum + wrap(Math.atan2(s.y - ky, s.x - kx) - out), 0) / facing.length;
+      const now = byAngle.reduce((sum, m) => sum + m.t, 0) / byAngle.length;
+      for (const m of byAngle) m.t += was - now;
+    }
+    /* The seats go to problems in angle order, so number order runs round the cluster. */
+    const rows = [];
+    byAngle.forEach((m, k) => {
+      const p = mine[k], st = stateOf(p), label = n0 + k + 1;
+      const mx = clamp(kx + Rm * Math.cos(out + m.t), MR + 1, W - MR - 1);
+      const my = clamp(ky + Rm * Math.sin(out + m.t), MR + 1, H - MR - 1);
+      seats += `<circle class="halo" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="5.5"/>`
+        + (st === "offline"
+          ? `<circle class="off" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="3.2"/>`
+          : `<circle class="part" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="2.6"/>`);
+      marks += `<path class="leader" d="M${f(m.s.x)},${f(m.s.y)} L${f(mx)},${f(my)}"/>`
+        + `<g class="devmark ${st}"><circle cx="${f(mx)}" cy="${f(my)}" r="${MR}"/>`
+        + `<text x="${f(mx)}" y="${f(my + 3.3)}" text-anchor="middle">${label}</text></g>`;
+      rows.push({ p, label });
+    });
+    n0 += mine.length;
+
+    const of = `${on}/${on + off + part}`;
+    const w = String(n.name).length * 6.3 + of.length * 6.3 + 26;
+    const h = hot ? " hot" : "";
+    hubs += `<rect class="hub${h}" x="${f(hx - w / 2)}" y="${f(hy - 11.5)}" width="${f(w)}" height="23" rx="11.5"/>`
+      + `<text class="hubname${h}" x="${f(hx - w / 2 + 10)}" y="${f(hy + 4)}">${esc(n.name)}</text>`
+      + `<text class="hubof${h}" x="${f(hx + w / 2 - 10)}" y="${f(hy + 4)}" text-anchor="end">${of}</text>`;
+
+    if (rows.length) {
+      list += `<p class="devroom">${esc(n.name)}</p>`;
+      for (const r of rows.sort((p, q) => p.label - q.label)) list += devPhoneRow(r.p, r.label, what, stateOf);
+    }
+  });
+  const other = problems.filter((p) => !placed.has(p));
+  if (other.length) {
+    list += `<p class="devroom">Other</p>`;
+    for (const p of other) list += devPhoneRow(p, null, what, stateOf);
+  }
+
+  const svg = `<svg class="devmap phone" viewBox="0 0 ${W} ${H}" role="img" `
+    + `aria-label="${esc(`${networks.length} networks, ${n0} device${n0 === 1 ? "" : "s"} numbered`)}">`
+    + spokes + seats + hubs + marks
+    + `<rect class="core" x="${cx - 30}" y="${cy - 12}" width="60" height="24" rx="4"/>`
+    + `<text class="coretxt" x="${cx}" y="${cy + 3.5}" text-anchor="middle">HOME</text></svg>`;
+  return svg + list;
+}
+
+/* A numbered problem row: the number as the map draws it, the name with its
+   room under it, and what is missing with how long on the right. */
+function devPhoneRow(p, label, what, stateOf) {
+  const st = stateOf(p);
+  const since = isBlank(p.since) ? null : shortSince(p.since);
+  const room = isBlank(p.area) ? "No room" : String(p.area);
+  const badge = label === null ? `<span class="devdot ${st}"></span>` : `<span class="devnum ${st}">${label}</span>`;
+  return `<div class="devrow">${badge}<div class="who"><p class="name">${esc(p.name)}</p><p class="room">${esc(room)}</p></div>`
+    + `<span class="what">${esc(what(p))}${since ? ` <span class="for">· ${esc(since)}</span>` : ""}</span></div>`;
 }
 
 /* The network map, drawn in a fixed 960x440 box that scales with the card.
@@ -7632,10 +7814,12 @@ const BODIES = {
      to its dot -- so five dead speakers read as one sick Cast cluster and
      one dead Wi-Fi as a whole cluster gone, without a word of explanation.
 
-     On a narrow card the labels would be too small to read, so it keeps the
-     list: every problem under the room it is in -- the room is where you
-     walk to -- then a bar per network. Both are in the markup; a container
-     query picks one, so the card never has to be told how wide it is.
+     On a narrow card -- a phone -- the side labels would be too small to
+     read, so the same map is drawn tighter and each problem dot carries a
+     number instead of a name. The numbers are a list under the map, grouped
+     by network, each row saying what is missing, for how long and in which
+     room. Both views are in the markup; a container query picks one, so the
+     card never has to be told how wide it is.
 
      "How long" is the sensor's, remembered across restarts. A device whose
      time is unknown just says what is wrong: Home Assistant's own
@@ -7666,34 +7850,11 @@ const BODIES = {
 
     if (networks.length) out += `<div class="devwide">${devicesMap(networks, problems, what, stateOf)}</div>`;
 
-    out += `<div class="devnarrow">`;
-    let room = null;
-    for (const p of problems) {
-      const here = isBlank(p.area) ? "No room" : String(p.area);
-      if (here !== room) {
-        room = here;
-        out += `<p class="devroom">${esc(room)}</p>`;
-      }
-      const since = isBlank(p.since) ? null : shortSince(p.since);
-      out += `<div class="devrow"><span class="devdot ${stateOf(p)}"></span>`
-        + `<p class="name">${esc(p.name)}</p>`
-        + `<span class="what">${esc(what(p))}${since ? ` <span class="for">· ${esc(since)}</span>` : ""}</span></div>`;
-    }
-
-    if (networks.length) {
-      out += `<p class="devhead">By network</p><div class="devnets">`;
-      for (const n of networks) {
-        const on = num(n.online), off = num(n.offline), part = num(n.partial);
-        const all = on + off + part;
-        const seg = (k, cls) => (k ? `<i class="${cls}" style="flex:${k} 0 0"></i>` : "");
-        out += `<span class="label">${esc(n.name)}</span>`
-          + `<span class="devbar" role="img" aria-label="${esc(`${n.name}: ${on} of ${all} answering`)}">`
-          + `${seg(off, "offline")}${seg(part, "partial")}${seg(on, "online")}</span>`
-          + `<span class="of${off + part ? " lvl" : ""}">${on}/${all}</span>`;
-      }
-      out += `</div>`;
-    }
-    return out + `</div></div>`;
+    if (networks.length) out += `<div class="devnarrow">${devicesPhone(networks, problems, what, stateOf)}</div>`;
+    /* No networks means no map to draw at either width -- but the problems
+       are still true, so they are still rows. */
+    else out += problems.map((p) => devPhoneRow(p, null, what, stateOf)).join("");
+    return out + `</div>`;
   },
   list(b) {
     /* A row that resolved to nothing -- a `cases` with no branch true and no
@@ -8594,15 +8755,21 @@ function shrinkPhoto(file, side) {
 }
 
 /* A photo picker, made on the press because a browser only opens a camera
-   from inside a tap. `camera` asks for the camera outright: without it a
-   phone may offer only its gallery, and the Home Assistant app on Android
-   does exactly that. Resolves the file, or null when nothing was chosen. */
-function pickPhoto(holder, camera) {
-  return new Promise((resolve) => {
+   from inside a tap. Resolves the file, or null when nothing was chosen.
+
+   `camera` asks for the camera. The file input's own way of asking,
+   `capture`, is ignored by the Home Assistant app on Android: it opens
+   the gallery for every file input whatever the page says. The app does
+   grant a page the camera itself, so a camera photo is taken here, in the
+   card's own camera. Only where the page cannot have the camera (refused,
+   or no camera) does it fall back to the input, which on a browser still
+   opens the camera. */
+function pickPhoto(holder, camera, accent) {
+  const byInput = (capture) => new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    if (camera) input.setAttribute("capture", "environment");
+    if (capture) input.setAttribute("capture", "environment");
     input.style.display = "none";
     input.addEventListener("change", () => {
       const file = input.files && input.files[0];
@@ -8611,6 +8778,133 @@ function pickPhoto(holder, camera) {
     });
     holder.appendChild(input);
     input.click();
+  });
+  const media = typeof navigator !== "undefined" && navigator.mediaDevices;
+  if (!camera || !media || typeof media.getUserMedia !== "function") return byInput(camera);
+  return cameraOpen(media, "environment")
+    .then((stream) => cameraSheet(holder, media, stream, accent, () => byInput(false)), (error) => {
+      LOGGER_WARN("spectra-card: no camera, choosing a photo instead", error);
+      return byInput(true);
+    });
+}
+
+function cameraOpen(media, facing) {
+  return media.getUserMedia({
+    video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false,
+  });
+}
+
+/* The card's camera, laid out like the phone's own: the picture full
+   screen on black, a round shutter in the middle of the bottom row, the
+   gallery to its left and, where there are two cameras, a flip to its
+   right; close at the top. Black in both themes, because a viewfinder is
+   judged by the picture and anything lighter around it reads as glare.
+
+   The shutter shows the photo before it is used -- Retake or Use photo --
+   because what happens next is a model reading the page, and a blurred
+   page is found out there, a minute later, as a recipe it could not read.
+
+   Resolves a JPEG file, the file chosen from the gallery, or null. The
+   camera is let go however it closes. It wears the card's accent: Use
+   photo is filled with it. */
+function cameraSheet(holder, media, stream, accent, gallery) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement("div");
+    wrap.className = "camwrap";
+    const a = accentNumber(accent) || 4;
+    wrap.style.setProperty("--accent", `var(--sp-a${a})`);
+    wrap.style.setProperty("--accent-on", `var(--sp-a${a}-on)`);
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-label", "Take a photo");
+    wrap.innerHTML = `<div class="camtop"><button type="button" class="camicon" data-no aria-label="Close">${iconMarkup("mdi:close")}</button>`
+      + `<span class="camhint">Fit the whole page in</span><span class="camicon" aria-hidden="true"></span></div>`
+      + `<div class="camview"><video autoplay playsinline muted></video><img alt="The photo taken" hidden></div>`
+      + `<div class="cambar" data-live>`
+      + `<button type="button" class="camicon" data-gallery aria-label="Choose from the gallery">${iconMarkup("mdi:image-outline")}</button>`
+      + `<button type="button" class="camshutter" data-shoot aria-label="Take the photo" disabled></button>`
+      + `<button type="button" class="camicon" data-flip aria-label="Switch camera" hidden>${iconMarkup("mdi:camera-flip-outline")}</button></div>`
+      + `<div class="cambar" data-review hidden>`
+      + `<button type="button" class="camtext" data-retake>Retake</button>`
+      + `<button type="button" class="camtext camuse" data-use>Use photo</button></div>`;
+    const video = wrap.querySelector("video");
+    const still = wrap.querySelector("img");
+    const shoot = wrap.querySelector("[data-shoot]");
+    const flip = wrap.querySelector("[data-flip]");
+    const liveBar = wrap.querySelector("[data-live]");
+    const reviewBar = wrap.querySelector("[data-review]");
+    let facing = "environment";
+    let shot = null;
+    let done = false;
+    const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; };
+    const finish = (file) => {
+      if (done) return;
+      done = true;
+      stop();
+      if (still.src) URL.revokeObjectURL(still.src);
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      resolve(file);
+    };
+    const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(null); } };
+    const show = (s) => {
+      stream = s;
+      shoot.disabled = true;
+      video.srcObject = s;
+      const play = video.play && video.play();
+      if (play && play.catch) play.catch(() => {});
+    };
+    const live = () => { if (video.videoWidth) shoot.disabled = false; };
+    video.addEventListener("loadedmetadata", live);
+    video.addEventListener("playing", live);
+    show(stream);
+    if (typeof media.enumerateDevices === "function") {
+      media.enumerateDevices().then((all) => {
+        if (all.filter((d) => d.kind === "videoinput").length > 1) flip.hidden = false;
+      }, () => {});
+    }
+    wrap.querySelector("[data-no]").addEventListener("click", () => finish(null));
+    wrap.querySelector("[data-gallery]").addEventListener("click", () => {
+      stop();
+      gallery().then((file) => (file ? finish(file) : cameraOpen(media, facing).then(show, () => finish(null))));
+    });
+    flip.addEventListener("click", () => {
+      facing = facing === "environment" ? "user" : "environment";
+      stop();
+      cameraOpen(media, facing).then(show, () => finish(null));
+    });
+    shoot.addEventListener("click", () => {
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+      shoot.disabled = true;
+      canvas.toBlob((blob) => {
+        if (!blob) { shoot.disabled = false; return; }
+        shot = new File([blob], "photo.jpg", { type: "image/jpeg" });
+        still.src = URL.createObjectURL(blob);
+        still.hidden = false;
+        video.hidden = true;
+        liveBar.hidden = true;
+        reviewBar.hidden = false;
+      }, "image/jpeg", 0.92);
+    });
+    wrap.querySelector("[data-retake]").addEventListener("click", () => {
+      shot = null;
+      if (still.src) URL.revokeObjectURL(still.src);
+      still.removeAttribute("src");
+      still.hidden = true;
+      video.hidden = false;
+      reviewBar.hidden = true;
+      liveBar.hidden = false;
+      live();
+    });
+    wrap.querySelector("[data-use]").addEventListener("click", () => { if (shot) finish(shot); });
+    document.addEventListener("keydown", onKey, true);
+    holder.appendChild(wrap);
   });
 }
 
@@ -15398,8 +15692,8 @@ class SpectraCard extends HTMLElement {
      see it. Resolves the saved photo's media id, or null when nothing was
      chosen. The file input is made on the press, because a browser only
      opens a camera from inside a tap. */
-  _mealPhoto(save, folder, camera) {
-    return pickPhoto(this._holder, camera).then((file) => {
+  _mealPhoto(save, folder, camera, accent) {
+    return pickPhoto(this._holder, camera, accent).then((file) => {
       if (!file) return null;
       this._voiceSay("thinking", "Looking at the photo…");
       return shrinkPhoto(file).then((image) => this._mealCall(save, { image, folder }))
@@ -15409,7 +15703,7 @@ class SpectraCard extends HTMLElement {
 
   /* A cookbook page, or a handwritten card, into the new-recipe form. */
   _recipeFromPhoto(spec, entry, accent, edit, camera) {
-    this._mealPhoto(spec.save, "cookbook", camera).then((photo) => {
+    this._mealPhoto(spec.save, "cookbook", camera, accent).then((photo) => {
       if (!photo) return null;
       this._voiceSay("thinking", "Reading the recipe…");
       return this._mealCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type })
@@ -17700,7 +17994,7 @@ class SpectraCard extends HTMLElement {
       this._signImage(String(recipe.recipe_id), "min").then((url) => { picHad = url; drawPic(); });
     }
     wrap.querySelectorAll("[data-pic-take]").forEach((b) => b.addEventListener("click", () => {
-      pickPhoto(this._holder, b.getAttribute("data-pic-take") === "camera").then((file) => {
+      pickPhoto(this._holder, b.getAttribute("data-pic-take") === "camera", accent).then((file) => {
         if (!file) return null;
         return shrinkPhoto(file, 1200).then((image) => { picNew = image; drawPic(); });
       }).catch(() => status("That photo could not be read."));

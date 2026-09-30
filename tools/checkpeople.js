@@ -168,6 +168,29 @@ const js = fs.readFileSync(file);
     check("home keeps its colour when the card's accent changes under it",
       homeOnTeal === band(0), `${homeOnTeal} vs ${band(0)}`);
 
+    /* "3h ago" is read off sensor.people_status, not off the person:
+       a person's own last_changed is reset by every restart. The value
+       sits one map deep, keyed by an entity id that has a dot in it. */
+    const arrived = new Date(Date.now() - 3 * 3600e3).toISOString();
+    el.setConfig({
+      type: "custom:spectra-card", accent: 4, title: "Who's home",
+      body: { type: "people", rows: [{
+        name: "James", state: { entity: "person.james" },
+        since: { entity: "sensor.people_status", attribute: "presence",
+          key: ["person.james", "since"], format: "since" },
+      }] },
+    });
+    el._signature = null;
+    el.hass = { states: {
+      "person.james": { state: "home", attributes: {}, last_changed: new Date().toISOString() },
+      "sensor.people_status": { state: "clear", attributes: {
+        presence: { "person.james": { state: "home", since: arrived } } } },
+    } };
+    await new Promise((r) => requestAnimationFrame(r));
+    const since = (root().querySelector(".psince") || {}).textContent || "";
+    check("the duration comes from the sensor that survives a restart",
+      /^3h ago/.test(since), since);
+
     return problems;
   });
 
