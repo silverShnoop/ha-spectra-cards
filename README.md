@@ -626,38 +626,32 @@ body:
 Three numbers first — connected, offline, partly offline — because they are
 the part read from the doorway.
 
-**On a card 700px wide or more, a network map.** Home Assistant in the middle,
-a hub per network with its `53/56`, and a dot per device clustered past it.
-Every device not fully answering is **named at the side of the map** with a
-line back to its dot: its name, how long, what is missing and its room. Five
-dead speakers read as one sick Cast cluster without a word of explanation.
-Give the section `column_span: 2` or more; it is drawn for that width.
+**Then the house's networks as a map**, at every width: Home Assistant in
+the middle, a hub per network with its `53/56`, and a dot per device clustered
+past it. Trouble is yellow — a dashed spoke, a yellow hub, the problem dots on
+the cluster's outside edge — so five dead speakers read as one sick Cast
+cluster without a word of explanation. Networks sit evenly round the map in
+the sensor's order, the first on the left.
 
-The labels keep three rules, and `tools/checkdevices.js` holds them: a label
-sits in the gutter on its dot's side, so no leader crosses the middle; a
-problem device takes the seats in its cluster that face that gutter; and each
-side is sorted by height and pushed apart, so labels never overlap and leaders
-never cross. About eleven fit a side. A side with more names the offline ones
-first and ends `+ N more` — the `Needs you` row still names them all.
+**Beside it, a list** — under it on a phone — of every device not fully
+answering, grouped by network in the map's order, offline first: the name,
+its room, what is missing (`offline`, `No temperature`, `5 of 8 missing`) and
+**how long**: `offline · 3d`. Networks with nothing wrong are one quiet line
+at the end: `All answering: Zigbee 7`. A problem whose network is not on the
+map is still a row, under *Other*.
 
-Networks sit evenly round the map in the sensor's order, the first on the
-left.
-
-**Narrower — a phone — the same map, numbered.** Side labels would be too
-small to read, so the map is drawn tighter and each problem dot carries a
-number just outside its cluster. The numbers are a list under the map,
-grouped by network, offline first: the name, its room, what is missing
-(`offline`, `No temperature`, `5 of 8 missing`) and **how long**:
-`offline · 3d`. A problem whose network is not on the map is still a row,
-under *Other*, with a dot instead of a number. A container query picks the
-view, so the card never has to be told how wide it is.
+The map names nothing and the list is not numbered against it. Labels at the
+side of the map, and then numbers on its dots, were both tried and read as
+clutter on the panel: the map shows where, the list says what. A container
+query lays them out side by side from 700px, so the card never has to be told
+how wide it is. Give the section `column_span: 2` or more on a panel.
 
 The time is the sensor's, remembered across restarts. A problem whose time is
 unknown shows none: Home Assistant's own `last_changed` would say it died at
 the last reboot, and a confident wrong number is worse than no number.
 
 Offline and partial wear `attention`, because the offline row in `Needs you`
-stands behind them — a dot, its leader, and the hub of a network with one.
+stands behind them — a dot, its spoke, and the hub of a network with one.
 With everything answering there is no yellow on the card, and no key either:
 the key is only there to decode the yellow.
 
