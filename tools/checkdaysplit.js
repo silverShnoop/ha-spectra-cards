@@ -139,6 +139,46 @@ const js = fs.readFileSync(file);
       hollow.el.hidden || getComputedStyle(hollow.el).display === "none"
         || !hollow.svg, "still rendered");
 
+    // ---- a year of months: empty ones keep their place
+    const month = (label, extra) => Object.assign(
+      { label, cost: [], kwh: [], total_cost_text: null, total_kwh: null, note: null },
+      extra || {});
+    const AUG = month("Aug");
+    const SEP = month("Sep", { cost: [5.8, 14.2, 18.9, 13.1], kwh: [23, 57, 76, 53],
+      total_cost: 52.0, total_cost_text: "£52", total_kwh: 209, note: "11/30 days" });
+    const OCT = month("Oct", { note: null });
+    const year = await draw({ days: [AUG, SEP, OCT], slots: 12, keep_empty: true });
+    const ytexts = [...year.svg.querySelectorAll("text")].map((t) => t.textContent);
+    check("an empty month keeps its label", ytexts.includes("Aug") && ytexts.includes("Oct"),
+      ytexts.join("|"));
+    check("...and shows a dash, not a zero",
+      ytexts.filter((t) => t === "\u2014").length === 2 && !ytexts.includes("£0"),
+      ytexts.join("|"));
+    check("a part-month says how much of it there is", ytexts.includes("11/30 days"),
+      ytexts.join("|"));
+    const ysegs = [...year.svg.querySelectorAll("rect")]
+      .filter((r) => Number(r.getAttribute("y")) > 20 && Number(r.getAttribute("height")) > 2);
+    check("only the filled month draws segments", ysegs.length === 4, `${ysegs.length}`);
+    const vb = year.svg.viewBox.baseVal;
+    check("twelve columns widen the box instead of squeezing it", vb.width > 320,
+      `${vb.width}`);
+    check("...and the cap widens with it, so the type stays a week's size",
+      parseFloat(year.svg.style.maxWidth) === Math.round(460 * vb.width / 320),
+      year.svg.style.maxWidth);
+    const xs = [...year.svg.querySelectorAll("text")]
+      .filter((t) => ["Aug", "Sep", "Oct"].includes(t.textContent))
+      .map((t) => Number(t.getAttribute("x")));
+    check("columns sit far enough apart for whole-pound figures",
+      xs[1] - xs[0] >= 40, `${(xs[1] - xs[0]).toFixed(1)}`);
+    const emptyYear = await draw({ days: [AUG, OCT], slots: 12, keep_empty: true });
+    check("a year with nothing in it at all still hides",
+      emptyYear.el.hidden || getComputedStyle(emptyYear.el).display === "none"
+        || !emptyYear.svg, "still rendered");
+    const dropped = await draw({ days: [AUG, SEP], slots: 7 });
+    const dtexts = [...dropped.svg.querySelectorAll("text")].map((t) => t.textContent);
+    check("without keep_empty an empty column is still dropped, as for days",
+      !dtexts.includes("Aug"), dtexts.join("|"));
+
     // ---- the size it draws at, same failure the line chart had
     document.getElementById("a").style.width = "1200px";
     const big = await draw({ days: [SAT, MON], slots: 7 });
