@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.147.2";
+const VERSION = "0.148.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -7653,28 +7653,41 @@ const BODIES = {
      The names arrive with the data and the segments are drawn in the order
      given, so re-cutting the day is a change to the sensor and not to this. */
   daysplit(b) {
-    const days = (Array.isArray(b.days) ? b.days : []).filter(
-      (d) => d && Array.isArray(d.cost) && d.cost.length
-    );
-    if (!days.length) return "";
+    const filled = (d) => d && Array.isArray(d.cost) && d.cost.length;
+    /* A column with no blocks is kept only where the source says so -- a
+       month nothing was recorded for, which keeps its place and its label
+       so a year with a gap reads as a gap. A run of days drops them, as it
+       always has: a day without blocks predates the figure. Either way a
+       chart with no column worth drawing is no chart at all. */
+    const all = Array.isArray(b.days) ? b.days.filter((d) => d && typeof d === "object") : [];
+    const days = b.keep_empty ? all : all.filter(filled);
+    if (!days.some(filled)) return "";
     const names = Array.isArray(b.names) ? b.names : [];
     const FILL = ["var(--sp-b1)", "var(--sp-b2)", "var(--sp-b3)", "var(--sp-b4)"];
 
-    const W = 320, H = 122;
-    /* The column band. Everything below FOOT is text: the day's money, its
-       units, and which day it was. */
-    const TOP = 26, FOOT = 78;
     /* Laid out for `slots` columns even when fewer have arrived, so a week
        filling up does not restretch every morning. */
     const slots = Math.max(days.length, Number(b.slots) || 0);
+    /* A week fits the original 320. More columns than that widen the box
+       rather than squeezing each one: twelve at a week's spacing would put
+       the figures under neighbouring columns on top of each other. The cap
+       below widens with it, so the type stays the size it is on a week. */
+    const W = Math.max(320, 34 + (slots - 1) * 44);
+    /* A note line under the labels only where some column carries one. */
+    const noted = days.some((d) => !isBlank(d.note));
+    const H = noted ? 132 : 122;
+    /* The column band. Everything below FOOT is text: the day's money, its
+       units, and which day it was. */
+    const TOP = 26, FOOT = 78;
     const step = slots > 1 ? (W - 34) / (slots - 1) : 0;
     const x = (i) => (slots > 1 ? 17 + i * step : W / 2);
     const bw = Math.min(34, Math.max(8, step * 0.66)) || 34;
     const peak = Math.max(
-      ...days.map((d) => d.cost.reduce((a, v) => a + (Number(v) || 0), 0)), 0
+      ...days.filter(filled).map((d) => d.cost.reduce((a, v) => a + (Number(v) || 0), 0)), 0
     ) || 1;
 
-    let out = `<svg class="chart tall" viewBox="0 0 ${W} ${H}" role="img"`
+    const cap = W > 320 ? ` style="max-width:${Math.round(460 * W / 320)}px"` : "";
+    let out = `<svg class="chart tall" viewBox="0 0 ${W} ${H}" role="img"${cap}`
       + ` aria-label="${esc(b.label || "Where the power went")}">`;
 
     /* A legend, because four series is past what direct labels can carry --
@@ -7691,6 +7704,20 @@ const BODIES = {
 
     days.forEach((day, i) => {
       let acc = 0;
+      if (!filled(day)) {
+        /* Nothing recorded: a hairline on the baseline and a dash where the
+           money would be, so the column is visibly there and visibly empty
+           -- not a zero, which would be a claim. */
+        out += `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${(FOOT - 1.5).toFixed(1)}"`
+          + ` width="${bw.toFixed(1)}" height="1.5" rx="0.75"`
+          + ` fill="var(--sp-ink-3)" opacity=".35"/>`
+          + `<text x="${x(i).toFixed(1)}" y="90" font-size="9.5"`
+          + ` text-anchor="middle" fill="var(--sp-ink-3)">\u2014</text>`
+          + `<text x="${x(i).toFixed(1)}" y="114" font-size="9"`
+          + ` text-anchor="middle" fill="var(--sp-ink-3)">`
+          + `${esc(day.label || "")}</text>`;
+        return;
+      }
       day.cost.forEach((raw, si) => {
         const v = Number(raw) || 0;
         if (v <= 0) return;
@@ -7718,6 +7745,14 @@ const BODIES = {
       out += `<text x="${x(i).toFixed(1)}" y="114" font-size="9"`
         + ` text-anchor="middle" fill="var(--sp-ink-2)">`
         + `${esc(day.label || "")}</text>`;
+      /* A column that is not the whole of its period says so, because a
+         part-month is otherwise just a short bar -- which reads as a cheap
+         month rather than an unfinished one. */
+      if (!isBlank(day.note)) {
+        out += `<text x="${x(i).toFixed(1)}" y="125" font-size="7"`
+          + ` text-anchor="middle" fill="var(--sp-ink-3)">`
+          + `${esc(day.note)}</text>`;
+      }
     });
     return out + `</svg>`;
   },
