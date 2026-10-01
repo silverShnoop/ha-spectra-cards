@@ -137,6 +137,10 @@ const js = fs.readFileSync(file);
     // ---- a line per lamp
     const rows = qa(".lamprow");
     check("a line per lamp", rows.length === 2, rows.length);
+    check("each line says it opens, with a chevron by its name",
+      rows.every((r) => r.querySelector(".lampchev")
+        && r.querySelector(".lampchev").previousElementSibling.classList.contains("name")),
+      rows.map((r) => r.innerHTML).join(" | "));
     check("named as configured", rows.map((r) => r.querySelector(".name").textContent)
       .join("|") === "Far light|Casey's lamp", rows.map((r) => r.textContent).join("|"));
     check("a dark lamp says Off", /Off/.test(rows[0].querySelector(".lampscene").textContent),
@@ -217,6 +221,25 @@ const js = fs.readFileSync(file);
       !!lost && lost.getAttribute("data-entity") === "scene.bedroom_dimmed", "wrong entity");
     check("nothing on the strip claims to be selected",
       !q(".scenetrack.lead .bands i.on"), "a band is on");
+
+    // ---- and the lost scene can be pressed straight back, even when it is
+    //      the first band -- where a finger on a strip with nothing selected
+    //      begins
+    calls.length = 0;
+    const strip = q(".scenetrack.lead");
+    const box = strip.querySelector(".slidehold").getBoundingClientRect();
+    const first = box.left + (box.width / ROOM.length) / 2;
+    strip.dispatchEvent(new PointerEvent("pointerdown",
+      { clientX: first, clientY: box.top + box.height / 2, button: 0, bubbles: true, pointerId: 1 }));
+    strip.dispatchEvent(new PointerEvent("pointerup",
+      { clientX: first, clientY: box.top + box.height / 2, button: 0, bubbles: true, pointerId: 1 }));
+    await settle();
+    check("tapping the lost scene puts it back at once",
+      calls.some((c) => c.service === "scene.turn_on"
+        && JSON.stringify(c).includes("scene.bedroom_dimmed")), JSON.stringify(calls));
+    // The bridge agrees, which is what releases the card's claim on it.
+    room("Dimmed");
+    await feed();
 
     // ---- a zone from outside the room takes the scene
     set("sensor.casey_active_scene", "none",
