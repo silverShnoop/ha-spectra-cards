@@ -566,6 +566,28 @@ arrived, so a week filling up does not restretch every morning. A day whose
 blocks are missing is a **gap** rather than a column of nothing — the house
 never used nothing, and a flat column under a real date would say it did.
 
+The same body draws a year of months:
+
+```yaml
+body:
+  type: daysplit
+  slots: 12
+  keep_empty: true
+  names: {entity: sensor.energy_day, attribute: block_names}
+  days:  {entity: sensor.energy_day, attribute: month_blocks}
+```
+
+`keep_empty` is the one difference. A month nothing was recorded for is not
+a figure that predates the blocks — it is a month — so it keeps its column:
+a hairline on the baseline, a dash where the money would be, and its label.
+A column may carry a `note` ("so far", "11/30 days"), printed under its
+label, because a part-month is otherwise just a short bar and reads as a
+cheap month. A chart with no filled column at all still hides.
+
+More than seven slots widen the box instead of squeezing the columns, and
+the size cap widens with it, so the type is the size it is on a week. Twelve
+months want a card two columns wide.
+
 Colour is one hue getting lighter through the day, because time of day is
 *ordered*: four unrelated hues would say the blocks are four kinds of thing
 rather than four parts of one day. The steps are uneven on purpose — adjacent
