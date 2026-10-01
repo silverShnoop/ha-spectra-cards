@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.147.0";
+const VERSION = "0.147.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -11270,6 +11270,11 @@ class SpectraCard extends HTMLElement {
        phone also shuts the keyboard -- so nothing paints until it closes,
        and closing it paints whatever was held back. */
     if (this._editing) return;
+    /* The camera is open. It is a sheet like the others, and the house
+       changing under it -- a light, a plan refetch, the idle clock -- took
+       it off the screen mid-photo, which looks like the dashboard
+       reloading. Held until it closes, like the form. */
+    if (this._camera) return;
     /* The same for a field on the card itself -- the recipe search, a meal
        typed into a slot. Every refetch and every state change in the house
        would otherwise rebuild the field under the caret and shut the
@@ -11766,9 +11771,13 @@ class SpectraCard extends HTMLElement {
        across a plan refetch or a note expiring, vanished mid-read. */
     const sheets = Array.from(holder.children)
       .filter((el) => el.classList && (el.classList.contains("confirmwrap")
-        || el.classList.contains("mltoast")));
+        || el.classList.contains("camwrap") || el.classList.contains("mltoast")));
     holder.innerHTML = html;
     for (const sheet of sheets) holder.appendChild(sheet);
+    /* A video taken off the page pauses, and coming back does not restart it. */
+    holder.querySelectorAll(".camwrap video").forEach((v) => {
+      if (v.paused && !v.hidden) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+    });
     /* The open slot's tray rises in when it opens, not again every time
        the card repaints under it -- a voice answer, a refetch, the clock.
        Marked before the frame is drawn, so the entrance never starts. */
@@ -14874,7 +14883,7 @@ class SpectraCard extends HTMLElement {
     if (!moved) return;
     if (Date.now() - (this._touchedAt || 0) < this._idleMs) return;
     if (this._voice && this._voice.phase !== "idle") return;
-    if (this._holder.querySelector(".confirmwrap") || this._typing()) return;
+    if (this._holder.querySelector(".confirmwrap, .camwrap") || this._typing()) return;
     this._mealPick = null;
     this._mealMoving = null;
     this._mealMenu = false;
@@ -15692,8 +15701,19 @@ class SpectraCard extends HTMLElement {
      see it. Resolves the saved photo's media id, or null when nothing was
      chosen. The file input is made on the press, because a browser only
      opens a camera from inside a tap. */
+  /* A photo, with the card held still while the camera is up. */
+  _pickPhoto(camera, accent) {
+    this._camera = true;
+    const done = () => {
+      this._camera = false;
+      this._signature = null;
+      this._update();
+    };
+    return pickPhoto(this._holder, camera, accent).then((file) => { done(); return file; }, (error) => { done(); throw error; });
+  }
+
   _mealPhoto(save, folder, camera, accent) {
-    return pickPhoto(this._holder, camera, accent).then((file) => {
+    return this._pickPhoto(camera, accent).then((file) => {
       if (!file) return null;
       this._voiceSay("thinking", "Looking at the photo…");
       return shrinkPhoto(file).then((image) => this._mealCall(save, { image, folder }))
@@ -17994,7 +18014,7 @@ class SpectraCard extends HTMLElement {
       this._signImage(String(recipe.recipe_id), "min").then((url) => { picHad = url; drawPic(); });
     }
     wrap.querySelectorAll("[data-pic-take]").forEach((b) => b.addEventListener("click", () => {
-      pickPhoto(this._holder, b.getAttribute("data-pic-take") === "camera", accent).then((file) => {
+      this._pickPhoto(b.getAttribute("data-pic-take") === "camera", accent).then((file) => {
         if (!file) return null;
         return shrinkPhoto(file, 1200).then((image) => { picNew = image; drawPic(); });
       }).catch(() => status("That photo could not be read."));
