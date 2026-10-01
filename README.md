@@ -993,7 +993,8 @@ body:
 Each lamp gets one line under the room's scenes: its name, what it is
 showing and its switch. It shows its own scene in that scene's colour,
 otherwise **Room scene** (or **No scene** while the room is on none), or
-**Off**. Tapping the line opens the lamp's own scenes and brightness beneath
+**Off**. A chevron beside the name marks the line as one that opens. Tapping
+the line opens the lamp's own scenes and brightness beneath
 it. This uses the same fold as the room's drawer, and only one drawer is open
 at a time. A lamp's press is the lamp's. Its scene is claimed on its own line
 and never rings the room's strip, which matters because the two often share
