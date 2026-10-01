@@ -6,13 +6,11 @@
  * known time shows no time rather than a made-up one, and a house with
  * everything answering carries no level colour anywhere.
  *
- * On a phone the card is a small network map with a number on each problem
- * dot, and the rows are those numbers: one each, in order, never overlapping
- * and never outside the drawing.
- *
- * Wide, the same card is a network map, and the labels are what it promises:
- * one per problem, on its dot's side, never overlapping, never crossing
- * each other's leaders, and never outside the drawing.
+ * The networks are a map at every width, naming nothing: a dot per device,
+ * a hub per network with how many answer, the trouble in yellow. The list
+ * is separate -- beside the map when the card is wide, under it on a phone
+ * -- grouped by network, and nothing numbers or labels one against the
+ * other.
  *
  *   node tools/checkdevices.js [path/to/spectra-cards.js]
  */
@@ -93,10 +91,10 @@ const js = fs.readFileSync(file);
     check("offline and partial tiles wear the level, connected never does",
       lit.join(",") === "false,true,true", lit.join(","));
 
-    // ---- a phone: the map with numbers, and the numbers as rows
-    const rows = [...today.root.querySelectorAll(".devnarrow .devrow")];
+    // ---- the list: by network, a row per problem, nothing linking it to the map
+    const rows = [...today.root.querySelectorAll(".devlist .devrow")];
     check("a row per problem", rows.length === 3, rows.length);
-    const heads = [...today.root.querySelectorAll(".devnarrow .devroom")].map((r) => r.textContent);
+    const heads = [...today.root.querySelectorAll(".devlist .devroom")].map((r) => r.firstChild.textContent);
     check("rows grouped by network, a problem off the map under Other", heads.join("|") === "Hue|Other", heads.join("|"));
     check("an offline row says offline, for how long, and the room",
       /offline/.test(rows[0].textContent) && /3d/.test(rows[0].textContent) && /Ensuite/.test(rows[0].textContent), rows[0].textContent);
@@ -104,15 +102,13 @@ const js = fs.readFileSync(file);
       rows[1].textContent.includes("No temperature") && /1h 30m/.test(rows[1].textContent), rows[1].textContent);
     check("an unknown time shows no time at all, not the last reboot",
       !rows[2].querySelector(".for"), rows[2].textContent);
-    check("offline is a filled number and partial a ring",
-      rows[0].querySelector(".devnum.offline") && rows[1].querySelector(".devnum.partial"), "badges");
-    check("a problem on no network on the map gets a dot, not a number",
-      rows[2].querySelector(".devdot") && !rows[2].querySelector(".devnum"), rows[2].innerHTML);
-    const marks = [...today.root.querySelectorAll(".devnarrow .devmark")].map((m) => m.textContent);
-    const labels = rows.map((r) => r.querySelector(".devnum")).filter(Boolean).map((n) => n.textContent);
-    check("the map's numbers are the rows' numbers", marks.sort().join(",") === labels.sort().join(",") && labels.join(",") === "1,2",
-      `${marks} / ${labels}`);
-    const ofs = [...today.root.querySelectorAll(".devnarrow .hubof")].map((o) => o.textContent);
+    check("offline is a filled dot and partial a ring",
+      rows[0].querySelector(".devdot.offline") && rows[1].querySelector(".devdot.partial"), "dots");
+    check("a network with nothing wrong is one quiet line, not a heading",
+      /All answering: Zigbee 7/.test((today.root.querySelector(".devquiet") || {}).textContent || ""), "no quiet line");
+    check("nothing numbers or labels the list against the map",
+      !today.root.querySelector(".devnum, .devmark, .leader, .devlabel"), "linked");
+    const ofs = [...today.root.querySelectorAll(".devmap .hubof")].map((o) => o.textContent);
     check("each network says how many answer", ofs.join(",") === "58/60,7/7,4/9", ofs.join(","));
 
     // ---- a quiet house has no yellow
@@ -120,10 +116,9 @@ const js = fs.readFileSync(file);
       networks: NETS.map((n) => ({ ...n, online: n.online + n.offline + n.partial, offline: 0, partial: 0 })), problems: [] });
     check("everything answering: no rows", calm.root.querySelectorAll(".devrow").length === 0, "rows");
     check("...and no level colour anywhere",
-      !calm.card.querySelector(".lvl, .devdot, .devbar .offline, .devbar .partial"), "yellow on a quiet day");
+      !calm.card.querySelector(".lvl, .devdot, .devlegend, .devmap .off, .devmap .part, .devmap .halo, .devmap .hot"), "yellow on a quiet day");
 
-
-    // ---- wide: the map, as this morning's house (30 Sep 2026)
+    // ---- this morning's house (30 Sep 2026), wide and narrow
     const HOUSE = {
       connected: 118, offline: 7, partial: 5,
       networks: [
@@ -148,102 +143,44 @@ const js = fs.readFileSync(file);
         { name: "Tado Bedroom Guest", area: null, network: "Tado", state: "partial", detail: "1 reading missing", since: ago(170) },
       ],
     };
-    const shown = (e) => !!e && getComputedStyle(e).display !== "none";
-    const narrow = await draw(HOUSE, 400);
-    check("narrow: the list, not the map",
-      shown(narrow.root.querySelector(".devnarrow")) && !shown(narrow.root.querySelector(".devwide")), "wrong view");
-
-    const pm = narrow.root.querySelector(".devnarrow .devmap");
-    const pinv = pm.getScreenCTM().inverse();
-    const pbox = (e) => { const r = e.getBoundingClientRect();
-      const p1 = new DOMPoint(r.left, r.top).matrixTransform(pinv), p2 = new DOMPoint(r.right, r.bottom).matrixTransform(pinv);
-      return { l: p1.x, t: p1.y, r: p2.x, b: p2.y }; };
-    const pmarks = [...pm.querySelectorAll(".devmark")].map((m) => ({ n: m.textContent, ...pbox(m.querySelector("circle")) }));
-    check("phone: a number per problem, 1 to 12, each once",
-      pmarks.map((m) => Number(m.n)).sort((a, b) => a - b).join(",") === Array.from({ length: 12 }, (_, i) => i + 1).join(","),
-      pmarks.map((m) => m.n).join(","));
-    /* Circles, so measured centre to centre: two boxes can touch at the corners of circles that do not. */
-    const ctr = (m) => [(m.l + m.r) / 2, (m.t + m.b) / 2];
-    const close = pmarks.flatMap((a, i) => pmarks.slice(i + 1).map((b) => [a, b]))
-      .filter(([a, b]) => Math.hypot(ctr(a)[0] - ctr(b)[0], ctr(a)[1] - ctr(b)[1]) < (a.r - a.l));
-    check("phone: no two numbers overlap", !close.length, close.map(([a, b]) => `${a.n}~${b.n}`).join(" "));
-    check("phone: every number inside the drawing",
-      pmarks.every((m) => m.l >= 0 && m.t >= 0 && m.r <= 420 && m.b <= 330), "clipped");
-    const plist = [...narrow.root.querySelectorAll(".devnarrow .devnum")].map((n) => Number(n.textContent));
-    check("phone: the list reads 1 to 12 in order", plist.join(",") === Array.from({ length: 12 }, (_, i) => i + 1).join(","), plist.join(","));
-    const firstCast = [...narrow.root.querySelectorAll(".devnarrow .devrow")].find((r) => /Speaker|TV|Display/.test(r.textContent));
-    check("phone: a network's offline rows before its partial ones",
-      [...narrow.root.querySelectorAll(".devnarrow .devroom")].every((h) => {
-        const rs = []; for (let e = h.nextElementSibling; e && e.classList.contains("devrow"); e = e.nextElementSibling) rs.push(e);
-        const st = rs.map((r) => (r.querySelector(".devnum.offline") ? 0 : 1));
+    const rect = (e) => e.getBoundingClientRect();
+    for (const [label, width, beside] of [["wide", 960, true], ["narrow", 380, false]]) {
+      const c = await draw(HOUSE, width);
+      const map = c.root.querySelector(".devmap"), list = c.root.querySelector(".devlist");
+      check(`${label}: the map is drawn`, !!map && rect(map).width > 200, map && rect(map).width);
+      check(`${label}: the list is ${beside ? "beside" : "under"} the map`,
+        beside ? rect(list).left >= rect(map).right - 1 : rect(list).top >= rect(map).bottom - 1,
+        `${JSON.stringify(rect(map))} / ${JSON.stringify(rect(list))}`);
+      const dots = map.querySelectorAll(".on, .off, .part").length;
+      check(`${label}: a dot per device`, dots === 130, dots);
+      check(`${label}: a yellow dot per problem`, map.querySelectorAll(".off, .part").length === 12, map.querySelectorAll(".off, .part").length);
+      check(`${label}: a network with a problem wears the level; one without does not`,
+        map.querySelectorAll(".hub.hot").length === 4 && map.querySelectorAll(".hub").length === 5, "hubs");
+      const order = [...list.querySelectorAll(".devroom")].map((h) => h.firstChild.textContent);
+      check(`${label}: networks in the map's order, the healthy one left out`,
+        order.join("|") === "Hue|Tado|Cast|Wi-Fi & cloud", order.join("|"));
+      check(`${label}: every problem is a row`, list.querySelectorAll(".devrow").length === 12, list.querySelectorAll(".devrow").length);
+      const offlineFirst = [...list.querySelectorAll(".devroom")].every((h) => {
+        const st = [];
+        for (let e = h.nextElementSibling; e && e.classList.contains("devrow"); e = e.nextElementSibling)
+          st.push(e.querySelector(".devdot.offline") ? 0 : 1);
         return st.every((v, i) => !i || v >= st[i - 1]);
-      }) && !!firstCast, "partial first");
-
-    /* The label geometry, in the svg's own units. */
-    const labelsOf = (root) => {
-      const svg = root.querySelector(".devwide .devmap");
-      const m = svg.getScreenCTM().inverse();
-      const toSvg = (r) => {
-        const p1 = new DOMPoint(r.left, r.top).matrixTransform(m);
-        const p2 = new DOMPoint(r.right, r.bottom).matrixTransform(m);
-        return { l: p1.x, t: p1.y, r: p2.x, b: p2.y };
-      };
-      const leaders = [...svg.querySelectorAll(".leader")].map((l) => {
-        const n = l.getAttribute("d").match(/-?[\d.]+/g).map(Number);
-        return { dx: n[0], dy: n[1], gx: n[4], ly: n[5] };
       });
-      const boxes = [...svg.querySelectorAll(".devlabel")].map((g) => ({ text: g.textContent, ...toSvg(g.getBoundingClientRect()) }));
-      return { svg, leaders, boxes };
-    };
+      check(`${label}: a network's offline rows before its partial ones`, offlineFirst, "partial first");
+      const svg = map.getBBox ? map : null;
+      const vb = map.viewBox.baseVal, inv = map.getScreenCTM().inverse();
+      const inside = [...map.querySelectorAll("circle, rect")].every((e) => {
+        const r = rect(e);
+        const p1 = new DOMPoint(r.left, r.top).matrixTransform(inv), p2 = new DOMPoint(r.right, r.bottom).matrixTransform(inv);
+        return p1.x >= -0.5 && p1.y >= -0.5 && p2.x <= vb.width + 0.5 && p2.y <= vb.height + 0.5;
+      });
+      check(`${label}: everything inside the drawing`, inside && !!svg, "clipped");
+    }
 
-    const wide = await draw(HOUSE, 960);
-    check("wide: the map, not the list",
-      shown(wide.root.querySelector(".devwide")) && !shown(wide.root.querySelector(".devnarrow")), "wrong view");
-    const L = labelsOf(wide.root);
-    check("a label per problem", L.boxes.length === 12, L.boxes.length);
-    check("every problem is named",
-      HOUSE.problems.every((p) => L.boxes.some((b) => b.text.startsWith(p.name))), L.boxes.map((b) => b.text).join("|"));
-    check("an unknown time stays unknown on the map too",
-      !L.boxes.find((b) => b.text.startsWith("Bedroom TV")).text.match(/\d+[mhd]\b/), "made-up time");
-    check("a label is on its dot's side",
-      L.leaders.every((l) => (l.gx > 480) === (l.dx > 480)), "crossed the middle");
-    const inOrder = (side) => {
-      const ls = L.leaders.filter((l) => (l.gx > 480) === side).sort((a, b) => a.dy - b.dy);
-      return ls.every((l, i) => !i || l.ly > ls[i - 1].ly);
-    };
-    check("leaders never cross", inOrder(true) && inOrder(false), "crossed");
-    const overlap = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
-    const clash = L.boxes.some((a, i) => L.boxes.some((b, j) => j > i && overlap(a, b)));
-    check("no two labels overlap", !clash, "overlap");
-    check("every label inside the drawing",
-      L.boxes.every((b) => b.l >= 0 && b.t >= 0 && b.r <= 960 && b.b <= 440), "clipped");
-    check("a network with a problem wears the level; one without does not",
-      wide.root.querySelectorAll(".devwide .hub.hot").length === 4 && wide.root.querySelectorAll(".devwide .hub").length === 5, "hubs");
-    const dots = wide.root.querySelectorAll(".devwide .on, .devwide .off, .devwide .part").length
-      - wide.root.querySelectorAll(".devwide .leader + circle").length;
-    check("a dot per device", dots === 130, dots);
-
-    // ---- more problems than a side can name
-    const many = Array.from({ length: 30 }, (_, i) => ({ name: `Speaker ${i + 1}`, area: "Hall", network: "Cast",
-      state: i % 3 ? "offline" : "partial" }));
-    const busy = await draw({ connected: 10, offline: 20, partial: 10,
-      networks: [{ name: "Hue", online: 10, offline: 0, partial: 0 }, { name: "Cast", online: 0, offline: 20, partial: 10 }],
-      problems: many }, 960);
-    const B = labelsOf(busy.root);
-    const more = busy.root.querySelector(".devmap .lmore");
-    check("a full side says how many more", more && /\+ \d+ more/.test(more.textContent), more && more.textContent);
-    check("...and the count adds up", more && B.boxes.length + Number(more.textContent.match(/\d+/)[0]) === 30, B.boxes.length);
-    check("...naming offline before partial",
-      B.boxes.every((b) => !/partly/.test(b.text)), B.boxes.map((b) => b.text).join("|"));
-    check("...still inside the drawing and not overlapping",
-      B.boxes.every((b) => b.t >= 0 && b.b <= 440) && !B.boxes.some((a, i) => B.boxes.some((b, j) => j > i && overlap(a, b))), "clipped");
-
-    // ---- a quiet house on the map
-    const calmWide = await draw({ connected: 130, offline: 0, partial: 0,
-      networks: HOUSE.networks.map((n) => ({ name: n.name, online: n.online + n.offline + n.partial, offline: 0, partial: 0 })),
-      problems: [] }, 960);
-    check("a quiet map has no yellow, no labels and no key",
-      !calmWide.root.querySelector(".devmap .off, .devmap .part, .devmap .halo, .devmap .leader, .devmap .hot, .devlegend"), "yellow on a quiet day");
+    // ---- no networks: no map, but the problems are still rows
+    const bare = await draw({ connected: 3, offline: 1, partial: 0, problems: [PROBS[0]] });
+    check("no networks: no map, the problem still a row",
+      !bare.root.querySelector(".devmap") && bare.root.querySelectorAll(".devrow").length === 1, "lost");
 
     // ---- nothing to say
     const none = await draw({});

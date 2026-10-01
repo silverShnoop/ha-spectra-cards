@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.147.2";
+const VERSION = "0.148.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2928,100 +2928,63 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    0-100 axis. The chart is capped a little narrower than a line chart's
    because it has no labels worth reading at size, only positions. */
 .chart.batt { max-width:420px; margin:4px 0 0; }
-/* devices — three numbers, the problems by room, then a bar per network.
+/* devices — three numbers, then the house's networks as a map, and beside
+   it (below it, on a phone) every device not answering, grouped by network.
    The tiles are the one place on the card read from across the room, so
    they take the hero's size; everything under them is row-sized. */
-.devtiles { display:flex; gap:6px; padding:2px 6px 4px; }
+.devbox { container-type:inline-size; container-name:devices; }
+.devtiles { display:flex; flex-wrap:wrap; gap:6px; padding:2px 6px 4px; }
 .devtile { flex:1 1 0; min-width:0; padding:7px 10px; border-radius:4px; background:var(--sp-zebra); }
 .devtile.lvl { background:var(--sp-attention-soft); color:var(--sp-attention-on); }
 .devtile .n { margin:0; font-size:28px; line-height:1.05; font-variant-numeric:tabular-nums; }
 .devtile .sub { margin:2px 0 0; }
 .devtile.lvl .sub { color:inherit; }
-.devroom { margin:8px 6px 2px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
-.devrow { display:flex; align-items:center; gap:8px; padding:3px 6px; font-size:12.5px; }
-.devrow .name { margin:0; font-size:12.5px; min-width:0; }
-.devrow .what { margin-left:auto; text-align:right; font-size:12px; color:var(--sp-ink-2); white-space:nowrap; }
-.devrow .for { font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); }
-.devdot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; box-sizing:border-box; }
-.devdot.offline { background:var(--sp-attention); }
-.devdot.partial { border:2px solid var(--sp-attention); }
-.devhead { display:flex; align-items:center; gap:8px; margin:10px 6px 4px; font-size:10px;
-  letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
-.devhead::after { content:""; flex:1 1 auto; height:1px; background:var(--sp-edge); }
-.devnets { display:grid; grid-template-columns:auto 1fr auto; gap:5px 10px; align-items:center; padding:0 6px 2px; font-size:12.5px; }
-.devnets .label { color:var(--sp-ink-2); }
-.devnets .of { font-family:var(--sp-mono); font-size:11.5px; color:var(--sp-ink-3); text-align:right; }
-.devnets .of.lvl { color:var(--sp-attention-on); }
-.devbar { display:flex; gap:1px; height:7px; border-radius:2px; overflow:hidden; background:var(--sp-zebra); }
-.devbar i { display:block; }
-.devbar .offline { background:var(--sp-attention); }
-.devbar .partial { background:var(--sp-attention-soft); box-shadow:inset 0 0 0 1px var(--sp-attention); }
-.devbar .online { background:var(--accent); }
-.battsum { margin:4px 6px 0; }
-/* The map: the same numbers drawn as the house's networks, for a card
-   wide enough to label them. Home Assistant in the middle, a hub per
-   network, a dot per device, and every device that is not answering named
-   in the gutter on its own side with a leader back to its dot.
-
-   Below 700px the labels would have to shrink to be read, so the card
-   keeps the list instead: a problem by room and a bar per network. The
-   phone gets the same facts in a shape a phone can read.
-
-   The one colour on the map that is not the accent is the level's, and it
-   is only on a dot, a leader or a hub whose network has something missing.
-   Every device answering: no yellow anywhere. */
-.devbox { container-type:inline-size; container-name:devices; }
-.devwide { display:none; }
-.devlegend { display:none; margin-left:auto; align-self:flex-end; gap:12px; font-size:11.5px; color:var(--sp-ink-2); flex-wrap:wrap; }
+.devlegend { display:flex; margin-left:auto; align-self:flex-end; gap:12px; font-size:11.5px; color:var(--sp-ink-2); flex-wrap:wrap; }
 .devlegend span { display:inline-flex; align-items:center; gap:5px; }
 .devkey { width:8px; height:8px; border-radius:50%; }
 .devkey.online { background:var(--accent); opacity:.6; }
 .devkey.offline { background:var(--sp-attention); }
 .devkey.partial { border:2px solid var(--sp-attention); }
-.devbox .devtiles { flex-wrap:wrap; }
-.devbox .devtile { flex:0 1 150px; }
+/* The map and the list are two separate things to read, not one thing
+   annotated: side by side where there is room, the map first on a phone. */
+.devbody { display:grid; grid-template-columns:minmax(0, 1fr); gap:4px 18px; align-items:start; }
 @container devices (min-width: 700px) {
-  .devwide { display:block; }
-  .devnarrow { display:none; }
-  .devlegend { display:flex; }
+  .devtile { flex:0 1 150px; }
+  .devbody { grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr); }
+  .devlist { padding-top:6px; }
 }
 @container devices (max-width: 699px) {
-  .devbox .devtile { flex:1 1 0; }
+  .devlegend { width:100%; margin-left:6px; }
 }
-.devmap { display:block; width:100%; height:auto; margin-top:4px; }
+.devlist { min-width:0; }
+.devroom { display:flex; align-items:baseline; gap:8px; margin:8px 6px 2px; font-size:10px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
+.devroom:first-child { margin-top:2px; }
+.devroom .of { margin-left:auto; font-family:var(--sp-mono); letter-spacing:0; color:var(--sp-attention-on); }
+.devrow { display:flex; align-items:center; gap:8px; padding:3px 6px; font-size:12.5px; }
+.devrow .who { min-width:0; }
+.devrow .name { margin:0; font-size:12.5px; min-width:0; }
+.devrow .room { margin:0; font-size:11px; color:var(--sp-ink-3); }
+.devrow .what { margin-left:auto; text-align:right; font-size:12px; color:var(--sp-ink-2); white-space:nowrap; }
+.devrow .for { font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); }
+.devdot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; box-sizing:border-box; }
+.devdot.offline { background:var(--sp-attention); }
+.devdot.partial { border:2px solid var(--sp-attention); }
+.devquiet { margin:8px 6px 0; font-size:11.5px; color:var(--sp-ink-3); }
+.devmap { display:block; width:100%; max-width:560px; height:auto; margin:2px auto 0; }
 .devmap .spoke { stroke:var(--sp-edge); stroke-width:2; fill:none; }
 .devmap .spoke.hot { stroke:var(--sp-attention); stroke-dasharray:5 4; }
 .devmap .core { fill:var(--sp-ink); }
 .devmap .coretxt { fill:var(--sp-surface); font-size:10px; font-weight:500; letter-spacing:.1em; }
 .devmap .hub { fill:var(--sp-surface); stroke:var(--accent); stroke-width:2; }
 .devmap .hub.hot { fill:var(--sp-attention-soft); stroke:var(--sp-attention); }
-.devmap .hubname { fill:var(--sp-ink); font-size:11.5px; font-weight:500; }
-.devmap .hubof { fill:var(--sp-ink-2); font-family:var(--sp-mono); font-size:11px; }
+.devmap .hubname { fill:var(--sp-ink); font-size:10.5px; font-weight:500; }
+.devmap .hubof { fill:var(--sp-ink-2); font-family:var(--sp-mono); font-size:10px; }
 .devmap .hot.hubname, .devmap .hot.hubof { fill:var(--sp-attention-on); }
 .devmap .on { fill:var(--accent); opacity:.55; }
 .devmap .off { fill:var(--sp-attention); }
 .devmap .part { fill:var(--sp-surface); stroke:var(--sp-attention); stroke-width:1.8; }
 .devmap .halo { fill:none; stroke:var(--sp-attention); stroke-width:1; opacity:.5; }
-.devmap .leader { fill:none; stroke:var(--sp-attention); stroke-width:1; }
-.devmap .lname { fill:var(--sp-ink); font-size:12.5px; font-weight:500; }
-.devmap .lwhat { fill:var(--sp-ink-2); font-size:11px; }
-.devmap .lfor { fill:var(--sp-ink-3); font-family:var(--sp-mono); font-size:10.5px; }
-.devmap .lmore { fill:var(--sp-ink-2); font-size:11.5px; }
-.devmap.phone .hubname { font-size:10.5px; }
-.devmap.phone .hubof { font-size:10px; }
-.devmap.phone { margin:2px 0 4px; }
-.devmark circle { stroke-width:1.5; }
-.devmark text { font-size:9.5px; font-weight:600; font-family:var(--sp-mono); }
-.devmark.offline circle { fill:var(--sp-attention); stroke:var(--sp-attention); }
-.devmark.offline text { fill:var(--sp-surface); }
-.devmark.partial circle { fill:var(--sp-surface); stroke:var(--sp-attention); }
-.devmark.partial text { fill:var(--sp-attention-on); }
-.devnum { flex:0 0 auto; width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center;
-  justify-content:center; font-family:var(--sp-mono); font-size:10.5px; font-weight:600; }
-.devnum.offline { background:var(--sp-attention); color:var(--sp-surface); }
-.devnum.partial { box-shadow:inset 0 0 0 1.5px var(--sp-attention); color:var(--sp-attention-on); }
-.devrow .who { min-width:0; }
-.devrow .room { margin:0; font-size:11px; color:var(--sp-ink-3); }
 
 /* control — the one body you touch rather than read. Same row metrics as
    list, so a panel of controls and a panel of readings sit at the same
@@ -5662,34 +5625,29 @@ function planHeat(b) {
   return out;
 }
 
-/* The network map for a phone: the same map drawn in a 420x330 box, with a
-   number on each problem dot instead of a name, and the names as a numbered
-   list underneath.
+/* The house's networks as a map, in a 420x330 box that scales with its
+   column: Home Assistant in the middle, a hub per network with how many
+   answer, and a dot per device clustered past it, laid out as a sunflower so
+   a cluster of 60 stays round.
+
+   The map names nothing. It says where the trouble is -- a dashed yellow
+   spoke, a yellow hub, yellow dots in the cluster -- and the list beside it
+   says what. Linking the two with labels or numbers was tried and read as
+   clutter on the panel, so they are two separate things to read.
 
    A problem dot takes the seats of its cluster that face away from the
-   middle, and its number sits just outside the cluster on the same side, so
-   the numbers never land on another network. Numbers in one cluster are
-   spread round it until they clear each other. The list is grouped by
-   network in the map's order, offline first, so reading down it walks the
-   map. A problem whose network is not on the map still gets its row, under
-   "Other", without a number -- the list may never be shorter than the Needs
-   you row behind it. */
-function devicesPhone(networks, problems, what, stateOf) {
+   middle, so a cluster's trouble is on its outside edge where it shows. */
+function devicesMap(networks, problems, stateOf) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const W = 420, H = 330, cx = 210, cy = 165;
-  const HUB = [88, 80], CL = [146, 124], MR = 7.5;
+  const HUB = [88, 80], CL = [146, 124];
   const golden = Math.PI * (3 - Math.sqrt(5));
   const f = (v) => v.toFixed(1);
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const pol = ([rx, ry], a) => [cx + rx * Math.cos(a), cy + ry * Math.sin(a)];
   const biggest = Math.max(1, ...networks.map((n) => num(n.online) + num(n.offline) + num(n.partial)));
   const S = Math.min(4.2, 28 / Math.sqrt(biggest));
-  const rank = (p) => (p.state === "offline" ? 0 : 1);
-  const wrap = (t) => Math.atan2(Math.sin(t), Math.cos(t));
 
-  let spokes = "", seats = "", marks = "", hubs = "", list = "";
-  let n0 = 0;
-  const placed = new Set();
+  let spokes = "", seats = "", hubs = "", named = 0;
   networks.forEach((n, i) => {
     const a = Math.PI + (2 * Math.PI * i) / networks.length;
     const on = num(n.online), off = num(n.offline), part = num(n.partial);
@@ -5697,50 +5655,24 @@ function devicesPhone(networks, problems, what, stateOf) {
     const [hx, hy] = pol(HUB, a), [kx, ky] = pol(CL, a);
     spokes += `<path class="spoke${hot ? " hot" : ""}" d="M${cx},${cy} L${f(hx)},${f(hy)} L${f(kx)},${f(ky)}"/>`;
 
-    const mine = problems.filter((p) => String(p.network) === String(n.name))
-      .sort((p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name)));
-    mine.forEach((p) => placed.add(p));
+    const mine = problems.filter((p) => String(p.network) === String(n.name));
+    named += mine.length;
     const count = Math.max(on + off + part, mine.length);
     const all = Array.from({ length: count }, (_, k) => {
       const r = S * Math.sqrt(k + 0.5) + 2, t = k * golden;
       return { x: kx + r * Math.cos(t), y: ky + r * Math.sin(t) };
     });
-    const R = S * Math.sqrt(count) + 2;
     const out = Math.atan2(ky - cy, kx - cx);
-    const facing = [...all].sort((p, q) =>
-      ((q.x - kx) * Math.cos(out) + (q.y - ky) * Math.sin(out))
-      - ((p.x - kx) * Math.cos(out) + (p.y - ky) * Math.sin(out))).slice(0, mine.length);
+    const reach = (p) => (p.x - kx) * Math.cos(out) + (p.y - ky) * Math.sin(out);
+    const facing = [...all].sort((p, q) => reach(q) - reach(p)).slice(0, mine.length);
     const taken = new Set(facing);
     for (const s of all) if (!taken.has(s)) seats += `<circle class="on" cx="${f(s.x)}" cy="${f(s.y)}" r="2.8"/>`;
-
-    /* Numbers round the outside, in angle order, pushed apart and recentred. */
-    /* Far enough out to clear the cluster, and to fit every number of a
-       small cluster with many problems within half a turn. */
-    const Rm = Math.max(R + MR + 4, (mine.length * (2 * MR + 4)) / Math.PI), gap = (2 * MR + 4) / Rm;
-    const byAngle = facing.map((s) => ({ s, t: wrap(Math.atan2(s.y - ky, s.x - kx) - out) }))
-      .sort((p, q) => p.t - q.t);
-    for (let k = 1; k < byAngle.length; k++) byAngle[k].t = Math.max(byAngle[k].t, byAngle[k - 1].t + gap);
-    if (byAngle.length) {
-      const was = facing.reduce((sum, s) => sum + wrap(Math.atan2(s.y - ky, s.x - kx) - out), 0) / facing.length;
-      const now = byAngle.reduce((sum, m) => sum + m.t, 0) / byAngle.length;
-      for (const m of byAngle) m.t += was - now;
-    }
-    /* The seats go to problems in angle order, so number order runs round the cluster. */
-    const rows = [];
-    byAngle.forEach((m, k) => {
-      const p = mine[k], st = stateOf(p), label = n0 + k + 1;
-      const mx = clamp(kx + Rm * Math.cos(out + m.t), MR + 1, W - MR - 1);
-      const my = clamp(ky + Rm * Math.sin(out + m.t), MR + 1, H - MR - 1);
-      seats += `<circle class="halo" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="5.5"/>`
-        + (st === "offline"
-          ? `<circle class="off" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="3.2"/>`
-          : `<circle class="part" cx="${f(m.s.x)}" cy="${f(m.s.y)}" r="2.6"/>`);
-      marks += `<path class="leader" d="M${f(m.s.x)},${f(m.s.y)} L${f(mx)},${f(my)}"/>`
-        + `<g class="devmark ${st}"><circle cx="${f(mx)}" cy="${f(my)}" r="${MR}"/>`
-        + `<text x="${f(mx)}" y="${f(my + 3.3)}" text-anchor="middle">${label}</text></g>`;
-      rows.push({ p, label });
+    facing.forEach((s, k) => {
+      seats += `<circle class="halo" cx="${f(s.x)}" cy="${f(s.y)}" r="5.5"/>`
+        + (stateOf(mine[k]) === "offline"
+          ? `<circle class="off" cx="${f(s.x)}" cy="${f(s.y)}" r="3.2"/>`
+          : `<circle class="part" cx="${f(s.x)}" cy="${f(s.y)}" r="2.6"/>`);
     });
-    n0 += mine.length;
 
     const of = `${on}/${on + off + part}`;
     const w = String(n.name).length * 6.3 + of.length * 6.3 + 26;
@@ -5748,139 +5680,54 @@ function devicesPhone(networks, problems, what, stateOf) {
     hubs += `<rect class="hub${h}" x="${f(hx - w / 2)}" y="${f(hy - 11.5)}" width="${f(w)}" height="23" rx="11.5"/>`
       + `<text class="hubname${h}" x="${f(hx - w / 2 + 10)}" y="${f(hy + 4)}">${esc(n.name)}</text>`
       + `<text class="hubof${h}" x="${f(hx + w / 2 - 10)}" y="${f(hy + 4)}" text-anchor="end">${of}</text>`;
-
-    if (rows.length) {
-      list += `<p class="devroom">${esc(n.name)}</p>`;
-      for (const r of rows.sort((p, q) => p.label - q.label)) list += devPhoneRow(r.p, r.label, what, stateOf);
-    }
   });
-  const other = problems.filter((p) => !placed.has(p));
-  if (other.length) {
-    list += `<p class="devroom">Other</p>`;
-    for (const p of other) list += devPhoneRow(p, null, what, stateOf);
-  }
 
-  const svg = `<svg class="devmap phone" viewBox="0 0 ${W} ${H}" role="img" `
-    + `aria-label="${esc(`${networks.length} networks, ${n0} device${n0 === 1 ? "" : "s"} numbered`)}">`
-    + spokes + seats + hubs + marks
+  return `<svg class="devmap" viewBox="0 0 ${W} ${H}" role="img" `
+    + `aria-label="${esc(`${networks.length} networks, ${named} device${named === 1 ? "" : "s"} not fully answering`)}">`
+    + spokes + seats + hubs
     + `<rect class="core" x="${cx - 30}" y="${cy - 12}" width="60" height="24" rx="4"/>`
     + `<text class="coretxt" x="${cx}" y="${cy + 3.5}" text-anchor="middle">HOME</text></svg>`;
-  return svg + list;
 }
 
-/* A numbered problem row: the number as the map draws it, the name with its
-   room under it, and what is missing with how long on the right. */
-function devPhoneRow(p, label, what, stateOf) {
+/* Every device not fully answering, grouped by network in the map's order,
+   offline first. A network with nothing wrong is not a heading -- it is
+   one quiet line at the end, so "Zigbee is fine" is still said. A problem
+   on a network the map does not draw is still a row, under "Other": the
+   list may never be shorter than the Needs you row behind it. */
+function devicesList(networks, problems, what, stateOf) {
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  const rank = (p) => (p.state === "offline" ? 0 : 1);
+  const byName = (p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name));
+  const placed = new Set();
+  const fine = [];
+  let out = "";
+  for (const n of networks) {
+    const mine = problems.filter((p) => String(p.network) === String(n.name)).sort(byName);
+    const on = num(n.online), all = on + num(n.offline) + num(n.partial);
+    if (!mine.length) {
+      if (all) fine.push(`${n.name} ${all}`);
+      continue;
+    }
+    mine.forEach((p) => placed.add(p));
+    out += `<p class="devroom">${esc(n.name)}<span class="of">${on}/${all}</span></p>`
+      + mine.map((p) => devRow(p, what, stateOf)).join("");
+  }
+  const other = problems.filter((p) => !placed.has(p)).sort(byName);
+  if (other.length) out += `<p class="devroom">${networks.length ? "Other" : "Not answering"}</p>`
+    + other.map((p) => devRow(p, what, stateOf)).join("");
+  if (fine.length && problems.length) out += `<p class="devquiet">All answering: ${esc(fine.join(" · "))}</p>`;
+  return out;
+}
+
+/* A problem row: offline is a filled dot and partial a ring, the name with
+   its room under it, and what is missing with how long on the right. */
+function devRow(p, what, stateOf) {
   const st = stateOf(p);
   const since = isBlank(p.since) ? null : shortSince(p.since);
   const room = isBlank(p.area) ? "No room" : String(p.area);
-  const badge = label === null ? `<span class="devdot ${st}"></span>` : `<span class="devnum ${st}">${label}</span>`;
-  return `<div class="devrow">${badge}<div class="who"><p class="name">${esc(p.name)}</p><p class="room">${esc(room)}</p></div>`
+  return `<div class="devrow"><span class="devdot ${st}"></span><div class="who"><p class="name">${esc(p.name)}</p>`
+    + `<p class="room">${esc(room)}</p></div>`
     + `<span class="what">${esc(what(p))}${since ? ` <span class="for">· ${esc(since)}</span>` : ""}</span></div>`;
-}
-
-/* The network map, drawn in a fixed 960x440 box that scales with the card.
-
-   Networks sit evenly round an ellipse in the sensor's order, the first
-   on the left. Each is a pill on its spoke with a cluster of seats past
-   it, laid out as a sunflower so a cluster of 60 stays round.
-
-   The labels are the hard part, and three rules keep them readable:
-     - a label goes in the gutter on its dot's side, so no leader crosses
-       the middle of the map;
-     - a problem device takes the seats in its cluster that face that
-       gutter, so its leader does not cut back through the cluster;
-     - on each side, labels are sorted by their dot's height and pushed
-       apart, so leaders never cross each other.
-   A side with more problems than room names offline ones first and ends
-   with "+ N more" -- the Needs you row still names them all. */
-function devicesMap(networks, problems, what, stateOf) {
-  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-  const W = 960, H = 440, cx = 480, cy = 224;
-  const HUB = [118, 84], CL = [206, 150];
-  const GUT_L = 212, GUT_R = 748, TOP = 22, BOT = H - 22, LINE = 36;
-  const cap = Math.floor((BOT - TOP) / LINE) + 1;
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  const f = (v) => v.toFixed(1);
-  const pol = ([rx, ry], a) => [cx + rx * Math.cos(a), cy + ry * Math.sin(a)];
-  const biggest = Math.max(1, ...networks.map((n) => num(n.online) + num(n.offline) + num(n.partial)));
-  const S = Math.min(5, 38 / Math.sqrt(biggest));
-  const rank = (p) => (p.state === "offline" ? 0 : 1);
-
-  let spokes = "", seats = "", hubs = "";
-  const anchors = [];
-  networks.forEach((n, i) => {
-    const a = Math.PI + (2 * Math.PI * i) / networks.length;
-    const on = num(n.online), off = num(n.offline), part = num(n.partial);
-    const hot = off + part > 0;
-    const [hx, hy] = pol(HUB, a), [kx, ky] = pol(CL, a);
-    spokes += `<path class="spoke${hot ? " hot" : ""}" d="M${cx},${cy} L${f(hx)},${f(hy)} L${f(kx)},${f(ky)}"/>`;
-
-    const mine = problems.filter((p) => String(p.network) === String(n.name))
-      .sort((p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name)));
-    const count = Math.max(on + off + part, mine.length);
-    const all = Array.from({ length: count }, (_, k) => {
-      const r = S * Math.sqrt(k + 0.5) + 2, t = k * golden;
-      return { x: kx + r * Math.cos(t), y: ky + r * Math.sin(t) };
-    });
-    const side = kx >= cx ? 1 : -1;
-    const facing = [...all].sort((p, q) => side * (q.x - p.x)).slice(0, mine.length);
-    const taken = new Set(facing);
-    for (const s of all) if (!taken.has(s)) seats += `<circle class="on" cx="${f(s.x)}" cy="${f(s.y)}" r="3.2"/>`;
-    facing.sort((p, q) => p.y - q.y).forEach((s, k) => {
-      const p = mine[k];
-      anchors.push({ p, x: s.x, y: s.y, side });
-      seats += `<circle class="halo" cx="${f(s.x)}" cy="${f(s.y)}" r="6.5"/>`
-        + (stateOf(p) === "offline"
-          ? `<circle class="off" cx="${f(s.x)}" cy="${f(s.y)}" r="3.6"/>`
-          : `<circle class="part" cx="${f(s.x)}" cy="${f(s.y)}" r="3"/>`);
-    });
-
-    const of = `${on}/${on + off + part}`;
-    const w = String(n.name).length * 6.9 + of.length * 6.9 + 34;
-    const h = hot ? " hot" : "";
-    hubs += `<rect class="hub${h}" x="${f(hx - w / 2)}" y="${f(hy - 13)}" width="${f(w)}" height="26" rx="13"/>`
-      + `<text class="hubname${h}" x="${f(hx - w / 2 + 12)}" y="${f(hy + 4)}">${esc(n.name)}</text>`
-      + `<text class="hubof${h}" x="${f(hx + w / 2 - 12)}" y="${f(hy + 4)}" text-anchor="end">${of}</text>`;
-  });
-
-  let labels = "";
-  for (const side of [-1, 1]) {
-    let list = anchors.filter((a) => a.side === side);
-    let more = 0;
-    if (list.length > cap) {
-      const keep = new Set([...list].sort((p, q) => rank(p.p) - rank(q.p)).slice(0, cap - 1));
-      more = list.length - keep.size;
-      list = list.filter((a) => keep.has(a));
-    }
-    list.sort((p, q) => p.y - q.y);
-    const last = more ? BOT - LINE : BOT;
-    const ys = list.map((a) => a.y);
-    for (let k = 1; k < ys.length; k++) ys[k] = Math.max(ys[k], ys[k - 1] + LINE);
-    for (let k = ys.length - 1; k >= 0; k--) ys[k] = Math.min(ys[k], k === ys.length - 1 ? last : ys[k + 1] - LINE);
-    for (let k = 0; k < ys.length; k++) ys[k] = Math.max(ys[k], TOP + k * LINE);
-    const gx = side > 0 ? GUT_R : GUT_L, tx = gx + side * 8, anchor = side > 0 ? "start" : "end";
-    list.forEach((a, k) => {
-      const ly = ys[k], p = a.p;
-      const since = isBlank(p.since) ? null : shortSince(p.since);
-      const room = isBlank(p.area) ? "No room" : String(p.area);
-      labels += `<path class="leader" d="M${f(a.x)},${f(a.y)} L${gx - side * 14},${f(ly)} L${gx},${f(ly)}"/>`
-        + (stateOf(p) === "offline"
-          ? `<circle class="off" cx="${gx}" cy="${f(ly)}" r="2.2"/>`
-          : `<circle class="part" cx="${gx}" cy="${f(ly)}" r="2" style="stroke-width:1.2"/>`)
-        + `<g class="devlabel"><text x="${tx}" y="${f(ly + 1)}" text-anchor="${anchor}"><tspan class="lname">${esc(p.name)}</tspan>`
-        + (since ? `<tspan class="lfor" dx="6">${esc(since)}</tspan>` : "") + `</text>`
-        + `<text class="lwhat" x="${tx}" y="${f(ly + 15)}" text-anchor="${anchor}">${esc(what(p))} · ${esc(room)}</text></g>`;
-    });
-    if (more) labels += `<text class="lmore" x="${tx}" y="${BOT + 4}" text-anchor="${anchor}">+ ${more} more</text>`;
-  }
-
-  const named = anchors.length;
-  return `<svg class="devmap" viewBox="0 0 ${W} ${H}" role="img" `
-    + `aria-label="${esc(`${networks.length} networks, ${named} device${named === 1 ? "" : "s"} not fully answering`)}">`
-    + spokes + seats + labels + hubs
-    + `<rect class="core" x="${cx - 34}" y="${cy - 14}" width="68" height="28" rx="4"/>`
-    + `<text class="coretxt" x="${cx}" y="${cy + 4}" text-anchor="middle">HOME</text></svg>`;
 }
 
 const BODIES = {
@@ -7814,18 +7661,13 @@ const BODIES = {
 
      Three numbers first, because they are the part read from the doorway.
 
-     Then, on a card wide enough, a map of the house's networks: Home
-     Assistant in the middle, a hub per network, a dot per device, and every
-     device that is not fully answering named at the side with a line back
-     to its dot -- so five dead speakers read as one sick Cast cluster and
-     one dead Wi-Fi as a whole cluster gone, without a word of explanation.
-
-     On a narrow card -- a phone -- the side labels would be too small to
-     read, so the same map is drawn tighter and each problem dot carries a
-     number instead of a name. The numbers are a list under the map, grouped
-     by network, each row saying what is missing, for how long and in which
-     room. Both views are in the markup; a container query picks one, so the
-     card never has to be told how wide it is.
+     Then the house's networks as a map -- Home Assistant in the middle, a
+     hub per network, a dot per device -- so five dead speakers read as one
+     sick Cast cluster and one dead Wi-Fi as a whole cluster gone. Beside it,
+     or under it on a phone, every device not fully answering, grouped by
+     network, each row saying what is missing, for how long and in which
+     room. The map shows where; the list says what. A container query lays
+     them out, so the card never has to be told how wide it is.
 
      "How long" is the sensor's, remembered across restarts. A device whose
      time is unknown just says what is wrong: Home Assistant's own
@@ -7854,12 +7696,9 @@ const BODIES = {
         + `<span><i class="devkey offline"></i>offline</span><span><i class="devkey partial"></i>partly offline</span></div>` : "")
       + `</div>`;
 
-    if (networks.length) out += `<div class="devwide">${devicesMap(networks, problems, what, stateOf)}</div>`;
-
-    if (networks.length) out += `<div class="devnarrow">${devicesPhone(networks, problems, what, stateOf)}</div>`;
-    /* No networks means no map to draw at either width -- but the problems
-       are still true, so they are still rows. */
-    else out += problems.map((p) => devPhoneRow(p, null, what, stateOf)).join("");
+    out += `<div class="devbody">`
+      + (networks.length ? devicesMap(networks, problems, stateOf) : "")
+      + `<div class="devlist">${devicesList(networks, problems, what, stateOf)}</div></div>`;
     return out + `</div>`;
   },
   list(b) {
