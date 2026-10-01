@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.147.1";
+const VERSION = "0.147.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -664,10 +664,16 @@ ha-icon { display:inline-flex; line-height:0; }
 }
 .lamprow:focus-visible { outline:2px solid var(--sp-a4); outline-offset:2px; }
 .lamprow .name {
-  margin:0; font-size:13px; flex:1 1 auto; min-width:0;
+  margin:0; font-size:13px; flex:0 1 auto; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .lamprow[aria-expanded="true"] .name { font-weight:600; }
+.lampgap { flex:1 1 auto; }
+.lamprow .lampchev { width:22px; height:22px; }
+.lamprow .lampchev ha-icon { --mdc-icon-size:16px; width:16px; height:16px; }
+.lamprow[aria-expanded="true"] .lampchev { color:var(--sp-ink); }
+.lamprow[aria-expanded="true"] .lampchev ha-icon { transform:rotate(180deg); }
+.lamprow.instant .lampchev ha-icon { transition:none; }
 .lampscene {
   display:flex; align-items:center; gap:5px; font-size:12px;
   color:var(--sp-ink-2); white-space:nowrap;
@@ -10567,7 +10573,14 @@ function lampsMarkup(b) {
         ? ` role="button" tabindex="0" data-chev="${key}" aria-expanded="false"`
           + ` aria-label="${esc(name)}: scenes and brightness"`
         : "")
-      + `><p class="name">${esc(name)}</p>${status}`
+      + `><p class="name">${esc(name)}</p>`
+      /* The line opens a drawer, and nothing about a name says so. The
+         room's own drawer is announced by a chevron; so is this one. It sits
+         against the name, not the switch: the room card moved its switch
+         away from its chevron for exactly that reason -- one opens a drawer,
+         the other turns a lamp off, and a misaimed thumb should not choose. */
+      + (drawer ? `<span class="chev lampchev" aria-hidden="true"><ha-icon icon="mdi:chevron-down"></ha-icon></span>` : "")
+      + `<span class="lampgap"></span>${status}`
       + `<span class="switch${lit ? " on" : ""}" role="switch"`
       + ` aria-checked="${lit ? "true" : "false"}" aria-label="${esc(name)}"`
       + ` tabindex="0" data-lamppower="${index}"><i></i></span></div>`
@@ -13355,7 +13368,12 @@ class SpectraCard extends HTMLElement {
          the commit, so it must not land after it. */
       hush();
       el.classList.remove("picking", "adrift");
-      if (commit && !adrift && value !== began) {
+      /* Landing where you began is a cancelled gesture -- unless nothing was
+         chosen to begin with. A scene track with no band selected still
+         has to start the finger somewhere, and it starts it on the first
+         band; without `fresh`, pressing that band (Concentrate, in a room
+         that has just lost Concentrate) did nothing at all. */
+      if (commit && !adrift && (value !== began || (spec.fresh && spec.fresh()))) {
         spec.commit(value, () => sendFinal(value));
       } else recant();
       this._signature = null;
@@ -13450,6 +13468,7 @@ class SpectraCard extends HTMLElement {
          the bridge leaves lights that are off off. Choosing a scene is
          the opposite: it is the thing that turns the room on. */
       read: () => (marked < 0 ? 0 : marked),
+      fresh: () => marked < 0,
       valueAt: (ratio) => Math.min(count - 1, Math.max(0, Math.floor(ratio * count))),
       step: (v, by) => Math.min(count - 1, Math.max(0, v + by)),
       describe: (v) => ({
