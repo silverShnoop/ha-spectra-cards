@@ -233,6 +233,28 @@ const js = fs.readFileSync(file);
     await settle();
     cameras = 1;
 
+    /* ---- the house changing under the camera does not take it away ---- */
+    await open();
+    const camEl = q(".camwrap");
+    const vid = cam("video");
+    card._signature = null;
+    card.hass = Object.assign({}, hass, { states: { "light.x": { state: "on", attributes: {} } } });
+    card._update();
+    await settle();
+    check("a state change while the camera is up leaves it alone", q(".camwrap") === camEl && !vid.paused && !released(),
+      `${q(".camwrap") === camEl} paused=${vid.paused}`);
+    /* And if a repaint gets through anyway, the camera is carried across it, still live. */
+    card._camera = false;
+    card._signature = null;
+    card._model = null;
+    card._render(card._model || Object.assign({}, card._lastModel || {}, { accent: 6, body: card._config.body }));
+    card._camera = true;
+    await settle();
+    check("a repaint carries the camera across, still live", q(".camwrap") === camEl && !vid.paused, `${!!q(".camwrap")} paused=${vid.paused}`);
+    cam("[data-no]").click();
+    await settle();
+    check("closing it lets the card paint again", !card._camera && !q(".camwrap"), String(card._camera));
+
     /* ---- Close on the camera lets it go too ---- */
     await open();
     cam("[data-no]").click();
