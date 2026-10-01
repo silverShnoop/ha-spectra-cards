@@ -179,6 +179,32 @@ const js = fs.readFileSync(file);
     check("without keep_empty an empty column is still dropped, as for days",
       !dtexts.includes("Aug"), dtexts.join("|"));
 
+    // ---- the standing charge as the base of the stack
+    const based = await draw({
+      names: ["Standing", ...NAMES], base: true, slots: 12, keep_empty: true,
+      days: [AUG, { label: "Sep", cost: [5.3, 5.4, 12.64, 19.04, 13.29],
+        kwh: [0, 21.8, 51.3, 77.1, 53.9], total_cost: 55.67,
+        total_cost_text: "£56", total_kwh: 204, note: "11/30 days" }],
+    });
+    const brects = [...based.svg.querySelectorAll("rect")]
+      .filter((r) => Number(r.getAttribute("y")) > 20 && Number(r.getAttribute("height")) > 2);
+    const bottom = brects.reduce((a, r) =>
+      (Number(r.getAttribute("y")) > Number(a.getAttribute("y")) ? r : a));
+    check("with base, five segments are drawn", brects.length === 5, `${brects.length}`);
+    check("...the bottom one is the neutral base, not a time of day",
+      bottom.getAttribute("fill") === "var(--sp-ink-3)", bottom.getAttribute("fill"));
+    check("...and the blocks keep the ramp from its first step",
+      brects.some((r) => r.getAttribute("fill") === "var(--sp-b1)")
+        && brects.some((r) => r.getAttribute("fill") === "var(--sp-b4)"),
+      brects.map((r) => r.getAttribute("fill")).join(","));
+    const btexts = [...based.svg.querySelectorAll("text")].map((t) => t.textContent);
+    check("...and the legend names the base first",
+      btexts.indexOf("Standing") > -1 && btexts.indexOf("Standing") < btexts.indexOf("Overnight"),
+      btexts.join("|"));
+    const legendFirst = based.svg.querySelector("rect");
+    check("...in the base's colour", legendFirst.getAttribute("fill") === "var(--sp-ink-3)",
+      legendFirst.getAttribute("fill"));
+
     // ---- the size it draws at, same failure the line chart had
     document.getElementById("a").style.width = "1200px";
     const big = await draw({ days: [SAT, MON], slots: 7 });
