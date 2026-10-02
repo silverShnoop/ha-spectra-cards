@@ -584,6 +584,16 @@ A column may carry a `note` ("so far", "11/30 days"), printed under its
 label, because a part-month is otherwise just a short bar and reads as a
 cheap month. A chart with no filled column at all still hides.
 
+`base: true` makes the first segment of every column a base rather than a
+block: drawn at the bottom in the ink's grey, off the time-of-day ramp, and
+named first in the legend. The month chart uses it for the standing charge,
+so the bar is the whole bill:
+
+```yaml
+  base: true
+  names: {entity: sensor.energy_day, attribute: month_block_names}
+```
+
 More than seven slots widen the box instead of squeezing the columns, and
 the size cap widens with it, so the type is the size it is on a week. Twelve
 months want a card two columns wide.

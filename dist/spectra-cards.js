@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.148.0";
+const VERSION = "0.149.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -7511,6 +7511,15 @@ const BODIES = {
     if (!days.some(filled)) return "";
     const names = Array.isArray(b.names) ? b.names : [];
     const FILL = ["var(--sp-b1)", "var(--sp-b2)", "var(--sp-b3)", "var(--sp-b4)"];
+    /* `base`: the first segment is not a time of day but what is paid
+       before anything is used -- the standing charge under a month. It sits
+       at the bottom in the ink's own grey, off the ramp, because the ramp
+       says "later in the day" and this is no part of the day at all. */
+    const base = Boolean(b.base);
+    const fillOf = (si) => (base
+      ? (si === 0 ? "var(--sp-ink-3)" : FILL[(si - 1) % FILL.length])
+      : FILL[si % FILL.length]);
+    const opacityOf = (si) => (base && si === 0 ? ' opacity=".45"' : "");
 
     /* Laid out for `slots` columns even when fewer have arrived, so a week
        filling up does not restretch every morning. */
@@ -7540,10 +7549,10 @@ const BODIES = {
     /* A legend, because four series is past what direct labels can carry --
        and in the same order as the stack, so the picture teaches the key. */
     let lx = 2;
-    names.slice(0, FILL.length).forEach((name, i) => {
+    names.slice(0, FILL.length + (base ? 1 : 0)).forEach((name, i) => {
       const text = String(name);
       out += `<rect x="${lx.toFixed(1)}" y="3" width="7" height="7" rx="1.5"`
-        + ` fill="${FILL[i]}"/>`
+        + ` fill="${fillOf(i)}"${opacityOf(i)}/>`
         + `<text x="${(lx + 10).toFixed(1)}" y="9.5" font-size="7.5"`
         + ` fill="var(--sp-ink-2)">${esc(text)}</text>`;
       lx += 17 + text.length * 4;
@@ -7575,7 +7584,7 @@ const BODIES = {
            blocks never read as one taller one. */
         out += `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${y.toFixed(1)}"`
           + ` width="${bw.toFixed(1)}" height="${Math.max(1, h - 1.5).toFixed(1)}"`
-          + ` rx="1" fill="${FILL[si % FILL.length]}"/>`;
+          + ` rx="1" fill="${fillOf(si)}"${opacityOf(si)}/>`;
       });
       /* Both totals under every column. The bars are money, so the money is
          the bigger line and the units sit under it as the check. */
