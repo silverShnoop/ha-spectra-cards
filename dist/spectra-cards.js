@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.152.0";
+const VERSION = "0.153.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -35,9 +35,9 @@ const LOGGER_WARN = (...args) => console.warn(...args);
  * ---- two sets, and the split between them is the whole rule ----
  *
  * a1..a6 are DECORATIVE. They say which tab a card belongs to and they
- * mean nothing else. attention/waiting/critical are LEVELS. They say the
- * house is asking a person for something, and they are the only colours
- * that do.
+ * mean nothing else. notice/attention/waiting/critical are LEVELS. They
+ * say the house is asking a person for something, and they are the only
+ * colours that do.
  *
  * Yellow, orange and red belong to the levels and may not appear in the
  * decorative set, which is why a1 and a2 are a brown and a bone rather
@@ -50,9 +50,16 @@ const LOGGER_WARN = (...args) => console.warn(...args);
  * the levels are named and the accents are numbered. A slot number is an
  * arbitrary label; a level name carries a timeline:
  *
+ *   notice      something you asked for is ready; nothing gets worse
  *   attention   needs doing today or tomorrow
  *   waiting     something is paused or degrading until a person acts
  *   critical    damage or risk is accruing now
+ *
+ * Notice is blue, and the quietest: the one level with no deadline in it,
+ * for work done on somebody's behalf -- an AI task that has finished. It
+ * sits ΔE00 15.9 from slate (a5) and 27 from teal (a4) by eye, 13.6 and
+ * 20.0 deutan: the slate pair is the close one, and it is a rail button
+ * beside a rail button. The other levels are 45+ away whichever way.
  *
  * Yellow and orange measure dE 13.3 apart to normal vision, under the 15
  * floor, so hue alone does not carry the step: waiting adds a 1px inset
@@ -98,6 +105,7 @@ const TOKENS_LIGHT = `
   --sp-attention:#B6862A; --sp-attention-soft:#F2E6C9; --sp-attention-on:#8A6310;
   --sp-waiting:#B0512C;   --sp-waiting-soft:#F0DED4;   --sp-waiting-on:#8C3E20;
   --sp-critical:#8E0C14;  --sp-critical-soft:#F2D7D8;  --sp-critical-on:#7A0B12;
+  --sp-notice:#0E79E0;    --sp-notice-soft:#DCEAF9;    --sp-notice-on:#0B5BAA;
   --sp-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --sp-press: rgba(43,39,36,.20);
   /* A flash on plain paper only has to beat paper. A flash landing on top of
@@ -154,6 +162,10 @@ const TOKENS_DARK = `
      stays small (8.0) whatever the hue, which is what the ring is for. */
   --sp-waiting:#EC6124;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
   --sp-critical:#E2333F;  --sp-critical-soft:#3A1618;  --sp-critical-on:#F0949B;
+  /* Darker than the light blue, not lighter: lifted, it walks into slate
+     (a5 is #8094C4 here). #1C6FE8 keeps ΔE00 15.6 from it by eye and 16.4
+     deutan, and 3.5:1 against the surface for a 2px border. */
+  --sp-notice:#1C6FE8;    --sp-notice-soft:#14223A;    --sp-notice-on:#9CC0F4;
 `;
 
 /* ------------------------------------------------------------------ *
@@ -2845,6 +2857,21 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    that has to stay readable — the space is reserved whether it is spinning
    or not, so its arrival moves nothing. */
 .spinslot { width:13px; height:13px; flex:none; display:inline-flex; }
+
+/* An AI task this card started. It wears the notice the card's outline is
+   already wearing, running or landed; dismissed while it runs, it is ink
+   and a spinner. */
+.aitasks { display:flex; flex-direction:column; gap:4px; margin:0 0 8px; }
+.aitask { display:flex; align-items:center; gap:8px; margin:0; min-height:28px;
+  font-size:13px; color:var(--sp-ink-2); }
+.aitask > span:last-child, .aitask .aitext { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aitask .aitext { flex:1 1 auto; }
+.aitask .mdi, .aitask ha-icon { width:18px; height:18px; flex:none; --mdc-icon-size:18px; }
+.aitask.ready { color:var(--sp-notice-on); padding:2px 8px; border-radius:6px; min-height:44px;
+  background:var(--sp-notice-soft); --accent:var(--sp-notice); --accent-on:var(--sp-notice-on); }
+.aitask.ready .mdi, .aitask.ready ha-icon { color:var(--sp-notice); }
+.aitask.running .spinner { color:var(--sp-notice); }
+.aitask b { font-weight:600; }
 .ok {
   width:13px; height:13px; flex:none; position:relative;
   animation: sp-settle 900ms ease-in-out forwards;
@@ -3513,6 +3540,10 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
 }
 .row.hasact { min-height:44px; }
+/* Two buttons on one row: the quieter one first, unfilled, and the pair
+   pushed right together rather than each claiming the free space. */
+.act.alt { border-color:var(--sp-edge); color:var(--sp-ink-2); }
+.act.alt + .act { margin-left:8px; }
 `;
 
 /* ------------------------------------------------------------------ *
@@ -3526,7 +3557,17 @@ const ACCENTS = [1, 2, 3, 4, 5, 6];
    whereas "waiting" carries a timeline a reviewer can check a row against.
    Numbering them alongside the accents is exactly how decoration and
    alerting came to share a palette in the first place. */
-const LEVELS = ["attention", "waiting", "critical"];
+const LEVELS = ["notice", "attention", "waiting", "critical"];
+
+/** The louder of some levels, or null when none is one. */
+function loudestLevel(...levels) {
+  let top = null;
+  for (const v of levels) {
+    const k = levelName(v);
+    if (k && (top === null || LEVELS.indexOf(k) > LEVELS.indexOf(top))) top = k;
+  }
+  return top;
+}
 
 function accentNumber(n) {
   const a = Number(n);
@@ -4023,6 +4064,76 @@ const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
 /* An icon name becomes markup in one place, because there are five call sites
    and they must not drift. A `spectra:` name is our own art and renders as
    inline svg; anything else is an mdi name and goes to ha-icon as before. */
+/* `tasks` on a card: the AI tasks it started, read from home_signals'
+   sensor.ai_tasks. A string is the card's own key -- the `card` it passes
+   to start_ai_task -- and an object can name a different sensor as well.
+
+   Opt-in rather than read off the body type, because a level is a card's
+   to claim: the Meals card on Home shows the same plan as the one on
+   Kitchen, and Home never wears a level. */
+const AI_TASKS_ENTITY = "sensor.ai_tasks";
+const OPEN_TASK_EVENT = "spectra-open-task";
+
+function tasksConfig(config) {
+  const t = config && config.tasks;
+  if (typeof t === "string" && !isBlank(t)) return { entity: AI_TASKS_ENTITY, card: t };
+  if (t && typeof t === "object" && !isBlank(t.card)) {
+    return { entity: isBlank(t.entity) ? AI_TASKS_ENTITY : String(t.entity), card: String(t.card) };
+  }
+  return null;
+}
+
+/** This card's tasks, and the level the sensor gives it. The sensor
+    decides the level; the card only reads its own. */
+function aiTasksOf(hass, cfg) {
+  const state = cfg && hass && hass.states ? hass.states[cfg.entity] : undefined;
+  const a = (state && state.attributes) || {};
+  const list = (Array.isArray(a.tasks) ? a.tasks : [])
+    .filter((t) => t && typeof t === "object" && String(t.card) === cfg.card);
+  const level = a.cards && typeof a.cards === "object" ? levelName(a.cards[cfg.card]) : null;
+  return { list, level };
+}
+
+/* A task running is the card's notice already: a spinner, "Running" and
+   its step, so the panel says the house is working on it. Finished, it
+   says which way it went before anything else -- a tick and "Done", or an
+   alert and "Failed" -- because a notice that does not say whether the
+   thing worked sends you to open it to find out. Two buttons, as on its
+   Needs you row: Dismiss, and Open when there is an answer to show. It
+   leaves on its own two minutes after it lands. */
+function aiTaskStrip(tasks) {
+  if (!Array.isArray(tasks) || !tasks.length) return "";
+  return `<div class="aitasks">${tasks.map((t) => {
+    const title = esc(firstOf(t.title, "AI task"));
+    if (t.state === "running") {
+      const step = Number(t.steps) > 1 ? ` · step ${esc(String(t.step || 1))} of ${esc(String(t.steps))}` : "";
+      /* Dismissed while it runs: still a fact on its own card, uncoloured. */
+      if (t.quiet) return `<p class="aitask"><span class="spinner"></span><span>${title}${step}…</span></p>`;
+      return `<div class="aitask ready running"><span class="spinner"></span>`
+        + `<span class="aitext"><b>Running</b> · ${title}${step}</span>`
+        + `<span class="act alt" role="button" tabindex="0" data-aidismiss="${esc(t.id)}">Dismiss</span></div>`;
+    }
+    const ok = t.state === "done";
+    const what = ok ? (isBlank(t.label) ? "" : ` · ${esc(t.label)}`) : (isBlank(t.error) ? "" : ` · ${esc(t.error)}`);
+    /* Dismiss always; Open only when there is an answer to show. */
+    const open = ok && t.open !== false;
+    return `<div class="aitask ready ${ok ? "success" : "failure"}">`
+      + `${iconMarkup(ok ? "mdi:check-circle-outline" : "mdi:alert-circle-outline")}`
+      + `<span class="aitext"><b>${ok ? "Done" : "Failed"}</b> · ${title}${what}</span>`
+      + `<span class="act alt" role="button" tabindex="0" data-aidismiss="${esc(t.id)}">Dismiss</span>`
+      + (open ? `<span class="act" role="button" tabindex="0" data-aitask="${esc(t.id)}">Open</span>` : "")
+      + `</div>`;
+  }).join("")}</div>`;
+}
+
+/* What a task's second step answered, in the import's terms: undefined
+   when it never ran (the recipe was already in the box), null when it ran
+   and fell over -- the task is still done, the recipe saved, not split. */
+function taskSplit(got) {
+  if (got && got.then !== null && got.then !== undefined) return got.then;
+  return got && got.task && got.task.partial ? null : undefined;
+}
+
 function iconMarkup(name, cls) {
   if (isBlank(name)) return "";
   const key = String(name).startsWith("spectra:") ? String(name).slice(8) : null;
@@ -7873,6 +7984,10 @@ const BODIES = {
       const sub = firstOf(r.sub, r.detail);
       const label = firstOf(r.action_label, r.button);
       const hasAction = Boolean(r.action) && !isBlank(label);
+      /* A second, quieter button -- Dismiss beside Open on a finished AI
+         task. Drawn before the main one, so the main one keeps the edge. */
+      const altLabel = firstOf(r.secondary_label, "");
+      const hasAlt = hasAction && Boolean(r.secondary_action) && !isBlank(altLabel);
 
       /* A row with a tone takes its soft fill as a wash, which overrides
          zebra. Never both — see the emphasis ladder.
@@ -7909,7 +8024,8 @@ const BODIES = {
 
       let tail = "";
       if (hasAction) {
-        tail = `<span class="act" role="button" tabindex="0" data-row="${index}">${esc(label)}</span>`;
+        tail = (hasAlt ? `<span class="act alt" role="button" tabindex="0" data-row="${index}" data-alt="1">${esc(altLabel)}</span>` : "")
+          + `<span class="act" role="button" tabindex="0" data-row="${index}">${esc(label)}</span>`;
       } else if (r.pill) {
         tail = pillMarkup(r.pill, "margin-left:auto");
       } else if (r.bar) {
@@ -10840,6 +10956,8 @@ class SpectraCard extends HTMLElement {
     this._live = false;
     this._timer = null;
     this._model = null;
+    /* Tasks this card started through _aiCall, by id, waiting to land. */
+    this._follows = new Map();
     this._forecastSources = new Map();
     this._forecasts = {};
     this._subscriptions = new Map();
@@ -10908,6 +11026,8 @@ class SpectraCard extends HTMLElement {
       calendars: new Map(), meals: new Map(), live: false,
     });
     this._sources = [...found.entities, ...[...found.todos.values()].map((t) => t.entity)];
+    this._tasksCfg = tasksConfig(config);
+    if (this._tasksCfg) this._sources.push(this._tasksCfg.entity);
     this._forecastSources = found.forecasts;
     this._todoSources = found.todos;
     this._calendarSources = found.calendars;
@@ -10925,6 +11045,7 @@ class SpectraCard extends HTMLElement {
     publishTokens(hass);
     if (!this._config) return;
     this._openRecipeLink();
+    this._followTask();
     this._reconcile();
     this._subscribeForecasts();
     /* Only re-marshal when an entity this card actually reads has changed.
@@ -10947,6 +11068,17 @@ class SpectraCard extends HTMLElement {
   connectedCallback() {
     this._startTicking();
     this._subscribeForecasts();
+    if (!this._onOpenTask) {
+      /* A Needs you row's Open. The first card that owns the task takes
+         it, so two copies of a card on one page do not open it twice. */
+      this._onOpenTask = (event) => {
+        const d = event.detail || {};
+        if (d.taken || !this._tasksCfg || String(d.card) !== this._tasksCfg.card) return;
+        d.taken = true;
+        this._openTask(String(d.id));
+      };
+    }
+    window.addEventListener(OPEN_TASK_EVENT, this._onOpenTask);
   }
 
   disconnectedCallback() {
@@ -10959,6 +11091,7 @@ class SpectraCard extends HTMLElement {
        of the rest below ever ran. tools/checkstrip.js now refuses a class
        with any method defined twice. */
     releaseDrawer(this);
+    if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
@@ -11299,6 +11432,13 @@ class SpectraCard extends HTMLElement {
       outline: resolveValue(this._hass, config.outline, f),
       body: resolveValue(this._hass, config.body, f) || {},
     };
+    /* A finished AI task is this card's notice. The louder of that and the
+       card's own level: two needs on one card, each decided by its owner. */
+    if (this._tasksCfg) {
+      const tasks = aiTasksOf(this._hass, this._tasksCfg);
+      model.tasks = tasks.list;
+      if (tasks.level) model.outline = loudestLevel(model.outline, tasks.level);
+    }
     this._fitDials(model.body);
     /* A finger is on the bar. Rebuilding it now would take the element the
        pointer is captured on out from under the gesture. */
@@ -11700,6 +11840,7 @@ class SpectraCard extends HTMLElement {
       festive && Array.isArray(fb.decor) && fb.decor.indexOf("bursts") >= 0
         ? festBursts(Array.isArray(fb.palette) ? fb.palette : []) : "",
       this._titlebar(model, this._phase),
+      aiTaskStrip(model.tasks),
       waiting
         ? `<p class="sub">${esc(waiting)}</p>`
         : BODIES[type](model.body),
@@ -12991,13 +13132,9 @@ class SpectraCard extends HTMLElement {
     const data = { transcript: said };
     if (!isBlank(spec.about)) data.about = String(spec.about);
     if (!isBlank(spec.agent)) data.agent = String(spec.agent);
-    return Promise.resolve(this._hass.callWS({
-      type: "call_service",
-      domain,
-      service,
-      service_data: data,
-      return_response: true,
-    })).catch((error) => {
+    return this._aiWS(`${domain}.${service}`, data, {
+      title: "Shopping list from speech", seen: () => this._onScreen(),
+    }).catch((error) => {
       throw voiceError("Could not work out what was said.", error && error.message);
     }).then((result) => {
       const rows = result && result.response && result.response.items;
@@ -13705,6 +13842,17 @@ class SpectraCard extends HTMLElement {
   _bind(model) {
     this._bindDrawer();
 
+    const press = (sel, go) => this._holder.querySelectorAll(sel).forEach((el) => {
+      const run = (event) => { event.stopPropagation(); go(el); };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
+    press("[data-aitask]", (el) => this._openTask(el.dataset.aitask));
+    press("[data-aidismiss]", (el) => onPress(el, () => this._callAction({
+      service: "home_signals.dismiss", data: { item_id: el.dataset.aidismiss } })));
+
     /* A photo that will not load -- Mealie down, a recipe whose picture
        was removed -- takes itself away rather than leaving a broken frame. */
     this._holder.querySelectorAll("img[data-thumb]").forEach((img) => {
@@ -13967,8 +14115,9 @@ class SpectraCard extends HTMLElement {
            the list, which is the same rule for a press, a snooze expiring
            and a door being opened. The press already has its own answer:
            the button flashes, and spins until the house agrees. */
-        this._guard(row && row.action && row.action.confirm, () => {
-          onPress(el, () => this._callAction(row && row.action));
+        const action = row && (el.dataset.alt ? row.secondary_action : row.action);
+        this._guard(action && action.confirm, () => {
+          onPress(el, () => this._callAction(action));
         });
       };
       el.addEventListener("click", run);
@@ -14402,6 +14551,15 @@ class SpectraCard extends HTMLElement {
      somewhere to read it. */
   _callAction(action, quiet) {
     if (!action || !this._hass) return Promise.resolve();
+    /* Opening an answer is a thing only a screen can do, so the row names
+       the task, its card and its tab rather than a service. The panel
+       moves to the tab; the card that owns the task opens it. */
+    if (!isBlank(action.open_task)) {
+      window.dispatchEvent(new CustomEvent(OPEN_TASK_EVENT, {
+        detail: { id: String(action.open_task), card: String(firstOf(action.card, "")), tab: firstOf(action.tab, null) },
+      }));
+      return Promise.resolve();
+    }
     const name = action.service || action.perform_action || action.action;
     if (typeof name !== "string" || !name.includes(".")) {
       LOGGER_WARN("spectra-card: action has no service to call", action);
@@ -14983,9 +15141,7 @@ class SpectraCard extends HTMLElement {
     const data = { transcript: said, date: day, entry_type: type };
     if (!isBlank(spec.agent)) data.agent = String(spec.agent);
     const snap = this._mealSnap(day, type);
-    return Promise.resolve(this._hass.callWS({
-      type: "call_service", domain, service, service_data: data, return_response: true,
-    })).catch((error) => {
+    return this._aiWS(`${domain}.${service}`, data, { title: "Plan what was said", label: "planned" }).catch((error) => {
       throw voiceError("Could not plan that.", error && error.message);
     }).then((result) => {
       const planned = result && result.response && result.response.planned;
@@ -15007,9 +15163,9 @@ class SpectraCard extends HTMLElement {
     this._voiceSay("thinking", while_);
     const data = Object.assign({}, ask, { list });
     if (!isBlank(spec.agent)) data.agent = String(spec.agent);
-    Promise.resolve(this._hass.callWS({
-      type: "call_service", domain, service, service_data: data, return_response: true,
-    })).catch((error) => {
+    this._aiWS(`${domain}.${service}`, data, {
+      title: "Ingredients for the shopping list", label: "recipe", seen: () => this._onScreen(),
+    }).catch((error) => {
       throw voiceError("Could not read the recipe.", error && error.message);
     }).then((result) => {
       const response = (result && result.response) || {};
@@ -15063,9 +15219,9 @@ class SpectraCard extends HTMLElement {
         const ask = Object.assign({ entry_type: type }, span);
         if (!isBlank(request)) ask.request = String(request);
         if (!isBlank(spec.agent)) ask.agent = String(spec.agent);
-        return Promise.resolve(this._hass.callWS({
-          type: "call_service", domain, service, service_data: ask, return_response: true,
-        })).then((result) => {
+        return this._aiWS(`${domain}.${service}`, ask, {
+          title: `Plan ${mealType(type).word.toLowerCase()}`,
+        }).then((result) => {
           const r = (result && result.response) || {};
           const n = Array.isArray(r.planned) ? r.planned.length : 0;
           if (n) done.push(plural(type, n));
@@ -15336,9 +15492,9 @@ class SpectraCard extends HTMLElement {
     };
     if (!body.arrange || isBlank(body.arrange.script)) { done(inOrder()); return; }
     this._voiceSay("thinking", "Working out which day for each\u2026");
-    this._mealCall(body.arrange.script, {
+    this._aiCall(body.arrange.script, {
       recipes: recipes.map((r) => String(r.recipe_id)), dates: empty, entry_type: type,
-    }).then((got) => {
+    }, { title: "Choose a day for each recipe", seen: () => this._onScreen() }).then((got) => {
       const byId = new Map(recipes.map((r) => [String(r.recipe_id), r]));
       const used = new Set();
       const days = new Set();
@@ -15419,7 +15575,9 @@ class SpectraCard extends HTMLElement {
       if (avoid && avoid.length) data.avoid = avoid;
       if (!isBlank(request)) data.request = String(request);
       if (!isBlank(week.agent)) data.agent = String(week.agent);
-      return this._mealCall(week.script, data).then((r) => (Array.isArray(r.planned) ? r.planned : [])
+      return this._aiCall(week.script, data, {
+        title: "Suggest meals", seen: () => this._onScreen(),
+      }).then((r) => (Array.isArray(r.planned) ? r.planned : [])
         .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
         .map((p) => ({ date: String(p.date), type, name: String(p.meal),
           recipe_id: isBlank(p.recipe_id) ? "" : String(p.recipe_id),
@@ -15589,7 +15747,9 @@ class SpectraCard extends HTMLElement {
     let made = 0;
     rows.reduce((c, r, i) => c.then(() => {
       this._voiceSay("thinking", `Writing ${r.name} (${i + 1} of ${rows.length})\u2026`);
-      return this._mealCall(body.write.script, { title: r.name, entry_type: r.type }).then((got) => {
+      return this._aiCall(body.write.script, { title: r.name, entry_type: r.type }, {
+        title: "Write a recipe", label: "name",
+      }).then((got) => {
         if (isBlank(got.name) || !Array.isArray(got.ingredients) || !got.ingredients.length) return null;
         const data = {
           name: String(got.name),
@@ -15606,7 +15766,9 @@ class SpectraCard extends HTMLElement {
           if (isBlank(saved.recipe_id)) return null;
           made += 1;
           const tag = body.recipes.tag;
-          if (!isBlank(tag) && !isBlank(saved.slug)) this._mealCall(tag, { recipe: String(saved.slug) }).catch(() => {});
+          if (!isBlank(tag) && !isBlank(saved.slug)) {
+            this._aiCall(tag, { recipe: String(saved.slug) }, { title: `Tag ${firstOf(got.name, "a recipe")}` }).catch(() => {});
+          }
           return this._mealCall(body.place.script, { date: r.date, entry_type: r.type, recipe_id: String(saved.recipe_id) });
         });
       }).catch((error) => LOGGER_WARN(`spectra-card: could not write a recipe for ${r.name}`, error));
@@ -15687,7 +15849,9 @@ class SpectraCard extends HTMLElement {
       busy = true;
       failed = false;
       paint();
-      self._mealCall(body.ideas.script, { date: slot[0], entry_type: slot[1], avoid: shown })
+      self._aiCall(body.ideas.script, { date: slot[0], entry_type: slot[1], avoid: shown }, {
+        title: "Ideas for a meal", seen: () => wrap.isConnected,
+      })
         .then((r) => {
           ideas = (Array.isArray(r.ideas) ? r.ideas : [])
             .filter((x) => x && !isBlank(x.name))
@@ -15715,7 +15879,9 @@ class SpectraCard extends HTMLElement {
   _mealMake(body, entry, slot, planned, accent) {
     const name = mealName(planned);
     this._voiceSay("thinking", `Writing a recipe for ${name}…`);
-    this._mealCall(body.write.script, { title: name, entry_type: slot[1] }).then((got) => {
+    this._aiCall(body.write.script, { title: name, entry_type: slot[1] }, {
+      title: "Write a recipe", label: "name", open: true, kind: "draft", seen: () => this._onScreen(),
+    }).then((got) => {
       this._voiceSay("idle", "");
       const draft = {
         name: firstOf(got.name, name),
@@ -15770,7 +15936,9 @@ class SpectraCard extends HTMLElement {
     this._mealPhoto(spec.save, "cookbook", camera, accent).then((photo) => {
       if (!photo) return null;
       this._voiceSay("thinking", "Reading the recipe…");
-      return this._mealCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type })
+      return this._aiCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type }, {
+        title: "Recipe from a photo", label: "name", open: true, kind: "draft", seen: () => this._onScreen(),
+      })
         .then((got) => {
           this._voiceSay("idle", "");
           if (isBlank(got.name) && !(Array.isArray(got.ingredients) && got.ingredients.length)) {
@@ -16027,7 +16195,9 @@ class SpectraCard extends HTMLElement {
       if (!text) { status("Say or type something first."); return; }
       event.currentTarget.disabled = true;
       status("Working the week out\u2026");
-      this._mealCall(body.sentence.script, { text, start_date: span.start_date, days: span.days, suggest: true })
+      this._aiCall(body.sentence.script, { text, start_date: span.start_date, days: span.days, suggest: true }, {
+        title: "Plan the week in words", seen: () => this._onScreen(),
+      })
         .then((got) => {
           const rows = (Array.isArray(got.planned) ? got.planned : [])
             .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
@@ -16160,11 +16330,11 @@ class SpectraCard extends HTMLElement {
       if (!kept.length) return;
       yes.disabled = true;
       status("Seeing what's in there\u2026");
-      this._mealCall(fridge.script, {
+      this._aiCall(fridge.script, {
         photo: kept[0].id, photo_type: kept[0].type,
         photos: kept.map((p) => ({ id: p.id, type: p.type })),
         start_date: span.start_date, days, types: [...on], request: request.value.trim(),
-      }).then((got) => {
+      }, { title: "Meals from the fridge", seen: () => this._onScreen() }).then((got) => {
         const rows = (Array.isArray(got.planned) ? got.planned : [])
           .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
           .map((p) => ({ date: String(p.date), type: String(p.entry_type || "dinner").toLowerCase(),
@@ -16447,6 +16617,9 @@ class SpectraCard extends HTMLElement {
     const finish = () => {
       if (done) return;
       done = true;
+      /* Closing the sheet does not stop the reading. It goes on at
+         home_signals, and Needs you takes over saying when it is done. */
+      this._follow = null;
       document.removeEventListener("keydown", onKey, true);
       if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
       this._editing = false;
@@ -16462,36 +16635,79 @@ class SpectraCard extends HTMLElement {
       const yes = event.currentTarget;
       const found = input.value.match(/https?:\/\/\S+/);
       if (!found) { status("That is not a web address."); return; }
-      const [domain, service] = String(spec.script).split(".");
       yes.disabled = true;
       status("Reading the page\u2026");
+      /* Handed to home_signals when it can take it, so the reading carries
+         on when this sheet is closed and Needs you says when it is done.
+         An older integration without it gets the old wait, in the sheet. */
+      if (this._canRunTasks()) {
+        const home = this._taskHome();
+        this._mealCall("home_signals.start_ai_task", Object.assign({
+          title: "Recipe from a link",
+          action: String(spec.script),
+          data: { url: found[0] },
+          card: home.card,
+          tab: home.tab,
+          label: "recipe",
+          kind: "import",
+        },
+        isBlank(spec.split) ? {} : {
+          then: { action: String(spec.split), pass: { recipe: "slug" }, unless: "already" },
+        })).then((r) => {
+          if (done || isBlank(r.task_id)) return;
+          input.disabled = true;
+          const no = wrap.querySelector("[data-no]");
+          if (no) no.textContent = "Close";
+          status("Reading the page\u2026 This can be closed: it carries on, and Needs you will say when it is ready.");
+          this._follow = {
+            id: String(r.task_id),
+            step: (task) => {
+              if (Number(task.step) === 2) status("In the box. Looking for what can be done ahead\u2026 This can still be closed.");
+            },
+            landed: (task) => {
+              if (done) return;
+              /* Seen here, so it is not news for Needs you as well. */
+              this._callAction({ service: "home_signals.dismiss", data: { item_id: task.id } }, true);
+              if (task.state !== "done") {
+                yes.disabled = false;
+                input.disabled = false;
+                status(`Failed: ${firstOf(task.error, "no recipe could be read from that page")}.`);
+                return;
+              }
+              this._taskResult(task.id).then((got) => {
+                if (done) return;
+                this._importLanded(wrap, status, got.result || {}, taskSplit(got), finish, spec);
+              }, () => status("It finished, but the answer could not be fetched."));
+            },
+          };
+          this._followTask();
+        }, (error) => {
+          LOGGER_WARN("spectra-card: could not start the import", error);
+          yes.disabled = false;
+          status("The import could not be started.");
+        });
+        return;
+      }
+      const [domain, service] = String(spec.script).split(".");
       Promise.resolve(this._hass.callWS({
         type: "call_service", domain, service, service_data: { url: found[0] }, return_response: true,
       })).then((result) => {
         const saved = (result && result.response) || {};
-        status(`${firstOf(saved.recipe, "The recipe")} is in the box.`);
-        this._refetchMeals();
         /* Then what can be done ahead, checked once while it is fresh:
            the split runs after every import, and this waits for it. */
         if (!isBlank(spec.split) && !isBlank(saved.slug) && !saved.already) {
           status(`${firstOf(saved.recipe, "The recipe")} is in the box. Looking for what can be done ahead\u2026`);
+          this._refetchMeals();
           this._mealCall(spec.split, { recipe: String(saved.slug) }).then((split) => {
             if (done) return;
-            /* No answer from the model is not "nothing to prep": the
-               recipe is saved and simply not split yet. */
-            if (!split || split.mode === "error") {
-              status(`${firstOf(saved.recipe, "The recipe")} is in the box. What can be done ahead could not be worked out this time.`);
-              setTimeout(finish, 2500);
-              return;
-            }
-            this._prepReview(wrap, saved, split, finish);
+            this._importLanded(wrap, status, saved, split, finish, spec);
           }, (error) => {
             LOGGER_WARN("spectra-card: could not split the recipe", error);
             setTimeout(finish, 1200);
           });
           return;
         }
-        setTimeout(finish, 1200);
+        this._importLanded(wrap, status, saved, undefined, finish, spec);
       }, (error) => {
         LOGGER_WARN("spectra-card: could not import the recipe", error);
         yes.disabled = false;
@@ -16502,6 +16718,223 @@ class SpectraCard extends HTMLElement {
     this._editing = true;
     this._holder.appendChild(wrap);
     if (input.focus && finePointer()) input.focus({ preventScroll: true });
+  }
+
+  /* An import has answered: say so, then show the split if there is one.
+     `split` undefined is "none was asked for"; null or an error from the
+     model is "asked, and no answer" -- the recipe is saved, only not split. */
+  _importLanded(wrap, status, saved, split, finish, spec) {
+    const name = firstOf(saved.recipe, "The recipe");
+    this._refetchMeals();
+    if (split === undefined || (spec && isBlank(spec.split))) {
+      status(`${name} is in the box.`);
+      setTimeout(finish, 1200);
+      return;
+    }
+    if (!split || split.mode === "error") {
+      status(`${name} is in the box. What can be done ahead could not be worked out this time.`);
+      setTimeout(finish, 2500);
+      return;
+    }
+    this._prepReview(wrap, saved, split, finish);
+  }
+
+  /* Whether home_signals can run a task in the background. */
+  _canRunTasks() {
+    const s = this._hass && this._hass.services;
+    return Boolean(s && s.home_signals && s.home_signals.start_ai_task);
+  }
+
+  _taskResult(id) {
+    return this._mealCall("home_signals.ai_task_result", { task_id: String(id) });
+  }
+
+  /* Every AI call on this card goes through here, so each one is a task at
+     home_signals: a spinner line while it runs, a blue Done or Failed when it
+     lands, gone two minutes later. The flow still gets its answer here and
+     shows it as it always did. An older integration without tasks gets the
+     plain call.
+
+     `opts`:
+       title   what the line and the Needs you row say
+       label   the answer's key that names what came back
+       open    whether the card can show the answer again later -- only
+               with a `kind` _openTask knows
+       seen    asked when it lands: true when the answer is about to be put
+               in front of somebody (a sheet still open, a form popping up),
+               which is seeing it, so the notice clears at once. Otherwise
+               it stays blue for its two minutes. */
+  _aiCall(name, data, opts) {
+    if (!this._canRunTasks()) return this._mealCall(name, data);
+    const o = opts || {};
+    const home = this._taskHome();
+    return this._mealCall("home_signals.start_ai_task", Object.assign({
+      title: String(firstOf(o.title, "AI task")), action: String(name), data: data || {},
+      card: home.card, tab: home.tab, open: Boolean(o.open), kind: isBlank(o.kind) ? "" : String(o.kind),
+    }, isBlank(o.label) ? {} : { label: String(o.label) })).then((r) => {
+      if (isBlank(r.task_id)) throw new Error("the task was not started");
+      return new Promise((resolve, reject) => {
+        this._follows.set(String(r.task_id), { resolve, reject, seen: o.seen });
+        this._followTask();
+      });
+    });
+  }
+
+  /* The same, answered the way callWS answers, for the flows written to it. */
+  _aiWS(name, data, opts) {
+    return this._aiCall(name, data, opts).then((response) => ({ response }));
+  }
+
+  /* Whose card and tab a task belongs to: `tasks` when the card has it,
+     else the body type -- a to-do card's on Lists, the rest on Kitchen. */
+  _taskHome() {
+    const cfg = this._tasksCfg;
+    const type = this._config && this._config.body && this._config.body.type;
+    return {
+      card: cfg ? cfg.card : String(type || "card"),
+      tab: cfg && !isBlank(cfg.tab) ? String(cfg.tab) : (type === "todo" ? "lists" : "kitchen"),
+    };
+  }
+
+  /* Up on screen: the card is on the page and the page is being shown. */
+  _onScreen() {
+    return this.isConnected && document.visibilityState !== "hidden";
+  }
+
+  /* The sheet watching a task it started, on every hass. Read here rather
+     than through `_sources`, so a card without `tasks` still follows its
+     own import. */
+  _followTask() {
+    if (!this._hass || !this._hass.states) return;
+    const entity = (this._tasksCfg && this._tasksCfg.entity) || AI_TASKS_ENTITY;
+    const state = this._hass.states[entity];
+    const tasks = state && Array.isArray(state.attributes && state.attributes.tasks) ? state.attributes.tasks : [];
+    /* The calls made through _aiCall: answered when they land. */
+    for (const [id, w] of [...this._follows]) {
+      const t = tasks.find((x) => x && String(x.id) === id);
+      if (!t || t.state === "running") continue;
+      this._follows.delete(id);
+      if (t.state !== "done") {
+        w.reject(new Error(firstOf(t.error, "it did not finish")));
+        continue;
+      }
+      this._taskResult(id).then((got) => {
+        const answer = got.result && typeof got.result === "object" ? got.result : {};
+        if (typeof w.seen === "function" && w.seen()) {
+          this._callAction({ service: "home_signals.dismiss", data: { item_id: id } }, true);
+        }
+        w.resolve(answer);
+      }, w.reject);
+    }
+    const f = this._follow;
+    if (!f) return;
+    const task = tasks.find((t) => t && String(t.id) === f.id);
+    if (!task) return;
+    if (task.state === "running") {
+      if (f.at !== task.step) { f.at = task.step; f.step(task); }
+      return;
+    }
+    this._follow = null;
+    f.landed(task);
+  }
+
+  /* A saved recipe on its reading sheet, from the slug an AI task answered
+     with. The sheet wants the index's own entry (its id is what favourites,
+     photos and prep match on), so the slug is looked up first; a recipe the
+     index does not have yet opens by slug, which the fetch accepts. */
+  _openRecipeBySlug(slug, name) {
+    if (!this._mealSources || !this._mealSources.size || isBlank(slug)) return false;
+    const [source] = this._mealSources.values();
+    const b = (this._config && this._config.body) || {};
+    const edit = [b.edit, b.recipes].find((x) => x && typeof x === "object" && !isBlank(x.save)) || b.recipes;
+    const accent = this._model && this._model.accent;
+    this._recipeIndex(source.entry, true).catch(() => []).then((list) => {
+      const hit = (Array.isArray(list) ? list : []).find((r) => r && String(r.slug) === String(slug));
+      this._mealRecipe(source.entry, hit || { recipe_id: String(slug), name: firstOf(name, "Recipe") }, accent, edit,
+        { schedule: b.schedule, shop: b.shop });
+    });
+    return true;
+  }
+
+  /* A finished task, opened from its line on the card or its Needs you
+     row. Opening it is seeing it, so the notice clears -- card, tab and
+     row together, through the row's own Done. */
+  _openTask(id) {
+    if (!this._hass || isBlank(id) || this._editing) return;
+    this._taskResult(id).then((got) => {
+      const task = got.task || {};
+      this._callAction({ service: "home_signals.dismiss", data: { item_id: String(id) } }, true);
+      const saved = got.result && typeof got.result === "object" ? got.result : {};
+      /* A recipe a model wrote or read, not yet saved: the same form it
+         would have opened in, for a person to check and save. What it was
+         written for -- a slot on the plan -- did not survive the wait, so
+         saving keeps it in the box and plans nothing. */
+      if (task.state === "done" && task.kind === "draft" && !isBlank(saved.name) && this._mealSources && this._mealSources.size) {
+        const [source] = this._mealSources.values();
+        const b = (this._config && this._config.body) || {};
+        const edit = [b.edit, b.recipes].find((x) => x && typeof x === "object" && !isBlank(x.save));
+        if (edit) {
+          this._mealEdit(source.entry, null, this._model && this._model.accent, edit, {
+            draft: {
+              name: String(saved.name),
+              total_time: saved.total_time || "",
+              recipe_servings: saved.servings || "",
+              ingredients: (Array.isArray(saved.ingredients) ? saved.ingredients : []).map((x) => ({ display: String(x) })),
+              instructions: (Array.isArray(saved.method) ? saved.method : []).map((x) => ({ text: String(x) })),
+            },
+            made: { ai: { what: "wrote", by: saved.made_by || "", model: saved.model || "", mark: "created", note: String(firstOf(task.title, "Written by AI")) } },
+            heading: "Check the recipe, then save",
+          });
+          return;
+        }
+      }
+      const title = esc(firstOf(task.title, "AI task"));
+      const ok = task.state === "done";
+      const wrap = document.createElement("div");
+      wrap.className = "confirmwrap";
+      this._wearAccent(wrap, this._model && this._model.accent);
+      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${title}">`
+        + `<div class="confirmhead">${iconMarkup(ok ? "mdi:check-circle-outline" : "mdi:alert-circle-outline")}`
+        + `<span>${ok ? "Done" : "Failed"} · ${title}</span></div>`
+        + `<div class="mlrecipe"><p class="confirmtext" data-status></p></div>`
+        + `<div class="confirmbtns"><button type="button" class="confirmyes" data-no>OK</button></div></div>`;
+      const status = (text) => { const el = wrap.querySelector("[data-status]"); if (el) el.textContent = text; };
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("keydown", onKey, true);
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        this._editing = false;
+        this._signature = null;
+        this._update();
+      };
+      const onKey = (event) => {
+        if (event.key === "Escape") { event.preventDefault(); finish(); }
+      };
+      wrap.querySelector("[data-no]").addEventListener("click", finish);
+      document.addEventListener("keydown", onKey, true);
+      this._editing = true;
+      this._holder.appendChild(wrap);
+      if (!ok) {
+        status(`It did not work: ${firstOf(task.error, "no answer came back")}.`);
+        return;
+      }
+      if (!isBlank(saved.slug)) {
+        /* A recipe: the same review the sheet would have shown, had it
+           still been open. Nothing closes itself -- this was asked for. */
+        const split = taskSplit(got);
+        const name = firstOf(saved.recipe, "The recipe");
+        this._refetchMeals();
+        /* Nothing to check: open the recipe itself. */
+        if (split === undefined && this._openRecipeBySlug(saved.slug, saved.recipe)) { finish(); return; }
+        if (split === undefined) status(`${name} is in the box.`);
+        else if (!split || split.mode === "error") status(`${name} is in the box. What can be done ahead could not be worked out this time.`);
+        else this._prepReview(wrap, saved, split, finish);
+        return;
+      }
+      status(isBlank(task.label) ? "Done." : `Done: ${task.label}.`);
+    }, (error) => LOGGER_WARN("spectra-card: could not open the task", error));
   }
 
   /* An import's split, checked once. The page's own make-ahead notes and
@@ -17832,9 +18265,9 @@ class SpectraCard extends HTMLElement {
       if (typeof o.onState === "function") o.onState(st);
     };
 
-    const askFor = (question, limit) => this._mealCall(o.askSpec.script, {
+    const askFor = (question, limit) => this._aiCall(o.askSpec.script, {
       question, entry_type: o.meal || "", date: o.date || "", limit,
-    }).then((r) => (Array.isArray(r.picks) ? r.picks : [])
+    }, { title: "Ask the recipe box", seen: () => box.isConnected }).then((r) => (Array.isArray(r.picks) ? r.picks : [])
       .filter((p) => p && byId.has(String(p.recipe_id))));
 
     if (find) find.addEventListener("input", apply);
@@ -18210,7 +18643,7 @@ class SpectraCard extends HTMLElement {
         /* A new recipe nobody tagged is tagged by AI, in the background:
            the box then knows which meals it suits the next time it opens. */
         if (!recipe && !tags.length && !isBlank(edit.tag) && !isBlank(saved.slug)) {
-          this._mealCall(edit.tag, { recipe: String(saved.slug) })
+          this._aiCall(edit.tag, { recipe: String(saved.slug) }, { title: `Tag ${firstOf(saved.name, name, "a recipe")}` })
             .then(() => this._refetchMeals(), (error) => LOGGER_WARN("spectra-card: could not tag the recipe", error));
         }
       }, (error) => {
@@ -18284,7 +18717,9 @@ class SpectraCard extends HTMLElement {
           if (isBlank(heard)) { said.textContent = "Nothing was heard."; return null; }
           mic.classList.add("thinking");
           said.textContent = `\u201c${heard}\u201d`;
-          return call(edit.dictate, { transcript: heard }, true).then((result) => {
+          return this._aiWS(edit.dictate, { transcript: heard }, {
+            title: "Recipe from speech", seen: () => wrap.isConnected,
+          }).then((result) => {
             mic.classList.remove("thinking");
             const got = (result && result.response) || {};
             const put = (key, value) => {
@@ -18797,6 +19232,8 @@ const PANEL_SHEET = `
 .needsbar .nbfirst { flex:1 1 auto; min-width:0; font-size:13px; color:var(--sp-ink-2);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .needsbar ha-icon { flex:none; --mdc-icon-size:20px; color:var(--sp-ink-2); transition:transform .2s; }
+.needsbar.lv-notice { border-color:var(--sp-notice); }
+.needsbar.lv-notice .nbcount { color:var(--sp-notice-on); }
 .needsbar.lv-attention { border-color:var(--sp-attention); }
 .needsbar.lv-attention .nbcount { color:var(--sp-attention-on); }
 .needsbar.lv-waiting { border-color:var(--sp-waiting); box-shadow:inset 0 0 0 1px var(--sp-waiting); }
@@ -18861,6 +19298,19 @@ class SpectraPanel extends HTMLElement {
     this._onTab = () => {
       this._applyTab();
       this._layout();
+    };
+    /* A Needs you row's Open names its tab in the house's words
+       ("kitchen"); the rail names it in the dashboard's ("Kitchen"). */
+    this._onOpenTask = (event) => {
+      const want = event.detail && event.detail.tab;
+      if (isBlank(want)) return;
+      const tabs = this._wrappers ? this._wrappers.flatMap((w) => w.tabs || []) : [];
+      const tab = tabs.find((t) => t.toLowerCase() === String(want).toLowerCase());
+      if (tab && tab !== tabStore.get()) tabStore.set(tab);
+      if (this._panel.classList.contains("open")) {
+        this._panel.classList.remove("open");
+        this._bar.setAttribute("aria-expanded", "false");
+      }
     };
     this.addEventListener("section-visibility-changed", this._onVisibility);
     this.addEventListener("card-visibility-changed", this._onVisibility);
@@ -18966,6 +19416,7 @@ class SpectraPanel extends HTMLElement {
 
   connectedCallback() {
     window.addEventListener(TAB_EVENT, this._onTab);
+    window.addEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     this._applyTab();
     if (!this._observer && typeof ResizeObserver !== "undefined") {
       this._observer = new ResizeObserver(this._relayout);
@@ -18981,6 +19432,7 @@ class SpectraPanel extends HTMLElement {
 
   disconnectedCallback() {
     window.removeEventListener(TAB_EVENT, this._onTab);
+    window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     if (this._observer) { this._observer.disconnect(); this._observer = null; }
     if (this._sizer) { this._sizer.disconnect(); this._sizer = null; }
     window.removeEventListener("resize", this._relayout);
@@ -19072,7 +19524,7 @@ class SpectraPanel extends HTMLElement {
       this._bar.setAttribute("aria-expanded", "false");
       return;
     }
-    const rank = { attention: 1, waiting: 2, critical: 3 };
+    const rank = { notice: 1, attention: 2, waiting: 3, critical: 4 };
     let top = null;
     for (const item of items) {
       if (!top || (rank[item.level] || 0) > (rank[top.level] || 0)) top = item;

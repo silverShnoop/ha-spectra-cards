@@ -12,7 +12,7 @@
  *
  *   - an accent number on `outline` buys nothing
  *   - a made-up level name buys nothing either, and does not throw
- *   - none of the three level hues is reachable as an accent
+ *   - none of the level hues is reachable as an accent
  *
  * And three about what must: each level paints the border, waiting adds
  * the inset ring, critical adds the ring and the ground -- without the
@@ -199,13 +199,24 @@ const js = fs.readFileSync(file);
        from "this is a Lights card". */
     await show(undefined);
     const accents = [1, 2, 3, 4, 5, 6].map((n) => tok(`a${n}`));
-    ["attention", "waiting", "critical"].forEach((name) => {
+    ["notice", "attention", "waiting", "critical"].forEach((name) => {
       check(`${name} is not also an accent`,
         accents.indexOf(tok(name)) === -1,
         `${tok(name)} is accent ${accents.indexOf(tok(name)) + 1}`);
     });
 
     /* ---- what each level draws ------------------------------------ */
+    /* Notice is the quietest, and draws exactly what attention draws:
+       the border, in its own hue. It promises no deadline, so it takes
+       no ring and no ground -- blue against yellow is the one pair the
+       hue alone carries, to normal vision and to deutan alike. */
+    await show("notice");
+    check("notice paints the border and nothing else",
+      st().borderTopColor === tok("notice")
+        && st().boxShadow === "none"
+        && st().backgroundColor === tok("surface"),
+      `${st().borderTopColor} / ${st().boxShadow} / ${st().backgroundColor}`);
+
     await show("attention");
     check("attention paints the border and nothing else",
       st().borderTopColor === tok("attention")
@@ -235,7 +246,7 @@ const js = fs.readFileSync(file);
        moment a level arrived. Measured, not asserted by reading the CSS:
        the geometry must be identical across all four states. */
     const boxes = { none: plainBox };
-    for (const name of ["attention", "waiting", "critical"]) {
+    for (const name of ["notice", "attention", "waiting", "critical"]) {
       await show(name);
       boxes[name] = box();
     }

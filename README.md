@@ -63,6 +63,7 @@ number in `outline` buys nothing at all.
 
 | Level | Timeline | Treatment | Light | Dark |
 | --- | --- | --- | --- | --- |
+| `notice` | none: something you asked for is under way or ready | 2px border | `#0E79E0` | `#1C6FE8` |
 | `attention` | today or tomorrow | 2px border | `#B6862A` | `#D9A63F` |
 | `waiting` | the next 30 minutes | border + 1px inset ring | `#B0512C` | `#EC6124` |
 | `critical` | now | ring + soft ground | `#8E0C14` | `#E2333F` |
@@ -70,6 +71,16 @@ number in `outline` buys nothing at all.
 The levels are ordered and the accents are not, which is why the levels are
 named and the accents numbered: a slot number is an arbitrary label, whereas
 `waiting` carries a timeline a reviewer can check a row against.
+
+**Notice is the quiet one, and it is blue.** It is the only level with no
+deadline in it: work the house did on somebody's behalf — an AI task that
+has finished, or failed — waiting to be looked at. It draws exactly what
+attention draws, the border, because blue against yellow is the one pair the
+hue alone carries to normal vision and to deutan alike. Its nearest
+neighbour is slate (`a5`): ΔE00 15.9 by eye and 13.6 deutan in light, 15.6
+and 16.4 in dark — and that is a rail button beside a rail button, so it is
+the pair to watch. Dark is the darker blue, not a lifted one: lifted, it
+walks into the dark slate.
 
 **Yellow, orange and red are reserved.** No decorative slot may be one of
 them, which is why `a1` and `a2` are a brown and a bone rather than the
@@ -142,6 +153,53 @@ changes colour.
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
 is never a seventh: if a new meaning appears, map it onto one of the six.
+
+## AI tasks: `tasks`
+
+```yaml
+type: custom:spectra-card
+title: Meals
+tasks: meals          # or {card: meals, entity: sensor.ai_tasks, tab: kitchen}
+```
+
+Every AI call a card makes goes through `_aiCall`, which runs it as a
+home_signals task rather than waiting on the script in the browser. That is
+the link import, a recipe from a photo or a name, writing recipes for new
+ideas, tagging, dictating, suggesting and arranging meals, ideas for a slot,
+the fridge, planning in words or by voice, asking the box, and reading
+ingredients or speech onto the shopping list. The flow still gets its answer
+and shows it as it always did.
+
+A card with `tasks` shows the tasks it started, from home_signals'
+`sensor.ai_tasks`, and wears the `notice` the sensor gives it (the louder of
+that and its own `outline`) from the moment one starts. Running, the line is
+a spinner, **Running** and its step, with **Dismiss**, which quietens it
+until it lands. Finished, the line says which way it went before anything else:
+**Done** with a tick, or **Failed** with an alert and the reason. It has two
+buttons, as its Needs you row does: **Dismiss**, which clears the card, the
+tab and the row together, and **Open** when the answer can be shown again —
+a saved recipe opens on its sheet, an unsaved draft in the form, an import
+in its review. Two minutes after it lands it goes on its own.
+
+An answer that is put in front of somebody as it lands — a sheet still
+open, a form or review popping up on a panel being looked at — is seen, so
+its notice clears at once. One that lands with nobody looking stays blue.
+
+Without `tasks` a card files its tasks under its body type (`meals`,
+`recipes`, `todo`), on Kitchen, or Lists for a to-do card.
+
+Opt-in, because a level is a card's to claim: the Meals card on Home shows
+the same plan as the one on Kitchen, and Home never wears a level.
+
+The link import uses it whenever home_signals has `start_ai_task`: the
+sheet says the reading can be closed, follows it through its steps, and
+shows the split if it is still open when the answer lands. Closed, the
+answer goes to Needs you, whose **Open** carries `open_task` instead of a
+service — the panel moves to the row's tab and the card that owns the task
+opens it.
+
+A list row takes a second button, `secondary_action` and `secondary_label`,
+drawn quieter and before the main one. `checkaitasks` holds all of it.
 
 ## Values: literals or entity references
 
