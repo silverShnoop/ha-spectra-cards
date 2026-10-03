@@ -283,6 +283,64 @@ const js = fs.readFileSync(file);
     check("when the sensor drops it, the card resets",
       !q(el, ".aitask") && !q(el, ".card").classList.contains("outlined"), q(el, ".card").className);
 
+    /* ---- any AI call: a task, answered when it lands ---- */
+    const viaTask = (landing) => {
+      const hh = hassWith([landing], {});
+      const ws = hh.callWS;
+      hh.callWS = (msg) => {
+        if (msg.service === "start_ai_task") {
+          calls.push(["home_signals.start_ai_task", msg.service_data]);
+          return Promise.resolve({ response: { task_id: "ai_7" } });
+        }
+        if (msg.service === "ai_task_result") {
+          calls.push(["home_signals.ai_task_result", msg.service_data]);
+          return Promise.resolve({ response: { task: landing, result: { planned: "Pie" }, then: null } });
+        }
+        return ws(msg);
+      };
+      return hh;
+    };
+    const seven = { id: "ai_7", title: "Plan what was said", card: "meals", tab: "kitchen", state: "running", step: 1, steps: 1 };
+    calls.length = 0;
+    await set(viaTask(seven));
+    let seenAsked = false;
+    const answer = el._aiCall("script.meal_plan_say", { transcript: "pie" },
+      { title: "Plan what was said", label: "planned", seen: () => { seenAsked = true; return true; } });
+    await new Promise((r) => setTimeout(r, 20));
+    const begun = calls.find(([n]) => n === "home_signals.start_ai_task");
+    check("an AI call starts a task with the card's own key and tab",
+      begun && begun[1].action === "script.meal_plan_say" && begun[1].card === "meals"
+        && begun[1].tab === "kitchen" && begun[1].open === false && begun[1].label === "planned"
+        && begun[1].kind === "",
+      JSON.stringify(begun));
+    let got = null;
+    answer.then((a) => { got = a; });
+    await set(viaTask(Object.assign({}, seven, { state: "done" })));
+    await new Promise((r) => setTimeout(r, 50));
+    check("...and answers with the script's own answer when it lands",
+      got && got.planned === "Pie", JSON.stringify(got));
+    check("...and an answer put in front of somebody clears its notice",
+      seenAsked && calls.some(([n, d]) => n === "home_signals.dismiss" && d.item_id === "ai_7"), JSON.stringify(calls));
+
+    calls.length = 0;
+    await set(viaTask(seven));
+    let err = null;
+    el._aiCall("script.meal_plan_say", {}, { title: "x" }).catch((e) => { err = e; });
+    await new Promise((r) => setTimeout(r, 20));
+    await set(viaTask(Object.assign({}, seven, { state: "failed", error: "model said nothing" })));
+    await new Promise((r) => setTimeout(r, 20));
+    check("a failed task fails the call, with its reason",
+      err && /model said nothing/.test(err.message), String(err));
+
+    const plain = hassWith([], {});
+    delete plain.services.home_signals;
+    calls.length = 0;
+    await set(plain);
+    el._aiCall("script.meal_plan_say", { transcript: "pie" }, { title: "x" });
+    await new Promise((r) => setTimeout(r, 20));
+    check("without home_signals tasks it is the plain call",
+      calls.length === 1 && calls[0][0] === "script.meal_plan_say", JSON.stringify(calls));
+
     return problems;
   });
 

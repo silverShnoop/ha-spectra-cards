@@ -10872,6 +10872,8 @@ class SpectraCard extends HTMLElement {
     this._live = false;
     this._timer = null;
     this._model = null;
+    /* Tasks this card started through _aiCall, by id, waiting to land. */
+    this._follows = new Map();
     this._forecastSources = new Map();
     this._forecasts = {};
     this._subscriptions = new Map();
@@ -13046,13 +13048,9 @@ class SpectraCard extends HTMLElement {
     const data = { transcript: said };
     if (!isBlank(spec.about)) data.about = String(spec.about);
     if (!isBlank(spec.agent)) data.agent = String(spec.agent);
-    return Promise.resolve(this._hass.callWS({
-      type: "call_service",
-      domain,
-      service,
-      service_data: data,
-      return_response: true,
-    })).catch((error) => {
+    return this._aiWS(`${domain}.${service}`, data, {
+      title: "Shopping list from speech", seen: () => this._onScreen(),
+    }).catch((error) => {
       throw voiceError("Could not work out what was said.", error && error.message);
     }).then((result) => {
       const rows = result && result.response && result.response.items;
@@ -15059,9 +15057,7 @@ class SpectraCard extends HTMLElement {
     const data = { transcript: said, date: day, entry_type: type };
     if (!isBlank(spec.agent)) data.agent = String(spec.agent);
     const snap = this._mealSnap(day, type);
-    return Promise.resolve(this._hass.callWS({
-      type: "call_service", domain, service, service_data: data, return_response: true,
-    })).catch((error) => {
+    return this._aiWS(`${domain}.${service}`, data, { title: "Plan what was said", label: "planned" }).catch((error) => {
       throw voiceError("Could not plan that.", error && error.message);
     }).then((result) => {
       const planned = result && result.response && result.response.planned;
@@ -15083,9 +15079,9 @@ class SpectraCard extends HTMLElement {
     this._voiceSay("thinking", while_);
     const data = Object.assign({}, ask, { list });
     if (!isBlank(spec.agent)) data.agent = String(spec.agent);
-    Promise.resolve(this._hass.callWS({
-      type: "call_service", domain, service, service_data: data, return_response: true,
-    })).catch((error) => {
+    this._aiWS(`${domain}.${service}`, data, {
+      title: "Ingredients for the shopping list", label: "recipe", seen: () => this._onScreen(),
+    }).catch((error) => {
       throw voiceError("Could not read the recipe.", error && error.message);
     }).then((result) => {
       const response = (result && result.response) || {};
@@ -15139,9 +15135,9 @@ class SpectraCard extends HTMLElement {
         const ask = Object.assign({ entry_type: type }, span);
         if (!isBlank(request)) ask.request = String(request);
         if (!isBlank(spec.agent)) ask.agent = String(spec.agent);
-        return Promise.resolve(this._hass.callWS({
-          type: "call_service", domain, service, service_data: ask, return_response: true,
-        })).then((result) => {
+        return this._aiWS(`${domain}.${service}`, ask, {
+          title: `Plan ${mealType(type).word.toLowerCase()}`,
+        }).then((result) => {
           const r = (result && result.response) || {};
           const n = Array.isArray(r.planned) ? r.planned.length : 0;
           if (n) done.push(plural(type, n));
@@ -15412,9 +15408,9 @@ class SpectraCard extends HTMLElement {
     };
     if (!body.arrange || isBlank(body.arrange.script)) { done(inOrder()); return; }
     this._voiceSay("thinking", "Working out which day for each\u2026");
-    this._mealCall(body.arrange.script, {
+    this._aiCall(body.arrange.script, {
       recipes: recipes.map((r) => String(r.recipe_id)), dates: empty, entry_type: type,
-    }).then((got) => {
+    }, { title: "Choose a day for each recipe", seen: () => this._onScreen() }).then((got) => {
       const byId = new Map(recipes.map((r) => [String(r.recipe_id), r]));
       const used = new Set();
       const days = new Set();
@@ -15495,7 +15491,9 @@ class SpectraCard extends HTMLElement {
       if (avoid && avoid.length) data.avoid = avoid;
       if (!isBlank(request)) data.request = String(request);
       if (!isBlank(week.agent)) data.agent = String(week.agent);
-      return this._mealCall(week.script, data).then((r) => (Array.isArray(r.planned) ? r.planned : [])
+      return this._aiCall(week.script, data, {
+        title: "Suggest meals", seen: () => this._onScreen(),
+      }).then((r) => (Array.isArray(r.planned) ? r.planned : [])
         .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
         .map((p) => ({ date: String(p.date), type, name: String(p.meal),
           recipe_id: isBlank(p.recipe_id) ? "" : String(p.recipe_id),
@@ -15665,7 +15663,9 @@ class SpectraCard extends HTMLElement {
     let made = 0;
     rows.reduce((c, r, i) => c.then(() => {
       this._voiceSay("thinking", `Writing ${r.name} (${i + 1} of ${rows.length})\u2026`);
-      return this._mealCall(body.write.script, { title: r.name, entry_type: r.type }).then((got) => {
+      return this._aiCall(body.write.script, { title: r.name, entry_type: r.type }, {
+        title: "Write a recipe", label: "name",
+      }).then((got) => {
         if (isBlank(got.name) || !Array.isArray(got.ingredients) || !got.ingredients.length) return null;
         const data = {
           name: String(got.name),
@@ -15682,7 +15682,9 @@ class SpectraCard extends HTMLElement {
           if (isBlank(saved.recipe_id)) return null;
           made += 1;
           const tag = body.recipes.tag;
-          if (!isBlank(tag) && !isBlank(saved.slug)) this._mealCall(tag, { recipe: String(saved.slug) }).catch(() => {});
+          if (!isBlank(tag) && !isBlank(saved.slug)) {
+            this._aiCall(tag, { recipe: String(saved.slug) }, { title: `Tag ${firstOf(got.name, "a recipe")}` }).catch(() => {});
+          }
           return this._mealCall(body.place.script, { date: r.date, entry_type: r.type, recipe_id: String(saved.recipe_id) });
         });
       }).catch((error) => LOGGER_WARN(`spectra-card: could not write a recipe for ${r.name}`, error));
@@ -15763,7 +15765,9 @@ class SpectraCard extends HTMLElement {
       busy = true;
       failed = false;
       paint();
-      self._mealCall(body.ideas.script, { date: slot[0], entry_type: slot[1], avoid: shown })
+      self._aiCall(body.ideas.script, { date: slot[0], entry_type: slot[1], avoid: shown }, {
+        title: "Ideas for a meal", seen: () => wrap.isConnected,
+      })
         .then((r) => {
           ideas = (Array.isArray(r.ideas) ? r.ideas : [])
             .filter((x) => x && !isBlank(x.name))
@@ -15791,7 +15795,9 @@ class SpectraCard extends HTMLElement {
   _mealMake(body, entry, slot, planned, accent) {
     const name = mealName(planned);
     this._voiceSay("thinking", `Writing a recipe for ${name}…`);
-    this._mealCall(body.write.script, { title: name, entry_type: slot[1] }).then((got) => {
+    this._aiCall(body.write.script, { title: name, entry_type: slot[1] }, {
+      title: "Write a recipe", label: "name", open: true, kind: "draft", seen: () => this._onScreen(),
+    }).then((got) => {
       this._voiceSay("idle", "");
       const draft = {
         name: firstOf(got.name, name),
@@ -15846,7 +15852,9 @@ class SpectraCard extends HTMLElement {
     this._mealPhoto(spec.save, "cookbook", camera, accent).then((photo) => {
       if (!photo) return null;
       this._voiceSay("thinking", "Reading the recipe…");
-      return this._mealCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type })
+      return this._aiCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type }, {
+        title: "Recipe from a photo", label: "name", open: true, kind: "draft", seen: () => this._onScreen(),
+      })
         .then((got) => {
           this._voiceSay("idle", "");
           if (isBlank(got.name) && !(Array.isArray(got.ingredients) && got.ingredients.length)) {
@@ -16103,7 +16111,9 @@ class SpectraCard extends HTMLElement {
       if (!text) { status("Say or type something first."); return; }
       event.currentTarget.disabled = true;
       status("Working the week out\u2026");
-      this._mealCall(body.sentence.script, { text, start_date: span.start_date, days: span.days, suggest: true })
+      this._aiCall(body.sentence.script, { text, start_date: span.start_date, days: span.days, suggest: true }, {
+        title: "Plan the week in words", seen: () => this._onScreen(),
+      })
         .then((got) => {
           const rows = (Array.isArray(got.planned) ? got.planned : [])
             .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
@@ -16236,11 +16246,11 @@ class SpectraCard extends HTMLElement {
       if (!kept.length) return;
       yes.disabled = true;
       status("Seeing what's in there\u2026");
-      this._mealCall(fridge.script, {
+      this._aiCall(fridge.script, {
         photo: kept[0].id, photo_type: kept[0].type,
         photos: kept.map((p) => ({ id: p.id, type: p.type })),
         start_date: span.start_date, days, types: [...on], request: request.value.trim(),
-      }).then((got) => {
+      }, { title: "Meals from the fridge", seen: () => this._onScreen() }).then((got) => {
         const rows = (Array.isArray(got.planned) ? got.planned : [])
           .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
           .map((p) => ({ date: String(p.date), type: String(p.entry_type || "dinner").toLowerCase(),
@@ -16547,14 +16557,16 @@ class SpectraCard extends HTMLElement {
          on when this sheet is closed and Needs you says when it is done.
          An older integration without it gets the old wait, in the sheet. */
       if (this._canRunTasks()) {
-        const cfg = this._tasksCfg || { card: "meals" };
+        const home = this._taskHome();
         this._mealCall("home_signals.start_ai_task", Object.assign({
           title: "Recipe from a link",
           action: String(spec.script),
           data: { url: found[0] },
-          card: cfg.card,
+          card: home.card,
+          tab: home.tab,
           label: "recipe",
-        }, isBlank(cfg.tab) ? {} : { tab: String(cfg.tab) },
+          kind: "import",
+        },
         isBlank(spec.split) ? {} : {
           then: { action: String(spec.split), pass: { recipe: "slug" }, unless: "already" },
         })).then((r) => {
@@ -16653,15 +16665,85 @@ class SpectraCard extends HTMLElement {
     return this._mealCall("home_signals.ai_task_result", { task_id: String(id) });
   }
 
+  /* Every AI call on this card goes through here, so each one is a task at
+     home_signals: a spinner line while it runs, a blue Done or Failed when it
+     lands, gone two minutes later. The flow still gets its answer here and
+     shows it as it always did. An older integration without tasks gets the
+     plain call.
+
+     `opts`:
+       title   what the line and the Needs you row say
+       label   the answer's key that names what came back
+       open    whether the card can show the answer again later -- only
+               with a `kind` _openTask knows
+       seen    asked when it lands: true when the answer is about to be put
+               in front of somebody (a sheet still open, a form popping up),
+               which is seeing it, so the notice clears at once. Otherwise
+               it stays blue for its two minutes. */
+  _aiCall(name, data, opts) {
+    if (!this._canRunTasks()) return this._mealCall(name, data);
+    const o = opts || {};
+    const home = this._taskHome();
+    return this._mealCall("home_signals.start_ai_task", Object.assign({
+      title: String(firstOf(o.title, "AI task")), action: String(name), data: data || {},
+      card: home.card, tab: home.tab, open: Boolean(o.open), kind: isBlank(o.kind) ? "" : String(o.kind),
+    }, isBlank(o.label) ? {} : { label: String(o.label) })).then((r) => {
+      if (isBlank(r.task_id)) throw new Error("the task was not started");
+      return new Promise((resolve, reject) => {
+        this._follows.set(String(r.task_id), { resolve, reject, seen: o.seen });
+        this._followTask();
+      });
+    });
+  }
+
+  /* The same, answered the way callWS answers, for the flows written to it. */
+  _aiWS(name, data, opts) {
+    return this._aiCall(name, data, opts).then((response) => ({ response }));
+  }
+
+  /* Whose card and tab a task belongs to: `tasks` when the card has it,
+     else the body type -- a to-do card's on Lists, the rest on Kitchen. */
+  _taskHome() {
+    const cfg = this._tasksCfg;
+    const type = this._config && this._config.body && this._config.body.type;
+    return {
+      card: cfg ? cfg.card : String(type || "card"),
+      tab: cfg && !isBlank(cfg.tab) ? String(cfg.tab) : (type === "todo" ? "lists" : "kitchen"),
+    };
+  }
+
+  /* Up on screen: the card is on the page and the page is being shown. */
+  _onScreen() {
+    return this.isConnected && document.visibilityState !== "hidden";
+  }
+
   /* The sheet watching a task it started, on every hass. Read here rather
      than through `_sources`, so a card without `tasks` still follows its
      own import. */
   _followTask() {
-    const f = this._follow;
-    if (!f || !this._hass || !this._hass.states) return;
+    if (!this._hass || !this._hass.states) return;
     const entity = (this._tasksCfg && this._tasksCfg.entity) || AI_TASKS_ENTITY;
     const state = this._hass.states[entity];
     const tasks = state && Array.isArray(state.attributes && state.attributes.tasks) ? state.attributes.tasks : [];
+    /* The calls made through _aiCall: answered when they land. */
+    for (const [id, w] of [...this._follows]) {
+      const t = tasks.find((x) => x && String(x.id) === id);
+      if (!t || t.state === "running") continue;
+      this._follows.delete(id);
+      if (t.state !== "done") {
+        w.reject(new Error(firstOf(t.error, "it did not finish")));
+        continue;
+      }
+      this._taskResult(id).then((got) => {
+        const answer = got.result && typeof got.result === "object" ? got.result : {};
+        if (typeof w.seen === "function" && w.seen()) {
+          this._callAction({ service: "home_signals.dismiss", data: { item_id: id } }, true);
+        }
+        w.resolve(answer);
+      }, w.reject);
+    }
+    const f = this._follow;
+    if (!f) return;
     const task = tasks.find((t) => t && String(t.id) === f.id);
     if (!task) return;
     if (task.state === "running") {
@@ -16670,6 +16752,24 @@ class SpectraCard extends HTMLElement {
     }
     this._follow = null;
     f.landed(task);
+  }
+
+  /* A saved recipe on its reading sheet, from the slug an AI task answered
+     with. The sheet wants the index's own entry (its id is what favourites,
+     photos and prep match on), so the slug is looked up first; a recipe the
+     index does not have yet opens by slug, which the fetch accepts. */
+  _openRecipeBySlug(slug, name) {
+    if (!this._mealSources || !this._mealSources.size || isBlank(slug)) return false;
+    const [source] = this._mealSources.values();
+    const b = (this._config && this._config.body) || {};
+    const edit = [b.edit, b.recipes].find((x) => x && typeof x === "object" && !isBlank(x.save)) || b.recipes;
+    const accent = this._model && this._model.accent;
+    this._recipeIndex(source.entry, true).catch(() => []).then((list) => {
+      const hit = (Array.isArray(list) ? list : []).find((r) => r && String(r.slug) === String(slug));
+      this._mealRecipe(source.entry, hit || { recipe_id: String(slug), name: firstOf(name, "Recipe") }, accent, edit,
+        { schedule: b.schedule, shop: b.shop });
+    });
+    return true;
   }
 
   /* A finished task, opened from its line on the card or its Needs you
@@ -16681,6 +16781,29 @@ class SpectraCard extends HTMLElement {
       const task = got.task || {};
       this._callAction({ service: "home_signals.dismiss", data: { item_id: String(id) } }, true);
       const saved = got.result && typeof got.result === "object" ? got.result : {};
+      /* A recipe a model wrote or read, not yet saved: the same form it
+         would have opened in, for a person to check and save. What it was
+         written for -- a slot on the plan -- did not survive the wait, so
+         saving keeps it in the box and plans nothing. */
+      if (task.state === "done" && task.kind === "draft" && !isBlank(saved.name) && this._mealSources && this._mealSources.size) {
+        const [source] = this._mealSources.values();
+        const b = (this._config && this._config.body) || {};
+        const edit = [b.edit, b.recipes].find((x) => x && typeof x === "object" && !isBlank(x.save));
+        if (edit) {
+          this._mealEdit(source.entry, null, this._model && this._model.accent, edit, {
+            draft: {
+              name: String(saved.name),
+              total_time: saved.total_time || "",
+              recipe_servings: saved.servings || "",
+              ingredients: (Array.isArray(saved.ingredients) ? saved.ingredients : []).map((x) => ({ display: String(x) })),
+              instructions: (Array.isArray(saved.method) ? saved.method : []).map((x) => ({ text: String(x) })),
+            },
+            made: { ai: { what: "wrote", by: saved.made_by || "", model: saved.model || "", mark: "created", note: String(firstOf(task.title, "Written by AI")) } },
+            heading: "Check the recipe, then save",
+          });
+          return;
+        }
+      }
       const title = esc(firstOf(task.title, "AI task"));
       const ok = task.state === "done";
       const wrap = document.createElement("div");
@@ -16719,6 +16842,8 @@ class SpectraCard extends HTMLElement {
         const split = taskSplit(got);
         const name = firstOf(saved.recipe, "The recipe");
         this._refetchMeals();
+        /* Nothing to check: open the recipe itself. */
+        if (split === undefined && this._openRecipeBySlug(saved.slug, saved.recipe)) { finish(); return; }
         if (split === undefined) status(`${name} is in the box.`);
         else if (!split || split.mode === "error") status(`${name} is in the box. What can be done ahead could not be worked out this time.`);
         else this._prepReview(wrap, saved, split, finish);
@@ -18056,9 +18181,9 @@ class SpectraCard extends HTMLElement {
       if (typeof o.onState === "function") o.onState(st);
     };
 
-    const askFor = (question, limit) => this._mealCall(o.askSpec.script, {
+    const askFor = (question, limit) => this._aiCall(o.askSpec.script, {
       question, entry_type: o.meal || "", date: o.date || "", limit,
-    }).then((r) => (Array.isArray(r.picks) ? r.picks : [])
+    }, { title: "Ask the recipe box", seen: () => box.isConnected }).then((r) => (Array.isArray(r.picks) ? r.picks : [])
       .filter((p) => p && byId.has(String(p.recipe_id))));
 
     if (find) find.addEventListener("input", apply);
@@ -18434,7 +18559,7 @@ class SpectraCard extends HTMLElement {
         /* A new recipe nobody tagged is tagged by AI, in the background:
            the box then knows which meals it suits the next time it opens. */
         if (!recipe && !tags.length && !isBlank(edit.tag) && !isBlank(saved.slug)) {
-          this._mealCall(edit.tag, { recipe: String(saved.slug) })
+          this._aiCall(edit.tag, { recipe: String(saved.slug) }, { title: `Tag ${firstOf(saved.name, name, "a recipe")}` })
             .then(() => this._refetchMeals(), (error) => LOGGER_WARN("spectra-card: could not tag the recipe", error));
         }
       }, (error) => {
@@ -18508,7 +18633,9 @@ class SpectraCard extends HTMLElement {
           if (isBlank(heard)) { said.textContent = "Nothing was heard."; return null; }
           mic.classList.add("thinking");
           said.textContent = `\u201c${heard}\u201d`;
-          return call(edit.dictate, { transcript: heard }, true).then((result) => {
+          return this._aiWS(edit.dictate, { transcript: heard }, {
+            title: "Recipe from speech", seen: () => wrap.isConnected,
+          }).then((result) => {
             mic.classList.remove("thinking");
             const got = (result && result.response) || {};
             const put = (key, value) => {

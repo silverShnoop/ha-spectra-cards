@@ -162,14 +162,31 @@ title: Meals
 tasks: meals          # or {card: meals, entity: sensor.ai_tasks, tab: kitchen}
 ```
 
-A card with `tasks` shows the AI tasks it started, from home_signals'
+Every AI call a card makes goes through `_aiCall`, which runs it as a
+home_signals task rather than waiting on the script in the browser. That is
+the link import, a recipe from a photo or a name, writing recipes for new
+ideas, tagging, dictating, suggesting and arranging meals, ideas for a slot,
+the fridge, planning in words or by voice, asking the box, and reading
+ingredients or speech onto the shopping list. The flow still gets its answer
+and shows it as it always did.
+
+A card with `tasks` shows the tasks it started, from home_signals'
 `sensor.ai_tasks`. Running, a task is a line with a spinner and its step —
 a fact, in no colour, because nothing needs doing yet. Finished, the card
 wears the `notice` the sensor gives it (the louder of that and its own
 `outline`), and the line says which way it went before anything else:
-**Done** with a tick, or **Failed** with an alert and the reason. Pressing
-it opens the answer — or why it failed — and opening it clears the card,
-the tab and the Needs you row together.
+**Done** with a tick, or **Failed** with an alert and the reason. It has two
+buttons, as its Needs you row does: **Dismiss**, which clears the card, the
+tab and the row together, and **Open** when the answer can be shown again —
+a saved recipe opens on its sheet, an unsaved draft in the form, an import
+in its review. Two minutes after it lands it goes on its own.
+
+An answer that is put in front of somebody as it lands — a sheet still
+open, a form or review popping up on a panel being looked at — is seen, so
+its notice clears at once. One that lands with nobody looking stays blue.
+
+Without `tasks` a card files its tasks under its body type (`meals`,
+`recipes`, `todo`), on Kitchen, or Lists for a to-do card.
 
 Opt-in, because a level is a card's to claim: the Meals card on Home shows
 the same plan as the one on Kitchen, and Home never wears a level.
@@ -179,7 +196,10 @@ sheet says the reading can be closed, follows it through its steps, and
 shows the split if it is still open when the answer lands. Closed, the
 answer goes to Needs you, whose **Open** carries `open_task` instead of a
 service — the panel moves to the row's tab and the card that owns the task
-opens it. `checkaitasks` holds all of it.
+opens it.
+
+A list row takes a second button, `secondary_action` and `secondary_label`,
+drawn quieter and before the main one. `checkaitasks` holds all of it.
 
 ## Values: literals or entity references
 
