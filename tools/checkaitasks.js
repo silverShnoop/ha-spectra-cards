@@ -123,12 +123,15 @@ const js = fs.readFileSync(file);
         && getComputedStyle(q(el, ".card")).borderTopColor === tok("notice"),
       `${q(el, ".card").className} / ${getComputedStyle(q(el, ".card")).borderTopColor}`);
     check("...and its line says it worked, and what came back",
-      /^Done · Recipe from a link · Pie$/.test(q(el, ".aitask.success").textContent), q(el, ".aitask").textContent);
+      /^Done · Recipe from a link · Pie$/.test(q(el, ".aitask.success .aitext").textContent), q(el, ".aitask").textContent);
+    check("...with two buttons: Dismiss, then Open",
+      [...q(el, ".aitask.success").querySelectorAll(".act")].map((b) => b.textContent).join("|") === "Dismiss|Open",
+      q(el, ".aitask.success").innerHTML);
 
     const failed = Object.assign({}, running, { id: "ai_9", state: "failed", error: "No recipe on that page" });
     await set(hassWith([failed], { meals: "notice" }));
     check("a failed task says it failed, and why",
-      /^Failed · Recipe from a link · No recipe on that page$/.test(q(el, ".aitask.failure").textContent)
+      /^Failed · Recipe from a link · No recipe on that page$/.test(q(el, ".aitask.failure .aitext").textContent)
         && q(el, ".card").classList.contains("lvl-notice"),
       `${q(el, ".aitask") && q(el, ".aitask").textContent} / ${q(el, ".card").className}`);
     await set(hassWith([done], { meals: "notice" }));
@@ -146,7 +149,7 @@ const js = fs.readFileSync(file);
     await set(hassWith([done], { meals: "notice" }));
 
     calls.length = 0;
-    q(el, ".aitask.ready").click();
+    q(el, "[data-aitask]").click();
     await new Promise((r) => setTimeout(r, 50));
     await frame();
     check("the line opens the answer",
@@ -170,7 +173,8 @@ const js = fs.readFileSync(file);
     needs.setConfig({ type: "custom:spectra-card", accent: 1, title: "Needs you",
       body: { type: "list", rows: { entity: "sensor.needs_you", attribute: "items" } } });
     const row = { id: "ai_1", title: "Recipe from a link", detail: "Done · Pie", level: "notice",
-      action_label: "Open", action: { open_task: "ai_1", card: "meals", tab: "kitchen" } };
+      action_label: "Open", action: { open_task: "ai_1", card: "meals", tab: "kitchen" },
+      secondary_label: "Dismiss", secondary_action: { service: "home_signals.dismiss", data: { item_id: "ai_1" } } };
     const h = hassWith([done], { meals: "notice" });
     h.states["sensor.needs_you"] = { entity_id: "sensor.needs_you", state: "1", attributes: { items: [row] } };
     needs.hass = h;
@@ -178,7 +182,16 @@ const js = fs.readFileSync(file);
     check("a notice row washes blue",
       getComputedStyle(q(needs, ".row")).backgroundColor === tok("notice-soft"),
       getComputedStyle(q(needs, ".row")).backgroundColor);
-    q(needs, ".row .act").click();
+    check("the row has Dismiss and Open, in that order",
+      [...(needs.shadowRoot || needs).querySelectorAll(".row .act")].map((b) => b.textContent).join("|") === "Dismiss|Open",
+      [...(needs.shadowRoot || needs).querySelectorAll(".row .act")].map((b) => b.textContent).join("|"));
+    q(needs, ".row .act.alt").click();
+    await new Promise((r) => setTimeout(r, 400));
+    check("Dismiss on the row calls dismiss for that task",
+      calls.some(([n, d]) => n === "home_signals.dismiss" && d.item_id === "ai_1"), JSON.stringify(calls));
+    calls.length = 0;
+    await set(h);
+    q(needs, ".row .act:not(.alt)").click();
     await new Promise((r) => setTimeout(r, 400));
     await frame();
     check("Open on the row reaches the card that owns the task",
@@ -247,24 +260,28 @@ const js = fs.readFileSync(file);
       !q(el, ".confirmwrap") && !calls.some(([n]) => n === "home_signals.dismiss"),
       JSON.stringify(calls));
 
-    /* ---- a failure opens to say why ---- */
+    /* ---- a failure has only Dismiss, and the reason is on the line ---- */
     { const open = q(el, ".confirmwrap [data-no]"); if (open) open.click(); await frame(); }
-    const hf = hassWith([failed], { meals: "notice" });
-    hf.callWS = (msg) => {
-      calls.push([`${msg.domain}.${msg.service}`, msg.service_data]);
-      return Promise.resolve({ response: { task: failed, result: null, then: null } });
-    };
-    await set(hf);
+    await set(hassWith([failed], { meals: "notice" }));
     calls.length = 0;
-    q(el, ".aitask.failure").click();
-    await new Promise((r) => setTimeout(r, 50));
-    await frame();
-    const fw = q(el, ".confirmwrap");
-    check("a failure opens to say it failed and why, and clears",
-      fw && /^Failed · /.test(fw.querySelector(".confirmhead").textContent)
-        && /No recipe on that page/.test(fw.textContent)
-        && calls.some(([n, d]) => n === "home_signals.dismiss" && d.item_id === "ai_9"),
-      fw ? fw.textContent : JSON.stringify(calls));
+    const fl = q(el, ".aitask.failure");
+    check("a failure has Dismiss and no Open",
+      [...fl.querySelectorAll(".act")].map((b) => b.textContent).join("|") === "Dismiss", fl.innerHTML);
+    fl.querySelector("[data-aidismiss]").click();
+    await new Promise((r) => setTimeout(r, 400));
+    check("...and Dismiss clears it",
+      calls.some(([n, d]) => n === "home_signals.dismiss" && d.item_id === "ai_9"), JSON.stringify(calls));
+
+    /* ---- nothing to show: no Open ---- */
+    await set(hassWith([Object.assign({}, done, { open: false })], { meals: "notice" }));
+    check("a task with nothing to show has only Dismiss",
+      [...q(el, ".aitask.success").querySelectorAll(".act")].map((b) => b.textContent).join("|") === "Dismiss",
+      q(el, ".aitask.success").innerHTML);
+
+    /* ---- two minutes on, the sensor has let it go: so has the card ---- */
+    await set(hassWith([], {}));
+    check("when the sensor drops it, the card resets",
+      !q(el, ".aitask") && !q(el, ".card").classList.contains("outlined"), q(el, ".card").className);
 
     return problems;
   });

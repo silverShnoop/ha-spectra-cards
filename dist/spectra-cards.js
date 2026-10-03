@@ -2863,10 +2863,11 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .aitasks { display:flex; flex-direction:column; gap:4px; margin:0 0 8px; }
 .aitask { display:flex; align-items:center; gap:8px; margin:0; min-height:28px;
   font-size:13px; color:var(--sp-ink-2); }
-.aitask > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aitask > span:last-child, .aitask .aitext { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aitask .aitext { flex:1 1 auto; }
 .aitask .mdi, .aitask ha-icon { width:18px; height:18px; flex:none; --mdc-icon-size:18px; }
-.aitask.ready { cursor:pointer; color:var(--sp-notice-on); padding:2px 8px; border-radius:6px;
-  background:var(--sp-notice-soft); }
+.aitask.ready { color:var(--sp-notice-on); padding:2px 8px; border-radius:6px; min-height:44px;
+  background:var(--sp-notice-soft); --accent:var(--sp-notice); --accent-on:var(--sp-notice-on); }
 .aitask.ready .mdi, .aitask.ready ha-icon { color:var(--sp-notice); }
 .aitask b { font-weight:600; }
 .ok {
@@ -3520,6 +3521,10 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   transform:translate(-50%,-50%); height:44px; min-width:44px; width:100%;
 }
 .row.hasact { min-height:44px; }
+/* Two buttons on one row: the quieter one first, unfilled, and the pair
+   pushed right together rather than each claiming the free space. */
+.act.alt { border-color:var(--sp-edge); color:var(--sp-ink-2); }
+.act.alt + .act { margin-left:8px; }
 `;
 
 /* ------------------------------------------------------------------ *
@@ -4074,8 +4079,9 @@ function aiTasksOf(hass, cfg) {
    because nothing needs doing yet. Finished, it is the card's notice, and
    says which way it went before anything else -- a tick and "Done", or an
    alert and "Failed" -- because a notice that does not say whether the
-   thing worked sends you to open it to find out. The line opens it: the
-   optional way in; the job is the Needs you row. */
+   thing worked sends you to open it to find out. Two buttons, as on its
+   Needs you row: Dismiss, and Open when there is an answer to show. It
+   leaves on its own two minutes after it lands. */
 function aiTaskStrip(tasks) {
   if (!Array.isArray(tasks) || !tasks.length) return "";
   return `<div class="aitasks">${tasks.map((t) => {
@@ -4086,9 +4092,14 @@ function aiTaskStrip(tasks) {
     }
     const ok = t.state === "done";
     const what = ok ? (isBlank(t.label) ? "" : ` · ${esc(t.label)}`) : (isBlank(t.error) ? "" : ` · ${esc(t.error)}`);
-    return `<p class="aitask ready ${ok ? "success" : "failure"}" role="button" tabindex="0" data-aitask="${esc(t.id)}">`
+    /* Dismiss always; Open only when there is an answer to show. */
+    const open = ok && t.open !== false;
+    return `<div class="aitask ready ${ok ? "success" : "failure"}">`
       + `${iconMarkup(ok ? "mdi:check-circle-outline" : "mdi:alert-circle-outline")}`
-      + `<span><b>${ok ? "Done" : "Failed"}</b> · ${title}${what}</span></p>`;
+      + `<span class="aitext"><b>${ok ? "Done" : "Failed"}</b> · ${title}${what}</span>`
+      + `<span class="act alt" role="button" tabindex="0" data-aidismiss="${esc(t.id)}">Dismiss</span>`
+      + (open ? `<span class="act" role="button" tabindex="0" data-aitask="${esc(t.id)}">Open</span>` : "")
+      + `</div>`;
   }).join("")}</div>`;
 }
 
@@ -7889,6 +7900,10 @@ const BODIES = {
       const sub = firstOf(r.sub, r.detail);
       const label = firstOf(r.action_label, r.button);
       const hasAction = Boolean(r.action) && !isBlank(label);
+      /* A second, quieter button -- Dismiss beside Open on a finished AI
+         task. Drawn before the main one, so the main one keeps the edge. */
+      const altLabel = firstOf(r.secondary_label, "");
+      const hasAlt = hasAction && Boolean(r.secondary_action) && !isBlank(altLabel);
 
       /* A row with a tone takes its soft fill as a wash, which overrides
          zebra. Never both — see the emphasis ladder.
@@ -7925,7 +7940,8 @@ const BODIES = {
 
       let tail = "";
       if (hasAction) {
-        tail = `<span class="act" role="button" tabindex="0" data-row="${index}">${esc(label)}</span>`;
+        tail = (hasAlt ? `<span class="act alt" role="button" tabindex="0" data-row="${index}" data-alt="1">${esc(altLabel)}</span>` : "")
+          + `<span class="act" role="button" tabindex="0" data-row="${index}">${esc(label)}</span>`;
       } else if (r.pill) {
         tail = pillMarkup(r.pill, "margin-left:auto");
       } else if (r.bar) {
@@ -13744,13 +13760,16 @@ class SpectraCard extends HTMLElement {
   _bind(model) {
     this._bindDrawer();
 
-    this._holder.querySelectorAll("[data-aitask]").forEach((el) => {
-      const open = (event) => { event.stopPropagation(); this._openTask(el.dataset.aitask); };
-      el.addEventListener("click", open);
+    const press = (sel, go) => this._holder.querySelectorAll(sel).forEach((el) => {
+      const run = (event) => { event.stopPropagation(); go(el); };
+      el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(event); }
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
       });
     });
+    press("[data-aitask]", (el) => this._openTask(el.dataset.aitask));
+    press("[data-aidismiss]", (el) => onPress(el, () => this._callAction({
+      service: "home_signals.dismiss", data: { item_id: el.dataset.aidismiss } })));
 
     /* A photo that will not load -- Mealie down, a recipe whose picture
        was removed -- takes itself away rather than leaving a broken frame. */
@@ -14014,8 +14033,9 @@ class SpectraCard extends HTMLElement {
            the list, which is the same rule for a press, a snooze expiring
            and a door being opened. The press already has its own answer:
            the button flashes, and spins until the house agrees. */
-        this._guard(row && row.action && row.action.confirm, () => {
-          onPress(el, () => this._callAction(row && row.action));
+        const action = row && (el.dataset.alt ? row.secondary_action : row.action);
+        this._guard(action && action.confirm, () => {
+          onPress(el, () => this._callAction(action));
         });
       };
       el.addEventListener("click", run);
