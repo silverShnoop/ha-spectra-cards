@@ -665,7 +665,7 @@ the cluster's outside edge — so five dead speakers read as one sick Cast
 cluster without a word of explanation. Networks sit evenly round the map in
 the sensor's order, the first on the left.
 
-**Under it and beside it, a list** — under it on a phone — of every device not fully
+**Under it, a list** — under it on a phone — of every device not fully
 answering, grouped by network in the map's order, offline first: the name,
 its room, what is missing (`offline`, `No temperature`, `5 of 8 missing`) and
 **how long**: `offline · 3d`. Networks with nothing wrong are one quiet line
@@ -676,12 +676,12 @@ The map names nothing and the list is not numbered against it. Labels at the
 side of the map, and then numbers on its dots, were both tried and read as
 clutter on the panel: the map shows where, the list says what.
 
-**The list takes as many columns as the card spans**, and the map is always at
-the top. On a card three columns wide the map spans two of them and the list
-starts in the third, beside it; on a card two wide the map takes one. The
-groups fill the columns in the map's order, cut so that no column runs on
-past the others — so a short list sits entirely beside the map, and a long
-one carries on under it. A phone gets the map and then one column.
+**The map is the top of the card, and the list takes as many columns as the
+card spans.** On a card three columns wide the map spans two of them with the
+three numbers beside it in the third; on a card two wide the map takes one and
+the numbers the other. Under that, the list's groups fill every column in the
+map's order, cut so that no column runs on past the others. A phone gets the
+numbers, the map, and then one column.
 
 The card cannot ask the panel how many columns it spans, so it reads its own
 width: three from 880px, two from 560px. The panel's columns are 280px at
