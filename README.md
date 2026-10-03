@@ -2320,7 +2320,8 @@ already there to choose from.
 **Favourites and tags.** A recipe sheet has a heart that saves `favourite`
 through `edit.save`. The edit form shows the recipe's tags as chips: meals,
 effort and diet always, main ingredient and cuisine folded away unless one is
-chosen. Tags are sent only when they changed. A new recipe saved with none is
+chosen. The diets are Vegetarian, Vegan, Dairy-free, Gluten-free and **Suitable
+for weaning**, which is also a filter chip once any recipe has it. Tags are sent only when they changed. A new recipe saved with none is
 handed to `edit.tag`, which tags it in the background.
 
 **The tray shows the first ingredients** of a planned recipe, under its name.

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.150.0";
+const VERSION = "0.151.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -9735,7 +9735,9 @@ function recipeMatches(recipe, find) {
 const RECIPE_TAGS = {
   meal: ["Breakfast", "Lunch", "Dinner", "Snack"],
   effort: ["Quick", "Weekend"],
-  diet: ["Vegetarian", "Vegan", "Dairy-free", "Gluten-free"],
+  /* Suitable for weaning is a diet in the sense that matters here: a
+     thing a recipe either is or is not, for one person at the table. */
+  diet: ["Vegetarian", "Vegan", "Dairy-free", "Gluten-free", "Suitable for weaning"],
   main: ["Chicken", "Beef", "Pork", "Lamb", "Fish", "Seafood", "Eggs", "Pasta", "Rice",
     "Vegetables", "Beans", "Cheese"],
   cuisine: ["British", "Italian", "French", "Spanish", "Mediterranean", "Greek", "Middle Eastern",
