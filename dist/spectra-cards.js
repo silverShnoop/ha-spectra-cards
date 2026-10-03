@@ -2946,9 +2946,9 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devkey.offline { background:var(--sp-attention); }
 .devkey.partial { border:2px solid var(--sp-attention); }
 /* The map and the list are two separate things to read, not one thing
-   annotated. The map is the top of the card -- across two columns on a card
-   three wide, one otherwise -- with the three numbers beside it. The list
-   is under it and takes as many columns as the card spans on the panel,
+   annotated. Under the three numbers the map comes first -- across two
+   columns on a card three wide, one otherwise -- with the key beside it.
+   The list is under it and takes as many columns as the card spans on the panel,
    its groups in the map's order, split so no column runs on past the
    others.
 
@@ -2960,15 +2960,15 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devlay { display:none; }
 .devlay.n1 { display:flex; flex-direction:column; gap:4px; }
 .devtop { display:grid; grid-template-columns:var(--devtop); gap:0 22px; align-items:start; margin-bottom:8px; }
-.devside { min-width:0; display:flex; flex-direction:column; gap:10px; padding-top:4px; }
-.devside .devtiles { flex-direction:column; padding:0; }
-.devside .devtile { flex:none; }
-.devside .devlegend { margin:0 0 0 2px; align-self:flex-start; }
+.devside { min-width:0; padding-top:6px; }
+.devside .devlegend { margin:0 0 0 2px; flex-direction:column; gap:6px; align-items:flex-start; }
+.devlay:not(.solo) > .devtiles { margin-bottom:6px; }
 .devgrid { display:grid; grid-template-columns:repeat(var(--devcols), minmax(0, 1fr)); gap:0 22px; align-items:start; }
 .devcol { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .devgroup { min-width:0; }
 .devlay.solo .devlegend { width:100%; margin-left:6px; }
 @container devices (min-width: 560px) {
+  .devtile { flex:0 1 150px; }
   .devlay.n1 { display:none; }
   .devlay.n2 { display:block; }
   .devtop .devmap { margin:0 auto; max-width:620px; }
@@ -5743,19 +5743,20 @@ function devicesGroups(networks, problems, what, stateOf) {
   return { groups, quiet };
 }
 
-/* The card's body for one span of the panel. The map is the top of the card:
-   across two columns on a card three wide and one otherwise, with the three
-   numbers and the key in the column beside it, so nothing of the list sits
-   level with the map. Under it, the list takes all `cols` columns. Its
+/* The card's body for one span of the panel. The three numbers first, across
+   the card, because they are the part read from the doorway. Then the map:
+   across two columns on a card three wide and one otherwise, with the key
+   beside it, so nothing of the list sits level with the map. Under it, the
+   list takes all `cols` columns. Its
    groups, in the map's order, are cut into one run per column; the cut is
    the one that leaves the tallest column shortest, counted in rows. The
    quiet line closes the last column. Reading the columns left to right
    walks the networks in turn. A phone gets the numbers, the map, then one
    column. */
-function devicesLayout(head, map, groups, quiet, cols) {
+function devicesLayout(tiles, key, map, groups, quiet, cols) {
   const html = (gs) => gs.map((g) => g.html).join("");
   if (cols === 1 || !map) {
-    return `<div class="devlay n${cols} solo">${head}${map}${html(groups)}${quiet}</div>`;
+    return `<div class="devlay n${cols} solo">${tiles}${key}${map}${html(groups)}${quiet}</div>`;
   }
   const rows = groups.map((g) => g.rows);
   const sum = (from, to) => rows.slice(from, to).reduce((t, r) => t + r, 0);
@@ -5775,7 +5776,7 @@ function devicesLayout(head, map, groups, quiet, cols) {
   const columns = runs.map((run, c) => `<div class="devcol">${html(run)}${c === cols - 1 ? quiet : ""}</div>`).join("");
   const frs = cols === 3 ? "minmax(0, 2fr) minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)";
   return `<div class="devlay n${cols}" style="--devtop:${frs};--devcols:${cols}">`
-    + `<div class="devtop">${map}<div class="devside">${head}</div></div>`
+    + `${tiles}<div class="devtop">${map}<div class="devside">${key}</div></div>`
     + (groups.length || quiet ? `<div class="devgrid">${columns}</div>` : "") + `</div>`;
 }
 
@@ -7805,7 +7806,7 @@ const BODIES = {
     const { groups, quiet } = devicesGroups(networks, problems, what, stateOf);
     const map = networks.length ? devicesMap(networks, problems, stateOf) : "";
     out += `<div class="devbody">`
-      + [1, 2, 3].map((cols) => devicesLayout(tiles + key, map, groups, quiet, cols)).join("") + `</div>`;
+      + [1, 2, 3].map((cols) => devicesLayout(tiles, key, map, groups, quiet, cols)).join("") + `</div>`;
     return out + `</div>`;
   },
   list(b) {

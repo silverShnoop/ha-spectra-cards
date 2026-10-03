@@ -8,9 +8,9 @@
  *
  * The networks are a map at every width, naming nothing: a dot per device,
  * a hub per network with how many answer, the trouble in yellow. The list
- * is separate. The map is the top of the card -- across two of three
- * columns, one otherwise, with the three numbers beside it -- and the list
- * is under it in as many columns as the card spans on the panel.
+ * is separate. Under the three numbers, the map -- across two of three
+ * columns, one otherwise, with the key beside it -- and the list under it
+ * in as many columns as the card spans on the panel.
  * -- grouped by network, and nothing numbers or labels one against the
  * other.
  *
@@ -171,10 +171,13 @@ const js = fs.readFileSync(file);
           rect(map).left >= rect(cols[0]).left - 1 && rect(map).right <= rect(cols[span - 1]).right + 1
             && (span === 1 || rect(map).right > rect(cols[0]).right + 20),
           `${Math.round(rect(map).left)}-${Math.round(rect(map).right)}`);
-        const side = list.querySelector(".devside");
-        check(`${label}: the three numbers beside the map`,
-          side.querySelectorAll(".devtile").length === 3 && rect(side).left >= rect(map).right - 1
-            && rect(side).top < rect(map).bottom, JSON.stringify(rect(side)));
+        const side = list.querySelector(".devside"), tiles = list.querySelector(".devtiles");
+        check(`${label}: the three numbers across the top, above the map`,
+          tiles.querySelectorAll(".devtile").length === 3 && rect(tiles).bottom <= rect(map).top + 1
+            && [...tiles.querySelectorAll(".devtile")].every((t, i, ts) => !i || rect(t).left > rect(ts[i - 1]).left),
+          JSON.stringify(rect(tiles)));
+        check(`${label}: the key beside the map`, rect(side).left >= rect(map).right - 1 && rect(side).top < rect(map).bottom,
+          JSON.stringify(rect(side)));
         check(`${label}: nothing overlaps`, !overlaps([...groups, map, side]), "overlap");
         const bottoms = cols.map((col) => rect(col).bottom);
         check(`${label}: no column runs far past the others`, Math.max(...bottoms) - Math.min(...bottoms) < 120,

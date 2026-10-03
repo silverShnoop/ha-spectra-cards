@@ -676,10 +676,10 @@ The map names nothing and the list is not numbered against it. Labels at the
 side of the map, and then numbers on its dots, were both tried and read as
 clutter on the panel: the map shows where, the list says what.
 
-**The map is the top of the card, and the list takes as many columns as the
-card spans.** On a card three columns wide the map spans two of them with the
-three numbers beside it in the third; on a card two wide the map takes one and
-the numbers the other. Under that, the list's groups fill every column in the
+**Under the numbers, the map, and the list takes as many columns as the card
+spans.** On a card three columns wide the map spans two of them with the key
+beside it in the third; on a card two wide the map takes one and the key the
+other. Under that, the list's groups fill every column in the
 map's order, cut so that no column runs on past the others. A phone gets the
 numbers, the map, and then one column.
 
