@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.149.0";
+const VERSION = "0.150.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2253,7 +2253,7 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 .camview [hidden] { display:none; }
 .cambar {
   display:grid; grid-template-columns:1fr auto 1fr; align-items:center; justify-items:center;
-  padding:18px 24px 22px;
+  padding:18px 24px 22px; min-height:120px; box-sizing:border-box;
 }
 .cambar[hidden] { display:none; }
 .cambar[data-review] { grid-template-columns:1fr 1fr; gap:12px; }
@@ -2276,6 +2276,27 @@ span.camicon { background:none; }
   cursor:pointer; border:1px solid rgba(255,255,255,.4); background:none; color:#fff;
 }
 .camtext.camuse { border-color:var(--accent); background:var(--accent); color:var(--sp-surface); }
+/* Sideways, the controls stand in a column on the right, as the phone's
+   own camera has them: a bottom row would take a third of the height from
+   a picture that has least of it. The shutter stays in the middle, the
+   flip above it and the gallery below, and close and the hint float over
+   the picture's top. */
+@media (orientation: landscape) {
+  .camwrap { flex-direction:row; padding:0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); }
+  .camtop { position:absolute; left:0; right:140px; top:0; z-index:1; pointer-events:none;
+    padding:max(8px, env(safe-area-inset-top, 0px)) 12px 8px; }
+  .camtop > * { pointer-events:auto; }
+  .camhint { text-shadow:0 1px 3px rgba(0,0,0,.8); }
+  .camview { height:100%; }
+  .cambar { grid-template-columns:none; grid-template-rows:1fr auto 1fr; width:140px; min-height:0;
+    padding:16px 18px; align-content:center; }
+  .cambar [data-flip] { order:0; }
+  .cambar .camshutter { order:1; }
+  .cambar [data-gallery] { order:2; }
+  .cambar[data-review] { grid-template-columns:none; grid-template-rows:auto auto; align-content:center; gap:14px; }
+  .cambar[data-review] [data-use] { order:0; }
+  .cambar[data-review] [data-retake] { order:1; }
+}
 @media (prefers-reduced-motion: reduce) { .camwrap { animation:none; } .camshutter { transition:none; } }
 /* The recipe's photo: small, because the form is for the words. */
 .mlform .mlphoto { display:flex; align-items:center; gap:12px; margin-top:4px; }
@@ -8797,16 +8818,36 @@ function cameraSheet(holder, media, stream, accent, gallery) {
   });
 }
 
-/* The part of a photo inside `box` ({left, top, right, bottom}, each 0 to
-   100 per cent of the photo), as a JPEG data URL at most `side` pixels on
-   its long edge. The dish on a cookbook page, found by the model that read
-   it. Null when the box is not a box. */
-function cropPhoto(file, box, side) {
-  const n = (k) => Number(box && box[k]);
-  const [l, t, r, b] = ["left", "top", "right", "bottom"].map(n);
-  if (![l, t, r, b].every((x) => Number.isFinite(x) && x >= 0 && x <= 100)) return Promise.resolve(null);
-  /* A sliver is a misreading, not a dish. */
-  if (r - l < 10 || b - t < 10) return Promise.resolve(null);
+/* A recipe's photo, made to look like one: the part of the photo inside
+   `box` ({left, top, right, bottom}, each 0 to 100 per cent; the whole
+   photo when there is none), turned upright by `turn` (90, 180 or 270
+   degrees clockwise), and cut to 4:3 about its middle, as a JPEG data URL
+   at most `side` pixels on its long edge.
+
+   The box is the dish on a cookbook page, found by the model that read
+   it, and a model's box is drawn generously: it takes in the white of the
+   page, a rule, the first letters of a caption. So the box is drawn in a
+   little before anything else. The turn is for a page photographed
+   sideways, or a picture printed sideways on it. And every recipe photo
+   comes out the same shape, because the box and the recipe sheet show
+   them side by side, and a tall one beside a wide one reads as a mistake.
+
+   Null when the box is not a box. */
+const PHOTO_ASPECT = 4 / 3;
+const PHOTO_INSET = 0.025;
+function cropPhoto(file, box, side, turn) {
+  let l = 0;
+  let t = 0;
+  let r = 100;
+  let b = 100;
+  if (box) {
+    const n = (k) => Number(box[k]);
+    [l, t, r, b] = ["left", "top", "right", "bottom"].map(n);
+    if (![l, t, r, b].every((x) => Number.isFinite(x) && x >= 0 && x <= 100)) return Promise.resolve(null);
+    /* A sliver is a misreading, not a dish. */
+    if (r - l < 10 || b - t < 10) return Promise.resolve(null);
+  }
+  const quarter = [0, 90, 180, 270].includes(Number(turn)) ? Number(turn) : 0;
   const max = side || 1200;
   const load = typeof createImageBitmap === "function"
     ? createImageBitmap(file, { imageOrientation: "from-image" }).then((bm) => [bm, bm.width, bm.height])
@@ -8818,16 +8859,37 @@ function cropPhoto(file, box, side) {
       img.src = url;
     });
   return load.then(([source, w, h]) => {
-    const sx = (l / 100) * w;
-    const sy = (t / 100) * h;
-    const sw = ((r - l) / 100) * w;
-    const sh = ((b - t) / 100) * h;
-    const scale = Math.min(1, max / Math.max(sw, sh));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(sw * scale));
-    canvas.height = Math.max(1, Math.round(sh * scale));
-    canvas.getContext("2d").drawImage(source, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.85);
+    let sx = (l / 100) * w;
+    let sy = (t / 100) * h;
+    let sw = ((r - l) / 100) * w;
+    let sh = ((b - t) / 100) * h;
+    if (box) {
+      const ix = sw * PHOTO_INSET;
+      const iy = sh * PHOTO_INSET;
+      sx += ix; sy += iy; sw -= 2 * ix; sh -= 2 * iy;
+    }
+    /* Upright first, on a canvas of its own, then the 4:3 cut from that. */
+    const side90 = quarter === 90 || quarter === 270;
+    const uw = side90 ? sh : sw;
+    const uh = side90 ? sw : sh;
+    const cw = uw / uh > PHOTO_ASPECT ? uh * PHOTO_ASPECT : uw;
+    const ch = uw / uh > PHOTO_ASPECT ? uh : uw / PHOTO_ASPECT;
+    const scale = Math.min(1, max / Math.max(cw, ch));
+    const up = document.createElement("canvas");
+    up.width = Math.max(1, Math.round(uw * scale));
+    up.height = Math.max(1, Math.round(uh * scale));
+    const g = up.getContext("2d");
+    g.translate(up.width / 2, up.height / 2);
+    g.rotate((quarter * Math.PI) / 180);
+    const dw = (side90 ? up.height : up.width);
+    const dh = (side90 ? up.width : up.height);
+    g.drawImage(source, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
+    const out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(cw * scale));
+    out.height = Math.max(1, Math.round(ch * scale));
+    out.getContext("2d").drawImage(up, (up.width - out.width) / 2, (up.height - out.height) / 2,
+      out.width, out.height, 0, 0, out.width, out.height);
+    return out.toDataURL("image/jpeg", 0.85);
   }, () => null);
 }
 
@@ -15637,7 +15699,7 @@ class SpectraCard extends HTMLElement {
           }
           /* The dish, where the page has a picture of it: cut out of the
              photo as it was taken, not the shrunk copy the model read. */
-          return (got.dish ? cropPhoto(photo.file, got.dish) : Promise.resolve(null)).then((image) => this._mealEdit(entry, null, accent, edit, {
+          return (got.dish ? cropPhoto(photo.file, got.dish, 1200, got.dish.turn) : Promise.resolve(null)).then((image) => this._mealEdit(entry, null, accent, edit, {
             image,
             heading: "Check the recipe, then save",
             made: { source: { kind: "photo" },
@@ -17918,7 +17980,7 @@ class SpectraCard extends HTMLElement {
     wrap.querySelectorAll("[data-pic-take]").forEach((b) => b.addEventListener("click", () => {
       this._pickPhoto(b.getAttribute("data-pic-take") === "camera", accent).then((file) => {
         if (!file) return null;
-        return shrinkPhoto(file, 1200).then((image) => { picNew = image; drawPic(); });
+        return cropPhoto(file, null, 1200).then((image) => { if (image) { picNew = image; drawPic(); } });
       }).catch(() => status("That photo could not be read."));
     }));
     picDrop.addEventListener("click", () => { picNew = ""; drawPic(); });
