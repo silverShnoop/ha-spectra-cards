@@ -63,6 +63,7 @@ number in `outline` buys nothing at all.
 
 | Level | Timeline | Treatment | Light | Dark |
 | --- | --- | --- | --- | --- |
+| `notice` | none: something you asked for is ready | 2px border | `#0E79E0` | `#1C6FE8` |
 | `attention` | today or tomorrow | 2px border | `#B6862A` | `#D9A63F` |
 | `waiting` | the next 30 minutes | border + 1px inset ring | `#B0512C` | `#EC6124` |
 | `critical` | now | ring + soft ground | `#8E0C14` | `#E2333F` |
@@ -70,6 +71,16 @@ number in `outline` buys nothing at all.
 The levels are ordered and the accents are not, which is why the levels are
 named and the accents numbered: a slot number is an arbitrary label, whereas
 `waiting` carries a timeline a reviewer can check a row against.
+
+**Notice is the quiet one, and it is blue.** It is the only level with no
+deadline in it: work the house did on somebody's behalf — an AI task that
+has finished, or failed — waiting to be looked at. It draws exactly what
+attention draws, the border, because blue against yellow is the one pair the
+hue alone carries to normal vision and to deutan alike. Its nearest
+neighbour is slate (`a5`): ΔE00 15.9 by eye and 13.6 deutan in light, 15.6
+and 16.4 in dark — and that is a rail button beside a rail button, so it is
+the pair to watch. Dark is the darker blue, not a lifted one: lifted, it
+walks into the dark slate.
 
 **Yellow, orange and red are reserved.** No decorative slot may be one of
 them, which is why `a1` and `a2` are a brown and a bone rather than the
@@ -142,6 +153,33 @@ changes colour.
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
 is never a seventh: if a new meaning appears, map it onto one of the six.
+
+## AI tasks: `tasks`
+
+```yaml
+type: custom:spectra-card
+title: Meals
+tasks: meals          # or {card: meals, entity: sensor.ai_tasks, tab: kitchen}
+```
+
+A card with `tasks` shows the AI tasks it started, from home_signals'
+`sensor.ai_tasks`. Running, a task is a line with a spinner and its step —
+a fact, in no colour, because nothing needs doing yet. Finished, the card
+wears the `notice` the sensor gives it (the louder of that and its own
+`outline`), and the line says which way it went before anything else:
+**Done** with a tick, or **Failed** with an alert and the reason. Pressing
+it opens the answer — or why it failed — and opening it clears the card,
+the tab and the Needs you row together.
+
+Opt-in, because a level is a card's to claim: the Meals card on Home shows
+the same plan as the one on Kitchen, and Home never wears a level.
+
+The link import uses it whenever home_signals has `start_ai_task`: the
+sheet says the reading can be closed, follows it through its steps, and
+shows the split if it is still open when the answer lands. Closed, the
+answer goes to Needs you, whose **Open** carries `open_task` instead of a
+service — the panel moves to the row's tab and the card that owns the task
+opens it. `checkaitasks` holds all of it.
 
 ## Values: literals or entity references
 

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.151.0";
+const VERSION = "0.152.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -35,9 +35,9 @@ const LOGGER_WARN = (...args) => console.warn(...args);
  * ---- two sets, and the split between them is the whole rule ----
  *
  * a1..a6 are DECORATIVE. They say which tab a card belongs to and they
- * mean nothing else. attention/waiting/critical are LEVELS. They say the
- * house is asking a person for something, and they are the only colours
- * that do.
+ * mean nothing else. notice/attention/waiting/critical are LEVELS. They
+ * say the house is asking a person for something, and they are the only
+ * colours that do.
  *
  * Yellow, orange and red belong to the levels and may not appear in the
  * decorative set, which is why a1 and a2 are a brown and a bone rather
@@ -50,9 +50,16 @@ const LOGGER_WARN = (...args) => console.warn(...args);
  * the levels are named and the accents are numbered. A slot number is an
  * arbitrary label; a level name carries a timeline:
  *
+ *   notice      something you asked for is ready; nothing gets worse
  *   attention   needs doing today or tomorrow
  *   waiting     something is paused or degrading until a person acts
  *   critical    damage or risk is accruing now
+ *
+ * Notice is blue, and the quietest: the one level with no deadline in it,
+ * for work done on somebody's behalf -- an AI task that has finished. It
+ * sits ΔE00 15.9 from slate (a5) and 27 from teal (a4) by eye, 13.6 and
+ * 20.0 deutan: the slate pair is the close one, and it is a rail button
+ * beside a rail button. The other levels are 45+ away whichever way.
  *
  * Yellow and orange measure dE 13.3 apart to normal vision, under the 15
  * floor, so hue alone does not carry the step: waiting adds a 1px inset
@@ -98,6 +105,7 @@ const TOKENS_LIGHT = `
   --sp-attention:#B6862A; --sp-attention-soft:#F2E6C9; --sp-attention-on:#8A6310;
   --sp-waiting:#B0512C;   --sp-waiting-soft:#F0DED4;   --sp-waiting-on:#8C3E20;
   --sp-critical:#8E0C14;  --sp-critical-soft:#F2D7D8;  --sp-critical-on:#7A0B12;
+  --sp-notice:#0E79E0;    --sp-notice-soft:#DCEAF9;    --sp-notice-on:#0B5BAA;
   --sp-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --sp-press: rgba(43,39,36,.20);
   /* A flash on plain paper only has to beat paper. A flash landing on top of
@@ -154,6 +162,10 @@ const TOKENS_DARK = `
      stays small (8.0) whatever the hue, which is what the ring is for. */
   --sp-waiting:#EC6124;   --sp-waiting-soft:#3A241A;   --sp-waiting-on:#F0B393;
   --sp-critical:#E2333F;  --sp-critical-soft:#3A1618;  --sp-critical-on:#F0949B;
+  /* Darker than the light blue, not lighter: lifted, it walks into slate
+     (a5 is #8094C4 here). #1C6FE8 keeps ΔE00 15.6 from it by eye and 16.4
+     deutan, and 3.5:1 against the surface for a 2px border. */
+  --sp-notice:#1C6FE8;    --sp-notice-soft:#14223A;    --sp-notice-on:#9CC0F4;
 `;
 
 /* ------------------------------------------------------------------ *
@@ -2845,6 +2857,18 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    that has to stay readable — the space is reserved whether it is spinning
    or not, so its arrival moves nothing. */
 .spinslot { width:13px; height:13px; flex:none; display:inline-flex; }
+
+/* An AI task this card started. Running, it is ink and a spinner: a fact.
+   Finished, it wears the notice the card's outline is already wearing. */
+.aitasks { display:flex; flex-direction:column; gap:4px; margin:0 0 8px; }
+.aitask { display:flex; align-items:center; gap:8px; margin:0; min-height:28px;
+  font-size:13px; color:var(--sp-ink-2); }
+.aitask > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aitask .mdi, .aitask ha-icon { width:18px; height:18px; flex:none; --mdc-icon-size:18px; }
+.aitask.ready { cursor:pointer; color:var(--sp-notice-on); padding:2px 8px; border-radius:6px;
+  background:var(--sp-notice-soft); }
+.aitask.ready .mdi, .aitask.ready ha-icon { color:var(--sp-notice); }
+.aitask b { font-weight:600; }
 .ok {
   width:13px; height:13px; flex:none; position:relative;
   animation: sp-settle 900ms ease-in-out forwards;
@@ -3509,7 +3533,17 @@ const ACCENTS = [1, 2, 3, 4, 5, 6];
    whereas "waiting" carries a timeline a reviewer can check a row against.
    Numbering them alongside the accents is exactly how decoration and
    alerting came to share a palette in the first place. */
-const LEVELS = ["attention", "waiting", "critical"];
+const LEVELS = ["notice", "attention", "waiting", "critical"];
+
+/** The louder of some levels, or null when none is one. */
+function loudestLevel(...levels) {
+  let top = null;
+  for (const v of levels) {
+    const k = levelName(v);
+    if (k && (top === null || LEVELS.indexOf(k) > LEVELS.indexOf(top))) top = k;
+  }
+  return top;
+}
 
 function accentNumber(n) {
   const a = Number(n);
@@ -4006,6 +4040,66 @@ const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
 /* An icon name becomes markup in one place, because there are five call sites
    and they must not drift. A `spectra:` name is our own art and renders as
    inline svg; anything else is an mdi name and goes to ha-icon as before. */
+/* `tasks` on a card: the AI tasks it started, read from home_signals'
+   sensor.ai_tasks. A string is the card's own key -- the `card` it passes
+   to start_ai_task -- and an object can name a different sensor as well.
+
+   Opt-in rather than read off the body type, because a level is a card's
+   to claim: the Meals card on Home shows the same plan as the one on
+   Kitchen, and Home never wears a level. */
+const AI_TASKS_ENTITY = "sensor.ai_tasks";
+const OPEN_TASK_EVENT = "spectra-open-task";
+
+function tasksConfig(config) {
+  const t = config && config.tasks;
+  if (typeof t === "string" && !isBlank(t)) return { entity: AI_TASKS_ENTITY, card: t };
+  if (t && typeof t === "object" && !isBlank(t.card)) {
+    return { entity: isBlank(t.entity) ? AI_TASKS_ENTITY : String(t.entity), card: String(t.card) };
+  }
+  return null;
+}
+
+/** This card's tasks, and the level the sensor gives it. The sensor
+    decides the level; the card only reads its own. */
+function aiTasksOf(hass, cfg) {
+  const state = cfg && hass && hass.states ? hass.states[cfg.entity] : undefined;
+  const a = (state && state.attributes) || {};
+  const list = (Array.isArray(a.tasks) ? a.tasks : [])
+    .filter((t) => t && typeof t === "object" && String(t.card) === cfg.card);
+  const level = a.cards && typeof a.cards === "object" ? levelName(a.cards[cfg.card]) : null;
+  return { list, level };
+}
+
+/* A task running is a fact: a spinner and what it is doing, in no colour,
+   because nothing needs doing yet. Finished, it is the card's notice, and
+   says which way it went before anything else -- a tick and "Done", or an
+   alert and "Failed" -- because a notice that does not say whether the
+   thing worked sends you to open it to find out. The line opens it: the
+   optional way in; the job is the Needs you row. */
+function aiTaskStrip(tasks) {
+  if (!Array.isArray(tasks) || !tasks.length) return "";
+  return `<div class="aitasks">${tasks.map((t) => {
+    const title = esc(firstOf(t.title, "AI task"));
+    if (t.state === "running") {
+      const step = Number(t.steps) > 1 ? ` · step ${esc(String(t.step || 1))} of ${esc(String(t.steps))}` : "";
+      return `<p class="aitask"><span class="spinner"></span><span>${title}${step}…</span></p>`;
+    }
+    const ok = t.state === "done";
+    const what = ok ? (isBlank(t.label) ? "" : ` · ${esc(t.label)}`) : (isBlank(t.error) ? "" : ` · ${esc(t.error)}`);
+    return `<p class="aitask ready ${ok ? "success" : "failure"}" role="button" tabindex="0" data-aitask="${esc(t.id)}">`
+      + `${iconMarkup(ok ? "mdi:check-circle-outline" : "mdi:alert-circle-outline")}`
+      + `<span><b>${ok ? "Done" : "Failed"}</b> · ${title}${what}</span></p>`;
+  }).join("")}</div>`;
+}
+
+/* What a task's second step answered, in the import's terms: undefined
+   when it never ran (the recipe was already in the box), null when it ran
+   and fell over -- the task is still done, the recipe saved, not split. */
+function taskSplit(got) {
+  if (got && got.then !== null && got.then !== undefined) return got.then;
+  return got && got.task && got.task.partial ? null : undefined;
+}
+
 function iconMarkup(name, cls) {
   if (isBlank(name)) return "";
   const key = String(name).startsWith("spectra:") ? String(name).slice(8) : null;
@@ -10830,6 +10924,8 @@ class SpectraCard extends HTMLElement {
       calendars: new Map(), meals: new Map(), live: false,
     });
     this._sources = [...found.entities, ...[...found.todos.values()].map((t) => t.entity)];
+    this._tasksCfg = tasksConfig(config);
+    if (this._tasksCfg) this._sources.push(this._tasksCfg.entity);
     this._forecastSources = found.forecasts;
     this._todoSources = found.todos;
     this._calendarSources = found.calendars;
@@ -10847,6 +10943,7 @@ class SpectraCard extends HTMLElement {
     publishTokens(hass);
     if (!this._config) return;
     this._openRecipeLink();
+    this._followTask();
     this._reconcile();
     this._subscribeForecasts();
     /* Only re-marshal when an entity this card actually reads has changed.
@@ -10869,6 +10966,17 @@ class SpectraCard extends HTMLElement {
   connectedCallback() {
     this._startTicking();
     this._subscribeForecasts();
+    if (!this._onOpenTask) {
+      /* A Needs you row's Open. The first card that owns the task takes
+         it, so two copies of a card on one page do not open it twice. */
+      this._onOpenTask = (event) => {
+        const d = event.detail || {};
+        if (d.taken || !this._tasksCfg || String(d.card) !== this._tasksCfg.card) return;
+        d.taken = true;
+        this._openTask(String(d.id));
+      };
+    }
+    window.addEventListener(OPEN_TASK_EVENT, this._onOpenTask);
   }
 
   disconnectedCallback() {
@@ -10881,6 +10989,7 @@ class SpectraCard extends HTMLElement {
        of the rest below ever ran. tools/checkstrip.js now refuses a class
        with any method defined twice. */
     releaseDrawer(this);
+    if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
@@ -11221,6 +11330,13 @@ class SpectraCard extends HTMLElement {
       outline: resolveValue(this._hass, config.outline, f),
       body: resolveValue(this._hass, config.body, f) || {},
     };
+    /* A finished AI task is this card's notice. The louder of that and the
+       card's own level: two needs on one card, each decided by its owner. */
+    if (this._tasksCfg) {
+      const tasks = aiTasksOf(this._hass, this._tasksCfg);
+      model.tasks = tasks.list;
+      if (tasks.level) model.outline = loudestLevel(model.outline, tasks.level);
+    }
     this._fitDials(model.body);
     /* A finger is on the bar. Rebuilding it now would take the element the
        pointer is captured on out from under the gesture. */
@@ -11622,6 +11738,7 @@ class SpectraCard extends HTMLElement {
       festive && Array.isArray(fb.decor) && fb.decor.indexOf("bursts") >= 0
         ? festBursts(Array.isArray(fb.palette) ? fb.palette : []) : "",
       this._titlebar(model, this._phase),
+      aiTaskStrip(model.tasks),
       waiting
         ? `<p class="sub">${esc(waiting)}</p>`
         : BODIES[type](model.body),
@@ -13627,6 +13744,14 @@ class SpectraCard extends HTMLElement {
   _bind(model) {
     this._bindDrawer();
 
+    this._holder.querySelectorAll("[data-aitask]").forEach((el) => {
+      const open = (event) => { event.stopPropagation(); this._openTask(el.dataset.aitask); };
+      el.addEventListener("click", open);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(event); }
+      });
+    });
+
     /* A photo that will not load -- Mealie down, a recipe whose picture
        was removed -- takes itself away rather than leaving a broken frame. */
     this._holder.querySelectorAll("img[data-thumb]").forEach((img) => {
@@ -14324,6 +14449,15 @@ class SpectraCard extends HTMLElement {
      somewhere to read it. */
   _callAction(action, quiet) {
     if (!action || !this._hass) return Promise.resolve();
+    /* Opening an answer is a thing only a screen can do, so the row names
+       the task, its card and its tab rather than a service. The panel
+       moves to the tab; the card that owns the task opens it. */
+    if (!isBlank(action.open_task)) {
+      window.dispatchEvent(new CustomEvent(OPEN_TASK_EVENT, {
+        detail: { id: String(action.open_task), card: String(firstOf(action.card, "")), tab: firstOf(action.tab, null) },
+      }));
+      return Promise.resolve();
+    }
     const name = action.service || action.perform_action || action.action;
     if (typeof name !== "string" || !name.includes(".")) {
       LOGGER_WARN("spectra-card: action has no service to call", action);
@@ -16369,6 +16503,9 @@ class SpectraCard extends HTMLElement {
     const finish = () => {
       if (done) return;
       done = true;
+      /* Closing the sheet does not stop the reading. It goes on at
+         home_signals, and Needs you takes over saying when it is done. */
+      this._follow = null;
       document.removeEventListener("keydown", onKey, true);
       if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
       this._editing = false;
@@ -16384,36 +16521,77 @@ class SpectraCard extends HTMLElement {
       const yes = event.currentTarget;
       const found = input.value.match(/https?:\/\/\S+/);
       if (!found) { status("That is not a web address."); return; }
-      const [domain, service] = String(spec.script).split(".");
       yes.disabled = true;
       status("Reading the page\u2026");
+      /* Handed to home_signals when it can take it, so the reading carries
+         on when this sheet is closed and Needs you says when it is done.
+         An older integration without it gets the old wait, in the sheet. */
+      if (this._canRunTasks()) {
+        const cfg = this._tasksCfg || { card: "meals" };
+        this._mealCall("home_signals.start_ai_task", Object.assign({
+          title: "Recipe from a link",
+          action: String(spec.script),
+          data: { url: found[0] },
+          card: cfg.card,
+          label: "recipe",
+        }, isBlank(cfg.tab) ? {} : { tab: String(cfg.tab) },
+        isBlank(spec.split) ? {} : {
+          then: { action: String(spec.split), pass: { recipe: "slug" }, unless: "already" },
+        })).then((r) => {
+          if (done || isBlank(r.task_id)) return;
+          input.disabled = true;
+          const no = wrap.querySelector("[data-no]");
+          if (no) no.textContent = "Close";
+          status("Reading the page\u2026 This can be closed: it carries on, and Needs you will say when it is ready.");
+          this._follow = {
+            id: String(r.task_id),
+            step: (task) => {
+              if (Number(task.step) === 2) status("In the box. Looking for what can be done ahead\u2026 This can still be closed.");
+            },
+            landed: (task) => {
+              if (done) return;
+              /* Seen here, so it is not news for Needs you as well. */
+              this._callAction({ service: "home_signals.dismiss", data: { item_id: task.id } }, true);
+              if (task.state !== "done") {
+                yes.disabled = false;
+                input.disabled = false;
+                status(`Failed: ${firstOf(task.error, "no recipe could be read from that page")}.`);
+                return;
+              }
+              this._taskResult(task.id).then((got) => {
+                if (done) return;
+                this._importLanded(wrap, status, got.result || {}, taskSplit(got), finish, spec);
+              }, () => status("It finished, but the answer could not be fetched."));
+            },
+          };
+          this._followTask();
+        }, (error) => {
+          LOGGER_WARN("spectra-card: could not start the import", error);
+          yes.disabled = false;
+          status("The import could not be started.");
+        });
+        return;
+      }
+      const [domain, service] = String(spec.script).split(".");
       Promise.resolve(this._hass.callWS({
         type: "call_service", domain, service, service_data: { url: found[0] }, return_response: true,
       })).then((result) => {
         const saved = (result && result.response) || {};
-        status(`${firstOf(saved.recipe, "The recipe")} is in the box.`);
-        this._refetchMeals();
         /* Then what can be done ahead, checked once while it is fresh:
            the split runs after every import, and this waits for it. */
         if (!isBlank(spec.split) && !isBlank(saved.slug) && !saved.already) {
           status(`${firstOf(saved.recipe, "The recipe")} is in the box. Looking for what can be done ahead\u2026`);
+          this._refetchMeals();
           this._mealCall(spec.split, { recipe: String(saved.slug) }).then((split) => {
             if (done) return;
-            /* No answer from the model is not "nothing to prep": the
-               recipe is saved and simply not split yet. */
-            if (!split || split.mode === "error") {
-              status(`${firstOf(saved.recipe, "The recipe")} is in the box. What can be done ahead could not be worked out this time.`);
-              setTimeout(finish, 2500);
-              return;
-            }
-            this._prepReview(wrap, saved, split, finish);
+            this._importLanded(wrap, status, saved, split, finish, spec);
           }, (error) => {
             LOGGER_WARN("spectra-card: could not split the recipe", error);
             setTimeout(finish, 1200);
           });
           return;
         }
-        setTimeout(finish, 1200);
+        this._importLanded(wrap, status, saved, undefined, finish, spec);
       }, (error) => {
         LOGGER_WARN("spectra-card: could not import the recipe", error);
         yes.disabled = false;
@@ -16424,6 +16602,110 @@ class SpectraCard extends HTMLElement {
     this._editing = true;
     this._holder.appendChild(wrap);
     if (input.focus && finePointer()) input.focus({ preventScroll: true });
+  }
+
+  /* An import has answered: say so, then show the split if there is one.
+     `split` undefined is "none was asked for"; null or an error from the
+     model is "asked, and no answer" -- the recipe is saved, only not split. */
+  _importLanded(wrap, status, saved, split, finish, spec) {
+    const name = firstOf(saved.recipe, "The recipe");
+    this._refetchMeals();
+    if (split === undefined || (spec && isBlank(spec.split))) {
+      status(`${name} is in the box.`);
+      setTimeout(finish, 1200);
+      return;
+    }
+    if (!split || split.mode === "error") {
+      status(`${name} is in the box. What can be done ahead could not be worked out this time.`);
+      setTimeout(finish, 2500);
+      return;
+    }
+    this._prepReview(wrap, saved, split, finish);
+  }
+
+  /* Whether home_signals can run a task in the background. */
+  _canRunTasks() {
+    const s = this._hass && this._hass.services;
+    return Boolean(s && s.home_signals && s.home_signals.start_ai_task);
+  }
+
+  _taskResult(id) {
+    return this._mealCall("home_signals.ai_task_result", { task_id: String(id) });
+  }
+
+  /* The sheet watching a task it started, on every hass. Read here rather
+     than through `_sources`, so a card without `tasks` still follows its
+     own import. */
+  _followTask() {
+    const f = this._follow;
+    if (!f || !this._hass || !this._hass.states) return;
+    const entity = (this._tasksCfg && this._tasksCfg.entity) || AI_TASKS_ENTITY;
+    const state = this._hass.states[entity];
+    const tasks = state && Array.isArray(state.attributes && state.attributes.tasks) ? state.attributes.tasks : [];
+    const task = tasks.find((t) => t && String(t.id) === f.id);
+    if (!task) return;
+    if (task.state === "running") {
+      if (f.at !== task.step) { f.at = task.step; f.step(task); }
+      return;
+    }
+    this._follow = null;
+    f.landed(task);
+  }
+
+  /* A finished task, opened from its line on the card or its Needs you
+     row. Opening it is seeing it, so the notice clears -- card, tab and
+     row together, through the row's own Done. */
+  _openTask(id) {
+    if (!this._hass || isBlank(id) || this._editing) return;
+    this._taskResult(id).then((got) => {
+      const task = got.task || {};
+      this._callAction({ service: "home_signals.dismiss", data: { item_id: String(id) } }, true);
+      const saved = got.result && typeof got.result === "object" ? got.result : {};
+      const title = esc(firstOf(task.title, "AI task"));
+      const ok = task.state === "done";
+      const wrap = document.createElement("div");
+      wrap.className = "confirmwrap";
+      this._wearAccent(wrap, this._model && this._model.accent);
+      wrap.innerHTML = `<div class="confirmbox" role="dialog" aria-modal="true" aria-label="${title}">`
+        + `<div class="confirmhead">${iconMarkup(ok ? "mdi:check-circle-outline" : "mdi:alert-circle-outline")}`
+        + `<span>${ok ? "Done" : "Failed"} · ${title}</span></div>`
+        + `<div class="mlrecipe"><p class="confirmtext" data-status></p></div>`
+        + `<div class="confirmbtns"><button type="button" class="confirmyes" data-no>OK</button></div></div>`;
+      const status = (text) => { const el = wrap.querySelector("[data-status]"); if (el) el.textContent = text; };
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("keydown", onKey, true);
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        this._editing = false;
+        this._signature = null;
+        this._update();
+      };
+      const onKey = (event) => {
+        if (event.key === "Escape") { event.preventDefault(); finish(); }
+      };
+      wrap.querySelector("[data-no]").addEventListener("click", finish);
+      document.addEventListener("keydown", onKey, true);
+      this._editing = true;
+      this._holder.appendChild(wrap);
+      if (!ok) {
+        status(`It did not work: ${firstOf(task.error, "no answer came back")}.`);
+        return;
+      }
+      if (!isBlank(saved.slug)) {
+        /* A recipe: the same review the sheet would have shown, had it
+           still been open. Nothing closes itself -- this was asked for. */
+        const split = taskSplit(got);
+        const name = firstOf(saved.recipe, "The recipe");
+        this._refetchMeals();
+        if (split === undefined) status(`${name} is in the box.`);
+        else if (!split || split.mode === "error") status(`${name} is in the box. What can be done ahead could not be worked out this time.`);
+        else this._prepReview(wrap, saved, split, finish);
+        return;
+      }
+      status(isBlank(task.label) ? "Done." : `Done: ${task.label}.`);
+    }, (error) => LOGGER_WARN("spectra-card: could not open the task", error));
   }
 
   /* An import's split, checked once. The page's own make-ahead notes and
@@ -18719,6 +19001,8 @@ const PANEL_SHEET = `
 .needsbar .nbfirst { flex:1 1 auto; min-width:0; font-size:13px; color:var(--sp-ink-2);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .needsbar ha-icon { flex:none; --mdc-icon-size:20px; color:var(--sp-ink-2); transition:transform .2s; }
+.needsbar.lv-notice { border-color:var(--sp-notice); }
+.needsbar.lv-notice .nbcount { color:var(--sp-notice-on); }
 .needsbar.lv-attention { border-color:var(--sp-attention); }
 .needsbar.lv-attention .nbcount { color:var(--sp-attention-on); }
 .needsbar.lv-waiting { border-color:var(--sp-waiting); box-shadow:inset 0 0 0 1px var(--sp-waiting); }
@@ -18783,6 +19067,19 @@ class SpectraPanel extends HTMLElement {
     this._onTab = () => {
       this._applyTab();
       this._layout();
+    };
+    /* A Needs you row's Open names its tab in the house's words
+       ("kitchen"); the rail names it in the dashboard's ("Kitchen"). */
+    this._onOpenTask = (event) => {
+      const want = event.detail && event.detail.tab;
+      if (isBlank(want)) return;
+      const tabs = this._wrappers ? this._wrappers.flatMap((w) => w.tabs || []) : [];
+      const tab = tabs.find((t) => t.toLowerCase() === String(want).toLowerCase());
+      if (tab && tab !== tabStore.get()) tabStore.set(tab);
+      if (this._panel.classList.contains("open")) {
+        this._panel.classList.remove("open");
+        this._bar.setAttribute("aria-expanded", "false");
+      }
     };
     this.addEventListener("section-visibility-changed", this._onVisibility);
     this.addEventListener("card-visibility-changed", this._onVisibility);
@@ -18888,6 +19185,7 @@ class SpectraPanel extends HTMLElement {
 
   connectedCallback() {
     window.addEventListener(TAB_EVENT, this._onTab);
+    window.addEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     this._applyTab();
     if (!this._observer && typeof ResizeObserver !== "undefined") {
       this._observer = new ResizeObserver(this._relayout);
@@ -18903,6 +19201,7 @@ class SpectraPanel extends HTMLElement {
 
   disconnectedCallback() {
     window.removeEventListener(TAB_EVENT, this._onTab);
+    window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     if (this._observer) { this._observer.disconnect(); this._observer = null; }
     if (this._sizer) { this._sizer.disconnect(); this._sizer = null; }
     window.removeEventListener("resize", this._relayout);
@@ -18994,7 +19293,7 @@ class SpectraPanel extends HTMLElement {
       this._bar.setAttribute("aria-expanded", "false");
       return;
     }
-    const rank = { attention: 1, waiting: 2, critical: 3 };
+    const rank = { notice: 1, attention: 2, waiting: 3, critical: 4 };
     let top = null;
     for (const item of items) {
       if (!top || (rank[item.level] || 0) > (rank[top.level] || 0)) top = item;
