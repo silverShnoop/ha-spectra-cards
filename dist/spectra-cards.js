@@ -2946,22 +2946,36 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devkey.offline { background:var(--sp-attention); }
 .devkey.partial { border:2px solid var(--sp-attention); }
 /* The map and the list are two separate things to read, not one thing
-   annotated. Where there is room they share two columns: the map sits in
-   the first with network groups above and below it, and the rest of the
-   groups fill the second, so neither column runs on past the other. On a
-   phone the columns dissolve into one run -- the map first, then every
-   group in order. */
-.devbody { display:flex; flex-direction:column; gap:4px; }
-.devcol { display:contents; }
-.devbody > .devcol > .devmap { order:-1; }
+   annotated. The list takes as many columns as the card spans on the panel
+   -- one, two or three -- and the map is always at the top: across two of
+   them on a card three wide, one otherwise. The list's groups fill the
+   columns under the map and beside it, in the map's order, split so no
+   column runs on past the others.
+
+   The card cannot ask the panel how many columns it spans, so it reads its
+   own width: three from 880px, two from 560px. The panel's columns are
+   280px at their narrowest, so those are the widths at which a card of
+   that span can first appear. Each span is its own markup and a container
+   query shows one, because the split differs with the column count. */
+.devlay { display:none; }
+.devlay.n1 { display:flex; flex-direction:column; gap:4px; }
+.devlay.n2, .devlay.n3 { grid-template-columns:var(--devcols); gap:0 22px; align-items:start; }
+.devlead { min-width:0; }
+.devsub { display:grid; grid-template-columns:var(--devsub); gap:0 22px; align-items:start; }
+.devcol { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .devgroup { min-width:0; }
-@container devices (min-width: 700px) {
+@container devices (min-width: 560px) {
   .devtile { flex:0 1 150px; }
-  .devbody { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:0 22px; align-items:start; }
-  .devcol { display:flex; flex-direction:column; gap:4px; min-width:0; }
-  .devbody > .devcol > .devmap { order:0; margin:4px auto; }
+  .devlay.n1 { display:none; }
+  .devlay.n2 { display:grid; }
+  .devlay .devmap { margin:4px auto 6px; }
 }
-@container devices (max-width: 699px) {
+@container devices (min-width: 880px) {
+  .devlay.n2 { display:none; }
+  .devlay.n3 { display:grid; }
+  .devlay.n3 .devmap { max-width:600px; }
+}
+@container devices (max-width: 559px) {
   .devlegend { width:100%; margin-left:6px; }
 }
 .devroom { display:flex; align-items:baseline; gap:8px; margin:8px 6px 2px; font-size:10px;
@@ -5730,33 +5744,46 @@ function devicesGroups(networks, problems, what, stateOf) {
   return { groups, quiet };
 }
 
-/* Two columns from groups and the map. The first column takes the map and
-   the first few groups, half of them above it and half below; the second
-   takes the rest. The split is the one that leaves the taller column
-   shortest, counted in rows -- the map is about DEV_MAP_ROWS of them at the
-   widths a panel draws it. Groups never leave the map's order: reading
-   down the first column and then the second walks the networks in turn,
-   which is also the order they fall into on a phone. */
-const DEV_MAP_ROWS = 10;
-function devicesLayout(map, groups, quiet) {
-  const units = groups.map((g) => g.rows);
-  const sum = (xs) => xs.reduce((t, x) => t + x, 0);
-  const tail = quiet ? 0.7 : 0;
-  let split = 0, best = Infinity;
-  for (let k = 0; k <= groups.length; k++) {
-    const left = (map ? DEV_MAP_ROWS : 0) + sum(units.slice(0, k));
-    const right = sum(units.slice(k)) + tail;
-    const tallest = Math.max(left, right);
-    if (tallest < best - 1e-9) { best = tallest; split = k; }
-  }
-  const first = groups.slice(0, split), second = groups.slice(split);
-  /* Half the first column's groups (by rows) above the map, the rest below. */
-  let above = 0;
-  const half = sum(first.map((g) => g.rows)) / 2;
-  for (let acc = 0; above < first.length && acc + first[above].rows / 2 <= half; above++) acc += first[above].rows;
+/* The card's body for one span of the panel: `cols` list columns, the map
+   across the first `lead` of them at the top. The groups, in the map's
+   order, are cut into one run per column; the cut is the one that leaves
+   the tallest column shortest, counted in rows, where a column under the
+   map starts DEV_MAP_ROWS[cols] rows down -- about how tall the map draws
+   at the widths a card of that span has. The quiet line closes the last
+   column. Reading the columns left to right walks the networks in turn. */
+const DEV_MAP_ROWS = { 2: 8, 3: 13 };
+function devicesLayout(map, groups, quiet, cols) {
   const html = (gs) => gs.map((g) => g.html).join("");
-  return `<div class="devcol">${html(first.slice(0, above))}${map}${html(first.slice(above))}${second.length ? "" : quiet}</div>`
-    + (second.length ? `<div class="devcol">${html(second)}${quiet}</div>` : "");
+  if (cols === 1 || !map && !groups.length) {
+    return `<div class="devlay n1">${map}${html(groups)}${quiet}</div>`;
+  }
+  const lead = cols === 3 ? 2 : 1;
+  const offset = (c) => (map && c < lead ? DEV_MAP_ROWS[cols] : 0);
+  const rows = groups.map((g) => g.rows);
+  const tail = quiet ? 0.7 : 0;
+  const n = groups.length;
+  /* Every way to cut n groups into `cols` ordered runs (n is a handful). */
+  let best = null, bestH = Infinity;
+  const cut = (start, c, acc, cuts) => {
+    if (c === cols - 1) {
+      const h = offset(c) + rows.slice(start).reduce((t, r) => t + r, 0) + tail;
+      const tallest = Math.max(acc, h);
+      if (tallest < bestH - 1e-9) { bestH = tallest; best = [...cuts, n]; }
+      return;
+    }
+    for (let end = start; end <= n; end++) {
+      const h = offset(c) + rows.slice(start, end).reduce((t, r) => t + r, 0);
+      cut(end, c + 1, Math.max(acc, h), [...cuts, end]);
+    }
+  };
+  cut(0, 0, 0, []);
+  const runs = best.map((end, c) => groups.slice(c ? best[c - 1] : 0, end));
+  const col = (c) => `<div class="devcol">${html(runs[c])}${c === cols - 1 ? quiet : ""}</div>`;
+  const under = Array.from({ length: lead }, (_, c) => col(c)).join("");
+  const beside = Array.from({ length: cols - lead }, (_, c) => col(lead + c)).join("");
+  const frs = cols === 3 ? "minmax(0, 2fr) minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)";
+  return `<div class="devlay n${cols}" style="--devcols:${frs};--devsub:repeat(${lead}, minmax(0, 1fr))">`
+    + `<div class="devlead">${map}<div class="devsub">${under}</div></div>${beside}</div>`;
 }
 
 /* A problem row: offline is a filled dot and partial a ring, the name with
@@ -7750,10 +7777,10 @@ const BODIES = {
      sick Cast cluster and one dead Wi-Fi as a whole cluster gone. Beside it,
      or under it on a phone, every device not fully answering, grouped by
      network, each row saying what is missing, for how long and in which
-     room. The map shows where; the list says what. Where there is room the
-     groups sit above and below the map and in a second column beside it.
-     A container query lays them out, so the card never has to be told how
-     wide it is.
+     room. The map shows where; the list says what. The map is always at the
+     top; the list takes as many columns as the card spans, under the map
+     and beside it. A container query picks the layout, so the card never
+     has to be told how wide it is.
 
      "How long" is the sensor's, remembered across restarts. A device whose
      time is unknown just says what is wrong: Home Assistant's own
@@ -7783,8 +7810,9 @@ const BODIES = {
       + `</div>`;
 
     const { groups, quiet } = devicesGroups(networks, problems, what, stateOf);
+    const map = networks.length ? devicesMap(networks, problems, stateOf) : "";
     out += `<div class="devbody">`
-      + devicesLayout(networks.length ? devicesMap(networks, problems, stateOf) : "", groups, quiet) + `</div>`;
+      + [1, 2, 3].map((cols) => devicesLayout(map, groups, quiet, cols)).join("") + `</div>`;
     return out + `</div>`;
   },
   list(b) {

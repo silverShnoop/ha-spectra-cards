@@ -665,7 +665,7 @@ the cluster's outside edge — so five dead speakers read as one sick Cast
 cluster without a word of explanation. Networks sit evenly round the map in
 the sensor's order, the first on the left.
 
-**Round it, a list** — under it on a phone — of every device not fully
+**Under it and beside it, a list** — under it on a phone — of every device not fully
 answering, grouped by network in the map's order, offline first: the name,
 its room, what is missing (`offline`, `No temperature`, `5 of 8 missing`) and
 **how long**: `offline · 3d`. Networks with nothing wrong are one quiet line
@@ -674,12 +674,19 @@ map is still a row, under *Other*.
 
 The map names nothing and the list is not numbered against it. Labels at the
 side of the map, and then numbers on its dots, were both tried and read as
-clutter on the panel: the map shows where, the list says what. From 700px the
-card is two columns: the map in the first with network groups above and below
-it, the rest of the groups in the second, split so neither column runs on
-past the other. Reading down the first column and then the second still walks
-the networks in the map's order. A container query does the layout, so the
-card never has to be told how wide it is. Give the section `column_span: 2` or more on a panel.
+clutter on the panel: the map shows where, the list says what.
+
+**The list takes as many columns as the card spans**, and the map is always at
+the top. On a card three columns wide the map spans two of them and the list
+starts in the third, beside it; on a card two wide the map takes one. The
+groups fill the columns in the map's order, cut so that no column runs on
+past the others — so a short list sits entirely beside the map, and a long
+one carries on under it. A phone gets the map and then one column.
+
+The card cannot ask the panel how many columns it spans, so it reads its own
+width: three from 880px, two from 560px. The panel's columns are 280px at
+their narrowest, so those are the widths at which a card of that span can
+first appear. Give the section `column_span: 3` on the panel. Give the section `column_span: 2` or more on a panel.
 
 The time is the sensor's, remembered across restarts. A problem whose time is
 unknown shows none: Home Assistant's own `last_changed` would say it died at
