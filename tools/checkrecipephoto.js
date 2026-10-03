@@ -58,7 +58,7 @@ const js = fs.readFileSync(file);
     const g = canvas.getContext("2d");
     g.fillStyle = "#fff"; g.fillRect(0, 0, 400, 300);
     g.fillStyle = "#c33"; g.fillRect(200, 0, 200, 150);
-    const photo = await new Promise((r) => canvas.toBlob((b) => r(new File([b], "page.png", { type: "image/png" })), "image/png"));
+    let photo = await new Promise((r) => canvas.toBlob((b) => r(new File([b], "page.png", { type: "image/png" })), "image/png"));
     const size = (url) => new Promise((r) => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.onerror = () => r(null); i.src = url; });
 
     /* The file picker: the next pick is this photo, and each is recorded. */
@@ -131,7 +131,59 @@ const js = fs.readFileSync(file);
     const sent = saves().pop();
     const image = sent && sent.service_data.image;
     const got = image ? await size(image) : null;
-    check("and saved with it, cut to the dish", got && got[0] === 200 && got[1] === 150, JSON.stringify(got));
+    check("and saved with it, cut to the dish, drawn in a little from the model's box", got && got[0] === 190 && got[1] === 143, JSON.stringify(got));
+    const pixel = (url, fx, fy) => new Promise((r) => {
+      const i = new Image();
+      i.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = i.naturalWidth; c.height = i.naturalHeight;
+        const x = c.getContext("2d");
+        x.drawImage(i, 0, 0);
+        const d = x.getImageData(Math.floor(fx * c.width), Math.floor(fy * c.height), 1, 1).data;
+        r(d[0] > 150 && d[2] < 100 ? "red" : d[2] > 150 && d[0] < 100 ? "blue" : `rgb(${d[0]},${d[1]},${d[2]})`);
+      };
+      i.src = url;
+    });
+    /* A dish printed sideways: red at its top, blue at its bottom, in a tall box. */
+    const tall = document.createElement("canvas");
+    tall.width = 400; tall.height = 400;
+    const tg = tall.getContext("2d");
+    tg.fillStyle = "#fff"; tg.fillRect(0, 0, 400, 400);
+    tg.fillStyle = "#d00"; tg.fillRect(100, 0, 200, 200);
+    tg.fillStyle = "#00d"; tg.fillRect(100, 200, 200, 200);
+    const tallFile = await new Promise((r) => tall.toBlob((b) => r(new File([b], "t.png", { type: "image/png" })), "image/png"));
+    const pageFile = photo;
+    const fromForm = async () => {
+      const pic = q(".confirmwrap [data-pic]");
+      await until(() => pic.classList.contains("has"));
+      const m = pic.style.backgroundImage.match(/url\("(.*)"\)/);
+      return m ? m[1] : null;
+    };
+    photo = tallFile;
+    dish = { left: 25, top: 0, right: 75, bottom: 100, turn: 90 };
+    card._recipeAdd(body, { accent: 6 }, "photo");
+    await settle();
+    q(".confirmwrap [data-take='']").click();
+    await until(() => q(".confirmwrap [data-pic]"));
+    const turned = await fromForm();
+    const tsz = turned ? await size(turned) : null;
+    check("a turn stands the dish upright and still cuts it 4:3", tsz && Math.abs(tsz[0] / tsz[1] - 4 / 3) < 0.02 && tsz[0] > tsz[1], JSON.stringify(tsz));
+    check("turned clockwise: what was its top is now on the right", turned && await pixel(turned, 0.9, 0.5) === "red" && await pixel(turned, 0.1, 0.5) === "blue",
+      turned && `${await pixel(turned, 0.1, 0.5)} | ${await pixel(turned, 0.9, 0.5)}`);
+    q(".confirmwrap [data-no]").click();
+    await settle();
+    /* A photo given on the form: the whole of it, cut 4:3 about its middle. */
+    card._mealEdit("e1", { recipe_id: "abcdef99", slug: "x", name: "X", ingredients: [], instructions: [] }, 6, { save: "home_signals.save_recipe" });
+    await settle();
+    q(".confirmwrap [data-pic-take='']").click();
+    const flat = await fromForm();
+    const fsz = flat ? await size(flat) : null;
+    check("a photo given on the form is cut 4:3 about its middle, not squeezed", fsz && fsz[0] === 400 && fsz[1] === 300
+      && await pixel(flat, 0.5, 0.1) === "red" && await pixel(flat, 0.5, 0.9) === "blue", JSON.stringify(fsz));
+    q(".confirmwrap [data-no]").click();
+    await settle();
+    photo = pageFile;
+    dish = { left: 50, top: 0, right: 100, bottom: 50 };
     check("the whole page is not what was sent", Boolean(image) && image.startsWith("data:image/jpeg"), String(image).slice(0, 30));
 
     /* ---- no dish on the page: no photo ---- */
@@ -190,8 +242,11 @@ const js = fs.readFileSync(file);
       && Math.abs(sb.left + sb.width / 2 - innerWidth / 2) < 2 && sb.width >= 64 && look.borderRadius === "50%",
       `${look.backgroundColor} ${sb.left} ${sb.width} ${look.borderRadius}`);
     check("one camera: no flip", cam("[data-flip]").hidden, "flip shown");
+    const viewBefore = q(".camwrap .camview").getBoundingClientRect().height;
     shutter.click();
     await until(() => cam("[data-review]") && !cam("[data-review]").hidden);
+    check("upright, the picture does not move when the shutter is pressed either",
+      Math.abs(q(".camwrap .camview").getBoundingClientRect().height - viewBefore) < 1, `${viewBefore} -> ${q(".camwrap .camview").getBoundingClientRect().height}`);
     check("the shutter shows the photo first, with Retake and Use photo", !cam("img").hidden && cam("video").hidden
       && cam("[data-live]").hidden && Boolean(cam("[data-retake]")) && Boolean(cam("[data-use]")), "no review");
     const use = getComputedStyle(cam("[data-use]"));
@@ -291,8 +346,59 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-yes]").click();
     await settle();
     check("an unchanged photo is not sent again", !("image" in saves().pop().service_data), "sent");
+    window.__card = card;
     return problems;
   });
+  /* ---- a phone on its side: the controls in a column on the right ---- */
+  await page.setViewportSize({ width: 900, height: 412 });
+  const sideways = await page.evaluate(async () => {
+    const problems = [];
+    const check = (name, ok, got) => {
+      console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : "  -> " + got}`);
+      if (!ok) problems.push(name);
+    };
+    const tick = () => new Promise((r) => setTimeout(r, 25));
+    const until = async (fn) => { for (let i = 0; i < 80 && !fn(); i += 1) await tick(); };
+    const card = window.__card;
+    const feed = document.createElement("canvas");
+    feed.width = 640; feed.height = 480;
+    const fg = feed.getContext("2d");
+    const paint = () => { fg.fillStyle = "#888"; fg.fillRect(0, 0, 640, 480); };
+    paint();
+    const timer = setInterval(paint, 50);
+    navigator.mediaDevices.getUserMedia = () => Promise.resolve(feed.captureStream(10));
+    navigator.mediaDevices.enumerateDevices = () => Promise.resolve([{ kind: "videoinput" }, { kind: "videoinput" }]);
+    const picked = card._pickPhoto(true, 6);
+    const q = (sel) => card.shadowRoot.querySelector(sel);
+    await until(() => q(".camwrap [data-shoot]") && !q(".camwrap [data-shoot]").disabled && !q(".camwrap [data-flip]").hidden);
+    const box = (sel) => q(sel).getBoundingClientRect();
+    const view = box(".camwrap .camview");
+    const bar = box(".camwrap [data-live]");
+    const shoot = box(".camwrap [data-shoot]");
+    const flip = box(".camwrap [data-flip]");
+    const gallery = box(".camwrap [data-gallery]");
+    check("sideways, the controls are a column on the right", bar.left >= view.right - 1 && bar.right >= innerWidth - 1 && bar.height >= innerHeight - 2,
+      JSON.stringify({ view: [view.left, view.right], bar: [bar.left, bar.right, bar.height] }));
+    check("the picture takes the full height", Math.abs(view.height - innerHeight) < 2, `${view.height} of ${innerHeight}`);
+    check("the shutter in the middle of the column, flip above, gallery below",
+      Math.abs(shoot.top + shoot.height / 2 - innerHeight / 2) < 3 && flip.bottom <= shoot.top && gallery.top >= shoot.bottom,
+      JSON.stringify({ flip: flip.top, shoot: shoot.top, gallery: gallery.top }));
+    const close = box(".camwrap [data-no]");
+    check("close floats over the picture's top left", close.top < 40 && close.left < 40 && close.right <= view.right, JSON.stringify([close.left, close.top]));
+    q(".camwrap [data-shoot]").click();
+    await until(() => !q(".camwrap [data-review]").hidden);
+    const view2 = box(".camwrap .camview");
+    check("the picture does not move when the shutter is pressed", Math.abs(view2.width - view.width) < 1, `${view.width} -> ${view2.width}`);
+    const use = box(".camwrap [data-use]");
+    const retake = box(".camwrap [data-retake]");
+    check("and the review buttons stand in the same column, Use photo on top", use.left >= view.right - 1 && use.bottom <= retake.top,
+      JSON.stringify({ use: [use.left, use.top], retake: retake.top }));
+    q(".camwrap [data-no]").click();
+    await picked;
+    clearInterval(timer);
+    return problems;
+  });
+  fails.push(...sideways);
   await browser.close();
   server.close();
   if (fails.length) { console.log(`FAIL (${fails.length})`); process.exit(1); }

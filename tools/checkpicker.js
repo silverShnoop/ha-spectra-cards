@@ -88,7 +88,7 @@ const js = fs.readFileSync(file);
         tags: ["Dinner", "Chicken", "Mexican"], ingredients: ["500g chicken thighs", "2 peppers", "1 onion", "8 tortillas", "soured cream"],
         last_made: day(-21), date_added: "2026-08-01", favourite: true, image: null },
       { recipe_id: "r2", slug: "oats", name: "Overnight oats", total_time: "10 minutes",
-        tags: ["Breakfast", "Quick", "Vegetarian"], ingredients: ["50g oats", "milk"],
+        tags: ["Breakfast", "Quick", "Vegetarian", "Suitable for weaning"], ingredients: ["50g oats", "milk"],
         last_made: null, date_added: "2026-09-20", favourite: false, image: null },
       { recipe_id: "r3", slug: "risotto", name: "Mushroom risotto", total_time: "40 minutes",
         tags: ["Dinner", "Vegetarian", "Rice"], ingredients: ["300g arborio rice", "250g mushrooms"],
@@ -165,6 +165,11 @@ const js = fs.readFileSync(file);
 
     check("chips for meals, and only the tags the box has", !!chip("meal:breakfast") && !!chip("tag:vegetarian")
       && !!chip("tag:rice") && !chip("tag:fish"), [...R.querySelectorAll("[data-rp-chip]")].map((c) => c.dataset.rpChip).join(","));
+    chip("tag:suitable for weaning").click();
+    await settle();
+    check("Suitable for weaning is a chip once a recipe has it, and filters to it", names().join("|") === "Overnight oats", names().join("|"));
+    chip("tag:suitable for weaning").click();
+    await settle();
     chip("meal:dinner").click();
     await settle();
     check("Dinner keeps dinners and anything untagged", names().join("|") === "Chicken fajitas|Mushroom risotto|Nana's stew",
@@ -324,6 +329,17 @@ const js = fs.readFileSync(file);
     const changed = asked.filter((m) => m.service === "save_recipe").pop();
     check("a changed tag is", changed && changed.service_data.tags === "Dinner, Quick, Vegetarian, Rice",
       JSON.stringify(changed && changed.service_data.tags));
+    rowOf("risotto").querySelector("[data-recipe-open]").click();
+    await settle();
+    sheet().querySelector("[data-more]").click();
+    sheet().querySelector("[data-edit]").click();
+    await settle();
+    check("Suitable for weaning is with the diets, never folded away", tag("Suitable for weaning") && !tag("Suitable for weaning").closest("details"), "missing");
+    tag("Suitable for weaning").click();
+    sheet().querySelector("[data-yes]").click();
+    await settle();
+    const weaning = asked.filter((m) => m.service === "save_recipe").pop();
+    check("and is saved like any tag", weaning && /Suitable for weaning/.test(weaning.service_data.tags), JSON.stringify(weaning && weaning.service_data.tags));
 
     R.querySelector("[data-recipe-add]").click();
     await settle();

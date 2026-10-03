@@ -2262,19 +2262,23 @@ way in, remembering the last one used:
   new-recipe form, for checking before it is saved. **Take a photo** opens
   the card's own camera, laid out like the phone's: the picture full screen,
   a round shutter, the gallery to its left and a flip where there are two
-  cameras. The shutter shows the photo first, with **Retake** and **Use
+  cameras; on a phone held sideways the controls stand in a column on the
+  right instead. The shutter shows the photo first, with **Retake** and **Use
   photo**, so a blurred page is caught before it is read. And **Choose a
   photo** picks one already taken. The camera is the card's own because the
   Home Assistant app on Android opens the gallery for every file picker,
   whatever the page asks for; where the camera cannot be had, Take falls
   back to the picker. When the script's answer has `dish`
-  (`{left, top, right, bottom}`, each 0–100 per cent of the photo), that
-  part of the photo is cut out and becomes the recipe's photo; with none,
+  (`{left, top, right, bottom}`, each 0–100 per cent of the photo, and
+  `turn`, 0, 90, 180 or 270 degrees clockwise), that part of the photo is
+  drawn in a little from the edges, turned upright, cut to 4:3 about its
+  middle, and becomes the recipe's photo; with none,
   the recipe has no photo until one is given.
 - **Type it** opens the empty form.
 
 The recipe form has a **Photo** row: the photo the recipe has, and **Take**
-or **Choose** for a new one, sent with Save (`home_signals.save_recipe`'s
+or **Choose** for a new one (cut to 4:3 about its middle, like every recipe
+photo), sent with Save (`home_signals.save_recipe`'s
 `image`, home_signals 0.17.0 or later). A new photo can be removed before
 saving; Mealie's own stays until it is replaced.
 
@@ -2327,7 +2331,8 @@ already there to choose from.
 **Favourites and tags.** A recipe sheet has a heart that saves `favourite`
 through `edit.save`. The edit form shows the recipe's tags as chips: meals,
 effort and diet always, main ingredient and cuisine folded away unless one is
-chosen. Tags are sent only when they changed. A new recipe saved with none is
+chosen. The diets are Vegetarian, Vegan, Dairy-free, Gluten-free and **Suitable
+for weaning**, which is also a filter chip once any recipe has it. Tags are sent only when they changed. A new recipe saved with none is
 handed to `edit.tag`, which tags it in the background.
 
 **The tray shows the first ingredients** of a planned recipe, under its name.
