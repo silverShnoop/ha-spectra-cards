@@ -239,6 +239,7 @@ const js = fs.readFileSync(file);
     check("the import starts a task rather than waiting on the script",
       started && started[1].action === spec.script && started[1].card === "meals"
         && started[1].then.action === spec.split && started[1].then.pass.recipe === "slug"
+        && started[1].require === "slug" && /No recipe found/.test(started[1].missing)
         && !calls.some(([n]) => n === "script.meal_import_recipe"),
       JSON.stringify(calls));
     check("...and the sheet says it can be closed",
@@ -312,13 +313,14 @@ const js = fs.readFileSync(file);
     await set(viaTask(seven));
     let seenAsked = false;
     const answer = el._aiCall("script.meal_plan_say", { transcript: "pie" },
-      { title: "Plan what was said", label: "planned", seen: () => { seenAsked = true; return true; } });
+      { title: "Plan what was said", label: "planned", require: "planned", missing: "Nothing was planned",
+        seen: () => { seenAsked = true; return true; } });
     await new Promise((r) => setTimeout(r, 20));
     const begun = calls.find(([n]) => n === "home_signals.start_ai_task");
     check("an AI call starts a task with the card's own key and tab",
       begun && begun[1].action === "script.meal_plan_say" && begun[1].card === "meals"
         && begun[1].tab === "kitchen" && begun[1].open === false && begun[1].label === "planned"
-        && begun[1].kind === "",
+        && begun[1].kind === "" && begun[1].require === "planned" && begun[1].missing === "Nothing was planned",
       JSON.stringify(begun));
     let got = null;
     answer.then((a) => { got = a; });
