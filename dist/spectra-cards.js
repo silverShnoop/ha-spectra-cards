@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.151.0";
+const VERSION = "0.152.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2967,20 +2967,37 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devkey.offline { background:var(--sp-attention); }
 .devkey.partial { border:2px solid var(--sp-attention); }
 /* The map and the list are two separate things to read, not one thing
-   annotated: side by side where there is room, the map first on a phone. */
-.devbody { display:grid; grid-template-columns:minmax(0, 1fr); gap:4px 18px; align-items:start; }
-@container devices (min-width: 700px) {
+   annotated. Under the three numbers the map comes first -- across two
+   columns on a card three wide, one otherwise. The list fills the space
+   beside it first, then carries on under it in as many columns as the card
+   spans on the panel, its groups in the map's order.
+
+   The card cannot ask the panel how many columns it spans, so it reads its
+   own width: three from 880px, two from 560px. The panel's columns are
+   280px at their narrowest, so those are the widths at which a card of
+   that span can first appear. Each span is its own markup and a container
+   query shows one, because the split differs with the column count. */
+.devlay { display:none; }
+.devlay.n1 { display:flex; flex-direction:column; gap:4px; }
+.devtop { display:grid; grid-template-columns:var(--devtop); gap:0 22px; align-items:start; margin-bottom:8px; }
+.devlay:not(.solo) > .devtiles { margin-bottom:6px; }
+.devgrid { display:grid; grid-template-columns:repeat(var(--devcols), minmax(0, 1fr)); gap:0 22px; align-items:start; }
+.devcol { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.devgroup { min-width:0; }
+.devlay.solo .devlegend { width:100%; margin-left:6px; }
+@container devices (min-width: 560px) {
   .devtile { flex:0 1 150px; }
-  .devbody { grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr); }
-  .devlist { padding-top:6px; }
+  .devlay.n1 { display:none; }
+  .devlay.n2 { display:block; }
+  .devtop .devmap { margin:0 auto; max-width:620px; }
 }
-@container devices (max-width: 699px) {
-  .devlegend { width:100%; margin-left:6px; }
+@container devices (min-width: 880px) {
+  .devlay.n2 { display:none; }
+  .devlay.n3 { display:block; }
 }
-.devlist { min-width:0; }
 .devroom { display:flex; align-items:baseline; gap:8px; margin:8px 6px 2px; font-size:10px;
   letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
-.devroom:first-child { margin-top:2px; }
+.devgroup:first-child .devroom, .devroom:first-child { margin-top:2px; }
 .devroom .of { margin-left:auto; font-family:var(--sp-mono); letter-spacing:0; color:var(--sp-attention-on); }
 .devrow { display:flex; align-items:center; gap:8px; padding:3px 6px; font-size:12.5px; }
 .devrow .who { min-width:0; }
@@ -5711,17 +5728,23 @@ function devicesMap(networks, problems, stateOf) {
 }
 
 /* Every device not fully answering, grouped by network in the map's order,
-   offline first. A network with nothing wrong is not a heading -- it is
-   one quiet line at the end, so "Zigbee is fine" is still said. A problem
-   on a network the map does not draw is still a row, under "Other": the
-   list may never be shorter than the Needs you row behind it. */
-function devicesList(networks, problems, what, stateOf) {
+   offline first, as separate groups so the layout can place them round the
+   map. Each comes with its height in rows, which is what the layout
+   balances on. A network with nothing wrong is not a group -- it is one
+   quiet line at the end, so "Zigbee is fine" is still said. A problem on a
+   network the map does not draw is still a row, under "Other": the list
+   may never be shorter than the Needs you row behind it. */
+function devicesGroups(networks, problems, what, stateOf) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const rank = (p) => (p.state === "offline" ? 0 : 1);
   const byName = (p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name));
   const placed = new Set();
   const fine = [];
-  let out = "";
+  const groups = [];
+  const group = (head, rows) => groups.push({
+    rows: rows.length + 0.7,
+    html: `<div class="devgroup">${head}${rows.map((p) => devRow(p, what, stateOf)).join("")}</div>`,
+  });
   for (const n of networks) {
     const mine = problems.filter((p) => String(p.network) === String(n.name)).sort(byName);
     const on = num(n.online), all = on + num(n.offline) + num(n.partial);
@@ -5730,14 +5753,66 @@ function devicesList(networks, problems, what, stateOf) {
       continue;
     }
     mine.forEach((p) => placed.add(p));
-    out += `<p class="devroom">${esc(n.name)}<span class="of">${on}/${all}</span></p>`
-      + mine.map((p) => devRow(p, what, stateOf)).join("");
+    group(`<p class="devroom">${esc(n.name)}<span class="of">${on}/${all}</span></p>`, mine);
   }
   const other = problems.filter((p) => !placed.has(p)).sort(byName);
-  if (other.length) out += `<p class="devroom">${networks.length ? "Other" : "Not answering"}</p>`
-    + other.map((p) => devRow(p, what, stateOf)).join("");
-  if (fine.length && problems.length) out += `<p class="devquiet">All answering: ${esc(fine.join(" · "))}</p>`;
-  return out;
+  if (other.length) group(`<p class="devroom">${networks.length ? "Other" : "Not answering"}</p>`, other);
+  const quiet = fine.length && problems.length ? `<p class="devquiet">All answering: ${esc(fine.join(" · "))}</p>` : "";
+  return { groups, quiet };
+}
+
+/* The card's body for one span of the panel. The three numbers first, across
+   the card, because they are the part read from the doorway. Then the map:
+   across two columns on a card three wide and one otherwise.
+
+   The list fills the space beside the map first -- that space is there
+   whatever the list does, so it is the first to be used -- taking groups in
+   the map's order while they fit the map's height. What does not fit goes
+   under the map in all `cols` columns, cut so the tallest is as short as it
+   can be. Reading beside the map and then the columns left to right walks
+   the networks in turn.
+
+   The map's height is counted in list rows, DEV_MAP_ROWS for each span --
+   about how tall it draws at the widths a card of that span has. A group
+   may run a row or so past the map rather than leave a gap above the
+   columns. A phone gets the numbers, the map, then one column. */
+const DEV_MAP_ROWS = { 2: 8, 3: 14 };
+function devicesLayout(tiles, map, groups, quiet, cols) {
+  const html = (gs) => gs.map((g) => g.html).join("");
+  if (cols === 1 || !map) {
+    return `<div class="devlay n${cols} solo">${tiles}${map}${html(groups)}${quiet}</div>`;
+  }
+  const room = DEV_MAP_ROWS[cols] + 1.5;
+  let beside = 0, used = 0;
+  while (beside < groups.length && used + groups[beside].rows <= room) used += groups[beside++].rows;
+  const rest = groups.slice(beside);
+  const tail = quiet ? 0.7 : 0;
+  /* The quiet line closes the list: beside the map if nothing is left under it. */
+  const quietBeside = !rest.length && used + tail <= room;
+
+  let columns = "";
+  if (rest.length || (quiet && !quietBeside)) {
+    const rows = rest.map((g) => g.rows);
+    const sum = (from, to) => rows.slice(from, to).reduce((t, r) => t + r, 0);
+    const n = rest.length;
+    /* Every way to cut the rest into `cols` ordered runs (n is a handful). */
+    let best = null, bestH = Infinity;
+    const cut = (start, c, acc, cuts) => {
+      if (c === cols - 1) {
+        const tallest = Math.max(acc, sum(start, n) + tail);
+        if (tallest < bestH - 1e-9) { bestH = tallest; best = [...cuts, n]; }
+        return;
+      }
+      for (let end = start; end <= n; end++) cut(end, c + 1, Math.max(acc, sum(start, end)), [...cuts, end]);
+    };
+    cut(0, 0, 0, []);
+    columns = `<div class="devgrid">` + best.map((end, c) => `<div class="devcol">`
+      + html(rest.slice(c ? best[c - 1] : 0, end)) + (c === cols - 1 ? quiet : "") + `</div>`).join("") + `</div>`;
+  }
+  const frs = cols === 3 ? "minmax(0, 2fr) minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)";
+  return `<div class="devlay n${cols}" style="--devtop:${frs};--devcols:${cols}">${tiles}`
+    + `<div class="devtop">${map}<div class="devcol devside">${html(groups.slice(0, beside))}${quietBeside ? quiet : ""}</div></div>`
+    + columns + `</div>`;
 }
 
 /* A problem row: offline is a filled dot and partial a ring, the name with
@@ -7731,8 +7806,10 @@ const BODIES = {
      sick Cast cluster and one dead Wi-Fi as a whole cluster gone. Beside it,
      or under it on a phone, every device not fully answering, grouped by
      network, each row saying what is missing, for how long and in which
-     room. The map shows where; the list says what. A container query lays
-     them out, so the card never has to be told how wide it is.
+     room. The map shows where; the list says what. The map is always at the
+     top; the list takes as many columns as the card spans, under the map
+     and beside it. A container query picks the layout, so the card never
+     has to be told how wide it is.
 
      "How long" is the sensor's, remembered across restarts. A device whose
      time is unknown just says what is wrong: Home Assistant's own
@@ -7754,16 +7831,17 @@ const BODIES = {
     const stateOf = (p) => (p.state === "offline" ? "offline" : "partial");
     const tile = (n, label, lvl) => `<div class="devtile${lvl ? " lvl" : ""}">`
       + `<p class="n">${esc(n)}</p><p class="sub">${esc(label)}</p></div>`;
-    let out = `<div class="devbox"><div class="devtiles">${tile(connected, "connected", false)}`
-      + `${tile(offline, "offline", offline > 0)}${tile(partial, "partly offline", partial > 0)}`
-      /* The key is only there to decode yellow, so a house with none has none. */
-      + (networks.length && problems.length ? `<div class="devlegend"><span><i class="devkey online"></i>answering</span>`
-        + `<span><i class="devkey offline"></i>offline</span><span><i class="devkey partial"></i>partly offline</span></div>` : "")
-      + `</div>`;
+    /* The key is only there to decode yellow, so a house with none has none. */
+    const key = networks.length && problems.length ? `<div class="devlegend"><span><i class="devkey online"></i>answering</span>`
+      + `<span><i class="devkey offline"></i>offline</span><span><i class="devkey partial"></i>partly offline</span></div>` : "";
+    const tiles = `<div class="devtiles">${tile(connected, "connected", false)}`
+      + `${tile(offline, "offline", offline > 0)}${tile(partial, "partly offline", partial > 0)}${key}</div>`;
+    let out = `<div class="devbox">`;
 
+    const { groups, quiet } = devicesGroups(networks, problems, what, stateOf);
+    const map = networks.length ? devicesMap(networks, problems, stateOf) : "";
     out += `<div class="devbody">`
-      + (networks.length ? devicesMap(networks, problems, stateOf) : "")
-      + `<div class="devlist">${devicesList(networks, problems, what, stateOf)}</div></div>`;
+      + [1, 2, 3].map((cols) => devicesLayout(tiles, map, groups, quiet, cols)).join("") + `</div>`;
     return out + `</div>`;
   },
   list(b) {

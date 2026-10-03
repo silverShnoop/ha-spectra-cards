@@ -8,7 +8,9 @@
  *
  * The networks are a map at every width, naming nothing: a dot per device,
  * a hub per network with how many answer, the trouble in yellow. The list
- * is separate -- beside the map when the card is wide, under it on a phone
+ * is separate. Under the three numbers, the map -- across two of three
+ * columns, one otherwise. The list fills the space beside the map first and
+ * carries on under it in as many columns as the card spans on the panel.
  * -- grouped by network, and nothing numbers or labels one against the
  * other.
  *
@@ -83,18 +85,21 @@ const js = fs.readFileSync(file);
       return { el, root, card: root.querySelector(".card") };
     };
 
+    /* The one layout the card is showing at its width. */
+    const lay = (root) => [...root.querySelectorAll(".devlay")].find((l) => getComputedStyle(l).display !== "none");
+
     // ---- the numbers are the sensor's
     const today = await draw({ connected: 69, offline: 1, partial: 2, networks: NETS, problems: PROBS });
-    const nums = [...today.root.querySelectorAll(".devtile .n")].map((n) => n.textContent);
+    const nums = [...lay(today.root).querySelectorAll(".devtile .n")].map((n) => n.textContent);
     check("three numbers, as given", nums.join(",") === "69,1,2", nums.join(","));
-    const lit = [...today.root.querySelectorAll(".devtile")].map((t) => t.classList.contains("lvl"));
+    const lit = [...lay(today.root).querySelectorAll(".devtile")].map((t) => t.classList.contains("lvl"));
     check("offline and partial tiles wear the level, connected never does",
       lit.join(",") === "false,true,true", lit.join(","));
 
     // ---- the list: by network, a row per problem, nothing linking it to the map
-    const rows = [...today.root.querySelectorAll(".devlist .devrow")];
+    const rows = [...lay(today.root).querySelectorAll(".devrow")];
     check("a row per problem", rows.length === 3, rows.length);
-    const heads = [...today.root.querySelectorAll(".devlist .devroom")].map((r) => r.firstChild.textContent);
+    const heads = [...lay(today.root).querySelectorAll(".devroom")].map((r) => r.firstChild.textContent);
     check("rows grouped by network, a problem off the map under Other", heads.join("|") === "Hue|Other", heads.join("|"));
     check("an offline row says offline, for how long, and the room",
       /offline/.test(rows[0].textContent) && /3d/.test(rows[0].textContent) && /Ensuite/.test(rows[0].textContent), rows[0].textContent);
@@ -108,7 +113,7 @@ const js = fs.readFileSync(file);
       /All answering: Zigbee 7/.test((today.root.querySelector(".devquiet") || {}).textContent || ""), "no quiet line");
     check("nothing numbers or labels the list against the map",
       !today.root.querySelector(".devnum, .devmark, .leader, .devlabel"), "linked");
-    const ofs = [...today.root.querySelectorAll(".devmap .hubof")].map((o) => o.textContent);
+    const ofs = [...lay(today.root).querySelectorAll(".devmap .hubof")].map((o) => o.textContent);
     check("each network says how many answer", ofs.join(",") === "58/60,7/7,4/9", ofs.join(","));
 
     // ---- a quiet house has no yellow
@@ -144,13 +149,44 @@ const js = fs.readFileSync(file);
       ],
     };
     const rect = (e) => e.getBoundingClientRect();
-    for (const [label, width, beside] of [["wide", 960, true], ["narrow", 380, false]]) {
+    const overlaps = (els) => els.some((a, i) => els.some((b, j) => j > i
+      && rect(a).left < rect(b).right - 0.5 && rect(b).left < rect(a).right - 0.5
+      && rect(a).top < rect(b).bottom - 0.5 && rect(b).top < rect(a).bottom - 0.5));
+    /* Three wide, two wide, one wide: [label, card width, list columns, columns the map spans]. */
+    for (const [label, width, ncols, span] of [["three wide", 960, 3, 2], ["two wide", 640, 2, 1], ["one wide", 380, 1, 1]]) {
       const c = await draw(HOUSE, width);
-      const map = c.root.querySelector(".devmap"), list = c.root.querySelector(".devlist");
+      const list = lay(c.root), map = list.querySelector(".devmap");
+      check(`${label}: the ${ncols}-column layout`, list.classList.contains(`n${ncols}`), list.className);
       check(`${label}: the map is drawn`, !!map && rect(map).width > 200, map && rect(map).width);
-      check(`${label}: the list is ${beside ? "beside" : "under"} the map`,
-        beside ? rect(list).left >= rect(map).right - 1 : rect(list).top >= rect(map).bottom - 1,
-        `${JSON.stringify(rect(map))} / ${JSON.stringify(rect(list))}`);
+      const groups = [...list.querySelectorAll(".devgroup")];
+      const tiles = list.querySelector(".devtiles");
+      check(`${label}: the three numbers across the top, above the map`,
+        tiles.querySelectorAll(".devtile").length === 3 && rect(tiles).bottom <= rect(map).top + 1
+          && [...tiles.querySelectorAll(".devtile")].every((t, i, ts) => !i || rect(t).left > rect(ts[i - 1]).left),
+        JSON.stringify(rect(tiles)));
+      if (ncols > 1) {
+        const side = list.querySelector(".devside");
+        const sideGroups = [...side.querySelectorAll(".devgroup")];
+        const below = [...list.querySelectorAll(".devgrid .devgroup")];
+        check(`${label}: the map spans ${span} column${span > 1 ? "s" : ""}, the list beside it`,
+          rect(side).left >= rect(map).right - 1 && Math.abs(rect(side).top - rect(map).top) < 12
+            && rect(map).width > (span === 2 ? 1.6 : 0.8) * rect(side).width,
+          `map ${Math.round(rect(map).width)} side ${Math.round(rect(side).width)}`);
+        check(`${label}: the space beside the map fills first`,
+          sideGroups.length > 0 && sideGroups[0] === groups[0], sideGroups.length);
+        check(`${label}: nothing beside the map runs far past it`,
+          rect(side).bottom <= rect(map).bottom + 60, `${Math.round(rect(side).bottom)} vs ${Math.round(rect(map).bottom)}`);
+        check(`${label}: what is left goes under the map`,
+          below.every((g) => rect(g).top >= Math.max(rect(map).bottom, rect(side).bottom) - 1), "beside");
+        const cols = [...list.querySelectorAll(".devgrid .devcol")];
+        check(`${label}: under the map, ${ncols} columns or none`, cols.length === 0 || cols.length === ncols, cols.length);
+        check(`${label}: nothing overlaps`, !overlaps([...groups, map]), "overlap");
+      } else {
+        check(`${label}: every group under the map`, groups.every((g) => rect(g).top >= rect(map).bottom - 1), "above");
+        const tops = groups.map((g) => rect(g).top);
+        check(`${label}: groups in one column, in order`, tops.every((t, i) => !i || t > tops[i - 1])
+          && groups.every((g) => Math.abs(rect(g).left - rect(groups[0]).left) < 1), tops.join(","));
+      }
       const dots = map.querySelectorAll(".on, .off, .part").length;
       check(`${label}: a dot per device`, dots === 130, dots);
       check(`${label}: a yellow dot per problem`, map.querySelectorAll(".off, .part").length === 12, map.querySelectorAll(".off, .part").length);
@@ -177,10 +213,33 @@ const js = fs.readFileSync(file);
       check(`${label}: everything inside the drawing`, inside && !!svg, "clipped");
     }
 
+    // ---- a busy house: beside the map first, then every column under it
+    const NETS6 = ["Hue", "Zigbee", "Tado", "Cast", "Wi-Fi & cloud", "Matter"]
+      .map((name) => ({ name, online: 10, offline: 2, partial: 1 }));
+    const PROBS6 = NETS6.flatMap((n) => [0, 1, 2, 3].map((i) => ({ name: `${n.name} ${i + 1}`, area: "Hall",
+      network: n.name, state: i < 2 ? "offline" : "partial" })));
+    for (const [w, ncols] of [[960, 3], [640, 2]]) {
+      const busy = await draw({ connected: 60, offline: 12, partial: 12, networks: NETS6, problems: PROBS6 }, w);
+      const blay = lay(busy.root);
+      check(`busy ${ncols} wide: groups beside the map`, !!blay.querySelector(".devside .devgroup"), "none");
+      const bcols = [...blay.querySelectorAll(".devgrid .devcol")];
+      check(`busy ${ncols} wide: and in every column under it`,
+        bcols.length === ncols && bcols.every((col) => col.querySelector(".devgroup")),
+        bcols.map((col) => col.querySelectorAll(".devgroup").length).join(","));
+      const border = [...blay.querySelectorAll(".devroom")].map((h) => h.firstChild.textContent);
+      check(`busy ${ncols} wide: beside, then the columns left to right, walks the networks in order`,
+        border.join("|") === NETS6.map((n) => n.name).join("|"), border.join("|"));
+      check(`busy ${ncols} wide: nothing overlaps`,
+        !overlaps([...blay.querySelectorAll(".devgroup"), blay.querySelector(".devmap")]), "overlap");
+      const bottoms = bcols.map((col) => rect(col).bottom);
+      check(`busy ${ncols} wide: the columns under the map end near level`,
+        Math.max(...bottoms) - Math.min(...bottoms) < 140, bottoms.map(Math.round).join(" / "));
+    }
+
     // ---- no networks: no map, but the problems are still rows
     const bare = await draw({ connected: 3, offline: 1, partial: 0, problems: [PROBS[0]] });
     check("no networks: no map, the problem still a row",
-      !bare.root.querySelector(".devmap") && bare.root.querySelectorAll(".devrow").length === 1, "lost");
+      !bare.root.querySelector(".devmap") && lay(bare.root).querySelectorAll(".devrow").length === 1, "lost");
 
     // ---- nothing to say
     const none = await draw({});
