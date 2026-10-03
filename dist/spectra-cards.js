@@ -2946,11 +2946,11 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devkey.offline { background:var(--sp-attention); }
 .devkey.partial { border:2px solid var(--sp-attention); }
 /* The map and the list are two separate things to read, not one thing
-   annotated. The list takes as many columns as the card spans on the panel
-   -- one, two or three -- and the map is always at the top: across two of
-   them on a card three wide, one otherwise. The list's groups fill the
-   columns under the map and beside it, in the map's order, split so no
-   column runs on past the others.
+   annotated. The map is the top of the card -- across two columns on a card
+   three wide, one otherwise -- with the three numbers beside it. The list
+   is under it and takes as many columns as the card spans on the panel,
+   its groups in the map's order, split so no column runs on past the
+   others.
 
    The card cannot ask the panel how many columns it spans, so it reads its
    own width: three from 880px, two from 560px. The panel's columns are
@@ -2959,24 +2959,23 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    query shows one, because the split differs with the column count. */
 .devlay { display:none; }
 .devlay.n1 { display:flex; flex-direction:column; gap:4px; }
-.devlay.n2, .devlay.n3 { grid-template-columns:var(--devcols); gap:0 22px; align-items:start; }
-.devlead { min-width:0; }
-.devsub { display:grid; grid-template-columns:var(--devsub); gap:0 22px; align-items:start; }
+.devtop { display:grid; grid-template-columns:var(--devtop); gap:0 22px; align-items:start; margin-bottom:8px; }
+.devside { min-width:0; display:flex; flex-direction:column; gap:10px; padding-top:4px; }
+.devside .devtiles { flex-direction:column; padding:0; }
+.devside .devtile { flex:none; }
+.devside .devlegend { margin:0 0 0 2px; align-self:flex-start; }
+.devgrid { display:grid; grid-template-columns:repeat(var(--devcols), minmax(0, 1fr)); gap:0 22px; align-items:start; }
 .devcol { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .devgroup { min-width:0; }
+.devlay.solo .devlegend { width:100%; margin-left:6px; }
 @container devices (min-width: 560px) {
-  .devtile { flex:0 1 150px; }
   .devlay.n1 { display:none; }
-  .devlay.n2 { display:grid; }
-  .devlay .devmap { margin:4px auto 6px; }
+  .devlay.n2 { display:block; }
+  .devtop .devmap { margin:0 auto; max-width:620px; }
 }
 @container devices (min-width: 880px) {
   .devlay.n2 { display:none; }
-  .devlay.n3 { display:grid; }
-  .devlay.n3 .devmap { max-width:600px; }
-}
-@container devices (max-width: 559px) {
-  .devlegend { width:100%; margin-left:6px; }
+  .devlay.n3 { display:block; }
 }
 .devroom { display:flex; align-items:baseline; gap:8px; margin:8px 6px 2px; font-size:10px;
   letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
@@ -5744,46 +5743,40 @@ function devicesGroups(networks, problems, what, stateOf) {
   return { groups, quiet };
 }
 
-/* The card's body for one span of the panel: `cols` list columns, the map
-   across the first `lead` of them at the top. The groups, in the map's
-   order, are cut into one run per column; the cut is the one that leaves
-   the tallest column shortest, counted in rows, where a column under the
-   map starts DEV_MAP_ROWS[cols] rows down -- about how tall the map draws
-   at the widths a card of that span has. The quiet line closes the last
-   column. Reading the columns left to right walks the networks in turn. */
-const DEV_MAP_ROWS = { 2: 8, 3: 13 };
-function devicesLayout(map, groups, quiet, cols) {
+/* The card's body for one span of the panel. The map is the top of the card:
+   across two columns on a card three wide and one otherwise, with the three
+   numbers and the key in the column beside it, so nothing of the list sits
+   level with the map. Under it, the list takes all `cols` columns. Its
+   groups, in the map's order, are cut into one run per column; the cut is
+   the one that leaves the tallest column shortest, counted in rows. The
+   quiet line closes the last column. Reading the columns left to right
+   walks the networks in turn. A phone gets the numbers, the map, then one
+   column. */
+function devicesLayout(head, map, groups, quiet, cols) {
   const html = (gs) => gs.map((g) => g.html).join("");
-  if (cols === 1 || !map && !groups.length) {
-    return `<div class="devlay n1">${map}${html(groups)}${quiet}</div>`;
+  if (cols === 1 || !map) {
+    return `<div class="devlay n${cols} solo">${head}${map}${html(groups)}${quiet}</div>`;
   }
-  const lead = cols === 3 ? 2 : 1;
-  const offset = (c) => (map && c < lead ? DEV_MAP_ROWS[cols] : 0);
   const rows = groups.map((g) => g.rows);
-  const tail = quiet ? 0.7 : 0;
-  const n = groups.length;
+  const sum = (from, to) => rows.slice(from, to).reduce((t, r) => t + r, 0);
+  const n = groups.length, tail = quiet ? 0.7 : 0;
   /* Every way to cut n groups into `cols` ordered runs (n is a handful). */
   let best = null, bestH = Infinity;
   const cut = (start, c, acc, cuts) => {
     if (c === cols - 1) {
-      const h = offset(c) + rows.slice(start).reduce((t, r) => t + r, 0) + tail;
-      const tallest = Math.max(acc, h);
+      const tallest = Math.max(acc, sum(start, n) + tail);
       if (tallest < bestH - 1e-9) { bestH = tallest; best = [...cuts, n]; }
       return;
     }
-    for (let end = start; end <= n; end++) {
-      const h = offset(c) + rows.slice(start, end).reduce((t, r) => t + r, 0);
-      cut(end, c + 1, Math.max(acc, h), [...cuts, end]);
-    }
+    for (let end = start; end <= n; end++) cut(end, c + 1, Math.max(acc, sum(start, end)), [...cuts, end]);
   };
   cut(0, 0, 0, []);
   const runs = best.map((end, c) => groups.slice(c ? best[c - 1] : 0, end));
-  const col = (c) => `<div class="devcol">${html(runs[c])}${c === cols - 1 ? quiet : ""}</div>`;
-  const under = Array.from({ length: lead }, (_, c) => col(c)).join("");
-  const beside = Array.from({ length: cols - lead }, (_, c) => col(lead + c)).join("");
+  const columns = runs.map((run, c) => `<div class="devcol">${html(run)}${c === cols - 1 ? quiet : ""}</div>`).join("");
   const frs = cols === 3 ? "minmax(0, 2fr) minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)";
-  return `<div class="devlay n${cols}" style="--devcols:${frs};--devsub:repeat(${lead}, minmax(0, 1fr))">`
-    + `<div class="devlead">${map}<div class="devsub">${under}</div></div>${beside}</div>`;
+  return `<div class="devlay n${cols}" style="--devtop:${frs};--devcols:${cols}">`
+    + `<div class="devtop">${map}<div class="devside">${head}</div></div>`
+    + (groups.length || quiet ? `<div class="devgrid">${columns}</div>` : "") + `</div>`;
 }
 
 /* A problem row: offline is a filled dot and partial a ring, the name with
@@ -7802,17 +7795,17 @@ const BODIES = {
     const stateOf = (p) => (p.state === "offline" ? "offline" : "partial");
     const tile = (n, label, lvl) => `<div class="devtile${lvl ? " lvl" : ""}">`
       + `<p class="n">${esc(n)}</p><p class="sub">${esc(label)}</p></div>`;
-    let out = `<div class="devbox"><div class="devtiles">${tile(connected, "connected", false)}`
-      + `${tile(offline, "offline", offline > 0)}${tile(partial, "partly offline", partial > 0)}`
-      /* The key is only there to decode yellow, so a house with none has none. */
-      + (networks.length && problems.length ? `<div class="devlegend"><span><i class="devkey online"></i>answering</span>`
-        + `<span><i class="devkey offline"></i>offline</span><span><i class="devkey partial"></i>partly offline</span></div>` : "")
-      + `</div>`;
+    const tiles = `<div class="devtiles">${tile(connected, "connected", false)}`
+      + `${tile(offline, "offline", offline > 0)}${tile(partial, "partly offline", partial > 0)}</div>`;
+    /* The key is only there to decode yellow, so a house with none has none. */
+    const key = networks.length && problems.length ? `<div class="devlegend"><span><i class="devkey online"></i>answering</span>`
+      + `<span><i class="devkey offline"></i>offline</span><span><i class="devkey partial"></i>partly offline</span></div>` : "";
+    let out = `<div class="devbox">`;
 
     const { groups, quiet } = devicesGroups(networks, problems, what, stateOf);
     const map = networks.length ? devicesMap(networks, problems, stateOf) : "";
     out += `<div class="devbody">`
-      + [1, 2, 3].map((cols) => devicesLayout(map, groups, quiet, cols)).join("") + `</div>`;
+      + [1, 2, 3].map((cols) => devicesLayout(tiles + key, map, groups, quiet, cols)).join("") + `</div>`;
     return out + `</div>`;
   },
   list(b) {

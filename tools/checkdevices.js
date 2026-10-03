@@ -8,9 +8,9 @@
  *
  * The networks are a map at every width, naming nothing: a dot per device,
  * a hub per network with how many answer, the trouble in yellow. The list
- * is separate. The map is always at the top; the list takes as many columns
- * as the card spans on the panel -- three, two or one -- under the map and
- * beside it, and the map spans two of three columns, one otherwise.
+ * is separate. The map is the top of the card -- across two of three
+ * columns, one otherwise, with the three numbers beside it -- and the list
+ * is under it in as many columns as the card spans on the panel.
  * -- grouped by network, and nothing numbers or labels one against the
  * other.
  *
@@ -90,9 +90,9 @@ const js = fs.readFileSync(file);
 
     // ---- the numbers are the sensor's
     const today = await draw({ connected: 69, offline: 1, partial: 2, networks: NETS, problems: PROBS });
-    const nums = [...today.root.querySelectorAll(".devtile .n")].map((n) => n.textContent);
+    const nums = [...lay(today.root).querySelectorAll(".devtile .n")].map((n) => n.textContent);
     check("three numbers, as given", nums.join(",") === "69,1,2", nums.join(","));
-    const lit = [...today.root.querySelectorAll(".devtile")].map((t) => t.classList.contains("lvl"));
+    const lit = [...lay(today.root).querySelectorAll(".devtile")].map((t) => t.classList.contains("lvl"));
     check("offline and partial tiles wear the level, connected never does",
       lit.join(",") === "false,true,true", lit.join(","));
 
@@ -159,30 +159,29 @@ const js = fs.readFileSync(file);
       check(`${label}: the ${ncols}-column layout`, list.classList.contains(`n${ncols}`), list.className);
       check(`${label}: the map is drawn`, !!map && rect(map).width > 200, map && rect(map).width);
       const groups = [...list.querySelectorAll(".devgroup")];
-      check(`${label}: the map at the top, nothing above it`,
-        rect(map).top - rect(list).top < 12 && groups.every((g) => rect(g).bottom <= rect(map).top + 1 ? false : true),
-        `${Math.round(rect(map).top - rect(list).top)}px down`);
+      check(`${label}: the map at the top, every group under it`,
+        groups.every((g) => rect(g).top >= rect(map).bottom - 1), `map bottom ${Math.round(rect(map).bottom)}`);
       if (ncols > 1) {
         const cols = [...list.querySelectorAll(".devcol")];
-        check(`${label}: ${ncols} list columns, side by side`,
-          cols.length === ncols && cols.every((col, i) => !i || rect(col).left >= rect(cols[i - 1]).right - 1),
-          cols.map((col) => Math.round(rect(col).left)).join(","));
-        const under = cols.slice(0, span), beside = cols.slice(span);
+        check(`${label}: ${ncols} list columns, side by side, each with groups`,
+          cols.length === ncols && cols.every((col, i) => !i || rect(col).left >= rect(cols[i - 1]).right - 1)
+            && cols.every((col) => col.querySelector(".devgroup")),
+          cols.map((col) => col.querySelectorAll(".devgroup").length).join(","));
         check(`${label}: the map spans ${span} column${span > 1 ? "s" : ""}`,
-          rect(map).left >= rect(under[0]).left - 1 && rect(map).right <= rect(under[span - 1]).right + 1
-            && (span === 1 || rect(map).width > rect(under[0]).width * 1.2)
-            && rect(map).right <= rect(beside[0]).left + 1,
+          rect(map).left >= rect(cols[0]).left - 1 && rect(map).right <= rect(cols[span - 1]).right + 1
+            && (span === 1 || rect(map).right > rect(cols[0]).right + 20),
           `${Math.round(rect(map).left)}-${Math.round(rect(map).right)}`);
-        check(`${label}: the columns under the map start under it`,
-          under.every((col) => rect(col).top >= rect(map).bottom - 1), "beside the map");
-        check(`${label}: the column beside the map starts at its top`,
-          Math.abs(rect(beside[0]).top - rect(map).top) < 12, `${Math.round(rect(beside[0]).top)} vs ${Math.round(rect(map).top)}`);
-        check(`${label}: nothing overlaps`, !overlaps([...groups, map]), "overlap");
-        const bottoms = cols.filter((col) => col.children.length).map((col) => rect(col).bottom);
-        check(`${label}: no column runs far past the others`, Math.max(...bottoms) - Math.min(...bottoms) < 200,
+        const side = list.querySelector(".devside");
+        check(`${label}: the three numbers beside the map`,
+          side.querySelectorAll(".devtile").length === 3 && rect(side).left >= rect(map).right - 1
+            && rect(side).top < rect(map).bottom, JSON.stringify(rect(side)));
+        check(`${label}: nothing overlaps`, !overlaps([...groups, map, side]), "overlap");
+        const bottoms = cols.map((col) => rect(col).bottom);
+        check(`${label}: no column runs far past the others`, Math.max(...bottoms) - Math.min(...bottoms) < 120,
           bottoms.map(Math.round).join(" / "));
       } else {
         const tops = groups.map((g) => rect(g).top);
+        check(`${label}: the numbers above the map`, rect(list.querySelector(".devtiles")).bottom <= rect(map).top + 1, "below");
         check(`${label}: groups in one column under the map, in order`, tops.every((t, i) => !i || t > tops[i - 1])
           && groups.every((g) => Math.abs(rect(g).left - rect(groups[0]).left) < 1), tops.join(","));
       }
