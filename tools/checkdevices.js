@@ -8,7 +8,8 @@
  *
  * The networks are a map at every width, naming nothing: a dot per device,
  * a hub per network with how many answer, the trouble in yellow. The list
- * is separate -- beside the map when the card is wide, under it on a phone
+ * is separate -- round the map in two columns when the card is wide, some
+ * groups above it and some below, and under it on a phone
  * -- grouped by network, and nothing numbers or labels one against the
  * other.
  *
@@ -92,9 +93,9 @@ const js = fs.readFileSync(file);
       lit.join(",") === "false,true,true", lit.join(","));
 
     // ---- the list: by network, a row per problem, nothing linking it to the map
-    const rows = [...today.root.querySelectorAll(".devlist .devrow")];
+    const rows = [...today.root.querySelectorAll(".devbody .devrow")];
     check("a row per problem", rows.length === 3, rows.length);
-    const heads = [...today.root.querySelectorAll(".devlist .devroom")].map((r) => r.firstChild.textContent);
+    const heads = [...today.root.querySelectorAll(".devbody .devroom")].map((r) => r.firstChild.textContent);
     check("rows grouped by network, a problem off the map under Other", heads.join("|") === "Hue|Other", heads.join("|"));
     check("an offline row says offline, for how long, and the room",
       /offline/.test(rows[0].textContent) && /3d/.test(rows[0].textContent) && /Ensuite/.test(rows[0].textContent), rows[0].textContent);
@@ -146,11 +147,34 @@ const js = fs.readFileSync(file);
     const rect = (e) => e.getBoundingClientRect();
     for (const [label, width, beside] of [["wide", 960, true], ["narrow", 380, false]]) {
       const c = await draw(HOUSE, width);
-      const map = c.root.querySelector(".devmap"), list = c.root.querySelector(".devlist");
+      const map = c.root.querySelector(".devmap"), list = c.root.querySelector(".devbody");
       check(`${label}: the map is drawn`, !!map && rect(map).width > 200, map && rect(map).width);
-      check(`${label}: the list is ${beside ? "beside" : "under"} the map`,
-        beside ? rect(list).left >= rect(map).right - 1 : rect(list).top >= rect(map).bottom - 1,
-        `${JSON.stringify(rect(map))} / ${JSON.stringify(rect(list))}`);
+      const groups = [...list.querySelectorAll(".devgroup")];
+      if (beside) {
+        const cols = [...list.querySelectorAll(".devcol")];
+        const inFirst = groups.filter((g) => cols[0].contains(g));
+        check(`${label}: two columns, side by side`,
+          cols.length === 2 && rect(cols[1]).left >= rect(cols[0]).right - 1, cols.length);
+        check(`${label}: the map in the first column, a group above it`,
+          cols[0].contains(map) && inFirst.some((g) => rect(g).bottom <= rect(map).top + 1),
+          inFirst.map((g) => g.firstChild.firstChild.textContent).join("|"));
+        check(`${label}: groups in the second column too`, groups.some((g) => cols[1].contains(g)), "none");
+        const h0 = rect(cols[0]).height, h1 = rect(cols[1]).height;
+        check(`${label}: neither column runs far past the other`, Math.abs(h0 - h1) < rect(map).height * 0.6,
+          `${Math.round(h0)} / ${Math.round(h1)}`);
+        const overlap = groups.some((a, i) => groups.some((b, j) => j > i
+          && rect(a).left < rect(b).right && rect(b).left < rect(a).right
+          && rect(a).top < rect(b).bottom && rect(b).top < rect(a).bottom))
+          || groups.some((g) => rect(g).left < rect(map).right && rect(map).left < rect(g).right
+            && rect(g).top < rect(map).bottom && rect(map).top < rect(g).bottom);
+        check(`${label}: nothing overlaps`, !overlap, "overlap");
+      } else {
+        check(`${label}: the map first, every group under it`,
+          groups.every((g) => rect(g).top >= rect(map).bottom - 1), JSON.stringify(rect(map)));
+        const tops = groups.map((g) => rect(g).top);
+        check(`${label}: groups in one column, in order`, tops.every((t, i) => !i || t > tops[i - 1])
+          && groups.every((g) => Math.abs(rect(g).left - rect(groups[0]).left) < 1), tops.join(","));
+      }
       const dots = map.querySelectorAll(".on, .off, .part").length;
       check(`${label}: a dot per device`, dots === 130, dots);
       check(`${label}: a yellow dot per problem`, map.querySelectorAll(".off, .part").length === 12, map.querySelectorAll(".off, .part").length);
@@ -176,6 +200,23 @@ const js = fs.readFileSync(file);
       });
       check(`${label}: everything inside the drawing`, inside && !!svg, "clipped");
     }
+
+    // ---- a busy house: groups above the map, below it, and beside it
+    const NETS6 = ["Hue", "Zigbee", "Tado", "Cast", "Wi-Fi & cloud", "Matter"]
+      .map((name) => ({ name, online: 10, offline: 2, partial: 1 }));
+    const PROBS6 = NETS6.flatMap((n) => [0, 1, 2].map((i) => ({ name: `${n.name} ${i + 1}`, area: "Hall",
+      network: n.name, state: i < 2 ? "offline" : "partial" })));
+    const busy = await draw({ connected: 60, offline: 12, partial: 6, networks: NETS6, problems: PROBS6 }, 960);
+    const bmap = busy.root.querySelector(".devmap");
+    const bcols = [...busy.root.querySelectorAll(".devcol")];
+    const bfirst = [...bcols[0].querySelectorAll(".devgroup")];
+    check("busy: groups both above and below the map",
+      bfirst.some((g) => rect(g).bottom <= rect(bmap).top + 1) && bfirst.some((g) => rect(g).top >= rect(bmap).bottom - 1),
+      bfirst.map((g) => `${g.firstChild.firstChild.textContent}@${Math.round(rect(g).top)}`).join("|") + ` map@${Math.round(rect(bmap).top)}`);
+    const border = [...busy.root.querySelectorAll(".devroom")].map((h) => h.firstChild.textContent);
+    check("busy: reading down the columns walks the networks in order", border.join("|") === NETS6.map((n) => n.name).join("|"), border.join("|"));
+    const bh = bcols.map((c) => rect(c).height);
+    check("busy: neither column runs far past the other", Math.abs(bh[0] - bh[1]) < rect(bmap).height * 0.6, bh.map(Math.round).join(" / "));
 
     // ---- no networks: no map, but the problems are still rows
     const bare = await draw({ connected: 3, offline: 1, partial: 0, problems: [PROBS[0]] });

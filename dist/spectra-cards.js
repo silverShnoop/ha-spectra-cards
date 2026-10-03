@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.149.0";
+const VERSION = "0.150.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2946,20 +2946,27 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devkey.offline { background:var(--sp-attention); }
 .devkey.partial { border:2px solid var(--sp-attention); }
 /* The map and the list are two separate things to read, not one thing
-   annotated: side by side where there is room, the map first on a phone. */
-.devbody { display:grid; grid-template-columns:minmax(0, 1fr); gap:4px 18px; align-items:start; }
+   annotated. Where there is room they share two columns: the map sits in
+   the first with network groups above and below it, and the rest of the
+   groups fill the second, so neither column runs on past the other. On a
+   phone the columns dissolve into one run -- the map first, then every
+   group in order. */
+.devbody { display:flex; flex-direction:column; gap:4px; }
+.devcol { display:contents; }
+.devbody > .devcol > .devmap { order:-1; }
+.devgroup { min-width:0; }
 @container devices (min-width: 700px) {
   .devtile { flex:0 1 150px; }
-  .devbody { grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr); }
-  .devlist { padding-top:6px; }
+  .devbody { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:0 22px; align-items:start; }
+  .devcol { display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .devbody > .devcol > .devmap { order:0; margin:4px auto; }
 }
 @container devices (max-width: 699px) {
   .devlegend { width:100%; margin-left:6px; }
 }
-.devlist { min-width:0; }
 .devroom { display:flex; align-items:baseline; gap:8px; margin:8px 6px 2px; font-size:10px;
   letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-2); }
-.devroom:first-child { margin-top:2px; }
+.devgroup:first-child .devroom, .devroom:first-child { margin-top:2px; }
 .devroom .of { margin-left:auto; font-family:var(--sp-mono); letter-spacing:0; color:var(--sp-attention-on); }
 .devrow { display:flex; align-items:center; gap:8px; padding:3px 6px; font-size:12.5px; }
 .devrow .who { min-width:0; }
@@ -5690,17 +5697,23 @@ function devicesMap(networks, problems, stateOf) {
 }
 
 /* Every device not fully answering, grouped by network in the map's order,
-   offline first. A network with nothing wrong is not a heading -- it is
-   one quiet line at the end, so "Zigbee is fine" is still said. A problem
-   on a network the map does not draw is still a row, under "Other": the
-   list may never be shorter than the Needs you row behind it. */
-function devicesList(networks, problems, what, stateOf) {
+   offline first, as separate groups so the layout can place them round the
+   map. Each comes with its height in rows, which is what the layout
+   balances on. A network with nothing wrong is not a group -- it is one
+   quiet line at the end, so "Zigbee is fine" is still said. A problem on a
+   network the map does not draw is still a row, under "Other": the list
+   may never be shorter than the Needs you row behind it. */
+function devicesGroups(networks, problems, what, stateOf) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const rank = (p) => (p.state === "offline" ? 0 : 1);
   const byName = (p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name));
   const placed = new Set();
   const fine = [];
-  let out = "";
+  const groups = [];
+  const group = (head, rows) => groups.push({
+    rows: rows.length + 0.7,
+    html: `<div class="devgroup">${head}${rows.map((p) => devRow(p, what, stateOf)).join("")}</div>`,
+  });
   for (const n of networks) {
     const mine = problems.filter((p) => String(p.network) === String(n.name)).sort(byName);
     const on = num(n.online), all = on + num(n.offline) + num(n.partial);
@@ -5709,14 +5722,41 @@ function devicesList(networks, problems, what, stateOf) {
       continue;
     }
     mine.forEach((p) => placed.add(p));
-    out += `<p class="devroom">${esc(n.name)}<span class="of">${on}/${all}</span></p>`
-      + mine.map((p) => devRow(p, what, stateOf)).join("");
+    group(`<p class="devroom">${esc(n.name)}<span class="of">${on}/${all}</span></p>`, mine);
   }
   const other = problems.filter((p) => !placed.has(p)).sort(byName);
-  if (other.length) out += `<p class="devroom">${networks.length ? "Other" : "Not answering"}</p>`
-    + other.map((p) => devRow(p, what, stateOf)).join("");
-  if (fine.length && problems.length) out += `<p class="devquiet">All answering: ${esc(fine.join(" · "))}</p>`;
-  return out;
+  if (other.length) group(`<p class="devroom">${networks.length ? "Other" : "Not answering"}</p>`, other);
+  const quiet = fine.length && problems.length ? `<p class="devquiet">All answering: ${esc(fine.join(" · "))}</p>` : "";
+  return { groups, quiet };
+}
+
+/* Two columns from groups and the map. The first column takes the map and
+   the first few groups, half of them above it and half below; the second
+   takes the rest. The split is the one that leaves the taller column
+   shortest, counted in rows -- the map is about DEV_MAP_ROWS of them at the
+   widths a panel draws it. Groups never leave the map's order: reading
+   down the first column and then the second walks the networks in turn,
+   which is also the order they fall into on a phone. */
+const DEV_MAP_ROWS = 10;
+function devicesLayout(map, groups, quiet) {
+  const units = groups.map((g) => g.rows);
+  const sum = (xs) => xs.reduce((t, x) => t + x, 0);
+  const tail = quiet ? 0.7 : 0;
+  let split = 0, best = Infinity;
+  for (let k = 0; k <= groups.length; k++) {
+    const left = (map ? DEV_MAP_ROWS : 0) + sum(units.slice(0, k));
+    const right = sum(units.slice(k)) + tail;
+    const tallest = Math.max(left, right);
+    if (tallest < best - 1e-9) { best = tallest; split = k; }
+  }
+  const first = groups.slice(0, split), second = groups.slice(split);
+  /* Half the first column's groups (by rows) above the map, the rest below. */
+  let above = 0;
+  const half = sum(first.map((g) => g.rows)) / 2;
+  for (let acc = 0; above < first.length && acc + first[above].rows / 2 <= half; above++) acc += first[above].rows;
+  const html = (gs) => gs.map((g) => g.html).join("");
+  return `<div class="devcol">${html(first.slice(0, above))}${map}${html(first.slice(above))}${second.length ? "" : quiet}</div>`
+    + (second.length ? `<div class="devcol">${html(second)}${quiet}</div>` : "");
 }
 
 /* A problem row: offline is a filled dot and partial a ring, the name with
@@ -7710,8 +7750,10 @@ const BODIES = {
      sick Cast cluster and one dead Wi-Fi as a whole cluster gone. Beside it,
      or under it on a phone, every device not fully answering, grouped by
      network, each row saying what is missing, for how long and in which
-     room. The map shows where; the list says what. A container query lays
-     them out, so the card never has to be told how wide it is.
+     room. The map shows where; the list says what. Where there is room the
+     groups sit above and below the map and in a second column beside it.
+     A container query lays them out, so the card never has to be told how
+     wide it is.
 
      "How long" is the sensor's, remembered across restarts. A device whose
      time is unknown just says what is wrong: Home Assistant's own
@@ -7740,9 +7782,9 @@ const BODIES = {
         + `<span><i class="devkey offline"></i>offline</span><span><i class="devkey partial"></i>partly offline</span></div>` : "")
       + `</div>`;
 
+    const { groups, quiet } = devicesGroups(networks, problems, what, stateOf);
     out += `<div class="devbody">`
-      + (networks.length ? devicesMap(networks, problems, stateOf) : "")
-      + `<div class="devlist">${devicesList(networks, problems, what, stateOf)}</div></div>`;
+      + devicesLayout(networks.length ? devicesMap(networks, problems, stateOf) : "", groups, quiet) + `</div>`;
     return out + `</div>`;
   },
   list(b) {

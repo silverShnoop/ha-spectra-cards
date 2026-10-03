@@ -665,7 +665,7 @@ the cluster's outside edge — so five dead speakers read as one sick Cast
 cluster without a word of explanation. Networks sit evenly round the map in
 the sensor's order, the first on the left.
 
-**Beside it, a list** — under it on a phone — of every device not fully
+**Round it, a list** — under it on a phone — of every device not fully
 answering, grouped by network in the map's order, offline first: the name,
 its room, what is missing (`offline`, `No temperature`, `5 of 8 missing`) and
 **how long**: `offline · 3d`. Networks with nothing wrong are one quiet line
@@ -674,9 +674,12 @@ map is still a row, under *Other*.
 
 The map names nothing and the list is not numbered against it. Labels at the
 side of the map, and then numbers on its dots, were both tried and read as
-clutter on the panel: the map shows where, the list says what. A container
-query lays them out side by side from 700px, so the card never has to be told
-how wide it is. Give the section `column_span: 2` or more on a panel.
+clutter on the panel: the map shows where, the list says what. From 700px the
+card is two columns: the map in the first with network groups above and below
+it, the rest of the groups in the second, split so neither column runs on
+past the other. Reading down the first column and then the second still walks
+the networks in the map's order. A container query does the layout, so the
+card never has to be told how wide it is. Give the section `column_span: 2` or more on a panel.
 
 The time is the sensor's, remembered across restarts. A problem whose time is
 unknown shows none: Home Assistant's own `last_changed` would say it died at
