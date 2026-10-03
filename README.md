@@ -723,7 +723,7 @@ the cluster's outside edge — so five dead speakers read as one sick Cast
 cluster without a word of explanation. Networks sit evenly round the map in
 the sensor's order, the first on the left.
 
-**Beside it, a list** — under it on a phone — of every device not fully
+**Under it, a list** — under it on a phone — of every device not fully
 answering, grouped by network in the map's order, offline first: the name,
 its room, what is missing (`offline`, `No temperature`, `5 of 8 missing`) and
 **how long**: `offline · 3d`. Networks with nothing wrong are one quiet line
@@ -732,9 +732,20 @@ map is still a row, under *Other*.
 
 The map names nothing and the list is not numbered against it. Labels at the
 side of the map, and then numbers on its dots, were both tried and read as
-clutter on the panel: the map shows where, the list says what. A container
-query lays them out side by side from 700px, so the card never has to be told
-how wide it is. Give the section `column_span: 2` or more on a panel.
+clutter on the panel: the map shows where, the list says what.
+
+**Under the numbers, the map, and the list fills the space beside it first.**
+On a card three columns wide the map spans two of them, on a card two wide it
+takes one, and the list starts in the column beside it — that space is there
+whatever the list does, so it is the first to be used. Groups go beside the
+map in its order while they fit its height; whatever is left carries on under
+the map in as many columns as the card spans, cut so that no column runs on
+past the others. A phone gets the numbers, the map, and then one column.
+
+The card cannot ask the panel how many columns it spans, so it reads its own
+width: three from 880px, two from 560px. The panel's columns are 280px at
+their narrowest, so those are the widths at which a card of that span can
+first appear. Give the section `column_span: 3` on the panel. Give the section `column_span: 2` or more on a panel.
 
 The time is the sensor's, remembered across restarts. A problem whose time is
 unknown shows none: Home Assistant's own `last_changed` would say it died at
