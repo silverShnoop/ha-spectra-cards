@@ -7,8 +7,8 @@
  * The card that started a task -- the one with `tasks: <its key>` --
  * shows it:
  *
- *   - running: a spinner and what it is doing, and NO outline. Nothing
- *     needs doing yet, so nothing may be coloured.
+ *   - running: already the notice -- a spinner, "Running" and its step,
+ *     the card outlined blue, and Dismiss.
  *   - finished: the card's outline is the notice the sensor gives it, the
  *     line says Done or Failed first, and it opens the answer (or why it
  *     failed) -- which also clears it, via dismiss.
@@ -108,13 +108,20 @@ const js = fs.readFileSync(file);
     const set = async (hass) => { el.hass = hass; other.hass = hass; await frame(); };
 
     const running = { id: "ai_1", title: "Recipe from a link", card: "meals", tab: "kitchen", state: "running", step: 2, steps: 2 };
-    await set(hassWith([running], {}));
+    await set(hassWith([running], { meals: "notice" }));
     const line = q(el, ".aitask");
-    check("a running task is a line with a spinner",
-      !!line && !!line.querySelector(".spinner") && /step 2 of 2/.test(line.textContent),
+    check("a running task is a blue line: spinner, Running and its step",
+      !!line && line.classList.contains("running") && !!line.querySelector(".spinner")
+        && /^Running · Recipe from a link · step 2 of 2$/.test(line.querySelector(".aitext").textContent),
       line ? line.outerHTML : "no line");
-    check("...and colours nothing: nothing needs doing yet",
-      !q(el, ".card").classList.contains("outlined"), q(el, ".card").className);
+    check("...and the card is already the notice",
+      q(el, ".card").classList.contains("lvl-notice"), q(el, ".card").className);
+    check("...with Dismiss, and nothing to open yet",
+      [...line.querySelectorAll(".act")].map((b) => b.textContent).join("|") === "Dismiss", line.innerHTML);
+    await set(hassWith([Object.assign({}, running, { quiet: true })], {}));
+    check("dismissed while it runs, it is an uncoloured fact on its card",
+      !q(el, ".aitask.running") && !!q(el, ".aitask .spinner")
+        && !q(el, ".card").classList.contains("outlined"), q(el, ".card").className);
 
     const done = Object.assign({}, running, { state: "done", label: "Pie" });
     await set(hassWith([done], { meals: "notice" }));
@@ -346,7 +353,7 @@ const js = fs.readFileSync(file);
 
   console.log(fails.length
     ? `FAILED (${fails.length})`
-    : "OK (ai tasks: a fact while running, a notice when done)");
+    : "OK (ai tasks: blue while running, Done or Failed when they land)");
   await browser.close();
   server.close();
   process.exit(fails.length ? 1 : 0);

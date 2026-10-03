@@ -2858,8 +2858,9 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    or not, so its arrival moves nothing. */
 .spinslot { width:13px; height:13px; flex:none; display:inline-flex; }
 
-/* An AI task this card started. Running, it is ink and a spinner: a fact.
-   Finished, it wears the notice the card's outline is already wearing. */
+/* An AI task this card started. It wears the notice the card's outline is
+   already wearing, running or landed; dismissed while it runs, it is ink
+   and a spinner. */
 .aitasks { display:flex; flex-direction:column; gap:4px; margin:0 0 8px; }
 .aitask { display:flex; align-items:center; gap:8px; margin:0; min-height:28px;
   font-size:13px; color:var(--sp-ink-2); }
@@ -2869,6 +2870,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .aitask.ready { color:var(--sp-notice-on); padding:2px 8px; border-radius:6px; min-height:44px;
   background:var(--sp-notice-soft); --accent:var(--sp-notice); --accent-on:var(--sp-notice-on); }
 .aitask.ready .mdi, .aitask.ready ha-icon { color:var(--sp-notice); }
+.aitask.running .spinner { color:var(--sp-notice); }
 .aitask b { font-weight:600; }
 .ok {
   width:13px; height:13px; flex:none; position:relative;
@@ -4075,8 +4077,8 @@ function aiTasksOf(hass, cfg) {
   return { list, level };
 }
 
-/* A task running is a fact: a spinner and what it is doing, in no colour,
-   because nothing needs doing yet. Finished, it is the card's notice, and
+/* A task running is the card's notice already: a spinner, "Running" and
+   its step, so the panel says the house is working on it. Finished, it
    says which way it went before anything else -- a tick and "Done", or an
    alert and "Failed" -- because a notice that does not say whether the
    thing worked sends you to open it to find out. Two buttons, as on its
@@ -4088,7 +4090,11 @@ function aiTaskStrip(tasks) {
     const title = esc(firstOf(t.title, "AI task"));
     if (t.state === "running") {
       const step = Number(t.steps) > 1 ? ` · step ${esc(String(t.step || 1))} of ${esc(String(t.steps))}` : "";
-      return `<p class="aitask"><span class="spinner"></span><span>${title}${step}…</span></p>`;
+      /* Dismissed while it runs: still a fact on its own card, uncoloured. */
+      if (t.quiet) return `<p class="aitask"><span class="spinner"></span><span>${title}${step}…</span></p>`;
+      return `<div class="aitask ready running"><span class="spinner"></span>`
+        + `<span class="aitext"><b>Running</b> · ${title}${step}</span>`
+        + `<span class="act alt" role="button" tabindex="0" data-aidismiss="${esc(t.id)}">Dismiss</span></div>`;
     }
     const ok = t.state === "done";
     const what = ok ? (isBlank(t.label) ? "" : ` · ${esc(t.label)}`) : (isBlank(t.error) ? "" : ` · ${esc(t.error)}`);

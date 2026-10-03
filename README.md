@@ -63,7 +63,7 @@ number in `outline` buys nothing at all.
 
 | Level | Timeline | Treatment | Light | Dark |
 | --- | --- | --- | --- | --- |
-| `notice` | none: something you asked for is ready | 2px border | `#0E79E0` | `#1C6FE8` |
+| `notice` | none: something you asked for is under way or ready | 2px border | `#0E79E0` | `#1C6FE8` |
 | `attention` | today or tomorrow | 2px border | `#B6862A` | `#D9A63F` |
 | `waiting` | the next 30 minutes | border + 1px inset ring | `#B0512C` | `#EC6124` |
 | `critical` | now | ring + soft ground | `#8E0C14` | `#E2333F` |
@@ -171,10 +171,10 @@ ingredients or speech onto the shopping list. The flow still gets its answer
 and shows it as it always did.
 
 A card with `tasks` shows the tasks it started, from home_signals'
-`sensor.ai_tasks`. Running, a task is a line with a spinner and its step —
-a fact, in no colour, because nothing needs doing yet. Finished, the card
-wears the `notice` the sensor gives it (the louder of that and its own
-`outline`), and the line says which way it went before anything else:
+`sensor.ai_tasks`, and wears the `notice` the sensor gives it (the louder of
+that and its own `outline`) from the moment one starts. Running, the line is
+a spinner, **Running** and its step, with **Dismiss**, which quietens it
+until it lands. Finished, the line says which way it went before anything else:
 **Done** with a tick, or **Failed** with an alert and the reason. It has two
 buttons, as its Needs you row does: **Dismiss**, which clears the card, the
 tab and the row together, and **Open** when the answer can be shown again —
