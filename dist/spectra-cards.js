@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.156.1";
+const VERSION = "0.157.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2260,7 +2260,13 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 }
 .camtop { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; }
 .camhint { font-size:13px; color:rgba(255,255,255,.72); }
-.camview { flex:1; min-height:0; position:relative; }
+.camview { flex:1; min-height:0; position:relative; overflow:hidden; }
+/* Cropping, the photo stands in from the edges so a corner's handle is
+   never off the screen; the dimming stays inside the picture. */
+.camview.cropping img { inset:24px; width:calc(100% - 48px); height:calc(100% - 48px); }
+/* Live, the whole picture is the shutter: one hand holds the phone and its
+   thumb can reach anywhere on it, not just one button at the bottom. */
+.camview.live { cursor:pointer; touch-action:manipulation; }
 .camview video, .camview img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
 .camview [hidden] { display:none; }
 .cambar {
@@ -2268,7 +2274,24 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
   padding:18px 24px 22px; min-height:120px; box-sizing:border-box;
 }
 .cambar[hidden] { display:none; }
-.cambar[data-review] { grid-template-columns:1fr 1fr; gap:12px; }
+.cambar[data-review] { grid-template-columns:repeat(4, 1fr); gap:8px; padding-left:12px; padding-right:12px; }
+.cambar[data-cropbar] { grid-template-columns:1fr 1fr; gap:12px; }
+/* Taking: the picture stands still under a spinner until it can be checked. */
+.camwait { position:absolute; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.28); }
+.camwait[hidden] { display:none; }
+.camwait .spinner { width:44px; height:44px; border-width:4px; color:#fff; border-color:rgba(255,255,255,.3); border-top-color:#fff; }
+/* Cropping: the box over the photo, the rest dimmed, a handle at each corner
+   big enough for a thumb. */
+.camcrop { position:absolute; touch-action:none; }
+.camcrop[hidden] { display:none; }
+.camcrop .box { position:absolute; border:2px solid #fff; box-shadow:0 0 0 9999px rgba(0,0,0,.55); cursor:move; touch-action:none; }
+.camcrop .h { position:absolute; width:44px; height:44px; margin:-22px 0 0 -22px; touch-action:none; }
+.camcrop .h::after { content:""; position:absolute; left:12px; top:12px; width:20px; height:20px;
+  border-radius:50%; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.5); }
+.camcrop .h[data-h="nw"] { left:0; top:0; cursor:nwse-resize; }
+.camcrop .h[data-h="ne"] { left:100%; top:0; cursor:nesw-resize; }
+.camcrop .h[data-h="sw"] { left:0; top:100%; cursor:nesw-resize; }
+.camcrop .h[data-h="se"] { left:100%; top:100%; cursor:nwse-resize; }
 .camicon {
   width:48px; height:48px; border-radius:50%; border:none; padding:0; cursor:pointer;
   background:rgba(255,255,255,.14); color:#fff; display:grid; place-items:center;
@@ -2288,6 +2311,9 @@ span.camicon { background:none; }
   cursor:pointer; border:1px solid rgba(255,255,255,.4); background:none; color:#fff;
 }
 .camtext.camuse { border-color:var(--accent); background:var(--accent); color:var(--sp-surface); }
+.camtext[aria-pressed="true"] { background:rgba(255,255,255,.92); color:#000; border-color:#fff; }
+.camtext:disabled { opacity:.45; cursor:default; }
+.cambar[data-review] .camtext { font-size:14px; padding:0 4px; }
 /* Sideways, the controls stand in a column on the right, as the phone's
    own camera has them: a bottom row would take a third of the height from
    a picture that has least of it. The shutter stays in the middle, the
@@ -2305,9 +2331,12 @@ span.camicon { background:none; }
   .cambar [data-flip] { order:0; }
   .cambar .camshutter { order:1; }
   .cambar [data-gallery] { order:2; }
-  .cambar[data-review] { grid-template-columns:none; grid-template-rows:auto auto; align-content:center; gap:14px; }
-  .cambar[data-review] [data-use] { order:0; }
-  .cambar[data-review] [data-retake] { order:1; }
+  .cambar[data-review], .cambar[data-cropbar] { grid-template-columns:none; grid-template-rows:none; grid-auto-rows:auto;
+    align-content:center; gap:12px; padding:16px 14px; }
+  .cambar[data-review] [data-use], .cambar[data-cropbar] [data-cropdone] { order:0; }
+  .cambar[data-review] [data-enhance] { order:1; }
+  .cambar[data-review] [data-crop] { order:2; }
+  .cambar[data-review] [data-retake], .cambar[data-cropbar] [data-cropreset] { order:3; }
 }
 @media (prefers-reduced-motion: reduce) { .camwrap { animation:none; } .camshutter { transition:none; } }
 /* The recipe's photo: small, because the form is for the words. */
@@ -8903,15 +8932,91 @@ function cameraOpen(media, facing) {
   });
 }
 
+/* A photo made to read well: the cast of kitchen light taken out (the
+   brightest part of a page is paper, so it is made white), the darkest
+   and brightest hundredth stretched to black and white, the middle
+   brought towards mid-grey, and colour lifted a little. What a phone's
+   "auto" does, gently, so a dim photo of a page reads and a plate of food
+   looks like food. A new canvas; the one given is left alone. */
+function enhancePhoto(src) {
+  const w = src.width;
+  const h = src.height;
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const g = out.getContext("2d");
+  g.drawImage(src, 0, 0);
+  let img;
+  try { img = g.getImageData(0, 0, w, h); } catch (x) { return out; }
+  const d = img.data;
+  const n = w * h;
+  const step = Math.max(1, Math.floor(n / 60000));
+  /* The brightest 2% of what is sampled is taken for white. */
+  const lums = [];
+  for (let i = 0; i < n; i += step) {
+    const p = i * 4;
+    lums.push(0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2]);
+  }
+  const sorted = lums.slice().sort((x, y) => x - y);
+  const at = (q) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(q * (sorted.length - 1))))];
+  const top = at(0.98);
+  let wr = 0; let wg = 0; let wb = 0; let wn = 0;
+  for (let k = 0, i = 0; i < n; i += step, k += 1) {
+    if (lums[k] < top) continue;
+    const p = i * 4;
+    wr += d[p]; wg += d[p + 1]; wb += d[p + 2]; wn += 1;
+  }
+  const white = wn ? [wr / wn, wg / wn, wb / wn] : [255, 255, 255];
+  const peak = Math.max(...white, 1);
+  const gain = white.map((c) => Math.min(1.5, peak / Math.max(c, 1)));
+  /* Black and white points of the balanced picture. */
+  const lo = at(0.01);
+  const hi = Math.max(at(0.99), lo + 1);
+  /* Not a flat colour, where a stretch would only amplify noise. */
+  const stretch = hi - lo > 12;
+  const mid = ((at(0.5) - (stretch ? lo : 0)) / (stretch ? hi - lo : 255));
+  const want = Math.log(0.5) / Math.log(Math.min(0.95, Math.max(0.05, mid)));
+  const gamma = 1 + (Math.min(1.4, Math.max(0.7, want)) - 1) * 0.6;
+  const luts = gain.map((gc) => {
+    const lut = new Uint8ClampedArray(256);
+    for (let v = 0; v < 256; v += 1) {
+      let x = v * gc;
+      x = stretch ? (x - lo) / (hi - lo) : x / 255;
+      x = Math.min(1, Math.max(0, x));
+      lut[v] = Math.round(255 * Math.pow(x, 1 / gamma));
+    }
+    return lut;
+  });
+  const SAT = 1.12;
+  for (let p = 0; p < d.length; p += 4) {
+    const r = luts[0][d[p]];
+    const gg = luts[1][d[p + 1]];
+    const bl = luts[2][d[p + 2]];
+    const l = 0.299 * r + 0.587 * gg + 0.114 * bl;
+    d[p] = l + (r - l) * SAT;
+    d[p + 1] = l + (gg - l) * SAT;
+    d[p + 2] = l + (bl - l) * SAT;
+  }
+  g.putImageData(img, 0, 0);
+  return out;
+}
+
 /* The card's camera, laid out like the phone's own: the picture full
    screen on black, a round shutter in the middle of the bottom row, the
    gallery to its left and, where there are two cameras, a flip to its
    right; close at the top. Black in both themes, because a viewfinder is
    judged by the picture and anything lighter around it reads as glare.
 
-   The shutter shows the photo before it is used -- Retake or Use photo --
-   because what happens next is a model reading the page, and a blurred
-   page is found out there, a minute later, as a recipe it could not read.
+   The whole picture is the shutter as well as the button: a phone held in
+   one hand is pressed with the thumb that holds it. The moment it is
+   pressed the picture stands still under a spinner, so it is plain that
+   the photo has been taken and is on its way.
+
+   The photo is shown before it is used -- Retake, Crop, Enhance, Use
+   photo -- because what happens next is a model reading the page, and a
+   blurred or dim page is found out there, a minute later, as a recipe it
+   could not read. Crop drags a box by its corners, or moves it; Enhance
+   is a toggle, so it can be compared and undone.
 
    Resolves a JPEG file, the file chosen from the gallery, or null. The
    camera is let go however it closes. It wears the card's accent: Use
@@ -8927,35 +9032,94 @@ function cameraSheet(holder, media, stream, accent, gallery) {
     wrap.setAttribute("aria-modal", "true");
     wrap.setAttribute("aria-label", "Take a photo");
     wrap.innerHTML = `<div class="camtop"><button type="button" class="camicon" data-no aria-label="Close">${iconMarkup("mdi:close")}</button>`
-      + `<span class="camhint">Fit the whole page in</span><span class="camicon" aria-hidden="true"></span></div>`
-      + `<div class="camview"><video autoplay playsinline muted></video><img alt="The photo taken" hidden></div>`
+      + `<span class="camhint" data-hint>Fit the whole page in · tap to take</span><span class="camicon" aria-hidden="true"></span></div>`
+      + `<div class="camview live" data-view aria-label="Tap to take the photo"><video autoplay playsinline muted></video><img alt="The photo taken" hidden>`
+      + `<div class="camcrop" data-cropper hidden><div class="box">`
+      + `<span class="h" data-h="nw"></span><span class="h" data-h="ne"></span><span class="h" data-h="sw"></span><span class="h" data-h="se"></span>`
+      + `</div></div>`
+      + `<div class="camwait" data-wait hidden><span class="spinner"></span></div></div>`
       + `<div class="cambar" data-live>`
       + `<button type="button" class="camicon" data-gallery aria-label="Choose from the gallery">${iconMarkup("mdi:image-outline")}</button>`
       + `<button type="button" class="camshutter" data-shoot aria-label="Take the photo" disabled></button>`
       + `<button type="button" class="camicon" data-flip aria-label="Switch camera" hidden>${iconMarkup("mdi:camera-flip-outline")}</button></div>`
       + `<div class="cambar" data-review hidden>`
       + `<button type="button" class="camtext" data-retake>Retake</button>`
-      + `<button type="button" class="camtext camuse" data-use>Use photo</button></div>`;
+      + `<button type="button" class="camtext" data-crop>Crop</button>`
+      + `<button type="button" class="camtext" data-enhance aria-pressed="false">Enhance</button>`
+      + `<button type="button" class="camtext camuse" data-use>Use photo</button></div>`
+      + `<div class="cambar" data-cropbar hidden>`
+      + `<button type="button" class="camtext" data-cropreset>Reset</button>`
+      + `<button type="button" class="camtext camuse" data-cropdone>Done</button></div>`;
     const video = wrap.querySelector("video");
     const still = wrap.querySelector("img");
+    const view = wrap.querySelector("[data-view]");
     const shoot = wrap.querySelector("[data-shoot]");
     const flip = wrap.querySelector("[data-flip]");
-    const liveBar = wrap.querySelector("[data-live]");
-    const reviewBar = wrap.querySelector("[data-review]");
+    const wait = wrap.querySelector("[data-wait]");
+    const hint = wrap.querySelector("[data-hint]");
+    const cropper = wrap.querySelector("[data-cropper]");
+    const cropBox = cropper.querySelector(".box");
+    const enhanceBtn = wrap.querySelector("[data-enhance]");
+    const bars = { live: wrap.querySelector("[data-live]"), review: wrap.querySelector("[data-review]"), crop: wrap.querySelector("[data-cropbar]") };
     let facing = "environment";
-    let shot = null;
+    let mode = "live";
+    let busy = false;
+    let orig = null;
+    let better = null;
+    let enhanced = false;
+    let crop = { l: 0, t: 0, r: 1, b: 1 };
     let done = false;
     const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; };
+    const drop = () => { if (still.src) URL.revokeObjectURL(still.src); still.removeAttribute("src"); };
     const finish = (file) => {
       if (done) return;
       done = true;
       stop();
-      if (still.src) URL.revokeObjectURL(still.src);
+      drop();
+      window.removeEventListener("resize", onResize);
       document.removeEventListener("keydown", onKey, true);
       if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
       resolve(file);
     };
     const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); finish(null); } };
+    const setBusy = (on) => {
+      busy = on;
+      wait.hidden = !on;
+      wrap.querySelectorAll(".cambar button").forEach((btn) => { btn.disabled = on || (btn === shoot && !video.videoWidth); });
+    };
+    const setMode = (m) => {
+      mode = m;
+      Object.entries(bars).forEach(([k, el]) => { el.hidden = k !== m; });
+      view.classList.toggle("live", m === "live");
+      video.hidden = m !== "live";
+      still.hidden = m === "live";
+      cropper.hidden = m !== "crop";
+      view.classList.toggle("cropping", m === "crop");
+      hint.textContent = m === "live" ? "Fit the whole page in · tap to take"
+        : m === "crop" ? "Drag the corners, or move the box" : "Check it can be read";
+    };
+    const base = () => (enhanced ? (better || (better = enhancePhoto(orig))) : orig);
+    /* The photo as it would be used: the crop of the enhanced or plain photo. */
+    const render = () => {
+      const src = base();
+      const x = Math.round(crop.l * src.width);
+      const y = Math.round(crop.t * src.height);
+      const w = Math.max(1, Math.round((crop.r - crop.l) * src.width));
+      const h = Math.max(1, Math.round((crop.b - crop.t) * src.height));
+      if (x === 0 && y === 0 && w === src.width && h === src.height) return src;
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      c.getContext("2d").drawImage(src, x, y, w, h, 0, 0, w, h);
+      return c;
+    };
+    const blobOf = (canvas) => new Promise((res) => canvas.toBlob((bl) => res(bl), "image/jpeg", 0.92));
+    const showStill = (canvas) => blobOf(canvas).then((bl) => {
+      if (!bl || done) return false;
+      drop();
+      still.src = URL.createObjectURL(bl);
+      return new Promise((res) => { still.onload = () => res(true); still.onerror = () => res(false); });
+    });
     const show = (s) => {
       stream = s;
       shoot.disabled = true;
@@ -8963,10 +9127,11 @@ function cameraSheet(holder, media, stream, accent, gallery) {
       const play = video.play && video.play();
       if (play && play.catch) play.catch(() => {});
     };
-    const live = () => { if (video.videoWidth) shoot.disabled = false; };
+    const live = () => { if (video.videoWidth && !busy) shoot.disabled = false; };
     video.addEventListener("loadedmetadata", live);
     video.addEventListener("playing", live);
     show(stream);
+    setMode("live");
     if (typeof media.enumerateDevices === "function") {
       media.enumerateDevices().then((all) => {
         if (all.filter((d) => d.kind === "videoinput").length > 1) flip.hidden = false;
@@ -8982,36 +9147,141 @@ function cameraSheet(holder, media, stream, accent, gallery) {
       stop();
       cameraOpen(media, facing).then(show, () => finish(null));
     });
-    shoot.addEventListener("click", () => {
+    const take = () => {
+      if (mode !== "live" || busy) return;
       const w = video.videoWidth;
       const h = video.videoHeight;
       if (!w || !h) return;
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext("2d").drawImage(video, 0, 0, w, h);
-      shoot.disabled = true;
-      canvas.toBlob((blob) => {
-        if (!blob) { shoot.disabled = false; return; }
-        shot = new File([blob], "photo.jpg", { type: "image/jpeg" });
-        still.src = URL.createObjectURL(blob);
-        still.hidden = false;
-        video.hidden = true;
-        liveBar.hidden = true;
-        reviewBar.hidden = false;
-      }, "image/jpeg", 0.92);
-    });
-    wrap.querySelector("[data-retake]").addEventListener("click", () => {
-      shot = null;
-      if (still.src) URL.revokeObjectURL(still.src);
-      still.removeAttribute("src");
-      still.hidden = true;
-      video.hidden = false;
-      reviewBar.hidden = true;
-      liveBar.hidden = false;
+      /* Still at once, so it is plain the photo was taken. */
+      try { video.pause(); } catch (x) { /* already */ }
+      setBusy(true);
+      orig = document.createElement("canvas");
+      orig.width = w;
+      orig.height = h;
+      orig.getContext("2d").drawImage(video, 0, 0, w, h);
+      better = null;
+      enhanced = false;
+      enhanceBtn.setAttribute("aria-pressed", "false");
+      crop = { l: 0, t: 0, r: 1, b: 1 };
+      showStill(orig).then((ok) => {
+        setBusy(false);
+        if (!ok) { retake(); return; }
+        setMode("review");
+      });
+    };
+    const retake = () => {
+      orig = null;
+      better = null;
+      drop();
+      setMode("live");
+      const play = video.play && video.play();
+      if (play && play.catch) play.catch(() => {});
       live();
+    };
+    shoot.addEventListener("click", take);
+    view.addEventListener("click", (e) => {
+      if (mode !== "live" || e.target.closest(".camcrop")) return;
+      take();
     });
-    wrap.querySelector("[data-use]").addEventListener("click", () => { if (shot) finish(shot); });
+    wrap.querySelector("[data-retake]").addEventListener("click", () => { if (!busy) retake(); });
+    enhanceBtn.addEventListener("click", () => {
+      if (busy || !orig) return;
+      setBusy(true);
+      /* The spinner draws before the work starts, which can take a moment. */
+      setTimeout(() => {
+        enhanced = !enhanced;
+        enhanceBtn.setAttribute("aria-pressed", String(enhanced));
+        showStill(render()).then(() => setBusy(false));
+      }, 30);
+    });
+
+    /* Cropping: the whole photo is shown, with the box over it. */
+    const shown = () => {
+      /* Where the photo sits in the view: drawn to fit, centred. */
+      const v = view.getBoundingClientRect();
+      const pad = 24;
+      const vw = v.width - 2 * pad;
+      const vh = v.height - 2 * pad;
+      const iw = still.naturalWidth || 1;
+      const ih = still.naturalHeight || 1;
+      const k = Math.min(vw / iw, vh / ih);
+      return { x: pad + (vw - iw * k) / 2, y: pad + (vh - ih * k) / 2, w: iw * k, h: ih * k };
+    };
+    const place = () => {
+      const r = shown();
+      cropper.style.left = `${r.x}px`;
+      cropper.style.top = `${r.y}px`;
+      cropper.style.width = `${r.w}px`;
+      cropper.style.height = `${r.h}px`;
+      cropBox.style.left = `${crop.l * 100}%`;
+      cropBox.style.top = `${crop.t * 100}%`;
+      cropBox.style.width = `${(crop.r - crop.l) * 100}%`;
+      cropBox.style.height = `${(crop.b - crop.t) * 100}%`;
+    };
+    wrap.querySelector("[data-crop]").addEventListener("click", () => {
+      if (busy || !orig) return;
+      setBusy(true);
+      showStill(base()).then(() => {
+        setBusy(false);
+        setMode("crop");
+        place();
+      });
+    });
+    const MIN = 0.1;
+    let drag = null;
+    cropper.addEventListener("pointerdown", (e) => {
+      const handle = e.target.closest(".h");
+      if (!handle && !e.target.closest(".box")) return;
+      e.preventDefault();
+      const r = cropper.getBoundingClientRect();
+      drag = { kind: handle ? handle.getAttribute("data-h") : "move", x: e.clientX, y: e.clientY, from: Object.assign({}, crop), w: r.width, h: r.height };
+      try { cropper.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
+    });
+    cropper.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const dx = (e.clientX - drag.x) / drag.w;
+      const dy = (e.clientY - drag.y) / drag.h;
+      const f = drag.from;
+      const c = Object.assign({}, f);
+      if (drag.kind === "move") {
+        const bw = f.r - f.l;
+        const bh = f.b - f.t;
+        c.l = Math.min(Math.max(0, f.l + dx), 1 - bw);
+        c.t = Math.min(Math.max(0, f.t + dy), 1 - bh);
+        c.r = c.l + bw;
+        c.b = c.t + bh;
+      } else {
+        if (drag.kind.includes("w")) c.l = Math.min(Math.max(0, f.l + dx), f.r - MIN);
+        if (drag.kind.includes("e")) c.r = Math.max(Math.min(1, f.r + dx), f.l + MIN);
+        if (drag.kind.includes("n")) c.t = Math.min(Math.max(0, f.t + dy), f.b - MIN);
+        if (drag.kind.includes("s")) c.b = Math.max(Math.min(1, f.b + dy), f.t + MIN);
+      }
+      crop = c;
+      place();
+    });
+    const endDrag = () => { drag = null; };
+    cropper.addEventListener("pointerup", endDrag);
+    cropper.addEventListener("pointercancel", endDrag);
+    wrap.querySelector("[data-cropreset]").addEventListener("click", () => {
+      crop = { l: 0, t: 0, r: 1, b: 1 };
+      place();
+    });
+    wrap.querySelector("[data-cropdone]").addEventListener("click", () => {
+      if (busy) return;
+      setBusy(true);
+      showStill(render()).then(() => { setBusy(false); setMode("review"); });
+    });
+    const onResize = () => { if (mode === "crop") place(); };
+    window.addEventListener("resize", onResize);
+
+    wrap.querySelector("[data-use]").addEventListener("click", () => {
+      if (busy || !orig) return;
+      setBusy(true);
+      blobOf(render()).then((bl) => {
+        if (!bl) { setBusy(false); return; }
+        finish(new File([bl], "photo.jpg", { type: "image/jpeg" }));
+      });
+    });
     document.addEventListener("keydown", onKey, true);
     holder.appendChild(wrap);
   });

@@ -291,13 +291,13 @@ const js = fs.readFileSync(file);
     feed.width = 400;
     feed.height = 300;
     const fg = feed.getContext("2d");
-    const paint = () => { fg.fillStyle = "#fff"; fg.fillRect(0, 0, 400, 300); fg.fillStyle = "#c33"; fg.fillRect(200, 0, 200, 150); };
+    let paint = () => { fg.fillStyle = "#fff"; fg.fillRect(0, 0, 400, 300); fg.fillStyle = "#c33"; fg.fillRect(200, 0, 200, 150); };
     paint();
     let stream = null;
     navigator.mediaDevices.getUserMedia = (c) => {
       stream = feed.captureStream(10);
       stream.asked = c;
-      const t = setInterval(paint, 50);
+      const t = setInterval(() => paint(), 50);
       stream.getTracks()[0].addEventListener("ended", () => clearInterval(t));
       return Promise.resolve(stream);
     };
@@ -351,6 +351,95 @@ const js = fs.readFileSync(file);
     await until(() => shot.classList.contains("has"));
     check("the photo used is read, and its dish is cut out", shot.classList.contains("has"), "no photo on the form");
     check("and the camera is let go", released() && !q(".camwrap"), stream.getTracks().map((t) => t.readyState).join(","));
+    q(".confirmwrap [data-no]").click();
+    await settle();
+
+    /* ---- one hand: the picture is the shutter, and stands still while it is taken ---- */
+    await open();
+    await until(() => !cam("[data-shoot]").disabled);
+    const realToBlob = HTMLCanvasElement.prototype.toBlob;
+    let release = null;
+    HTMLCanvasElement.prototype.toBlob = function slow(cb, ...rest) {
+      const self = this;
+      release = () => realToBlob.call(self, cb, ...rest);
+    };
+    cam("[data-view]").click();
+    await settle();
+    check("a tap anywhere on the picture takes the photo", Boolean(release), "nothing taken");
+    check("and the picture stands still at once, under a spinner", cam("video").paused && !cam("[data-wait]").hidden,
+      `paused=${cam("video").paused} wait=${!cam("[data-wait]").hidden}`);
+    check("with nothing to press until it is ready", [...q(".camwrap").querySelectorAll(".cambar:not([hidden]) button")].every((b) => b.disabled), "a button is live");
+    HTMLCanvasElement.prototype.toBlob = realToBlob;
+    release();
+    await until(() => !cam("[data-review]").hidden);
+    check("then it is shown to check, the spinner gone", !cam("[data-review]").hidden && cam("[data-wait]").hidden, "still waiting");
+    check("and a tap on the photo now takes nothing", (() => { cam("[data-view]").click(); return !cam("[data-review]").hidden; })(), "went back");
+
+    /* ---- Enhance: a dull photo comes out with its full range, and can be undone ---- */
+    const range = () => new Promise((r) => {
+      const i = new Image();
+      i.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = i.naturalWidth; c.height = i.naturalHeight;
+        const x = c.getContext("2d");
+        x.drawImage(i, 0, 0);
+        const d = x.getImageData(0, 0, c.width, c.height).data;
+        let lo = 255; let hi = 0;
+        for (let p = 0; p < d.length; p += 4) { const l = (d[p] + d[p + 1] + d[p + 2]) / 3; if (l < lo) lo = l; if (l > hi) hi = l; }
+        r(hi - lo);
+      };
+      i.src = cam("img").src;
+    });
+    cam("[data-retake]").click();
+    await settle();
+    const dull = () => { fg.fillStyle = "#8a8070"; fg.fillRect(0, 0, 400, 300); fg.fillStyle = "#a89c88"; fg.fillRect(100, 60, 200, 180); fg.fillStyle = "#958a78"; fg.fillRect(150, 110, 100, 80); };
+    const keep = paint;
+    paint = dull;
+    dull();
+    await tick(); await tick(); await tick();
+    await until(() => !cam("[data-shoot]").disabled);
+    cam("[data-shoot]").click();
+    await until(() => !cam("[data-review]").hidden);
+    const before = await range();
+    cam("[data-enhance]").click();
+    await until(() => cam("[data-enhance]").getAttribute("aria-pressed") === "true" && cam("[data-wait]").hidden);
+    await settle();
+    const after = await range();
+    check("Enhance stretches a dull photo to its full range", after > before + 60, `${Math.round(before)} -> ${Math.round(after)}`);
+    cam("[data-enhance]").click();
+    await until(() => cam("[data-enhance]").getAttribute("aria-pressed") === "false" && cam("[data-wait]").hidden);
+    await settle();
+    check("and pressed again puts it back", Math.abs(await range() - before) < 6, String(await range()));
+    paint = keep;
+
+    /* ---- Crop: drag a corner, then Done; the photo used is the box ---- */
+    cam("[data-crop]").click();
+    await until(() => !cam("[data-cropbar]").hidden);
+    const cropper = cam("[data-cropper]");
+    check("Crop shows the box over the whole photo", !cropper.hidden && cropper.getBoundingClientRect().width > 50, "no box");
+    const handle = cropper.querySelector('.h[data-h="se"]');
+    const hb = handle.getBoundingClientRect();
+    const cw = cropper.getBoundingClientRect();
+    const fire = (type, x, y) => (type === "pointerdown" ? handle : cropper).dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, pointerId: 7, bubbles: true, composed: true }));
+    const sx = hb.left + hb.width / 2;
+    const sy = hb.top + hb.height / 2;
+    fire("pointerdown", sx, sy);
+    fire("pointermove", sx - cw.width / 2, sy - cw.height / 2);
+    fire("pointerup", sx - cw.width / 2, sy - cw.height / 2);
+    await settle();
+    const box = cropper.querySelector(".box");
+    check("dragging the bottom-right corner shrinks the box to it", Math.abs(parseFloat(box.style.width) - 50) < 2 && Math.abs(parseFloat(box.style.height) - 50) < 2,
+      `${box.style.width} x ${box.style.height}`);
+    cam("[data-cropdone]").click();
+    await until(() => !cam("[data-review]").hidden && cam("[data-wait]").hidden);
+    await settle();
+    const shownSize = [cam("img").naturalWidth, cam("img").naturalHeight];
+    check("Done shows the photo cropped", shownSize[0] === 200 && shownSize[1] === 150, JSON.stringify(shownSize));
+    cam("[data-use]").click();
+    await until(() => q(".confirmwrap [data-pic]"));
+    const usedRead = asked.filter((m) => m.service === "save_photo").slice(-2)[0];
+    const usedSize = usedRead ? await size(usedRead.service_data.image) : null;
+    check("and Use photo sends the cropped photo", usedSize && usedSize[0] === 200 && usedSize[1] === 150, JSON.stringify(usedSize));
     q(".confirmwrap [data-no]").click();
     await settle();
 
