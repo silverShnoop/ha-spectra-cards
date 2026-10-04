@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.156.0";
+const VERSION = "0.156.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -8875,11 +8875,16 @@ function pickPhoto(holder, camera, accent) {
     input.accept = "image/*";
     if (capture) input.setAttribute("capture", "environment");
     input.style.display = "none";
-    input.addEventListener("change", () => {
-      const file = input.files && input.files[0];
+    const done = (file) => {
       if (input.parentNode) input.parentNode.removeChild(input);
       resolve(file || null);
-    });
+    };
+    input.addEventListener("change", () => done(input.files && input.files[0]));
+    /* A picker closed with nothing chosen fires no change, only cancel.
+       Without this the promise never settled, and the card that opened it
+       held its paints for good: a wall tablet's meals card stopped going
+       to next week after somebody backed out of the gallery. */
+    input.addEventListener("cancel", () => done(null));
     holder.appendChild(input);
     input.click();
   });
@@ -11602,12 +11607,14 @@ class SpectraCard extends HTMLElement {
        keeps it on screen but takes the caret out of the field, which on a
        phone also shuts the keyboard -- so nothing paints until it closes,
        and closing it paints whatever was held back. */
-    if (this._editing) return;
+    /* Only while the sheet is there: a flag left behind by a sheet that
+       went some other way must not stop the card painting for good. */
+    if (this._editing && this._holder.querySelector(".confirmwrap")) return;
     /* The camera is open. It is a sheet like the others, and the house
        changing under it -- a light, a plan refetch, the idle clock -- took
        it off the screen mid-photo, which looks like the dashboard
        reloading. Held until it closes, like the form. */
-    if (this._camera) return;
+    if (this._camera && this._holder.querySelector(".camwrap")) return;
     /* The same for a field on the card itself -- the recipe search, a meal
        typed into a slot. Every refetch and every state change in the house
        would otherwise rebuild the field under the caret and shut the
