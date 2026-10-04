@@ -2327,8 +2327,12 @@ way in, remembering the last one used:
   the card's own camera, laid out like the phone's: the picture full screen,
   a round shutter, the gallery to its left and a flip where there are two
   cameras; on a phone held sideways the controls stand in a column on the
-  right instead. The shutter shows the photo first, with **Retake** and **Use
-  photo**, so a blurred page is caught before it is read. And **Choose a
+  right instead. The whole picture is the shutter too, for a phone held in one
+  hand; it stands still under a spinner the moment it is pressed. The
+  photo is then shown first, with **Retake**, **Crop** (drag the corners or
+  move the box), **Enhance** (white balance, levels, a little colour; press
+  again to undo) and **Use photo**, so a blurred or dim page is caught
+  before it is read. And **Choose a
   photo** picks one already taken. The camera is the card's own because the
   Home Assistant app on Android opens the gallery for every file picker,
   whatever the page asks for; where the camera cannot be had, Take falls
