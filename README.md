@@ -2334,7 +2334,11 @@ way in, remembering the last one used:
   whatever the page asks for; where the camera cannot be had, Take falls
   back to the picker. When the script's answer has `dish`
   (`{left, top, right, bottom}`, each 0–100 per cent of the photo, and
-  `turn`, 0, 90, 180 or 270 degrees clockwise), the box is where the dish is
+  `turn`, 0, 90, 180 or 270 degrees clockwise), the card also sends the
+  script a copy of the page with a labelled 8×8 grid on it (`grid_photo`,
+  A–H across, 1–8 down), because a model names the squares a picture covers
+  far more exactly than it guesses percentages; a script that knows about it
+  answers its box from those squares. The box is where the dish is
   looked for, not its edges: a model's box is rough, and often takes in
   half the page. Inside it the card finds the food by its colour (food is
   coloured; paper and type are not), turns it upright, and cuts 4:3 around
