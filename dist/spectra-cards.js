@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.155.0";
+const VERSION = "0.156.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -9192,6 +9192,56 @@ function cropPhoto(file, box, side, turn) {
   }, () => null);
 }
 
+/* The same photo with a grid on it: 8 squares across, A to H, and 8 down,
+   1 to 8, each square labelled in its corner ("C6"). A model asked
+   where a dish is answers in percentages roughly -- a spinach tart's
+   came back as most of the page -- but names the squares it covers
+   well, because naming what it can see is what it is good at. The
+   clean photo still goes with it, for reading the recipe: lines and
+   labels over the type would cost words. A JPEG data URL. */
+const PHOTO_GRID = 8;
+function gridPhoto(image) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const n = PHOTO_GRID;
+      g.lineWidth = Math.max(2, Math.round(Math.min(w, h) / 300));
+      g.strokeStyle = "rgba(255, 0, 170, 0.85)";
+      g.beginPath();
+      for (let i = 1; i < n; i += 1) {
+        g.moveTo((w * i) / n, 0); g.lineTo((w * i) / n, h);
+        g.moveTo(0, (h * i) / n); g.lineTo(w, (h * i) / n);
+      }
+      g.stroke();
+      const size = Math.max(11, Math.round(Math.min(w, h) / n / 4.5));
+      g.font = `bold ${size}px sans-serif`;
+      g.textBaseline = "top";
+      for (let col = 0; col < n; col += 1) {
+        for (let row = 0; row < n; row += 1) {
+          const label = `${String.fromCharCode(65 + col)}${row + 1}`;
+          const x = (w * col) / n + 3;
+          const y = (h * row) / n + 3;
+          const tw = g.measureText(label).width;
+          g.fillStyle = "rgba(255, 255, 255, 0.85)";
+          g.fillRect(x, y, tw + 6, size + 4);
+          g.fillStyle = "#c0008a";
+          g.fillText(label, x + 3, y + 2);
+        }
+      }
+      resolve(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => reject(new Error("not an image"));
+    img.src = image;
+  });
+}
+
 /* What a Fill or a Shop should cover: the days shown that have not gone,
    as the scripts' `start_date` and `days`. Null when every day shown is
    past, which is a Sunday night looking at this week. */
@@ -16035,21 +16085,29 @@ class SpectraCard extends HTMLElement {
     return pickPhoto(this._holder, camera, accent).then((file) => { done(); return file; }, (error) => { done(); throw error; });
   }
 
-  _mealPhoto(save, folder, camera, accent) {
+  _mealPhoto(save, folder, camera, accent, grid) {
     return this._pickPhoto(camera, accent).then((file) => {
       if (!file) return null;
       this._voiceSay("thinking", "Looking at the photo…");
-      return shrinkPhoto(file).then((image) => this._mealCall(save, { image, folder }))
-        .then((r) => (r.media_content_id ? Object.assign({}, r, { file }) : null));
+      return shrinkPhoto(file).then((image) => this._mealCall(save, { image, folder }).then((r) => {
+        if (!r.media_content_id) return null;
+        const kept = Object.assign({}, r, { file });
+        if (!grid) return kept;
+        /* The gridded copy is a help, not a need: without it the
+           model still gives its box in percentages. */
+        return gridPhoto(image).then((gridded) => this._mealCall(save, { image: gridded, folder: `${folder}-grid` }))
+          .then((g) => Object.assign(kept, g && g.media_content_id ? { grid: g } : {}), () => kept);
+      }));
     });
   }
 
   /* A cookbook page, or a handwritten card, into the new-recipe form. */
   _recipeFromPhoto(spec, entry, accent, edit, camera) {
-    this._mealPhoto(spec.save, "cookbook", camera, accent).then((photo) => {
+    this._mealPhoto(spec.save, "cookbook", camera, accent, true).then((photo) => {
       if (!photo) return null;
       this._voiceSay("thinking", "Reading the recipe…");
-      return this._aiCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type }, {
+      return this._aiCall(spec.script, Object.assign({ photo: photo.media_content_id, photo_type: photo.media_content_type },
+        photo.grid ? { grid_photo: photo.grid.media_content_id, grid_photo_type: photo.grid.media_content_type } : {}), {
         title: "Recipe from a photo", label: "name", open: true, kind: "draft",
         require: "name", missing: "No recipe found in the photo", seen: () => this._onScreen(),
       })

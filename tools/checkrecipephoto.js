@@ -82,7 +82,9 @@ const js = fs.readFileSync(file);
         asked.push(msg);
         if (msg.type === "config_entries/get") return Promise.resolve([{ entry_id: "e1", state: "loaded" }]);
         if (msg.type === "auth/sign_path") return Promise.resolve({ path: `${msg.path}?authSig=x${asked.length}` });
-        if (msg.service === "save_photo") return Promise.resolve({ response: { media_content_id: "media-source://x/p.jpg", media_content_type: "image/jpeg" } });
+        if (msg.service === "save_photo") {
+          return Promise.resolve({ response: { media_content_id: `media-source://x/${msg.service_data.folder}.jpg`, media_content_type: "image/jpeg" } });
+        }
         if (msg.service === "meal_recipe_from_photo") {
           return Promise.resolve({ response: { name: "Tomato tart", ingredients: ["2 tomatoes"], method: ["Bake."], dish } });
         }
@@ -124,6 +126,29 @@ const js = fs.readFileSync(file);
     /* ---- the dish, cut from the page ---- */
     const pic = q(".confirmwrap [data-pic]");
     await until(() => pic.classList.contains("has"));
+    const saved = asked.filter((m) => m.service === "save_photo");
+    check("the page is kept twice: as it is, and with a labelled grid on it",
+      saved.length === 2 && saved[0].service_data.folder === "cookbook" && saved[1].service_data.folder === "cookbook-grid",
+      JSON.stringify(saved.map((m) => m.service_data.folder)));
+    const gridImg = saved[1] && saved[1].service_data.image;
+    const magenta = gridImg ? await new Promise((r) => {
+      const i = new Image();
+      i.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = i.naturalWidth; c.height = i.naturalHeight;
+        const x = c.getContext("2d");
+        x.drawImage(i, 0, 0);
+        /* On the first vertical line, an eighth of the way across, below the labels. */
+        const d = x.getImageData(Math.round(c.width / 8), Math.round(c.height * 0.3), 1, 1).data;
+        r(d[0] > 180 && d[1] < 120 && d[2] > 110);
+      };
+      i.src = gridImg;
+    }) : false;
+    check("the grid's lines are drawn on the copy", magenta, "no line at 1/8");
+    const read = asked.filter((m) => m.service === "meal_recipe_from_photo").pop();
+    check("and the script gets both: the clean page to read, the gridded one to point with",
+      read && read.service_data.photo === "media-source://x/cookbook.jpg" && read.service_data.grid_photo === "media-source://x/cookbook-grid.jpg",
+      JSON.stringify(read && read.service_data));
     check("the dish is on the new recipe's form", pic.classList.contains("has") && pic.style.backgroundImage.includes("data:image/jpeg"),
       pic.style.backgroundImage.slice(0, 40));
     q(".confirmwrap [data-yes]").click();
