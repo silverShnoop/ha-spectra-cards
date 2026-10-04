@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.154.0";
+const VERSION = "0.155.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -9028,6 +9028,87 @@ function cameraSheet(holder, media, stream, accent, gallery) {
 
    Null when the box is not a box. */
 const PHOTO_ASPECT = 4 / 3;
+
+/* Where the food is in a photo, as the 4:3 window to cut: {x, y, w, h}
+   in the canvas's pixels, or null when nothing in it stands out. The
+   food is looked for inside `inner` (the model's box); the window may
+   reach past it, to the canvas's edge, to put the food in its middle.
+
+   Food is coloured and a cookbook page is not: white paper, black and
+   grey type, a pale rule. So each pixel scores by its saturation,
+   squared so the faint cast of paper and the grey of type count for
+   next to nothing, and nothing at all for the near-black and the
+   near-white. The window takes in the middle 92% of that score in each
+   direction, with a margin, made 4:3 by widening its shorter side, and
+   is centred there -- kept inside the photo, and never smaller than
+   two fifths of the largest window that fits the box, so a garnish is not
+   mistaken for the dish. Measured on a copy at most 200 pixels across:
+   framing does not need more, and a phone does it in a few
+   milliseconds. */
+function photoFocus(canvas, inner) {
+  const W = canvas.width;
+  const H = canvas.height;
+  const k = Math.min(1, 200 / Math.max(W, H));
+  const sw = Math.max(1, Math.round(W * k));
+  const sh = Math.max(1, Math.round(H * k));
+  const small = document.createElement("canvas");
+  small.width = sw;
+  small.height = sh;
+  const sg = small.getContext("2d");
+  sg.drawImage(canvas, 0, 0, sw, sh);
+  let px;
+  try { px = sg.getImageData(0, 0, sw, sh).data; } catch (x) { return null; }
+  const cols = new Float64Array(sw);
+  const rows = new Float64Array(sh);
+  const area = inner || { x: 0, y: 0, w: W, h: H };
+  const ax0 = Math.max(0, Math.floor(area.x * k));
+  const ay0 = Math.max(0, Math.floor(area.y * k));
+  const ax1 = Math.min(sw, Math.ceil((area.x + area.w) * k));
+  const ay1 = Math.min(sh, Math.ceil((area.y + area.h) * k));
+  let total = 0;
+  for (let y = ay0; y < ay1; y += 1) {
+    for (let x = ax0; x < ax1; x += 1) {
+      const i = (y * sw + x) * 4;
+      const hi = Math.max(px[i], px[i + 1], px[i + 2]);
+      const lo = Math.min(px[i], px[i + 1], px[i + 2]);
+      const v = hi / 255;
+      if (v < 0.12) continue;
+      const sat = hi ? (hi - lo) / hi : 0;
+      if (v > 0.92 && sat < 0.12) continue;
+      const score = sat * sat;
+      cols[x] += score;
+      rows[y] += score;
+      total += score;
+    }
+  }
+  /* A black and white page, or a photo with nothing coloured in it. */
+  if (total < (ax1 - ax0) * (ay1 - ay0) * 0.004) return null;
+  const span = (sums, n) => {
+    let run = 0;
+    let a = 0;
+    let b = n - 1;
+    for (let i = 0; i < n; i += 1) { run += sums[i]; if (run >= total * 0.04) { a = i; break; } }
+    run = 0;
+    for (let i = n - 1; i >= 0; i -= 1) { run += sums[i]; if (run >= total * 0.04) { b = i; break; } }
+    return [a, b + 1];
+  };
+  const [x0, x1] = span(cols, sw);
+  const [y0, y1] = span(rows, sh);
+  let w = (x1 - x0) * 1.16;
+  let h = (y1 - y0) * 1.16;
+  if (w / h > PHOTO_ASPECT) h = w / PHOTO_ASPECT; else w = h * PHOTO_ASPECT;
+  const fitW = Math.min(ax1 - ax0, (ay1 - ay0) * PHOTO_ASPECT);
+  const least = fitW * 0.4;
+  if (w < least) { w = least; h = w / PHOTO_ASPECT; }
+  const shrink = Math.min(1, sw / w, sh / h);
+  w *= shrink;
+  h *= shrink;
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const x = Math.min(Math.max(cx - w / 2, 0), sw - w);
+  const y = Math.min(Math.max(cy - h / 2, 0), sh - h);
+  return { x: x / k, y: y / k, w: w / k, h: h / k };
+}
 const PHOTO_INSET = 0.025;
 function cropPhoto(file, box, side, turn) {
   let l = 0;
@@ -9053,21 +9134,36 @@ function cropPhoto(file, box, side, turn) {
       img.src = url;
     });
   return load.then(([source, w, h]) => {
-    let sx = (l / 100) * w;
-    let sy = (t / 100) * h;
-    let sw = ((r - l) / 100) * w;
-    let sh = ((b - t) / 100) * h;
+    /* The box, drawn in a little, is where the dish is looked for. */
+    let ix = (l / 100) * w;
+    let iy = (t / 100) * h;
+    let iw = ((r - l) / 100) * w;
+    let ih = ((b - t) / 100) * h;
     if (box) {
-      const ix = sw * PHOTO_INSET;
-      const iy = sh * PHOTO_INSET;
-      sx += ix; sy += iy; sw -= 2 * ix; sh -= 2 * iy;
+      ix += iw * PHOTO_INSET; iy += ih * PHOTO_INSET;
+      iw *= 1 - 2 * PHOTO_INSET; ih *= 1 - 2 * PHOTO_INSET;
     }
+    /* What is drawn reaches a quarter of the box further each way, so a
+       dish at the edge of a model's box can still be cut with it in the
+       middle. A photo given whole is all there is. */
+    const pad = box ? 0.25 : 0;
+    const sx = Math.max(0, ix - iw * pad);
+    const sy = Math.max(0, iy - ih * pad);
+    const sw = Math.min(w, ix + iw * (1 + pad)) - sx;
+    const sh = Math.min(h, iy + ih * (1 + pad)) - sy;
+    /* The box's margins inside what is drawn, turned with it. */
+    const m = [ix - sx, iy - sy, sx + sw - (ix + iw), sy + sh - (iy + ih)];
+    const [ml, mt, mr, mb] = {
+      0: m, 90: [m[3], m[0], m[1], m[2]], 180: [m[2], m[3], m[0], m[1]], 270: [m[1], m[2], m[3], m[0]],
+    }[quarter];
     /* Upright first, on a canvas of its own, then the 4:3 cut from that. */
     const side90 = quarter === 90 || quarter === 270;
     const uw = side90 ? sh : sw;
     const uh = side90 ? sw : sh;
-    const cw = uw / uh > PHOTO_ASPECT ? uh * PHOTO_ASPECT : uw;
-    const ch = uw / uh > PHOTO_ASPECT ? uh : uw / PHOTO_ASPECT;
+    const bw = side90 ? ih : iw;
+    const bh = side90 ? iw : ih;
+    const cw = bw / bh > PHOTO_ASPECT ? bh * PHOTO_ASPECT : bw;
+    const ch = bw / bh > PHOTO_ASPECT ? bh : bw / PHOTO_ASPECT;
     const scale = Math.min(1, max / Math.max(cw, ch));
     const up = document.createElement("canvas");
     up.width = Math.max(1, Math.round(uw * scale));
@@ -9078,11 +9174,20 @@ function cropPhoto(file, box, side, turn) {
     const dw = (side90 ? up.height : up.width);
     const dh = (side90 ? up.width : up.height);
     g.drawImage(source, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
+    const inner = { x: ml * scale, y: mt * scale, w: bw * scale, h: bh * scale };
+    /* A box from the model is "the dish is in here", not its edges: the
+       one for a spinach tart ran 7-68% across and 12-99% down a page,
+       most of the page, and its middle 4:3 slice missed the tart. So
+       inside a box the cut is centred on the food itself, found by its
+       colour; the middle is only for a photo given as it is, or a box
+       with nothing coloured in it. */
+    const win = (box && photoFocus(up, inner)) || {
+      x: inner.x + (inner.w - cw * scale) / 2, y: inner.y + (inner.h - ch * scale) / 2, w: cw * scale, h: ch * scale,
+    };
     const out = document.createElement("canvas");
-    out.width = Math.max(1, Math.round(cw * scale));
-    out.height = Math.max(1, Math.round(ch * scale));
-    out.getContext("2d").drawImage(up, (up.width - out.width) / 2, (up.height - out.height) / 2,
-      out.width, out.height, 0, 0, out.width, out.height);
+    out.width = Math.max(1, Math.round(win.w));
+    out.height = Math.max(1, Math.round(win.h));
+    out.getContext("2d").drawImage(up, win.x, win.y, win.w, win.h, 0, 0, out.width, out.height);
     return out.toDataURL("image/jpeg", 0.85);
   }, () => null);
 }
