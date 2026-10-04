@@ -2334,9 +2334,13 @@ way in, remembering the last one used:
   whatever the page asks for; where the camera cannot be had, Take falls
   back to the picker. When the script's answer has `dish`
   (`{left, top, right, bottom}`, each 0–100 per cent of the photo, and
-  `turn`, 0, 90, 180 or 270 degrees clockwise), that part of the photo is
-  drawn in a little from the edges, turned upright, cut to 4:3 about its
-  middle, and becomes the recipe's photo; with none,
+  `turn`, 0, 90, 180 or 270 degrees clockwise), the box is where the dish is
+  looked for, not its edges: a model's box is rough, and often takes in
+  half the page. Inside it the card finds the food by its colour (food is
+  coloured; paper and type are not), turns it upright, and cuts 4:3 around
+  it with the food in the middle, reaching past the box if it has to. A
+  box with nothing coloured in it is cut 4:3 about its middle. That is the
+  recipe's photo; with none,
   the recipe has no photo until one is given.
 - **Type it** opens the empty form.
 

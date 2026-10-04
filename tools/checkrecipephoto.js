@@ -131,7 +131,7 @@ const js = fs.readFileSync(file);
     const sent = saves().pop();
     const image = sent && sent.service_data.image;
     const got = image ? await size(image) : null;
-    check("and saved with it, cut to the dish, drawn in a little from the model's box", got && got[0] === 190 && got[1] === 143, JSON.stringify(got));
+    check("and saved with it, cut 4:3 around the dish", got && Math.abs(got[0] / got[1] - 4 / 3) < 0.03 && got[0] <= 220, JSON.stringify(got));
     const pixel = (url, fx, fy) => new Promise((r) => {
       const i = new Image();
       i.onload = () => {
@@ -180,6 +180,69 @@ const js = fs.readFileSync(file);
     const fsz = flat ? await size(flat) : null;
     check("a photo given on the form is cut 4:3 about its middle, not squeezed", fsz && fsz[0] === 400 && fsz[1] === 300
       && await pixel(flat, 0.5, 0.1) === "red" && await pixel(flat, 0.5, 0.9) === "blue", JSON.stringify(fsz));
+    q(".confirmwrap [data-no]").click();
+    await settle();
+    /* The spinach tart: a cookbook page whose photo of the dish sits low on
+       the left, type everywhere else, and a model's box that took in most of
+       the page (7-68% across, 12-99% down). The middle of that box is type. */
+    const book = document.createElement("canvas");
+    book.width = 450; book.height = 600;
+    const bg = book.getContext("2d");
+    bg.fillStyle = "#fbfaf6"; bg.fillRect(0, 0, 450, 600);
+    bg.fillStyle = "#222";
+    for (let y = 20; y < 330; y += 14) bg.fillRect(40, y, 360, 6);
+    for (let y = 340; y < 590; y += 14) bg.fillRect(250, y, 170, 6);
+    bg.fillStyle = "#e0a040"; bg.fillRect(35, 400, 190, 170);
+    bg.fillStyle = "#2f8a3a"; bg.fillRect(80, 440, 90, 70);
+    bg.fillStyle = "#c0392b"; bg.fillRect(60, 520, 60, 30);
+    const bookFile = await new Promise((r) => book.toBlob((b) => r(new File([b], "book.png", { type: "image/png" })), "image/png"));
+    const coloured = (url) => new Promise((r) => {
+      const i = new Image();
+      i.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = i.naturalWidth; c.height = i.naturalHeight;
+        const x = c.getContext("2d");
+        x.drawImage(i, 0, 0);
+        const d = x.getImageData(0, 0, c.width, c.height).data;
+        let n = 0; let sx = 0; let sy = 0;
+        for (let p = 0; p < d.length; p += 4) {
+          const hi = Math.max(d[p], d[p + 1], d[p + 2]);
+          const lo = Math.min(d[p], d[p + 1], d[p + 2]);
+          if (hi > 40 && (hi - lo) / hi > 0.35) { n += 1; const q = p / 4; sx += q % c.width; sy += Math.floor(q / c.width); }
+        }
+        r({ share: n / (d.length / 4), cx: n ? sx / n / c.width : 0, cy: n ? sy / n / c.height : 0 });
+      };
+      i.src = url;
+    });
+    photo = bookFile;
+    dish = { left: 7, top: 12, right: 68, bottom: 99, turn: 0 };
+    card._recipeAdd(body, { accent: 6 }, "photo");
+    await settle();
+    q(".confirmwrap [data-take='']").click();
+    await until(() => q(".confirmwrap [data-pic]"));
+    const tart = await fromForm();
+    const tz = tart ? await size(tart) : null;
+    const tc = tart ? await coloured(tart) : null;
+    check("a loose box is cut around the food in it, not its middle", tc && tc.share > 0.6, JSON.stringify(tc));
+    check("with the food in the middle of the photo", tc && Math.abs(tc.cx - 0.5) < 0.12 && Math.abs(tc.cy - 0.5) < 0.12, JSON.stringify(tc));
+    check("and still 4:3", tz && Math.abs(tz[0] / tz[1] - 4 / 3) < 0.03, JSON.stringify(tz));
+    q(".confirmwrap [data-no]").click();
+    await settle();
+    /* A black and white page has nothing to find: the box's middle, as before. */
+    const plain = document.createElement("canvas");
+    plain.width = 400; plain.height = 400;
+    const pg = plain.getContext("2d");
+    pg.fillStyle = "#fff"; pg.fillRect(0, 0, 400, 400);
+    pg.fillStyle = "#333"; pg.fillRect(100, 100, 200, 200);
+    photo = await new Promise((r) => plain.toBlob((b) => r(new File([b], "p.png", { type: "image/png" })), "image/png"));
+    dish = { left: 25, top: 25, right: 75, bottom: 75, turn: 0 };
+    card._recipeAdd(body, { accent: 6 }, "photo");
+    await settle();
+    q(".confirmwrap [data-take='']").click();
+    await until(() => q(".confirmwrap [data-pic]"));
+    const grey = await fromForm();
+    const gz = grey ? await size(grey) : null;
+    check("a photo with no colour in it falls back to the box's middle", gz && gz[0] === 190 && gz[1] === 143, JSON.stringify(gz));
     q(".confirmwrap [data-no]").click();
     await settle();
     photo = pageFile;
