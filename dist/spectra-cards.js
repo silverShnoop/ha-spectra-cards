@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.153.0";
+const VERSION = "0.154.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -15141,7 +15141,9 @@ class SpectraCard extends HTMLElement {
     const data = { transcript: said, date: day, entry_type: type };
     if (!isBlank(spec.agent)) data.agent = String(spec.agent);
     const snap = this._mealSnap(day, type);
-    return this._aiWS(`${domain}.${service}`, data, { title: "Plan what was said", label: "planned" }).catch((error) => {
+    return this._aiWS(`${domain}.${service}`, data, {
+      title: "Plan what was said", label: "planned", require: "planned", missing: "Nothing was planned",
+    }).catch((error) => {
       throw voiceError("Could not plan that.", error && error.message);
     }).then((result) => {
       const planned = result && result.response && result.response.planned;
@@ -15494,7 +15496,10 @@ class SpectraCard extends HTMLElement {
     this._voiceSay("thinking", "Working out which day for each\u2026");
     this._aiCall(body.arrange.script, {
       recipes: recipes.map((r) => String(r.recipe_id)), dates: empty, entry_type: type,
-    }, { title: "Choose a day for each recipe", seen: () => this._onScreen() }).then((got) => {
+    }, {
+      title: "Choose a day for each recipe", require: "placed", missing: "No days were worked out",
+      seen: () => this._onScreen(),
+    }).then((got) => {
       const byId = new Map(recipes.map((r) => [String(r.recipe_id), r]));
       const used = new Set();
       const days = new Set();
@@ -15576,7 +15581,8 @@ class SpectraCard extends HTMLElement {
       if (!isBlank(request)) data.request = String(request);
       if (!isBlank(week.agent)) data.agent = String(week.agent);
       return this._aiCall(week.script, data, {
-        title: "Suggest meals", seen: () => this._onScreen(),
+        title: "Suggest meals", require: "planned", missing: "No meals were suggested",
+        seen: () => this._onScreen(),
       }).then((r) => (Array.isArray(r.planned) ? r.planned : [])
         .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
         .map((p) => ({ date: String(p.date), type, name: String(p.meal),
@@ -15748,7 +15754,7 @@ class SpectraCard extends HTMLElement {
     rows.reduce((c, r, i) => c.then(() => {
       this._voiceSay("thinking", `Writing ${r.name} (${i + 1} of ${rows.length})\u2026`);
       return this._aiCall(body.write.script, { title: r.name, entry_type: r.type }, {
-        title: "Write a recipe", label: "name",
+        title: "Write a recipe", label: "name", require: "name", missing: "No recipe was written",
       }).then((got) => {
         if (isBlank(got.name) || !Array.isArray(got.ingredients) || !got.ingredients.length) return null;
         const data = {
@@ -15850,7 +15856,8 @@ class SpectraCard extends HTMLElement {
       failed = false;
       paint();
       self._aiCall(body.ideas.script, { date: slot[0], entry_type: slot[1], avoid: shown }, {
-        title: "Ideas for a meal", seen: () => wrap.isConnected,
+        title: "Ideas for a meal", require: "ideas", missing: "No ideas came back",
+        seen: () => wrap.isConnected,
       })
         .then((r) => {
           ideas = (Array.isArray(r.ideas) ? r.ideas : [])
@@ -15880,7 +15887,8 @@ class SpectraCard extends HTMLElement {
     const name = mealName(planned);
     this._voiceSay("thinking", `Writing a recipe for ${name}…`);
     this._aiCall(body.write.script, { title: name, entry_type: slot[1] }, {
-      title: "Write a recipe", label: "name", open: true, kind: "draft", seen: () => this._onScreen(),
+      title: "Write a recipe", label: "name", open: true, kind: "draft",
+      require: "name", missing: "No recipe was written", seen: () => this._onScreen(),
     }).then((got) => {
       this._voiceSay("idle", "");
       const draft = {
@@ -15937,7 +15945,8 @@ class SpectraCard extends HTMLElement {
       if (!photo) return null;
       this._voiceSay("thinking", "Reading the recipe…");
       return this._aiCall(spec.script, { photo: photo.media_content_id, photo_type: photo.media_content_type }, {
-        title: "Recipe from a photo", label: "name", open: true, kind: "draft", seen: () => this._onScreen(),
+        title: "Recipe from a photo", label: "name", open: true, kind: "draft",
+        require: "name", missing: "No recipe found in the photo", seen: () => this._onScreen(),
       })
         .then((got) => {
           this._voiceSay("idle", "");
@@ -16196,7 +16205,8 @@ class SpectraCard extends HTMLElement {
       event.currentTarget.disabled = true;
       status("Working the week out\u2026");
       this._aiCall(body.sentence.script, { text, start_date: span.start_date, days: span.days, suggest: true }, {
-        title: "Plan the week in words", seen: () => this._onScreen(),
+        title: "Plan the week in words", require: "planned", missing: "No meals were suggested",
+        seen: () => this._onScreen(),
       })
         .then((got) => {
           const rows = (Array.isArray(got.planned) ? got.planned : [])
@@ -16334,7 +16344,10 @@ class SpectraCard extends HTMLElement {
         photo: kept[0].id, photo_type: kept[0].type,
         photos: kept.map((p) => ({ id: p.id, type: p.type })),
         start_date: span.start_date, days, types: [...on], request: request.value.trim(),
-      }, { title: "Meals from the fridge", seen: () => this._onScreen() }).then((got) => {
+      }, {
+        title: "Meals from the fridge", require: "planned", missing: "No meals were suggested",
+        seen: () => this._onScreen(),
+      }).then((got) => {
         const rows = (Array.isArray(got.planned) ? got.planned : [])
           .filter((p) => p && !isBlank(p.date) && !isBlank(p.meal))
           .map((p) => ({ date: String(p.date), type: String(p.entry_type || "dinner").toLowerCase(),
@@ -16650,6 +16663,8 @@ class SpectraCard extends HTMLElement {
           tab: home.tab,
           label: "recipe",
           kind: "import",
+          require: "slug",
+          missing: "No recipe found on that page",
         },
         isBlank(spec.split) ? {} : {
           then: { action: String(spec.split), pass: { recipe: "slug" }, unless: "already" },
@@ -16760,6 +16775,10 @@ class SpectraCard extends HTMLElement {
        label   the answer's key that names what came back
        open    whether the card can show the answer again later -- only
                with a `kind` _openTask knows
+       require the answer's key it has to have -- a recipe's name. An answer
+               without it found nothing, so the task is Failed, saying
+               `missing`, and the flow gets the same rejection a failed
+               call gives it
        seen    asked when it lands: true when the answer is about to be put
                in front of somebody (a sheet still open, a form popping up),
                which is seeing it, so the notice clears at once. Otherwise
@@ -16771,7 +16790,9 @@ class SpectraCard extends HTMLElement {
     return this._mealCall("home_signals.start_ai_task", Object.assign({
       title: String(firstOf(o.title, "AI task")), action: String(name), data: data || {},
       card: home.card, tab: home.tab, open: Boolean(o.open), kind: isBlank(o.kind) ? "" : String(o.kind),
-    }, isBlank(o.label) ? {} : { label: String(o.label) })).then((r) => {
+    }, isBlank(o.label) ? {} : { label: String(o.label) },
+    isBlank(o.require) ? {} : { require: String(o.require), missing: String(firstOf(o.missing, "Nothing came back")) },
+    )).then((r) => {
       if (isBlank(r.task_id)) throw new Error("the task was not started");
       return new Promise((resolve, reject) => {
         this._follows.set(String(r.task_id), { resolve, reject, seen: o.seen });
@@ -18718,7 +18739,8 @@ class SpectraCard extends HTMLElement {
           mic.classList.add("thinking");
           said.textContent = `\u201c${heard}\u201d`;
           return this._aiWS(edit.dictate, { transcript: heard }, {
-            title: "Recipe from speech", seen: () => wrap.isConnected,
+            title: "Recipe from speech", require: "name", missing: "No recipe was heard",
+            seen: () => wrap.isConnected,
           }).then((result) => {
             mic.classList.remove("thinking");
             const got = (result && result.response) || {};

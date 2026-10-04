@@ -181,6 +181,12 @@ tab and the row together, and **Open** when the answer can be shown again —
 a saved recipe opens on its sheet, an unsaved draft in the form, an import
 in its review. Two minutes after it lands it goes on its own.
 
+A call that answers without the thing asked for is **Failed**, not Done:
+each flow names the key its answer must have (`require` -- a recipe's
+name, a page's slug, the meals planned) and what the row says when it is
+missing ("No recipe found in the photo"). The flow gets the same rejection
+a failed call gives it, so the card and the row agree.
+
 An answer that is put in front of somebody as it lands — a sheet still
 open, a form or review popping up on a panel being looked at — is seen, so
 its notice clears at once. One that lands with nobody looking stays blue.
