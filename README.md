@@ -1214,7 +1214,7 @@ body:
       since: {entity: binary_sensor.anaya_s_room_anayas_room_camera_person, attribute: last_changed, format: relative}
   live:                            # what the sheet streams; an address, not a value
     fluent: camera.anaya_s_room_anayas_room_camera_fluent
-    clear: camera.anayas_room_clear  # optional; adds a Sharper button
+    clear: camera.anayas_room_clear  # optional; adds Low / High
   ptz:                             # optional; button entities
     left: button.anaya_s_room_anayas_room_camera_ptz_left
     right: button.anaya_s_room_anayas_room_camera_ptz_right
@@ -1258,7 +1258,8 @@ sound, muted until somebody taps *Sound*. If the camera offers no WebRTC,
 the session fails, or nothing has arrived after twelve seconds, it falls
 back to the MJPEG stream, which is a still fetched over and over, a couple
 of frames a second and silent, and says so under the picture. The sheet
-opens on `fluent`; *Sharper* switches to `clear`. While the sheet is up
+opens on *Low* (`fluent`); *High* switches to `clear`. The buttons say Low
+and High rather than the camera's own names for its two streams. While the sheet is up
 the card does not repaint, because a repaint takes the sheet off the page
 for a moment and a `<video>` taken off the page stops; state changes are
 handed to the sheet instead.

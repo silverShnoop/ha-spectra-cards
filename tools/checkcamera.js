@@ -214,11 +214,13 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     q("[data-ccsound]").click();
     check("and one tap turns it on", !q(".cclive video").muted && /Sound on/.test(q("[data-ccsound]").textContent), q("[data-ccsound]").textContent);
 
-    // ---- sharper
+    // ---- high
+    check("the two streams are called Low and High", qa("[data-ccwhich]").map((b) => b.textContent.trim()).join("/") === "Low/High",
+      qa("[data-ccwhich]").map((b) => b.textContent.trim()).join("/"));
     q('[data-ccwhich="clear"]').click();
     await wait(300);
     const sharp = subs[subs.length - 1];
-    check("Sharper ends the fluent session", offer.closed, "fluent still open");
+    check("High ends the low session", offer.closed, "fluent still open");
     check("and offers the clear stream", sharp !== offer && sharp.msg.entity_id === CLEAR, sharp && sharp.msg.entity_id);
 
     // ---- falling back

@@ -19585,8 +19585,11 @@ class SpectraCard extends HTMLElement {
       + `<div class="ccwait"><span class="spinner"></span></div>`
       + `<div class="ccveil" hidden>${iconMarkup("mdi:eye-off-outline")}<b>Privacy on</b><span>The camera is closed.</span></div></div>`
       + `<div class="ccbar">`
-      + (hasClear ? `<span class="ccseg" role="group" aria-label="Picture"><button type="button" data-ccwhich="fluent" aria-pressed="true">Fluent</button>`
-        + `<button type="button" data-ccwhich="clear" aria-pressed="false">Sharper</button></span>` : "")
+      /* Low and High, not the camera's own Fluent and Clear: nobody reading
+         the panel should need to know Reolink's names for its two streams. */
+      + (hasClear ? `<span class="ccseg" role="group" aria-label="Picture quality">`
+        + `<button type="button" data-ccwhich="fluent" aria-pressed="true">${iconMarkup("mdi:quality-low")}Low</button>`
+        + `<button type="button" data-ccwhich="clear" aria-pressed="false">${iconMarkup("mdi:quality-high")}High</button></span>` : "")
       + `<button type="button" class="ccbtn" data-ccsound aria-pressed="false">${iconMarkup("mdi:volume-off")}<span>Sound off</span></button>`
       + `<p class="ccnote" data-ccnote></p></div></div>`
       + (padHtml || (Array.isArray(b.toggles) && b.toggles.length)
