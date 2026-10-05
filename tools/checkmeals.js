@@ -5,7 +5,8 @@
  *     unplanned day is drawn, greyed, rather than left out
  *   - the days are LOCAL days from today, which is the one date bug this
  *     card can have that nobody would see until it planned the wrong night
- *   - a planned slot opens and shuts its tray, and only one is open at a
+ *   - a planned recipe opens the recipe, with its tray behind it; a note
+ *     opens and shuts its tray, and only one is open at a
  *     time; an empty slot opens its Plan sheet instead of a tray
  *   - Clear does not ask, sends the id as a string, and rereads the plan
  *   - the Plan sheet's Describe mic hands the words, the day and the meal
@@ -229,8 +230,16 @@ const js = fs.readFileSync(file);
     check("no tray until a slot is pressed", !q(".mltray"), "a tray was open");
     slots[0].click();
     await settle();
+    let opened = root().querySelector(".confirmwrap");
+    check("pressing a planned recipe opens the recipe", opened
+      && text(opened.querySelector(".confirmhead")) === "Sea bass with ginger",
+      opened ? text(opened.querySelector(".confirmhead")) : "no sheet");
+    check("and asks Mealie for it", asked.some((m) => m.service === "get_recipe"),
+      JSON.stringify(asked.map((m) => m.service)));
+    if (opened) opened.querySelector("[data-no]").click();
+    await settle();
     let tray = q(".mltray");
-    check("pressing a slot opens its tray", Boolean(tray), "no tray");
+    check("with its tray behind the sheet", Boolean(tray), "no tray");
     check("in the row it belongs to", tray && tray.closest(".mlday") === all(".mlday")[0],
       "tray under the wrong day");
     check("a recipe offers ingredients", Boolean(q("[data-meal-shop]")), "no shop button");
@@ -318,6 +327,8 @@ const js = fs.readFileSync(file);
     /* ---- shop ---- */
     all(".mlslot")[0].click();
     await settle();
+    root().querySelector(".confirmwrap [data-no]").click();
+    await settle();
     q("[data-meal-shop]").click();
     await settle();
     const asks = asked.find((m) => m.service === "meal_ingredients_to_items");
@@ -393,6 +404,8 @@ const js = fs.readFileSync(file);
     };
 
     all(".mlslot")[0].click();
+    await settle();
+    root().querySelector(".confirmwrap [data-no]").click();
     await settle();
     check("a recipe can be opened", Boolean(q("[data-meal-recipe]")), "no recipe button");
     check("a planned meal can be moved and cleared",
