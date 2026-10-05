@@ -155,6 +155,8 @@ const js = fs.readFileSync(file);
 
     /* ---- move, and undo ---- */
     await open(`${day(1)}|dinner`);
+    q(".confirmwrap [data-no]").click();
+    await settle();
     q(".mldetail [data-meal-move]").click();
     await settle();
     check("Move asks for the day over the screen", q(".mlmoving") && text(q(".mlmoving")).includes("Chicken fajitas"),

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.157.0";
+const VERSION = "0.158.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -15098,11 +15098,27 @@ class SpectraCard extends HTMLElement {
         /* An empty day ahead is planned: straight to the Plan sheet for
            it. A planned meal opens, which is selecting that one meal. */
         const [day, type] = key.split("|");
-        if (!mealsAt(plan, day, type).length) {
+        const here = mealsAt(plan, day, type);
+        if (!here.length) {
           if (day < localDay(0)) return;
           this._mealPick = null;
           this._voiceSay("idle", "");
           this._planOpen(body, model, { one: [day, type] });
+          return;
+        }
+        /* One meal with a recipe behind it: tapping it is wanting the
+           recipe, so the recipe opens. Its tray opens behind the sheet,
+           so Change, Move and Clear are there when the recipe is shut.
+           A note, or two meals in the slot, opens the tray as before. */
+        const only = here.length === 1 ? here[0] : null;
+        if (only && only.recipe && !isBlank(only.recipe.recipe_id) && body.recipe !== false
+          && this._mealSources.size) {
+          const [source] = this._mealSources.values();
+          this._mealPick = key;
+          this._voiceSay("idle", "");
+          this._mealRecipe(source.entry, only.recipe, model.accent, body.recipes,
+            { schedule: body.place ? Object.assign({ types: body.types }, body.place) : null,
+              meal: { body, day, type, entry: only } });
           return;
         }
         this._mealPick = this._mealPick === key ? null : key;

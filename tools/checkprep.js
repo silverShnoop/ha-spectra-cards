@@ -173,6 +173,8 @@ const js = fs.readFileSync(file);
     /* ---- one meal ---- */
     q(`.mlgridview [data-meal="${day(2)}|dinner"]`).click();
     await settle();
+    q(".confirmwrap [data-no]").click();
+    await settle();
     check("the tray says the prep is not planned", text(q(".mldetail .pptray")).includes("2 steps"), text(q(".mldetail .pptray")));
     check("the tray's prep tile reads Prep", text(q(".mldetail [data-meal-prep]")) === "Prep", text(q(".mldetail [data-meal-prep]")));
     q(".mldetail [data-meal-prep]").click();

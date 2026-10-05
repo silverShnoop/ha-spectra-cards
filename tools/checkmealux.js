@@ -132,6 +132,10 @@ const js = fs.readFileSync(file);
     const today = all(".mlgridview [data-meal]").find((c) => c.getAttribute("data-meal") === `${day(0)}|dinner`);
     today.click();
     await settle();
+    check("a planned recipe opens the recipe", top() && text(top().querySelector(".confirmhead")) !== ""
+      && Boolean(top().querySelector(".mlrecipe")), top() && text(top().querySelector(".confirmhead")));
+    top().querySelector("[data-no]").click();
+    await settle();
     check("the tray has no mic or typing of its own", q(".mldetail") && !q(".mldetail [data-meal-typed]")
       && !q(".mldetail [data-meal-say]") && !q(".mldetail [data-meal-send]"), text(q(".mldetail")));
     check("Recipe leads the tray", !!q(".mldetail .mltile[data-meal-recipe]"), text(q(".mldetail")));
