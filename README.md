@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1197,6 +1197,82 @@ later. The spinner is what covers that gap.
 
 Urgency rides the card's `outline`, not the title accent: plain when
 locked, then amber and red as the Needs-you row escalates.
+
+### `camera` — what is that room doing right now?
+
+```yaml
+body:
+  type: camera
+  picture: {entity: camera.anaya_s_room_anayas_room_camera_fluent, attribute: entity_picture}
+  refresh: 10                      # seconds between stills; default 10, floor 3
+  privacy: {entity: switch.anaya_s_room_anayas_room_camera_privacy_mode}
+  night: {entity: sensor.anaya_s_room_anayas_room_camera_day_night_state, map: {night: true}, default: false}
+  detections:
+    - name: Person
+      icon: mdi:account
+      on: {entity: binary_sensor.anaya_s_room_anayas_room_camera_person}
+      since: {entity: binary_sensor.anaya_s_room_anayas_room_camera_person, attribute: last_changed, format: relative}
+  live:                            # what the sheet streams; an address, not a value
+    fluent: camera.anaya_s_room_anayas_room_camera_fluent
+    clear: camera.anayas_room_clear  # optional; adds a Sharper button
+  ptz:                             # optional; button entities
+    left: button.anaya_s_room_anayas_room_camera_ptz_left
+    right: button.anaya_s_room_anayas_room_camera_ptz_right
+    up: button.anaya_s_room_anayas_room_camera_ptz_up
+    down: button.anaya_s_room_anayas_room_camera_ptz_down
+    stop: button.anaya_s_room_anayas_room_camera_ptz_stop
+    home: button.anaya_s_room_anayas_room_camera_guard_go_to
+  toggles:                         # optional; switches in the sheet
+    - {name: Privacy, icon: mdi:eye-off-outline, on: {entity: switch.anaya_s_room_anayas_room_camera_privacy_mode},
+       on_text: Lens shut, off_text: Lens open}
+```
+
+The card is the room as a still, and what the camera has noticed with
+when it last did. Tapping the picture opens the **live sheet**: the stream,
+a direction pad and the camera's switches. Nothing on the card is a job,
+so it takes no level; the controls are optional and live one tap away.
+
+**The still is the card's, not the body's.** A card repaints whenever
+anything it reads changes, and a camera card reads motion sensors that
+flip all day. An `<img>` in the markup was rebuilt by every one of those
+paints, went black and fetched again. So the body draws an empty frame
+and the card puts the same element back into it after every paint, loading
+each new frame off-screen and swapping it in whole. Fetching stops while
+the tab is hidden or the sheet is open. A fresh picture carries no time;
+one the camera has stopped replacing says how old it is, so a room that
+looks quiet is not mistaken for a room that is quiet now.
+
+**Privacy fetches nothing.** With the lens shut the picture is replaced by
+a plain panel saying so, and no request is made at all.
+
+**An active detection wears the card's accent, not a level.** Crying
+fills teal on a Security card, the way an active state does anywhere else.
+It is not yet a `Needs you` row, because a level is a promise and the
+camera's hearing has not been tested against this house. When it has, the
+level belongs in `home_signals`, with the row and the rail button.
+
+**Live is WebRTC first.** The sheet asks Home Assistant for a WebRTC
+session (`camera/webrtc/offer`, the same API Home Assistant's own player
+uses), which go2rtc serves without re-encoding: smooth, with the room's
+sound, muted until somebody taps *Sound*. If the camera offers no WebRTC,
+the session fails, or nothing has arrived after twelve seconds, it falls
+back to the MJPEG stream, which is a still fetched over and over, a couple
+of frames a second and silent, and says so under the picture. The sheet
+opens on `fluent`; *Sharper* switches to `clear`. While the sheet is up
+the card does not repaint, because a repaint takes the sheet off the page
+for a moment and a `<video>` taken off the page stops; state changes are
+handed to the sheet instead.
+
+**Hold to move.** A Reolink keeps turning after a move until it is told
+to stop, so the pad sends the direction on press and `stop` on every way a
+press can end: lift, cancel, the pointer escaping, and the sheet closing.
+The middle button goes to the saved home position.
+
+**No siren.** The camera has one, and it is left off on purpose: one stray
+press in a nursery costs more than the button could ever earn.
+
+**Any camera, not this one.** Nothing here knows it is a Reolink. The next
+camera, or Frigate's entities, is another card with different ids.
 
 ### `people` — who is in, who is out, and who nobody can say
 
@@ -3196,6 +3272,18 @@ the offset the panel's Roboto needed.
 So the probe is now empty and zero-height, and every card is measured through
 five unrelated font stacks. An offset that only lines up in one of them is
 not lined up.
+
+```
+node tools/checkcamera.js
+```
+
+The camera card, against a served 1x1 picture rather than a camera. It
+counts requests and service calls: the picture is one element kept
+across a repaint, a repaint fetches nothing, a shut lens fetches nothing
+at all, the live sheet sends Home Assistant's WebRTC offer and trickles
+candidates with the session id, an error or a camera without WebRTC
+falls back to the MJPEG stream, and every held arrow is followed by a
+stop, including the one interrupted by closing the sheet.
 
 ```
 node tools/checkclimate.js
