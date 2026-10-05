@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.159.0";
+const VERSION = "0.160.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1059,6 +1059,97 @@ ha-icon { display:inline-flex; line-height:0; }
 }
 .lockbtn:active { background:var(--accent); color:var(--sp-paper); }
 
+/* camera — the room as it looks. The frame is black in both themes,
+   because a picture is a picture; everything around it is the card's. */
+.ccpic {
+  position:relative; aspect-ratio:16/9; max-width:100%; border-radius:6px;
+  overflow:hidden; background:#111; margin-top:2px;
+}
+.ccpic[data-ccopen] { cursor:pointer; }
+.ccframe { position:absolute; inset:0; }
+.ccframe img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+/* Over the picture, so a dark scrim rather than a token: it has to read
+   against whatever the room happens to look like. */
+.ccbadge {
+  position:absolute; display:inline-flex; align-items:center; gap:5px;
+  font-size:11px; line-height:1; padding:5px 8px; border-radius:10px;
+  background:rgba(0,0,0,.58); color:#fff; white-space:nowrap;
+}
+.ccbadge[hidden] { display:none; }
+.ccbadge .mdi, .ccbadge ha-icon { --mdc-icon-size:13px; width:13px; height:13px; }
+.ccbadge.tl { top:8px; left:8px; }
+.ccbadge.tr { top:8px; right:8px; }
+.ccbadge.bl { bottom:8px; left:8px; }
+.ccbadge.br { bottom:8px; right:8px; }
+.ccbadge.on { background:var(--accent); color:var(--sp-surface); }
+.ccveil {
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:6px; padding:12px; text-align:center;
+  background:var(--sp-sink); color:var(--sp-ink-2); font-size:12px;
+}
+.ccveil .mdi, .ccveil ha-icon { --mdc-icon-size:30px; width:30px; height:30px; color:var(--sp-ink-3); }
+.ccveil b { font-size:14px; font-weight:600; color:var(--sp-ink); }
+.ccdets { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.ccdet {
+  display:inline-flex; align-items:center; gap:5px; height:24px;
+  font-size:12px; color:var(--sp-ink-2); background:var(--sp-sink);
+  padding:0 9px 0 7px; border-radius:12px; white-space:nowrap;
+}
+.ccdet .mdi, .ccdet ha-icon { --mdc-icon-size:14px; width:14px; height:14px; color:var(--sp-ink-3); }
+.ccdet i { font-style:normal; font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); }
+.ccdet.on { background:var(--accent); color:var(--sp-surface); font-weight:600; }
+.ccdet.on .mdi, .ccdet.on ha-icon, .ccdet.on i { color:var(--sp-surface); }
+
+/* The live sheet: the picture, then what you can do to the camera. Beside
+   each other on a wall panel so nothing scrolls; stacked on a phone. */
+.ccsheet, .ccmain { display:flex; flex-direction:column; gap:14px; min-width:0; }
+.cclive { position:relative; aspect-ratio:16/9; max-width:100%; background:#000; border-radius:6px; overflow:hidden; }
+.cclive video, .cclive img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+.cclive [hidden], .cclive .ccwait[hidden] { display:none; }
+.cclive .ccwait { position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-size:12px; }
+.cclive .ccwait .spinner { width:36px; height:36px; border-width:3px; color:#fff; border-color:rgba(255,255,255,.3); border-top-color:#fff; position:static; }
+.ccbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.ccseg { display:inline-flex; border:2px solid var(--sp-sink); border-radius:6px; overflow:hidden; }
+.ccseg button, .ccbtn {
+  height:40px; padding:0 14px; border:0; background:var(--sp-sink); color:var(--sp-ink-2);
+  font:inherit; font-size:13px; font-weight:600; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.ccseg button[aria-pressed="true"] { background:var(--accent); color:var(--sp-surface); }
+.ccbtn { border:2px solid var(--sp-sink); border-radius:6px; }
+.ccbtn[aria-pressed="true"] { background:var(--accent-soft); border-color:var(--accent); color:var(--accent-on); }
+.ccbtn .mdi, .ccbtn ha-icon, .ccseg .mdi { --mdc-icon-size:18px; width:18px; height:18px; }
+.ccnote { font-size:12px; color:var(--sp-ink-3); margin:0; }
+.ccctl { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:18px 28px; align-items:start; }
+.ccpad { display:grid; grid-template-columns:repeat(3, 56px); grid-template-rows:repeat(3, 56px); gap:6px; }
+.ccpad button {
+  border:2px solid var(--sp-sink); background:var(--sp-sink); color:var(--sp-ink-2);
+  border-radius:8px; display:grid; place-items:center; cursor:pointer; padding:0;
+  touch-action:none; user-select:none; -webkit-user-select:none;
+}
+.ccpad button .mdi, .ccpad button ha-icon { --mdc-icon-size:26px; width:26px; height:26px; }
+.ccpad button.held { background:var(--accent); border-color:var(--accent); color:var(--sp-surface); }
+.ccpad button[data-cchome] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-on); }
+.ccpadnote { grid-column:1 / -1; font-size:11px; color:var(--sp-ink-3); text-align:center; margin:2px 0 0; }
+.cctogs { display:flex; flex-direction:column; min-width:0; }
+.cctog {
+  display:flex; align-items:center; gap:10px; min-height:48px;
+  border-bottom:1px solid var(--sp-sink); font-size:14px;
+}
+.cctog:last-child { border-bottom:0; }
+.cctog > .mdi, .cctog > ha-icon { --mdc-icon-size:18px; width:18px; height:18px; color:var(--sp-ink-3); flex:none; }
+.cctog .n { flex:1 1 auto; min-width:0; }
+.cctog .s { font-size:12px; color:var(--sp-ink-3); }
+@container sheet (max-width: 520px) {
+  .ccctl { grid-template-columns:1fr; justify-items:center; }
+  .cctogs { width:100%; }
+}
+@container sheet (min-width: 860px) {
+  .ccsheet { display:grid; grid-template-columns:minmax(0, 1fr) 300px; gap:24px; align-items:start; }
+  .ccsheet > .ccctl { grid-template-columns:1fr; justify-items:center; }
+  .ccsheet .cctogs { width:100%; }
+}
+
 /* The emergency stop is deliberately not a switch. A switch says "this is
    how you turn the machine off", and it is not -- the knob on the machine
    is. A latched button behind a hazard lip says what it is, and the
@@ -1153,6 +1244,8 @@ ha-icon { display:inline-flex; line-height:0; }
    emptied the list, and a centred sheet that changes height moves every
    button on it, the one just pressed included. */
 .confirmbox.tall { height:min(100%, 820px); }
+/* The live sheet is as tall as the picture and its controls, no taller. */
+.confirmbox.tall.ccbox { height:auto; }
 .confirmbox.tall > .confirmbtns { margin-top:auto; }
 /* In a sheet of fixed height only the body gives way. The tabs, the
    quick picks and the head used to shrink with it, and at 800px tall the
@@ -1182,6 +1275,7 @@ ha-icon { display:inline-flex; line-height:0; }
   /* The suggestions are a list of days, each with its rows: one column
      reads in order, and a day never breaks from its heading. */
   .confirmwrap > .confirmbox.tall.mlpropose { max-width:min(860px, 100%); }
+  .confirmwrap > .confirmbox.tall.ccbox { height:auto; }
 }
 .confirmwrap.still, .confirmwrap.still .confirmbox, .confirmbox.still, .mldetail.still, .mlmoving.still { animation:none; }
 @keyframes sheetrise { from { transform:translateY(24px); opacity:.6; } to { transform:none; opacity:1; } }
@@ -4079,6 +4173,9 @@ const RAW_KEYS = new Set([
   "place", "write", "schedule", "photo", "fridge", "edit", "import", "ask",
   /* The to-do list's typed row: a placeholder and a preview name. */
   "add",
+  /* A camera's buttons and its streams: things to press and play, each an
+     entity id that must reach the card as written. */
+  "ptz", "live",
 ]);
 
 const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -5364,6 +5461,11 @@ const BODY_STATUS = {
     return null;
   },
 
+  /* For the spinner slot, which the live sheet's switches use. */
+  camera() {
+    return null;
+  },
+
   /* Also here only for the spinner slot. A count belongs in the card's
      own `meta`, where it can be configured, rather than being invented
      by the body. */
@@ -5958,6 +6060,45 @@ function devRow(p, what, stateOf) {
   return `<div class="devrow"><span class="devdot ${st}"></span><div class="who"><p class="name">${esc(p.name)}</p>`
     + `<p class="room">${esc(room)}</p></div>`
     + `<span class="what">${esc(what(p))}${since ? ` <span class="for">· ${esc(since)}</span>` : ""}</span></div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Cameras
+ * ------------------------------------------------------------------ */
+
+/* A switch, a binary sensor or a mapped boolean, read the one way. */
+function cameraOn(v) {
+  return v === true || v === "on" || v === "true";
+}
+
+/* Each thing the camera can notice, with when it last did. An active one
+   says "now"; a quiet one says how long ago, which is the part worth
+   reading -- "Crying 05:40" on a morning is the night summarised. A
+   `since` already worded as a time ago is left as it is. */
+function cameraDetections(b) {
+  return (Array.isArray(b.detections) ? b.detections : [])
+    .filter((d) => d && !isBlank(d.name))
+    .map((d) => {
+      const on = cameraOn(d.on);
+      const since = isBlank(d.since) ? "" : String(d.since);
+      const when = on ? "now" : (since && !/ago|:/.test(since) ? `${since} ago` : since);
+      return { name: String(d.name), icon: firstOf(d.icon, "mdi:motion-sensor"), on, when };
+    });
+}
+
+/* How long the still waits between frames. Ten seconds is what Home
+   Assistant's own picture cards use; a floor of three, because every frame
+   is a request to a camera on Wi-Fi. */
+function cameraRefreshMs(b) {
+  const n = Number(b && b.refresh);
+  return Math.max(3, Number.isFinite(n) && n > 0 ? n : 10) * 1000;
+}
+
+/* A camera's still, as an MJPEG stream instead: the same entity and token
+   under the stream path. The fallback when WebRTC cannot be had. */
+function cameraStreamUrl(entity, token) {
+  if (!/^camera\.[a-z0-9_]+$/.test(String(entity)) || isBlank(token)) return null;
+  return `/api/camera_proxy_stream/${entity}?token=${encodeURIComponent(String(token))}`;
 }
 
 const BODIES = {
@@ -6610,6 +6751,51 @@ const BODIES = {
         + ` style="${toneStyle(b.accent)}">${esc(action.label)}</button>`;
     }
     return out + `</div>`;
+  },
+
+  /* What is that room doing right now?
+
+     A camera is a fact like any other on this panel: the room as it looks,
+     and what the camera has noticed in it and when. The still is a frame
+     the card owns rather than markup -- see _bindCamera -- because the card
+     repaints whenever a motion sensor flips, and an <img> rebuilt on every
+     paint flashes black and fetches again. The body only draws where the
+     frame goes and what sits over it.
+
+     Nothing here is a job. An active detection fills with the card's own
+     accent, the way an active state does anywhere else: crying is worth
+     seeing at a glance, and it is not yet a level, because a level is a
+     promise this house has not tested the camera's hearing against. */
+  camera(b) {
+    const shut = cameraOn(b.privacy);
+    const picture = shut ? null : safePicture(b.picture);
+    const night = !shut && cameraOn(b.night);
+    const dets = cameraDetections(b);
+    const live = dets.filter((d) => d.on);
+    let out;
+    if (shut) {
+      /* The lens is shut, so there is nothing to fetch and nothing is
+         fetched. Still pressable: the sheet is where the lens opens. */
+      out = `<div class="ccpic" role="button" tabindex="0" aria-label="Camera controls" data-ccopen>`
+        + `<div class="ccveil">${iconMarkup("mdi:eye-off-outline")}<b>Privacy on</b>`
+        + `<span>The camera is closed. Tap to open it.</span></div></div>`;
+    } else if (picture) {
+      out = `<div class="ccpic" role="button" tabindex="0" aria-label="Open the live view" data-ccopen>`
+        + `<div class="ccframe" data-ccframe data-src="${esc(picture)}"></div>`
+        + (live.length ? `<span class="ccbadge tl on">${iconMarkup(live[0].icon)}${esc(live[0].name)}</span>` : "")
+        + (night ? `<span class="ccbadge tr">${iconMarkup("mdi:weather-night")}Night vision</span>` : "")
+        + `<span class="ccbadge bl" data-ccage hidden></span>`
+        + `<span class="ccbadge br">${iconMarkup("mdi:arrow-expand")}Live</span></div>`;
+    } else {
+      out = `<div class="ccpic"><div class="ccveil">${iconMarkup("mdi:cctv-off")}<b>No picture</b>`
+        + `<span>The camera is not answering.</span></div></div>`;
+    }
+    if (dets.length) {
+      out += `<div class="ccdets">` + dets.map((d) => `<span class="ccdet${d.on ? " on" : ""}">`
+        + `${iconMarkup(d.icon)}${esc(d.name)}${d.when ? ` <i>${esc(d.when)}</i>` : ""}</span>`).join("")
+        + `</div>`;
+    }
+    return out;
   },
 
   summary(b) {
@@ -8101,6 +8287,11 @@ function bodyIsEmpty(type, b) {
       return !safePicture(b.image);
     case "alert":
       return isBlank(b.title);
+    /* A camera with no picture, no shut lens and nothing it has ever
+       noticed is offline, and the devices card already says so. */
+    case "camera":
+      return !cameraOn(b.privacy) && !safePicture(b.picture)
+        && !cameraDetections(b).some((d) => d.on || d.when);
     case "quote":
       return isBlank(b.text);
     case "control":
@@ -11519,6 +11710,7 @@ class SpectraCard extends HTMLElement {
 
   connectedCallback() {
     this._startTicking();
+    if (this._cc) this._cameraTick();
     this._subscribeForecasts();
     if (!this._onOpenTask) {
       /* A Needs you row's Open. The first card that owns the task takes
@@ -11544,6 +11736,9 @@ class SpectraCard extends HTMLElement {
        with any method defined twice. */
     releaseDrawer(this);
     if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
+    /* A camera stream left running off-screen is a camera left streaming. */
+    if (this._ccSheet) this._ccSheet.sheet.finish();
+    if (this._cc && this._cc.timer) { clearTimeout(this._cc.timer); this._cc.timer = null; }
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
@@ -11937,6 +12132,12 @@ class SpectraCard extends HTMLElement {
           this._update();
         }, left + 20);
       }
+      return;
+    }
+    /* The camera's live sheet is up: it takes the news instead of the card.
+       See _cameraSheet. */
+    if (this._ccSheet && this._holder.querySelector(".ccbox")) {
+      this._ccSheet.refresh(model);
       return;
     }
     this._applyPending(model);
@@ -14295,6 +14496,7 @@ class SpectraCard extends HTMLElement {
 
   _bind(model) {
     this._bindDrawer();
+    this._bindCamera(model);
 
     const press = (sel, go) => this._holder.querySelectorAll(sel).forEach((el) => {
       const run = (event) => { event.stopPropagation(); go(el); };
@@ -18038,7 +18240,7 @@ class SpectraCard extends HTMLElement {
   }
 
   /* A sheet with a head, a body and buttons, for the two prep sheets. */
-  _prepSheet(accent, icon, head, cls) {
+  _prepSheet(accent, icon, head, cls, onClose) {
     const wrap = document.createElement("div");
     wrap.className = "confirmwrap";
     this._wearAccent(wrap, accent);
@@ -18049,6 +18251,7 @@ class SpectraCard extends HTMLElement {
       done = true;
       document.removeEventListener("keydown", onKey, true);
       if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      if (onClose) onClose();
     };
     const fill = (inner, buttons) => {
       wrap.innerHTML = `<div class="confirmbox tall${cls ? ` ${cls}` : ""}" role="dialog" aria-modal="true" aria-label="${esc(head)}">`
@@ -19256,6 +19459,416 @@ class SpectraCard extends HTMLElement {
     if (first && !recipe && !(opts && opts.draft) && first.focus && finePointer()) {
       first.focus({ preventScroll: true });
     }
+  }
+
+  /* ---- the camera ----
+     The still is an <img> the card keeps, not one the body draws. The card
+     repaints whenever anything it reads changes -- a motion sensor flipping
+     is enough -- and an <img> rebuilt by a repaint goes black and fetches
+     again. So the body leaves a frame and this puts the same element back
+     into it after every paint. A new frame is loaded off-screen and swapped
+     in whole once it has arrived, so the picture never blinks. */
+  _bindCamera(model) {
+    this._holder.querySelectorAll("[data-ccopen]").forEach((el) => {
+      const run = (event) => { event.stopPropagation(); this._cameraSheet(); };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
+    const frame = this._holder.querySelector("[data-ccframe]");
+    if (!frame) { this._cameraIdle(); return; }
+    const st = this._cc || (this._cc = { img: null, timer: null, src: "", at: 0, failed: false, loading: false });
+    st.every = cameraRefreshMs(model.body);
+    if (!st.img) { st.img = document.createElement("img"); st.img.alt = ""; }
+    frame.appendChild(st.img);
+    const src = frame.getAttribute("data-src");
+    /* A new token is the same camera, so the picture on screen stays until
+       the next frame replaces it; only the address moves. */
+    if (src !== st.src) { st.src = src; this._cameraFrame(); }
+    this._cameraAge();
+    this._cameraTick();
+  }
+
+  _cameraTick() {
+    const st = this._cc;
+    if (!st || st.timer || !st.src || !this.isConnected) return;
+    st.timer = setTimeout(() => {
+      st.timer = null;
+      /* Nobody is looking: a hidden tab, or the live sheet over the card,
+         which is already showing the room better than a still can. */
+      if (!document.hidden && !this._ccSheet) this._cameraFrame();
+      this._cameraAge();
+      this._cameraTick();
+    }, st.every || 10000);
+  }
+
+  _cameraIdle() {
+    const st = this._cc;
+    if (st && st.timer) { clearTimeout(st.timer); st.timer = null; }
+    if (st) st.src = "";
+  }
+
+  _cameraFrame() {
+    const st = this._cc;
+    if (!st || !st.src || st.loading) return;
+    st.loading = true;
+    const want = st.src;
+    const next = new Image();
+    next.alt = "";
+    next.onload = () => {
+      st.loading = false;
+      if (st.src !== want) return;
+      if (st.img && st.img.parentNode) st.img.parentNode.replaceChild(next, st.img);
+      st.img = next;
+      st.at = Date.now();
+      st.failed = false;
+      this._cameraAge();
+    };
+    next.onerror = () => { st.loading = false; st.failed = true; this._cameraAge(); };
+    next.src = `${want}${want.indexOf("?") >= 0 ? "&" : "?"}_=${Date.now()}`;
+  }
+
+  /* A picture is only worth dating once it is old enough to mislead. A
+     fresh one says nothing; one the camera has stopped replacing says how
+     old it is, so a room that looks quiet is not mistaken for a room that
+     is quiet now. */
+  _cameraAge() {
+    const st = this._cc;
+    const el = this._holder.querySelector("[data-ccage]");
+    if (!st || !el) return;
+    const stale = Math.max(30000, 3 * (st.every || 10000));
+    let text = "";
+    if (st.at && Date.now() - st.at > stale) text = `Picture ${shortDuration((Date.now() - st.at) / 1000)} old`;
+    else if (!st.at && st.failed) text = "No picture yet";
+    el.textContent = text;
+    el.hidden = !text;
+  }
+
+  /* The camera that streams. `live.fluent` names it; without one, the
+     camera whose still the card shows. */
+  _cameraEntity(which) {
+    const live = (this._config.body && this._config.body.live) || {};
+    if (which === "clear" && /^camera\./.test(String(live.clear || ""))) return String(live.clear);
+    if (/^camera\./.test(String(live.fluent || ""))) return String(live.fluent);
+    const pic = this._config.body && this._config.body.picture;
+    const id = pic && typeof pic === "object" ? pic.entity : null;
+    return /^camera\./.test(String(id || "")) ? String(id) : null;
+  }
+
+  /* The live sheet. While it is up the card does not repaint -- a repaint
+     takes the sheet off the page for a moment, and a <video> taken off the
+     page stops -- so state changes are handed to the sheet instead, and
+     the card catches up when it closes. */
+  _cameraSheet() {
+    if (this._ccSheet || !this._model) return;
+    const model = this._model;
+    const b = this._config.body || {};
+    const hasClear = Boolean(this._cameraEntity("clear")) && this._cameraEntity("clear") !== this._cameraEntity("fluent");
+    const ptz = b.ptz && typeof b.ptz === "object" ? b.ptz : null;
+    const s = { which: "fluent", sound: false, stop: null, token: null, shut: null, held: null };
+    const sheet = this._prepSheet(model.accent, firstOf(model.icon, "mdi:cctv"),
+      String(firstOf(model.title, "Camera")), "ccbox", () => this._cameraClose());
+    s.sheet = sheet;
+    this._ccSheet = s;
+
+    const pad = (dir, icon, label) => `<button type="button" aria-label="${label}" data-ccmove="${dir}">${iconMarkup(icon)}</button>`;
+    const padHtml = ptz && (ptz.left || ptz.right || ptz.up || ptz.down)
+      ? `<div class="ccpad"><span></span>${pad("up", "mdi:chevron-up", "Tilt up")}<span></span>`
+        + `${pad("left", "mdi:chevron-left", "Pan left")}`
+        + (ptz.home ? `<button type="button" aria-label="Go to the home position" data-cchome>${iconMarkup("mdi:home-outline")}</button>` : `<span></span>`)
+        + `${pad("right", "mdi:chevron-right", "Pan right")}<span></span>${pad("down", "mdi:chevron-down", "Tilt down")}<span></span>`
+        + `<p class="ccpadnote">Hold to move${ptz.home ? " · the middle goes home" : ""}</p></div>`
+      : "";
+    sheet.fill(`<div class="ccsheet"><div class="ccmain">`
+      + `<div class="cclive"><video playsinline autoplay muted hidden></video><img alt="" hidden>`
+      + `<div class="ccwait"><span class="spinner"></span></div>`
+      + `<div class="ccveil" hidden>${iconMarkup("mdi:eye-off-outline")}<b>Privacy on</b><span>The camera is closed.</span></div></div>`
+      + `<div class="ccbar">`
+      /* Low and High, not the camera's own Fluent and Clear: nobody reading
+         the panel should need to know Reolink's names for its two streams. */
+      + (hasClear ? `<span class="ccseg" role="group" aria-label="Picture quality">`
+        + `<button type="button" data-ccwhich="fluent" aria-pressed="true">${iconMarkup("mdi:quality-low")}Low</button>`
+        + `<button type="button" data-ccwhich="clear" aria-pressed="false">${iconMarkup("mdi:quality-high")}High</button></span>` : "")
+      + `<button type="button" class="ccbtn" data-ccsound aria-pressed="false">${iconMarkup("mdi:volume-off")}<span>Sound off</span></button>`
+      + `<p class="ccnote" data-ccnote></p></div></div>`
+      + (padHtml || (Array.isArray(b.toggles) && b.toggles.length)
+        ? `<div class="ccctl">${padHtml}<div class="cctogs" data-cctogs></div></div>` : "")
+      + `</div>`);
+    const wrap = sheet.wrap;
+
+    wrap.querySelectorAll("[data-ccwhich]").forEach((el) => el.addEventListener("click", () => {
+      const which = el.getAttribute("data-ccwhich");
+      if (which === s.which) return;
+      s.which = which;
+      wrap.querySelectorAll("[data-ccwhich]").forEach((x) => x.setAttribute("aria-pressed", String(x === el)));
+      this._cameraStart();
+    }));
+    const sound = wrap.querySelector("[data-ccsound]");
+    sound.addEventListener("click", () => {
+      s.sound = !s.sound;
+      const video = wrap.querySelector(".cclive video");
+      video.muted = !s.sound;
+      if (s.sound) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
+      sound.setAttribute("aria-pressed", String(s.sound));
+      sound.innerHTML = `${iconMarkup(s.sound ? "mdi:volume-high" : "mdi:volume-off")}<span>${s.sound ? "Sound on" : "Sound off"}</span>`;
+    });
+
+    /* Hold to move, let go to stop. A Reolink keeps turning after a move
+       until it is told to stop, so the stop is sent on every way a press
+       can end -- lift, cancel, the pointer escaping -- and once more when
+       the sheet closes. */
+    const press = (entity) => (entity ? this._callAction({ service: "button.press", target: { entity_id: entity } }) : null);
+    const start = (el) => {
+      const entity = ptz && ptz[el.getAttribute("data-ccmove")];
+      if (!entity || s.held) return;
+      s.held = el;
+      el.classList.add("held");
+      press(entity);
+    };
+    const end = () => {
+      if (!s.held) return;
+      s.held.classList.remove("held");
+      s.held = null;
+      press(ptz && ptz.stop);
+    };
+    s.end = end;
+    wrap.querySelectorAll("[data-ccmove]").forEach((el) => {
+      el.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        if (el.setPointerCapture) { try { el.setPointerCapture(event.pointerId); } catch (e) { /* synthetic */ } }
+        start(el);
+      });
+      ["pointerup", "pointercancel", "lostpointercapture"].forEach((name) => el.addEventListener(name, end));
+      el.addEventListener("keydown", (event) => {
+        if ((event.key === "Enter" || event.key === " ") && !event.repeat) { event.preventDefault(); start(el); }
+      });
+      el.addEventListener("keyup", (event) => { if (event.key === "Enter" || event.key === " ") end(); });
+      el.addEventListener("contextmenu", (event) => event.preventDefault());
+    });
+    const home = wrap.querySelector("[data-cchome]");
+    if (home) home.addEventListener("click", () => onPress(home, () => press(ptz.home)));
+
+    /* A wall panel's screen going off hides the page and leaves the sheet
+       up. Streaming to nobody holds the camera's Wi-Fi and a go2rtc session
+       all night, so the stream stops while hidden and comes back with it. */
+    s.onVisible = () => {
+      if (document.hidden) this._cameraStop();
+      else if (!s.shut) this._cameraStart();
+    };
+    document.addEventListener("visibilitychange", s.onVisible);
+
+    s.refresh = (m) => this._cameraRefresh(m);
+    s.refresh(model);
+  }
+
+  /* The sheet against the latest model: privacy, and the switches. */
+  _cameraRefresh(model) {
+    const s = this._ccSheet;
+    if (!s) return;
+    const wrap = s.sheet.wrap;
+    const body = model.body || {};
+    const shut = cameraOn(body.privacy);
+    if (shut !== s.shut) {
+      s.shut = shut;
+      wrap.querySelector(".cclive .ccveil").hidden = !shut;
+      if (shut) this._cameraStop(); else this._cameraStart();
+    }
+    const box = wrap.querySelector("[data-cctogs]");
+    if (!box) return;
+    const raw = Array.isArray(this._config.body.toggles) ? this._config.body.toggles : [];
+    const rows = Array.isArray(body.toggles) ? body.toggles : [];
+    box.innerHTML = rows.map((t, i) => {
+      if (!t || isBlank(t.name)) return "";
+      const on = cameraOn(t.on);
+      const said = on ? firstOf(t.on_text, "On") : firstOf(t.off_text, "Off");
+      return `<div class="cctog">${iconMarkup(firstOf(t.icon, "mdi:toggle-switch-outline"))}`
+        + `<span class="n">${esc(t.name)}</span><span class="s">${esc(said)}</span>`
+        + `<span class="switch${on ? " on" : ""}" role="switch" aria-checked="${on}" aria-label="${esc(t.name)}"`
+        + ` tabindex="0" data-cctog="${i}"><i></i></span></div>`;
+    }).join("");
+    box.querySelectorAll("[data-cctog]").forEach((el) => {
+      const spec = raw[Number(el.getAttribute("data-cctog"))] || {};
+      const entity = spec.on && typeof spec.on === "object" ? String(spec.on.entity || "") : "";
+      const action = spec.action || (entity.indexOf(".") > 0
+        ? { service: `${entity.split(".")[0]}.toggle`, target: { entity_id: entity } } : null);
+      const run = (event) => {
+        event.stopPropagation();
+        if (!action) return;
+        this._guard(action.confirm, () => {
+          /* Claimed on the knob straight away; the next state the house
+             reports redraws the row with whatever is true. */
+          el.classList.toggle("on");
+          el.setAttribute("aria-checked", String(el.classList.contains("on")));
+          onPress(el, () => this._callAction(action));
+        });
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
+  }
+
+  /* WebRTC first, through Home Assistant's own camera API -- the stream
+     goes through go2rtc untouched, so it is smooth, has the room's sound,
+     and costs the Green almost nothing. The MJPEG stream is the fallback:
+     a still fetched over and over, a couple of frames a second, but it
+     works anywhere Home Assistant does. */
+  _cameraStart() {
+    const s = this._ccSheet;
+    if (!s) return;
+    this._cameraStop();
+    if (s.shut) return;
+    const wrap = s.sheet.wrap;
+    const video = wrap.querySelector(".cclive video");
+    const img = wrap.querySelector(".cclive img");
+    const wait = wrap.querySelector(".cclive .ccwait");
+    const note = wrap.querySelector("[data-ccnote]");
+    const sound = wrap.querySelector("[data-ccsound]");
+    const entity = this._cameraEntity(s.which);
+    const token = {};
+    s.token = token;
+    wait.hidden = false;
+    note.textContent = "";
+    if (sound) sound.disabled = false;
+    const mine = () => s.token === token && this._ccSheet === s;
+    const slow = (why) => {
+      if (!mine() || s.mode === "mjpeg") return;
+      if (why) LOGGER_WARN("spectra-card: no WebRTC for the camera, using the slow stream", why);
+      if (s.rtcStop) { s.rtcStop(); s.rtcStop = null; }
+      s.mode = "mjpeg";
+      video.hidden = true;
+      video.srcObject = null;
+      const state = this._hass && this._hass.states ? this._hass.states[entity] : null;
+      const url = cameraStreamUrl(entity, state && state.attributes ? state.attributes.access_token : null);
+      if (sound) sound.disabled = true;
+      if (!url) { wait.hidden = true; note.textContent = "The live view could not be started."; return; }
+      img.onload = () => { if (mine()) { wait.hidden = true; img.hidden = false; } };
+      img.onerror = () => { if (mine()) { wait.hidden = true; note.textContent = "The live view could not be started."; } };
+      img.src = url;
+      note.textContent = "Slow view: a couple of frames a second, no sound.";
+    };
+    s.mode = "rtc";
+    video.muted = !s.sound;
+    video.onplaying = () => {
+      if (!mine() || s.mode !== "rtc") return;
+      clearTimeout(s.giveUp);
+      wait.hidden = true;
+      video.hidden = false;
+    };
+    /* Twelve seconds to a first frame. Over Nabu Casa a relayed connection
+       takes a few; one that has not shown anything by then is not coming. */
+    s.giveUp = setTimeout(() => slow("no picture after 12s"), 12000);
+    this._cameraWebRTC(entity, video, slow).then((stop) => {
+      if (mine() && s.mode === "rtc") s.rtcStop = stop; else stop();
+    }, slow);
+  }
+
+  _cameraStop() {
+    const s = this._ccSheet;
+    if (!s) return;
+    s.token = null;
+    clearTimeout(s.giveUp);
+    if (s.rtcStop) { s.rtcStop(); s.rtcStop = null; }
+    const wrap = s.sheet.wrap;
+    const video = wrap.querySelector(".cclive video");
+    const img = wrap.querySelector(".cclive img");
+    if (video) { video.srcObject = null; video.hidden = true; }
+    /* An MJPEG <img> holds its connection open until the src goes. */
+    if (img) { img.onload = null; img.onerror = null; img.removeAttribute("src"); img.hidden = true; }
+    s.mode = null;
+  }
+
+  _cameraClose() {
+    const s = this._ccSheet;
+    if (!s) return;
+    if (s.end) s.end();
+    this._cameraStop();
+    if (s.onVisible) document.removeEventListener("visibilitychange", s.onVisible);
+    this._ccSheet = null;
+    this._signature = null;
+    if (this._hass && this._config) this._update();
+  }
+
+  /* One WebRTC session, the way Home Assistant's own player opens it:
+     receive-only audio and video, the offer sent at once and candidates
+     trickled after it, queued until the session has an id. Resolves to
+     the function that ends it; calls `fail` with why if it cannot. */
+  _cameraWebRTC(entity, video, fail) {
+    const hass = this._hass;
+    if (!entity || !hass || !hass.connection || typeof hass.callWS !== "function"
+      || typeof hass.connection.subscribeMessage !== "function" || typeof RTCPeerConnection !== "function") {
+      return Promise.reject(new Error("WebRTC is not available here"));
+    }
+    let pc = null;
+    let unsub = null;
+    let ended = false;
+    const stop = () => {
+      ended = true;
+      if (unsub) { Promise.resolve(unsub).then((u) => { if (typeof u === "function") u(); }, () => {}); unsub = null; }
+      if (pc) { try { pc.close(); } catch (e) { /* closed */ } pc = null; }
+    };
+    return Promise.resolve(hass.callWS({ type: "camera/capabilities", entity_id: entity }))
+      .then((caps) => {
+        const types = caps && Array.isArray(caps.frontend_stream_types) ? caps.frontend_stream_types : [];
+        if (types.indexOf("web_rtc") < 0) throw new Error(`${entity} offers no WebRTC`);
+        return Promise.resolve(hass.callWS({ type: "camera/webrtc/get_client_config", entity_id: entity }))
+          .catch(() => ({}));
+      })
+      .then((client) => {
+        if (ended) return stop;
+        pc = new RTCPeerConnection((client && client.configuration) || {});
+        if (client && client.dataChannel) pc.createDataChannel(String(client.dataChannel));
+        pc.addTransceiver("audio", { direction: "recvonly" });
+        pc.addTransceiver("video", { direction: "recvonly" });
+        const stream = new MediaStream();
+        pc.ontrack = (event) => {
+          stream.addTrack(event.track);
+          if (video.srcObject !== stream) video.srcObject = stream;
+          const p = video.play();
+          if (p && p.catch) p.catch(() => {});
+        };
+        let session = null;
+        const queued = [];
+        const send = (candidate) => Promise.resolve(hass.callWS({
+          type: "camera/webrtc/candidate", entity_id: entity, session_id: session, candidate,
+        })).catch(() => {});
+        pc.onicecandidate = (event) => {
+          if (!event.candidate || !event.candidate.candidate) return;
+          const c = event.candidate.toJSON();
+          if (session) send(c); else queued.push(c);
+        };
+        pc.oniceconnectionstatechange = () => {
+          if (pc && pc.iceConnectionState === "failed") fail(new Error("the connection failed"));
+        };
+        return pc.createOffer().then((offer) => pc.setLocalDescription(offer).then(() => offer)).then((offer) => {
+          if (ended) return stop;
+          unsub = hass.connection.subscribeMessage((event) => {
+            if (ended || !pc || !event) return;
+            if (event.type === "session") {
+              session = event.session_id;
+              queued.splice(0).forEach(send);
+            } else if (event.type === "answer") {
+              if (pc.signalingState === "stable" || pc.signalingState === "closed") return;
+              pc.setRemoteDescription({ type: "answer", sdp: event.answer }).catch(fail);
+            } else if (event.type === "candidate") {
+              const c = event.candidate || {};
+              const mid = firstOf(c.sdpMid, c.sdp_mid);
+              const line = c.sdpMLineIndex !== undefined ? c.sdpMLineIndex : c.sdp_m_line_index;
+              const init = mid !== null || (line !== undefined && line !== null)
+                ? { candidate: c.candidate, sdpMid: mid, sdpMLineIndex: line === undefined ? null : line }
+                : { candidate: c.candidate, sdpMid: "0" };
+              pc.addIceCandidate(init).catch((e) => LOGGER_WARN("spectra-card: a camera candidate was refused", e));
+            } else if (event.type === "error") {
+              fail(new Error(String(firstOf(event.message, event.code, "WebRTC error"))));
+            }
+          }, { type: "camera/webrtc/offer", entity_id: entity, offer: offer.sdp });
+          Promise.resolve(unsub).catch(fail);
+          return stop;
+        });
+      })
+      .catch((error) => { stop(); throw error; });
   }
 
   _guard(spec, go) {
