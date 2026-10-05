@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.158.0";
+const VERSION = "0.159.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2264,8 +2264,8 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 /* Cropping, the photo stands in from the edges so a corner's handle is
    never off the screen; the dimming stays inside the picture. */
 .camview.cropping img { inset:24px; width:calc(100% - 48px); height:calc(100% - 48px); }
-/* Live, the whole picture is the shutter: one hand holds the phone and its
-   thumb can reach anywhere on it, not just one button at the bottom. */
+/* Live, the whole picture is the shutter, and there is no other: one hand
+   holds the phone and its thumb can reach anywhere on it. */
 .camview.live { cursor:pointer; touch-action:manipulation; }
 .camview video, .camview img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
 .camview [hidden] { display:none; }
@@ -2274,6 +2274,10 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
   padding:18px 24px 22px; min-height:120px; box-sizing:border-box;
 }
 .cambar[hidden] { display:none; }
+/* Live: the gallery on the left and, with two cameras, the flip on the
+   right. The same size as the review's row, so the picture does not jump
+   when it is taken. */
+.cambar[data-live]:not([hidden]) { display:flex; justify-content:space-between; }
 .cambar[data-review] { grid-template-columns:repeat(4, 1fr); gap:8px; padding-left:12px; padding-right:12px; }
 .cambar[data-cropbar] { grid-template-columns:1fr 1fr; gap:12px; }
 /* Taking: the picture stands still under a spinner until it can be checked. */
@@ -2299,13 +2303,6 @@ button.mlhead .mlheadchk { position:absolute; left:4px; top:50%; transform:trans
 span.camicon { background:none; }
 .camicon[hidden] { visibility:hidden; display:grid; }
 .camicon .mdi, .camicon ha-icon { width:24px; height:24px; --mdc-icon-size:24px; }
-.camshutter {
-  width:76px; height:76px; border-radius:50%; cursor:pointer; padding:0;
-  background:#fff; border:4px solid #000; box-shadow:0 0 0 4px #fff;
-  transition:transform .08s ease-out;
-}
-.camshutter:active { transform:scale(.92); }
-.camshutter:disabled { opacity:.4; cursor:default; }
 .camtext {
   width:100%; min-height:48px; border-radius:24px; font:inherit; font-size:15px; font-weight:600;
   cursor:pointer; border:1px solid rgba(255,255,255,.4); background:none; color:#fff;
@@ -2316,9 +2313,8 @@ span.camicon { background:none; }
 .cambar[data-review] .camtext { font-size:14px; padding:0 4px; }
 /* Sideways, the controls stand in a column on the right, as the phone's
    own camera has them: a bottom row would take a third of the height from
-   a picture that has least of it. The shutter stays in the middle, the
-   flip above it and the gallery below, and close and the hint float over
-   the picture's top. */
+   a picture that has least of it. The flip at the top, the gallery at the
+   bottom, and close and the hint float over the picture's top. */
 @media (orientation: landscape) {
   .camwrap { flex-direction:row; padding:0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); }
   .camtop { position:absolute; left:0; right:140px; top:0; z-index:1; pointer-events:none;
@@ -2328,9 +2324,7 @@ span.camicon { background:none; }
   .camview { height:100%; }
   .cambar { grid-template-columns:none; grid-template-rows:1fr auto 1fr; width:140px; min-height:0;
     padding:16px 18px; align-content:center; }
-  .cambar [data-flip] { order:0; }
-  .cambar .camshutter { order:1; }
-  .cambar [data-gallery] { order:2; }
+  .cambar[data-live] { flex-direction:column-reverse; align-items:center; padding:24px 18px; }
   .cambar[data-review], .cambar[data-cropbar] { grid-template-columns:none; grid-template-rows:none; grid-auto-rows:auto;
     align-content:center; gap:12px; padding:16px 14px; }
   .cambar[data-review] [data-use], .cambar[data-cropbar] [data-cropdone] { order:0; }
@@ -2338,7 +2332,7 @@ span.camicon { background:none; }
   .cambar[data-review] [data-crop] { order:2; }
   .cambar[data-review] [data-retake], .cambar[data-cropbar] [data-cropreset] { order:3; }
 }
-@media (prefers-reduced-motion: reduce) { .camwrap { animation:none; } .camshutter { transition:none; } }
+@media (prefers-reduced-motion: reduce) { .camwrap { animation:none; } }
 /* The recipe's photo: small, because the form is for the words. */
 .mlform .mlphoto { display:flex; align-items:center; gap:12px; margin-top:4px; }
 .mlphoto .mlpic {
@@ -9002,13 +8996,12 @@ function enhancePhoto(src) {
 }
 
 /* The card's camera, laid out like the phone's own: the picture full
-   screen on black, a round shutter in the middle of the bottom row, the
-   gallery to its left and, where there are two cameras, a flip to its
-   right; close at the top. Black in both themes, because a viewfinder is
+   screen on black, the gallery at the left of the bottom row and, where
+   there are two cameras, a flip at its right; close at the top. Black in both themes, because a viewfinder is
    judged by the picture and anything lighter around it reads as glare.
 
-   The whole picture is the shutter as well as the button: a phone held in
-   one hand is pressed with the thumb that holds it. The moment it is
+   The whole picture is the shutter, and there is no round button: a phone
+   held in one hand is pressed with the thumb that holds it. The moment it is
    pressed the picture stands still under a spinner, so it is plain that
    the photo has been taken and is on its way.
 
@@ -9016,7 +9009,8 @@ function enhancePhoto(src) {
    photo -- because what happens next is a model reading the page, and a
    blurred or dim page is found out there, a minute later, as a recipe it
    could not read. Crop drags a box by its corners, or moves it; Enhance
-   is a toggle, so it can be compared and undone.
+   is a toggle, so it can be compared and undone, and only the first press
+   takes a moment.
 
    Resolves a JPEG file, the file chosen from the gallery, or null. The
    camera is let go however it closes. It wears the card's accent: Use
@@ -9033,14 +9027,13 @@ function cameraSheet(holder, media, stream, accent, gallery) {
     wrap.setAttribute("aria-label", "Take a photo");
     wrap.innerHTML = `<div class="camtop"><button type="button" class="camicon" data-no aria-label="Close">${iconMarkup("mdi:close")}</button>`
       + `<span class="camhint" data-hint>Fit the whole page in · tap to take</span><span class="camicon" aria-hidden="true"></span></div>`
-      + `<div class="camview live" data-view aria-label="Tap to take the photo"><video autoplay playsinline muted></video><img alt="The photo taken" hidden>`
+      + `<div class="camview live" data-view role="button" tabindex="0" aria-label="Take the photo" aria-disabled="true"><video autoplay playsinline muted></video><img alt="The photo taken" hidden>`
       + `<div class="camcrop" data-cropper hidden><div class="box">`
       + `<span class="h" data-h="nw"></span><span class="h" data-h="ne"></span><span class="h" data-h="sw"></span><span class="h" data-h="se"></span>`
       + `</div></div>`
       + `<div class="camwait" data-wait hidden><span class="spinner"></span></div></div>`
       + `<div class="cambar" data-live>`
       + `<button type="button" class="camicon" data-gallery aria-label="Choose from the gallery">${iconMarkup("mdi:image-outline")}</button>`
-      + `<button type="button" class="camshutter" data-shoot aria-label="Take the photo" disabled></button>`
       + `<button type="button" class="camicon" data-flip aria-label="Switch camera" hidden>${iconMarkup("mdi:camera-flip-outline")}</button></div>`
       + `<div class="cambar" data-review hidden>`
       + `<button type="button" class="camtext" data-retake>Retake</button>`
@@ -9053,7 +9046,6 @@ function cameraSheet(holder, media, stream, accent, gallery) {
     const video = wrap.querySelector("video");
     const still = wrap.querySelector("img");
     const view = wrap.querySelector("[data-view]");
-    const shoot = wrap.querySelector("[data-shoot]");
     const flip = wrap.querySelector("[data-flip]");
     const wait = wrap.querySelector("[data-wait]");
     const hint = wrap.querySelector("[data-hint]");
@@ -9067,10 +9059,18 @@ function cameraSheet(holder, media, stream, accent, gallery) {
     let orig = null;
     let better = null;
     let enhanced = false;
+    /* Each version of the still shown, plain and enhanced, crop by crop,
+       kept once made: Enhance pressed again is a swap, not the whole
+       photo worked and encoded a second time. */
+    let shots = new Map();
     let crop = { l: 0, t: 0, r: 1, b: 1 };
     let done = false;
     const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; };
-    const drop = () => { if (still.src) URL.revokeObjectURL(still.src); still.removeAttribute("src"); };
+    const drop = () => {
+      shots.forEach((u) => URL.revokeObjectURL(u));
+      shots = new Map();
+      still.removeAttribute("src");
+    };
     const finish = (file) => {
       if (done) return;
       done = true;
@@ -9085,7 +9085,7 @@ function cameraSheet(holder, media, stream, accent, gallery) {
     const setBusy = (on) => {
       busy = on;
       wait.hidden = !on;
-      wrap.querySelectorAll(".cambar button").forEach((btn) => { btn.disabled = on || (btn === shoot && !video.videoWidth); });
+      wrap.querySelectorAll(".cambar button").forEach((btn) => { btn.disabled = on; });
     };
     const setMode = (m) => {
       mode = m;
@@ -9099,6 +9099,7 @@ function cameraSheet(holder, media, stream, accent, gallery) {
         : m === "crop" ? "Drag the corners, or move the box" : "Check it can be read";
     };
     const base = () => (enhanced ? (better || (better = enhancePhoto(orig))) : orig);
+    const shotKey = () => `${enhanced ? 1 : 0}|${crop.l},${crop.t},${crop.r},${crop.b}`;
     /* The photo as it would be used: the crop of the enhanced or plain photo. */
     const render = () => {
       const src = base();
@@ -9114,20 +9115,28 @@ function cameraSheet(holder, media, stream, accent, gallery) {
       return c;
     };
     const blobOf = (canvas) => new Promise((res) => canvas.toBlob((bl) => res(bl), "image/jpeg", 0.92));
-    const showStill = (canvas) => blobOf(canvas).then((bl) => {
-      if (!bl || done) return false;
-      drop();
-      still.src = URL.createObjectURL(bl);
-      return new Promise((res) => { still.onload = () => res(true); still.onerror = () => res(false); });
-    });
+    const showUrl = (url) => (still.getAttribute("src") === url ? Promise.resolve(true)
+      : new Promise((res) => { still.onload = () => res(true); still.onerror = () => res(false); still.src = url; }));
+    /* `make` draws the still, and is only asked when this one is new. */
+    const showStill = (make, key = shotKey()) => {
+      if (shots.has(key)) return showUrl(shots.get(key));
+      return blobOf(make()).then((bl) => {
+        if (!bl || done) return false;
+        const url = URL.createObjectURL(bl);
+        shots.set(key, url);
+        return showUrl(url);
+      });
+    };
     const show = (s) => {
       stream = s;
-      shoot.disabled = true;
+      ready(false);
       video.srcObject = s;
       const play = video.play && video.play();
       if (play && play.catch) play.catch(() => {});
     };
-    const live = () => { if (video.videoWidth && !busy) shoot.disabled = false; };
+    /* Ready to take once the camera is showing a picture. */
+    const ready = (on) => view.setAttribute("aria-disabled", on ? "false" : "true");
+    const live = () => { if (video.videoWidth && !busy) ready(true); };
     video.addEventListener("loadedmetadata", live);
     video.addEventListener("playing", live);
     show(stream);
@@ -9160,10 +9169,11 @@ function cameraSheet(holder, media, stream, accent, gallery) {
       orig.height = h;
       orig.getContext("2d").drawImage(video, 0, 0, w, h);
       better = null;
+      drop();
       enhanced = false;
       enhanceBtn.setAttribute("aria-pressed", "false");
       crop = { l: 0, t: 0, r: 1, b: 1 };
-      showStill(orig).then((ok) => {
+      showStill(() => orig).then((ok) => {
         setBusy(false);
         if (!ok) { retake(); return; }
         setMode("review");
@@ -9178,20 +9188,32 @@ function cameraSheet(holder, media, stream, accent, gallery) {
       if (play && play.catch) play.catch(() => {});
       live();
     };
-    shoot.addEventListener("click", take);
     view.addEventListener("click", (e) => {
       if (mode !== "live" || e.target.closest(".camcrop")) return;
+      take();
+    });
+    view.addEventListener("keydown", (e) => {
+      if (mode !== "live" || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
       take();
     });
     wrap.querySelector("[data-retake]").addEventListener("click", () => { if (!busy) retake(); });
     enhanceBtn.addEventListener("click", () => {
       if (busy || !orig) return;
+      /* Seen before: swapped at once, with no spinner. */
+      enhanced = !enhanced;
+      if (shots.has(shotKey())) {
+        enhanceBtn.setAttribute("aria-pressed", String(enhanced));
+        showStill(render);
+        return;
+      }
+      enhanced = !enhanced;
       setBusy(true);
       /* The spinner draws before the work starts, which can take a moment. */
       setTimeout(() => {
         enhanced = !enhanced;
         enhanceBtn.setAttribute("aria-pressed", String(enhanced));
-        showStill(render()).then(() => setBusy(false));
+        showStill(render).then(() => setBusy(false));
       }, 30);
     });
 
@@ -9221,7 +9243,7 @@ function cameraSheet(holder, media, stream, accent, gallery) {
     wrap.querySelector("[data-crop]").addEventListener("click", () => {
       if (busy || !orig) return;
       setBusy(true);
-      showStill(base()).then(() => {
+      showStill(base, `${enhanced ? 1 : 0}|whole`).then(() => {
         setBusy(false);
         setMode("crop");
         place();
@@ -9269,7 +9291,7 @@ function cameraSheet(holder, media, stream, accent, gallery) {
     wrap.querySelector("[data-cropdone]").addEventListener("click", () => {
       if (busy) return;
       setBusy(true);
-      showStill(render()).then(() => { setBusy(false); setMode("review"); });
+      showStill(render).then(() => { setBusy(false); setMode("review"); });
     });
     const onResize = () => { if (mode === "crop") place(); };
     window.addEventListener("resize", onResize);

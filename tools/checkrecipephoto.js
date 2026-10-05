@@ -319,16 +319,12 @@ const js = fs.readFileSync(file);
     check("Take opens the camera in the card, full screen", Boolean(cam("video")) && picks.length === picksBefore
       && Math.abs(q(".camwrap").getBoundingClientRect().height - innerHeight) < 2, `${!!cam("video")} ${picks.length - picksBefore} file inputs`);
     check("the back camera is asked for", stream && JSON.stringify(stream.asked.video.facingMode) === '{"ideal":"environment"}', stream && JSON.stringify(stream.asked));
-    const shutter = cam("[data-shoot]");
-    await until(() => !shutter.disabled);
-    check("the shutter works once the picture is live", !shutter.disabled, "still disabled");
-    /* Seen, not just there: it once had no fill, and was invisible. */
-    const look = getComputedStyle(shutter);
+    const shutter = cam("[data-view]");
+    await until(() => shutter.getAttribute("aria-disabled") === "false");
+    check("the picture is the shutter once it is live", shutter.getAttribute("aria-disabled") === "false"
+      && shutter.getAttribute("role") === "button", shutter.outerHTML.slice(0, 120));
+    check("and there is no round shutter button", !cam("[data-shoot]") && !cam(".camshutter"), "a shutter button");
     const clear = (c) => c === "transparent" || /rgba\(.*,\s*0\)$/.test(c);
-    const sb = shutter.getBoundingClientRect();
-    check("the shutter is a round, filled button in the middle of the bottom row", !clear(look.backgroundColor)
-      && Math.abs(sb.left + sb.width / 2 - innerWidth / 2) < 2 && sb.width >= 64 && look.borderRadius === "50%",
-      `${look.backgroundColor} ${sb.left} ${sb.width} ${look.borderRadius}`);
     check("one camera: no flip", cam("[data-flip]").hidden, "flip shown");
     const viewBefore = q(".camwrap .camview").getBoundingClientRect().height;
     shutter.click();
@@ -342,7 +338,8 @@ const js = fs.readFileSync(file);
     check("nothing is read before Use photo", !q(".confirmwrap [data-pic]"), "read already");
     cam("[data-retake]").click();
     await settle();
-    check("Retake goes back to the live picture", !cam("video").hidden && cam("img").hidden && !cam("[data-live]").hidden && !shutter.disabled, "not live");
+    check("Retake goes back to the live picture", !cam("video").hidden && cam("img").hidden && !cam("[data-live]").hidden
+      && shutter.getAttribute("aria-disabled") === "false", "not live");
     shutter.click();
     await until(() => cam("[data-review]") && !cam("[data-review]").hidden);
     cam("[data-use]").click();
@@ -356,7 +353,7 @@ const js = fs.readFileSync(file);
 
     /* ---- one hand: the picture is the shutter, and stands still while it is taken ---- */
     await open();
-    await until(() => !cam("[data-shoot]").disabled);
+    await until(() => cam("[data-view]").getAttribute("aria-disabled") === "false");
     const realToBlob = HTMLCanvasElement.prototype.toBlob;
     let release = null;
     HTMLCanvasElement.prototype.toBlob = function slow(cb, ...rest) {
@@ -397,8 +394,8 @@ const js = fs.readFileSync(file);
     paint = dull;
     dull();
     await tick(); await tick(); await tick();
-    await until(() => !cam("[data-shoot]").disabled);
-    cam("[data-shoot]").click();
+    await until(() => cam("[data-view]").getAttribute("aria-disabled") === "false");
+    cam("[data-view]").click();
     await until(() => !cam("[data-review]").hidden);
     const before = await range();
     cam("[data-enhance]").click();
@@ -410,6 +407,20 @@ const js = fs.readFileSync(file);
     await until(() => cam("[data-enhance]").getAttribute("aria-pressed") === "false" && cam("[data-wait]").hidden);
     await settle();
     check("and pressed again puts it back", Math.abs(await range() - before) < 6, String(await range()));
+    /* Both versions have been seen: pressing it now is a swap, at once. */
+    const realToBlob2 = HTMLCanvasElement.prototype.toBlob;
+    let encoded = 0;
+    HTMLCanvasElement.prototype.toBlob = function counted(...a) { encoded += 1; return realToBlob2.apply(this, a); };
+    cam("[data-enhance]").click();
+    check("and pressed a third time it is on again at once, with no spinner",
+      cam("[data-enhance]").getAttribute("aria-pressed") === "true" && cam("[data-wait]").hidden, "waited");
+    await settle();
+    check("without working the photo again", encoded === 0 && await range() > before + 60, `${encoded} encodes`);
+    cam("[data-enhance]").click();
+    await settle();
+    check("and off again the same way", encoded === 0 && Math.abs(await range() - before) < 6
+      && cam("[data-enhance]").getAttribute("aria-pressed") === "false", `${encoded} encodes`);
+    HTMLCanvasElement.prototype.toBlob = realToBlob2;
     paint = keep;
 
     /* ---- Crop: drag a corner, then Done; the photo used is the box ---- */
@@ -547,22 +558,21 @@ const js = fs.readFileSync(file);
     navigator.mediaDevices.enumerateDevices = () => Promise.resolve([{ kind: "videoinput" }, { kind: "videoinput" }]);
     const picked = card._pickPhoto(true, 6);
     const q = (sel) => card.shadowRoot.querySelector(sel);
-    await until(() => q(".camwrap [data-shoot]") && !q(".camwrap [data-shoot]").disabled && !q(".camwrap [data-flip]").hidden);
+    await until(() => q(".camwrap [data-view]") && q(".camwrap [data-view]").getAttribute("aria-disabled") === "false" && !q(".camwrap [data-flip]").hidden);
     const box = (sel) => q(sel).getBoundingClientRect();
     const view = box(".camwrap .camview");
     const bar = box(".camwrap [data-live]");
-    const shoot = box(".camwrap [data-shoot]");
     const flip = box(".camwrap [data-flip]");
     const gallery = box(".camwrap [data-gallery]");
     check("sideways, the controls are a column on the right", bar.left >= view.right - 1 && bar.right >= innerWidth - 1 && bar.height >= innerHeight - 2,
       JSON.stringify({ view: [view.left, view.right], bar: [bar.left, bar.right, bar.height] }));
     check("the picture takes the full height", Math.abs(view.height - innerHeight) < 2, `${view.height} of ${innerHeight}`);
-    check("the shutter in the middle of the column, flip above, gallery below",
-      Math.abs(shoot.top + shoot.height / 2 - innerHeight / 2) < 3 && flip.bottom <= shoot.top && gallery.top >= shoot.bottom,
-      JSON.stringify({ flip: flip.top, shoot: shoot.top, gallery: gallery.top }));
+    check("flip at the top of the column, gallery at the bottom", flip.bottom <= gallery.top
+      && flip.top < innerHeight / 2 && gallery.bottom > innerHeight / 2,
+      JSON.stringify({ flip: flip.top, gallery: gallery.top }));
     const close = box(".camwrap [data-no]");
     check("close floats over the picture's top left", close.top < 40 && close.left < 40 && close.right <= view.right, JSON.stringify([close.left, close.top]));
-    q(".camwrap [data-shoot]").click();
+    q(".camwrap [data-view]").click();
     await until(() => !q(".camwrap [data-review]").hidden);
     const view2 = box(".camwrap .camview");
     check("the picture does not move when the shutter is pressed", Math.abs(view2.width - view.width) < 1, `${view.width} -> ${view2.width}`);
