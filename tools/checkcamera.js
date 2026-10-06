@@ -335,6 +335,76 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     return problems;
   });
 
+  /* The same view held three ways: a phone upright, a phone sideways, and
+     the stream pill and title symbol on the way. */
+  const layout = async (w, h) => {
+    await page.setViewportSize({ width: w, height: h });
+    return page.evaluate(async () => {
+      const problems = [];
+      const check = (name, ok, got) => {
+        console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : "  -> " + got}`);
+        if (!ok) problems.push(`${name}: ${got}`);
+      };
+      const CAM = "camera.nursery_fluent";
+      const hass = {
+        states: {
+          [CAM]: { state: "idle", attributes: { entity_picture: `/api/camera_proxy/${CAM}?token=T1`, access_token: "T1" } },
+          "camera.nursery_clear": { state: "idle", attributes: { access_token: "C1" } },
+        },
+        themes: { darkMode: false }, callService: () => Promise.resolve(),
+        callWS: () => Promise.resolve({ frontend_stream_types: [] }),
+        connection: { subscribeMessage: () => Promise.resolve(() => {}) },
+      };
+      const holder = document.getElementById("a");
+      holder.innerHTML = "";
+      const el = document.createElement("spectra-card");
+      el.setConfig({ type: "custom:spectra-card", accent: 4, icon: "mdi:cctv", title: "Nursery", body: {
+        type: "camera", picture: { entity: CAM, attribute: "entity_picture" },
+        live: { fluent: CAM, clear: "camera.nursery_clear" },
+        ptz: { left: "b.l", right: "b.r", up: "b.u", down: "b.d", stop: "b.s" } } });
+      holder.appendChild(el);
+      el.hass = hass;
+      await new Promise((r) => setTimeout(r, 80));
+      const q = (sel) => el.shadowRoot.querySelector(sel);
+      const sym = q(".titlebar [data-expand]");
+      check("a card that opens full screen says so beside its title", !!sym, "no symbol");
+      sym.click();
+      await new Promise((r) => setTimeout(r, 300));
+      const top = q(".cctop").getBoundingClientRect();
+      const live = q(".cclive").getBoundingClientRect();
+      const side = q(".ccside");
+      const out = { w: innerWidth, h: innerHeight, top, live, sideShown: getComputedStyle(side).display !== "none",
+        sideBtn: getComputedStyle(q("[data-ccside]")).display !== "none" };
+      const pill = q("[data-ccstream]");
+      out.pill = pill && pill.textContent;
+      if (pill) { pill.click(); await new Promise((r) => setTimeout(r, 50)); out.pillAfter = pill.textContent;
+        out.high = q('[data-ccwhich="clear"]').getAttribute("aria-pressed"); }
+      if (out.sideBtn) {
+        q("[data-ccside]").click();
+        out.sideOpened = getComputedStyle(side).display !== "none";
+      }
+      q("[data-no]").click();
+      return out;
+    });
+  };
+  const portrait = await layout(390, 800);
+  const pcheck = (name, ok, got) => { console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : "  -> " + got}`); if (!ok) fails.push(name); };
+  pcheck("upright, the bar sits above the picture, not over it", portrait.live.top >= portrait.top.bottom - 0.5,
+    `bar ends ${portrait.top.bottom}, picture starts ${portrait.live.top}`);
+  pcheck("and the controls are under it, always shown", portrait.sideShown && !portrait.sideBtn, JSON.stringify(portrait));
+  pcheck("the bar says which stream is playing", portrait.pill === "Low", portrait.pill);
+  pcheck("and a tap on it swaps the stream", portrait.pillAfter === "High" && portrait.high === "true",
+    `${portrait.pillAfter} / ${portrait.high}`);
+  const sideways = await layout(800, 380);
+  pcheck("a phone turned sideways gives the picture the whole screen",
+    Math.round(sideways.live.width) === 800 && Math.round(sideways.live.height) === 380 && !sideways.sideShown,
+    `${sideways.live.width}x${sideways.live.height}, side ${sideways.sideShown}`);
+  pcheck("with the bar laid over its top", sideways.top.top === 0 && sideways.live.top === 0, JSON.stringify(sideways.top));
+  pcheck("and the controls a drawer opened from the bar", sideways.sideBtn && sideways.sideOpened, JSON.stringify(sideways));
+  const panel = await layout(1200, 800);
+  pcheck("a wall panel keeps the controls in a column beside the picture",
+    panel.sideShown && !panel.sideBtn && Math.round(panel.live.width) === 880, `${panel.live.width}`);
+
   await browser.close();
   server.close();
   console.log(fails.length ? `FAILED (${fails.length})` : "OK (camera: one picture, kept; live first, slow when it must; every move stopped)");

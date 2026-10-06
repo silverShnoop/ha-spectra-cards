@@ -1276,9 +1276,19 @@ the card does not repaint, because a repaint takes the sheet off the page
 for a moment and a `<video>` taken off the page stops; state changes are
 handed to the sheet instead.
 
-**The live view is the whole screen**, black in both themes, with the
-camera's controls in a column beside it on a wall panel and under it on a
-phone held upright. Close is top left; Escape closes it too.
+**The live view is the whole screen**, black in both themes. A card that
+opens one says so with a symbol beside its title (`BODY_EXPANDS`), and the
+symbol opens it as the picture does. The bar along the top carries close,
+the camera's name, the zoom, and the stream it is playing, Low or High, as
+a pill that swaps it on a tap.
+
+It lays itself out for how the screen is held. A wall panel has the
+controls in a column beside the picture, with the bar laid over the
+picture's top. A phone held upright has the bar *above* the picture, where
+laid over it the close button sat on the top of the room, and the
+controls underneath. A phone turned sideways gives the picture the whole
+screen, the bar fading over its top, and the controls become a drawer
+opened from the bar. Escape closes the view.
 
 **Pinch to zoom.** Two fingers zoom about the point between them, one
 finger drags a zoomed picture around, a double tap zooms in or back out,
