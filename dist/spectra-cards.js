@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.160.1";
+const VERSION = "0.161.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -809,6 +809,9 @@ ha-icon { display:inline-flex; line-height:0; }
 .phlive.ph-heat ha-icon { animation:sp-breathe 3s ease-in-out infinite; }
 .phlive.ph-tumble ha-icon { animation:sp-phase-tumble 3s ease-in-out infinite; }
 .phlive.ph-spin ha-icon { animation:sp-spin 1.6s linear infinite; }
+/* The spray arm turns one way and keeps turning, but it is water, not a
+   drum flat out: slower than spin, so the two never read as one. */
+.phlive.ph-wash ha-icon { animation:sp-spin 4s linear infinite; }
 @keyframes sp-phase-fill {
   0%   { transform:translateY(-135%); opacity:0; }
   22%  { opacity:1; }
@@ -3383,7 +3386,8 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
      those rules outrank -- a one-class difference is the whole reason
      a reduced-motion override silently fails. */
   .phcell.now.ph-fill ha-icon, .phcell.now.ph-heat ha-icon,
-  .phcell.now.ph-tumble ha-icon, .phcell.now.ph-spin ha-icon {
+  .phcell.now.ph-tumble ha-icon, .phcell.now.ph-spin ha-icon,
+  .phcell.now.ph-wash ha-icon {
     animation:none; opacity:1; transform:none;
   }
   .fk { opacity:0; }
@@ -11151,6 +11155,14 @@ function washerDrum(b, cycle, leak, powered, waiting) {
  *   tumble  mdi:sync            two arrows opposed -- the drum reverses
  *   spin    mdi:rotate-right    one arrow, one direction, flat out
  *
+ * And a fifth, which is a dishwasher's only answer besides heat:
+ *
+ *   wash    mdi:water-sync      water, going round -- the pump through
+ *                               the spray arms. Not tumble: nothing in a
+ *                               dishwasher tumbles, and a dishwasher card
+ *                               saying "Tumbling" is the dryer's mistake
+ *                               of wearing a washing machine, again.
+ *
  * Mirror images (rotate-left against rotate-right) were the obvious pair
  * and the worst one: at 17px two glyphs that differ only in handedness
  * are one glyph. Opposed-versus-single is a difference in FORM, which
@@ -11173,12 +11185,15 @@ const PHASE_GLYPH = {
   heat: "mdi:thermometer",
   tumble: "mdi:sync",
   spin: "mdi:rotate-right",
+  wash: "mdi:water-sync",
 };
 const PHASE_DOING = {
   fill: "Filling", heat: "Heating", tumble: "Tumbling", spin: "Spinning",
+  wash: "Washing",
 };
 const PHASE_DID = {
   fill: "Filled", heat: "Heated", tumble: "Tumbled", spin: "Spun",
+  wash: "Washed",
 };
 
 /* The phase happening right now, or "" if the machine is not running

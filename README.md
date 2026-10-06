@@ -1722,6 +1722,16 @@ rather than direction: `mdi:sync` (two arrows opposed — the drum reverses)
 against `mdi:rotate-right` (one arrow, flat out). Mirror images were the
 obvious pair and the worst one; at 17px, handedness is not a difference.
 
+**A dishwasher has a fifth: `wash`.** Its draw says only *element* or
+*pump*, so it reports `heat` and `wash` and nothing else. `wash` is
+`mdi:water-sync` — water, going round, the pump through the spray arms —
+and turns one way at 4s a revolution, slower than a spin so the two never
+read as one. It is not tumble: a dishwasher card saying *Tumbling* would be
+the dryer wearing a washing machine all over again. Configure it as any
+washer body with `machine: mdi:dishwasher` and `machine_off:
+mdi:dishwasher-off`, and leave out `pending`, `leak` and the `hanging`
+field — it has none of them.
+
 **`cost` is the one figure that earned a chip back.** There is no wattage
 chip, because the draw is already in the card's `meta` and a card does not
 state a figure twice. The cost is stated nowhere else, so it is a figure
