@@ -425,7 +425,10 @@ body:
 
 Each event carries `area`, `kind` and either `ago` or `at` (a timestamp the
 rail turns into "2m ago"). The icon comes from `kind` — `motion`, `occupancy`,
-`button`, `lock`, `door` — overridable with `iconMap`.
+`button`, `lock`, `door`, and what a camera saw: `person`, `animal`,
+`vehicle`, `crying`, `camera` — overridable with `iconMap`. The floor plan
+draws the same kinds with the same glyphs, and a camera's are the ones its
+card puts on its detections.
 
 **Consecutive events from the same source collapse into one row with a
 count.** Nineteen hall trips in twelve minutes is one thing happening, not

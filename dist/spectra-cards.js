@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.160.1";
+const VERSION = "0.161.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6101,6 +6101,24 @@ function cameraStreamUrl(entity, token) {
   return `/api/camera_proxy_stream/${entity}?token=${encodeURIComponent(String(token))}`;
 }
 
+/* The activity feed's kinds and the glyph each one wears, shared by the
+   rail and the floor plan so a kind cannot look one way down the list and
+   another on the house. The last five are what a camera saw, named by what
+   it was -- "Anaya's Bedroom · crying" -- the same glyphs the camera card
+   puts on its detections. */
+const FEED_ICONS = {
+  motion: "mdi:walk",
+  occupancy: "mdi:account",
+  button: "mdi:gesture-tap-button",
+  lock: "mdi:lock-open-variant",
+  door: "mdi:door-open",
+  person: "mdi:account",
+  animal: "mdi:paw",
+  vehicle: "mdi:car",
+  crying: "mdi:emoticon-cry-outline",
+  camera: "mdi:cctv",
+};
+
 const BODIES = {
   /* What is worth reading today? */
   quote(b) {
@@ -7441,13 +7459,7 @@ const BODIES = {
   /* What happened, in order? */
   rail(b) {
     const raw = Array.isArray(b.events) ? b.events.filter(Boolean) : [];
-    const icons = Object.assign({
-      motion: "mdi:walk",
-      occupancy: "mdi:account",
-      button: "mdi:gesture-tap-button",
-      lock: "mdi:lock-open-variant",
-      door: "mdi:door-open",
-    }, b.iconMap || {});
+    const icons = Object.assign({}, FEED_ICONS, b.iconMap || {});
 
     /* Nineteen hall trips in twelve minutes is one thing happening, not
        nineteen. Consecutive events from the same source collapse to a row
@@ -7522,13 +7534,7 @@ const BODIES = {
     const fade = Number(b.fade) > 0 ? Number(b.fade) : 60;
     const now = Date.now();
     const heat = planHeat(b);
-    const icons = Object.assign({
-      motion: "mdi:walk",
-      occupancy: "mdi:account",
-      button: "mdi:gesture-tap-button",
-      lock: "mdi:lock-open-variant",
-      door: "mdi:door-open",
-    }, b.iconMap || {});
+    const icons = Object.assign({}, FEED_ICONS, b.iconMap || {});
 
     const rooms = (Array.isArray(b.rooms) ? b.rooms : []).filter((r) => r
       && Array.isArray(r.points) && r.points.length >= 3);

@@ -284,6 +284,16 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     el.remove();
     await wait(50);
     check("taking the card off the page ends the stream", !el._ccSheet, "sheet still held");
+
+    // ---- the activity rail
+    await show({ type: "rail", events: [
+      { area: "Anaya's Bedroom", kind: "crying", at: new Date().toISOString(), entity_id: CRY },
+      { area: "Anaya's Bedroom", kind: "person", at: new Date().toISOString(), entity_id: PERSON },
+    ] });
+    const railIcons = qa(".event ha-icon").map((i) => i.getAttribute("icon")).join(" ");
+    check("the rail names what a camera saw, with the card's own glyphs",
+      railIcons === "mdi:emoticon-cry-outline mdi:account"
+        && /Anaya's Bedroom · crying/.test(q(".event .name").textContent), railIcons);
     return problems;
   });
 
