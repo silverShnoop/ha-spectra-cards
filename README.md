@@ -425,7 +425,10 @@ body:
 
 Each event carries `area`, `kind` and either `ago` or `at` (a timestamp the
 rail turns into "2m ago"). The icon comes from `kind` — `motion`, `occupancy`,
-`button`, `lock`, `door` — overridable with `iconMap`.
+`button`, `lock`, `door`, and what a camera saw: `person`, `animal`,
+`vehicle`, `crying`, `camera` — overridable with `iconMap`. The floor plan
+draws the same kinds with the same glyphs, and a camera's are the ones its
+card puts on its detections.
 
 **Consecutive events from the same source collapse into one row with a
 count.** Nineteen hall trips in twelve minutes is one thing happening, not
@@ -1272,6 +1275,20 @@ and High rather than the camera's own names for its two streams. While the sheet
 the card does not repaint, because a repaint takes the sheet off the page
 for a moment and a `<video>` taken off the page stops; state changes are
 handed to the sheet instead.
+
+**The live view is the whole screen**, black in both themes, with the
+camera's controls in a column beside it on a wall panel and under it on a
+phone held upright. Close is top left; Escape closes it too.
+
+**Pinch to zoom.** Two fingers zoom about the point between them, one
+finger drags a zoomed picture around, a double tap zooms in or back out,
+and a mouse wheel works on a desktop. The picture is never let go of an
+edge, and a label says how far in it is; tapping it goes back to the whole
+room. Zoom is only zoom: it never changes the stream. *Low* or *High* is
+the choice of whoever is holding the panel, and for a close look *High*
+is the one with the detail in it. Switching keeps the zoom, and the new
+stream is laid under it while the old one is still showing, so the room
+never drops to black.
 
 **Hold to move.** A Reolink keeps turning after a move until it is told
 to stop, so the pad sends the direction on press and `stop` on every way a
