@@ -1211,7 +1211,8 @@ body:
     - name: Person
       icon: mdi:account
       on: {entity: binary_sensor.rileys_room_camera_person}
-      since: {entity: binary_sensor.rileys_room_camera_person, attribute: last_changed, format: relative}
+      since: {entity: sensor.camera_sightings, attribute: sightings,
+              key: [binary_sensor.rileys_room_camera_person, since], format: relative}
   live:                            # what the sheet streams; an address, not a value
     fluent: camera.rileys_room_camera_fluent
     clear: camera.rileys_room_clear  # optional; adds Low / High
@@ -1241,6 +1242,14 @@ each new frame off-screen and swapping it in whole. Fetching stops while
 the tab is hidden or the sheet is open. A fresh picture carries no time;
 one the camera has stopped replacing says how old it is, so a room that
 looks quiet is not mistaken for a room that is quiet now.
+
+**`since` is when it last saw something, not when its sensor last moved.**
+A detection sensor's `last_changed` moves whenever the camera goes into
+privacy mode and out again, reloads or restarts, so reading it said
+"Crying 5s ago" in a house where nobody had cried. `home_signals` keeps
+`sensor.camera_sightings`, which writes down only a sighting starting and
+ending and holds it across restarts. A detection that has never fired has
+no time at all, and the chip is its name alone.
 
 **Privacy fetches nothing.** With the lens shut the picture is replaced by
 a plain panel saying so, and no request is made at all.
