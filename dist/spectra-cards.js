@@ -6121,10 +6121,8 @@ function cameraDetections(b) {
     });
 }
 
-/* How far the live view zooms, and the step past which it fetches the
-   High stream: zooming the small one further only enlarges its pixels. */
+/* How far the live view zooms. */
 const CAMERA_ZOOM_MAX = 6;
-const CAMERA_ZOOM_SHARP = 1.25;
 
 /* How long the still waits between frames. Ten seconds is what Home
    Assistant's own picture cards use; a floor of three, because every frame
@@ -19605,7 +19603,7 @@ class SpectraCard extends HTMLElement {
     const hasClear = Boolean(this._cameraEntity("clear")) && this._cameraEntity("clear") !== this._cameraEntity("fluent");
     const ptz = b.ptz && typeof b.ptz === "object" ? b.ptz : null;
     const s = {
-      which: "fluent", auto: false, sound: false, shut: null, held: null,
+      which: "fluent", sound: false, shut: null, held: null,
       sessions: [], zoom: { s: 1, x: 0, y: 0 }, hasClear,
     };
     const wrap = document.createElement("div");
@@ -19652,8 +19650,6 @@ class SpectraCard extends HTMLElement {
 
     wrap.querySelectorAll("[data-ccwhich]").forEach((el) => el.addEventListener("click", () => {
       const which = el.getAttribute("data-ccwhich");
-      /* Chosen by hand, so zooming out no longer puts it back. */
-      s.auto = false;
       if (which !== s.which) this._cameraWhich(which);
     }));
     const sound = wrap.querySelector("[data-ccsound]");
@@ -19725,9 +19721,9 @@ class SpectraCard extends HTMLElement {
      between the fingers, so what is under them stays under them; it is
      never let go of an edge, so there is always picture behind the glass.
 
-     It zooms the real picture, not the small one blown up: past the first
-     step in, the view moves itself to the High stream, and back to Low
-     when the zoom comes all the way out -- unless High was chosen by hand. */
+     Zoom is only zoom. It never changes which stream is playing: Low or
+     High is the choice of whoever is holding the panel, and a stream that
+     swapped itself under a pinch would be the card deciding for them. */
   _bindCameraZoom(screen) {
     const s = this._ccSheet;
     const points = new Map();
@@ -19814,11 +19810,6 @@ class SpectraCard extends HTMLElement {
     const p = at || { x: (m.x - z.x) / z.s, y: (m.y - z.y) / z.s };
     z.s = next;
     this._cameraPan(m.x - p.x * next, m.y - p.y * next);
-    /* The real picture for a close look; the light one for the whole room. */
-    if (s.hasClear && !s.shut) {
-      if (next > CAMERA_ZOOM_SHARP && s.which === "fluent") { s.auto = true; this._cameraWhich("clear"); }
-      else if (next <= 1 && s.auto && s.which === "clear") { s.auto = false; this._cameraWhich("fluent"); }
-    }
   }
 
   _cameraPan(x, y) {
@@ -19910,8 +19901,8 @@ class SpectraCard extends HTMLElement {
 
      Each stream is a layer of its own, and a new one is laid under the
      zoom over whatever is already showing; the old one is let go only once
-     the new one has a picture. So switching to High in the middle of a
-     pinch never drops the room to black. */
+     the new one has a picture. So switching between Low and High keeps the
+     zoom and never drops the room to black. */
   _cameraStart() {
     const s = this._ccSheet;
     if (!s || s.shut) return;

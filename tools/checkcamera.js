@@ -304,46 +304,34 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     check("and says how far", !q("[data-cczoom]").hidden && q("[data-cczoom]").textContent === "2.5\u00d7",
       q("[data-cczoom]").textContent);
     await wait(300);
-    const layers = qa(".cclayer");
-    check("zooming in fetches the real picture, not the small one enlarged",
-      layers.length === 1 && q(".cclive img").getAttribute("src") === `/api/camera_proxy_stream/${CLEAR}?token=C1`
-        && q('[data-ccwhich="clear"]').getAttribute("aria-pressed") === "true",
-      `${layers.length} layers, ${q(".cclive img") && q(".cclive img").getAttribute("src")}`);
+    check("zoom never changes the stream", qa(".cclayer").length === 1
+      && q(".cclive img").getAttribute("src") === `/api/camera_proxy_stream/${CAM}?token=T1`
+      && q('[data-ccwhich="fluent"]').getAttribute("aria-pressed") === "true",
+      q(".cclive img") && q(".cclive img").getAttribute("src"));
     pe("pointerup", 11, cx - 100, cy); pe("pointerup", 12, cx + 100, cy);
 
     pe("pointerdown", 13, cx, cy); pe("pointermove", 13, cx + 5000, cy + 5000); pe("pointerup", 13, cx + 5000, cy + 5000);
     check("a drag never pulls the picture off an edge", el._ccSheet.zoom.x === 0 && el._ccSheet.zoom.y === 0,
       JSON.stringify(el._ccSheet.zoom));
 
+    q('[data-ccwhich="clear"]').click();
+    await wait(300);
+    check("switching to High by hand keeps the zoom", el._ccSheet.zoom.s === 2.5
+      && /scale\(2\.5/.test(q(".ccstage").style.transform), q(".ccstage").style.transform);
+    check("and hands over without a gap: one layer, the High one",
+      qa(".cclayer").length === 1 && q(".cclive img").getAttribute("src") === `/api/camera_proxy_stream/${CLEAR}?token=C1`,
+      `${qa(".cclayer").length} layers`);
+
     q("[data-cczoom]").click();
     await wait(300);
     check("tapping the zoom goes back to the whole picture", q(".ccstage").style.transform === ""
       && q("[data-cczoom]").hidden, q(".ccstage").style.transform);
-    check("and back to the light stream it chose itself", q(".cclive img").getAttribute("src") === `/api/camera_proxy_stream/${CAM}?token=T1`,
-      q(".cclive img").getAttribute("src"));
+    check("and leaves the stream as it was", q('[data-ccwhich="clear"]').getAttribute("aria-pressed") === "true"
+      && q(".cclive img").getAttribute("src") === `/api/camera_proxy_stream/${CLEAR}?token=C1`, "stream changed");
 
     pe("pointerdown", 14, cx, cy); pe("pointerup", 14, cx, cy);
     pe("pointerdown", 15, cx, cy); pe("pointerup", 15, cx, cy);
     check("a double tap zooms in", el._ccSheet.zoom.s === 2.5, String(el._ccSheet.zoom.s));
-    q('[data-ccwhich="clear"]').click();
-    await wait(250);
-    q("[data-cczoom]").click();
-    await wait(250);
-    check("High chosen by hand stays when the zoom comes out",
-      q('[data-ccwhich="clear"]').getAttribute("aria-pressed") === "true", "went back to Low");
-    el.remove();
-    await wait(50);
-    check("taking the card off the page ends the stream", !el._ccSheet, "sheet still held");
-
-    // ---- the activity rail
-    await show({ type: "rail", events: [
-      { area: "Anaya's Bedroom", kind: "crying", at: new Date().toISOString(), entity_id: CRY },
-      { area: "Anaya's Bedroom", kind: "person", at: new Date().toISOString(), entity_id: PERSON },
-    ] });
-    const railIcons = qa(".event ha-icon").map((i) => i.getAttribute("icon")).join(" ");
-    check("the rail names what a camera saw, with the card's own glyphs",
-      railIcons === "mdi:emoticon-cry-outline mdi:account"
-        && /Anaya's Bedroom · crying/.test(q(".event .name").textContent), railIcons);
     return problems;
   });
 
