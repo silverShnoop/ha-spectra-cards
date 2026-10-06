@@ -298,6 +298,29 @@ const js = fs.readFileSync(file);
         && all(".phcell.now")[0] === all(".phcell")[1],
       `${all(".phcell.now").length} live`);
 
+    // ---- a dishwasher: heat or wash, and nothing a drum does
+    const DISHES = [
+      { kind: "wash", started_at: ago(70), seconds: 600 },
+      { kind: "heat", started_at: ago(60), seconds: 900 },
+      { kind: "wash", started_at: ago(45), seconds: 0 },
+    ];
+    await show({ state: "running", phases: DISHES, machine: "mdi:dishwasher" });
+    check("a dishwasher's strip is its own two glyphs",
+      kinds().join(" ") === "mdi:water-sync mdi:thermometer mdi:water-sync",
+      kinds().join(" "));
+    check("and says it is washing, never tumbling",
+      /^Washing\b/.test(names()[2]) && !names().some((n) => /Tumbl/.test(n)),
+      names().join(" | "));
+    const washSpeed = (() => {
+      const i = cellOf("wash") && cellOf("wash").querySelector("ha-icon");
+      return i ? getComputedStyle(i).animationDuration : "(no cell)";
+    })();
+    check("a live wash turns, slower than a spin",
+      anim(cellOf("wash")) === "sp-spin" && parseFloat(washSpeed) > 1.6,
+      `${anim(cellOf("wash"))} ${washSpeed}`);
+    check("and the hero shows the wash too",
+      q(".drumglyph.ph-wash") !== null, "no live wash in the drum");
+
     // Left running, with something moving, for the reduced-motion pass.
     await show({ state: "running", phases: CYCLE });
     return problems;
@@ -326,6 +349,19 @@ const js = fs.readFileSync(file);
       .filter((a) => a !== "none");
     check("reduced motion stops every one of them",
       moving.length === 0, moving.join(" "));
+    /* Again with the one kind that only a dishwasher sends. */
+    const conf = JSON.parse(JSON.stringify(el._config));
+    conf.body.phases = [{ kind: "wash", started_at: new Date().toISOString(), seconds: 0 }];
+    el.setConfig(conf);
+    el._signature = null;
+    el.hass = el.hass;
+    await new Promise((r) => requestAnimationFrame(r));
+    const washing = Array.from(root.querySelectorAll(".phcell ha-icon"))
+      .map((i) => getComputedStyle(i).animationName)
+      .filter((a) => a !== "none");
+    check("including a dishwasher's wash",
+      washing.length === 0 && root.querySelector(".phcell.ph-wash") !== null,
+      washing.join(" ") || "no wash cell");
     return problems;
   });
 
