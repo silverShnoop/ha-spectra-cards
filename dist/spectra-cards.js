@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.162.1";
+const VERSION = "0.163.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -817,9 +817,28 @@ ha-icon { display:inline-flex; line-height:0; }
 .phlive.ph-heat ha-icon { animation:sp-breathe 3s ease-in-out infinite; }
 .phlive.ph-tumble ha-icon { animation:sp-phase-tumble 3s ease-in-out infinite; }
 .phlive.ph-spin ha-icon { animation:sp-spin 1.6s linear infinite; }
-/* The spray arm turns one way and keeps turning, but it is water, not a
-   drum flat out: slower than spin, so the two never read as one. */
-.phlive.ph-wash ha-icon { animation:sp-spin 4s linear infinite; }
+/* A dishwasher's wash is drawn rather than borrowed: no icon set has a
+   spray arm, and a droplet turning round read as a droplet turning round.
+   Water leaves the arm in three jets and rises, so it can never be taken
+   for the fill, whose drop falls. Each jet carries two drops half a beat
+   apart, which is what makes it a spray and not a blink. */
+.washglyph { display:block; width:17px; height:17px; fill:currentColor; overflow:visible; }
+.drumglyph .washglyph { width:26px; height:26px; }
+/* The jets themselves, faint, so a still glance reads a fan of water
+   and not a scatter of dots; the drops riding them are the motion. */
+.washglyph .jetline {
+  stroke:currentColor; stroke-width:1.2; stroke-linecap:round;
+  stroke-dasharray:1.2 2.4; opacity:.45;
+}
+.washglyph .jet {
+  transform:translate(calc(var(--dx) * var(--t)), calc(var(--dy) * var(--t)));
+}
+.phlive.ph-wash .jet { animation:sp-jet 1.5s ease-out var(--d) infinite; }
+@keyframes sp-jet {
+  0%   { transform:translate(0, 0); opacity:0; }
+  15%  { opacity:1; }
+  100% { transform:translate(var(--dx), var(--dy)); opacity:.15; }
+}
 @keyframes sp-phase-fill {
   0%   { transform:translateY(-135%); opacity:0; }
   22%  { opacity:1; }
@@ -3452,7 +3471,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
      a reduced-motion override silently fails. */
   .phcell.now.ph-fill ha-icon, .phcell.now.ph-heat ha-icon,
   .phcell.now.ph-tumble ha-icon, .phcell.now.ph-spin ha-icon,
-  .phcell.now.ph-wash ha-icon {
+  .phlive.ph-wash .jet {
     animation:none; opacity:1; transform:none;
   }
   .fk { opacity:0; }
@@ -11207,7 +11226,7 @@ function washerDrum(b, cycle, leak, powered, waiting) {
   const many = !b.drum_full && waiting > 1;
   const inner = `<span class="drumglyph${many ? " counted" : ""}`
     + `${live ? ` ph-${live} phlive` : ""}">`
-    + `<ha-icon icon="${esc(glyph)}"></ha-icon>`
+    + glyphHtml(glyph)
     + (many ? `<span class="drumn">${esc(String(waiting))}</span>` : "")
     + `</span>`;
   /* Written onto --accent rather than --outline so the .drum rules below
@@ -11242,11 +11261,12 @@ function washerDrum(b, cycle, leak, powered, waiting) {
  *
  * And a fifth, which is a dishwasher's only answer besides heat:
  *
- *   wash    mdi:water-sync      water, going round -- the pump through
- *                               the spray arms. Not tumble: nothing in a
- *                               dishwasher tumbles, and a dishwasher card
- *                               saying "Tumbling" is the dryer's mistake
- *                               of wearing a washing machine, again.
+ *   wash    a drawn spray arm   three jets of water rising off a bar --
+ *                               the pump through the arms. Not tumble:
+ *                               nothing in a dishwasher tumbles, and a
+ *                               dishwasher card saying "Tumbling" is the
+ *                               dryer's mistake of wearing a washing
+ *                               machine, again. See sprayGlyph.
  *
  * Mirror images (rotate-left against rotate-right) were the obvious pair
  * and the worst one: at 17px two glyphs that differ only in handedness
@@ -11270,8 +11290,33 @@ const PHASE_GLYPH = {
   heat: "mdi:thermometer",
   tumble: "mdi:sync",
   spin: "mdi:rotate-right",
-  wash: "mdi:water-sync",
+  wash: "spectra:spray",
 };
+
+/* The spray arm, for the one glyph no icon set has. Drawn in the icon
+   grid so it sits where an ha-icon would. The drops start at the arm and
+   carry their own direction; at rest each sits part-way up its jet, so a
+   still or finished cell is still a fan of water, not a bare bar. */
+const SPRAY_JETS = [
+  [7.5, 16.5, -5, -11], [12, 16, 0, -12.5], [16.5, 16.5, 5, -11],
+];
+function sprayGlyph() {
+  const drops = SPRAY_JETS.flatMap(([x, y, dx, dy], i) => [0, 1].map((k) =>
+    `<circle class="jet" cx="${x}" cy="${y}" r="1.8"`
+    + ` style="--dx:${dx}px;--dy:${dy}px;--t:${k ? 0.8 : 0.4};`
+    + `--d:${-(i * 0.25 + k * 0.75).toFixed(2)}s"></circle>`)).join("");
+  return `<svg class="washglyph" viewBox="0 0 24 24" aria-hidden="true">`
+    + SPRAY_JETS.map(([x, y, dx, dy]) =>
+      `<line class="jetline" x1="${x}" y1="${y}" x2="${x + dx}" y2="${y + dy}"></line>`).join("")
+    + `<rect x="2.5" y="18" width="19" height="2.8" rx="1.4"></rect>`
+    + `<rect x="10.5" y="20" width="3" height="3" rx=".8"></rect>`
+    + drops + `</svg>`;
+}
+function glyphHtml(glyph) {
+  return glyph === "spectra:spray"
+    ? sprayGlyph()
+    : `<ha-icon icon="${esc(glyph)}"></ha-icon>`;
+}
 const PHASE_DOING = {
   fill: "Filling", heat: "Heating", tumble: "Tumbling", spin: "Spinning",
   wash: "Washing",
@@ -11319,7 +11364,7 @@ function washerPhases(b, running) {
       : `${PHASE_DID[kind]} for ${ran}`;
     cells.push(`<span class="phcell ph-${kind}${now ? " now phlive" : ""}" role="listitem"`
       + ` title="${esc(said)}" aria-label="${esc(said)}">`
-      + `<span class="phglyph"><ha-icon icon="${glyph}"></ha-icon></span>`
+      + `<span class="phglyph">${glyphHtml(glyph)}</span>`
       + (now ? `<span class="phword">${esc(PHASE_DOING[kind])}</span>` : "")
       + `</span>`);
   });

@@ -1758,10 +1758,13 @@ against `mdi:rotate-right` (one arrow, flat out). Mirror images were the
 obvious pair and the worst one; at 17px, handedness is not a difference.
 
 **A dishwasher has a fifth: `wash`.** Its draw says only *element* or
-*pump*, so it reports `heat` and `wash` and nothing else. `wash` is
-`mdi:water-sync` — water, going round, the pump through the spray arms —
-and turns one way at 4s a revolution, slower than a spin so the two never
-read as one. It is not tumble: a dishwasher card saying *Tumbling* would be
+*pump*, so it reports `heat` and `wash` and nothing else. `wash` is drawn
+rather than borrowed, because no icon set has a spray arm and a droplet
+turning round only ever read as a droplet turning round: a bar with three
+faint jets fanning up from it, and drops riding the jets upward, two to a
+jet half a beat apart. Rising is the point — the fill's drop falls, so the
+two can never be confused. Still or finished, the drops rest part-way up
+their jets, so it stays a spray. It is not tumble: a dishwasher card saying *Tumbling* would be
 the dryer wearing a washing machine all over again. Configure it as any
 washer body with `machine: mdi:dishwasher` and `machine_off:
 mdi:dishwasher-off`, and leave out `pending`, `leak` and the `hanging`
