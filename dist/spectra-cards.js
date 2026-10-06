@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.162.0";
+const VERSION = "0.162.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6166,6 +6166,9 @@ function cameraDetections(b) {
 
 /* How far the live view zooms. */
 const CAMERA_ZOOM_MAX = 6;
+/* How long a card off the page keeps its live view, in case it is only
+   being moved -- the panel re-places every card when a phone turns. */
+const CAMERA_LEAVE_MS = 1500;
 
 /* How long the still waits between frames. Ten seconds is what Home
    Assistant's own picture cards use; a floor of three, because every frame
@@ -11808,6 +11811,18 @@ class SpectraCard extends HTMLElement {
   connectedCallback() {
     this._startTicking();
     if (this._cc) this._cameraTick();
+    /* Moved, not removed: the live view stays, and its video -- which a
+       browser pauses the moment it leaves the page -- carries on. */
+    if (this._ccLeaving) {
+      clearTimeout(this._ccLeaving);
+      this._ccLeaving = null;
+      if (this._ccSheet) {
+        this._ccSheet.wrap.querySelectorAll(".cclayer video").forEach((v) => {
+          const p = v.play();
+          if (p && p.catch) p.catch(() => {});
+        });
+      }
+    }
     this._subscribeForecasts();
     if (!this._onOpenTask) {
       /* A Needs you row's Open. The first card that owns the task takes
@@ -11833,8 +11848,19 @@ class SpectraCard extends HTMLElement {
        with any method defined twice. */
     releaseDrawer(this);
     if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
-    /* A camera stream left running off-screen is a camera left streaming. */
-    if (this._ccSheet) this._cameraClose();
+    /* A camera stream left running off-screen is a camera left streaming
+       -- but a card is also taken off the page for an instant when the
+       panel moves it, and turning a phone sideways moves every card into
+       the side layout. Closing at once shut the live view on every
+       rotation. So it waits a moment, and a card put straight back keeps
+       its view; see connectedCallback. */
+    if (this._ccSheet) {
+      clearTimeout(this._ccLeaving);
+      this._ccLeaving = setTimeout(() => {
+        this._ccLeaving = null;
+        if (!this.isConnected && this._ccSheet) this._cameraClose();
+      }, CAMERA_LEAVE_MS);
+    }
     if (this._cc && this._cc.timer) { clearTimeout(this._cc.timer); this._cc.timer = null; }
     if (this._timer) {
       clearTimeout(this._timer);
