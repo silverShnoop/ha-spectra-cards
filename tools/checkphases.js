@@ -95,7 +95,10 @@ const js = fs.readFileSync(file);
       el.hass = hass;
       await new Promise((r) => requestAnimationFrame(r));
     };
-    const kinds = () => all(".phcell ha-icon").map((i) => i.getAttribute("icon"));
+    const kinds = () => all(".phglyph").map((g) => {
+      const i = g.querySelector("ha-icon");
+      return i ? i.getAttribute("icon") : g.querySelector(".washglyph") ? "spray" : "?";
+    });
     const names = () => all(".phcell").map((c) => c.getAttribute("aria-label") || "");
 
     // ---- when it appears at all
@@ -170,7 +173,7 @@ const js = fs.readFileSync(file);
 
     // ---- the live cell moves the way the machine does
     const anim = (el) => {
-      const i = el && el.querySelector("ha-icon");
+      const i = el && el.querySelector("ha-icon, .jet");
       return i ? getComputedStyle(i).animationName : "(no cell)";
     };
     const cellOf = (kind) => root().querySelector(`.phcell.now.ph-${kind}`);
@@ -306,20 +309,31 @@ const js = fs.readFileSync(file);
     ];
     await show({ state: "running", phases: DISHES, machine: "mdi:dishwasher" });
     check("a dishwasher's strip is its own two glyphs",
-      kinds().join(" ") === "mdi:water-sync mdi:thermometer mdi:water-sync",
+      kinds().join(" ") === "spray mdi:thermometer spray",
       kinds().join(" "));
     check("and says it is washing, never tumbling",
       /^Washing\b/.test(names()[2]) && !names().some((n) => /Tumbl/.test(n)),
       names().join(" | "));
-    const washSpeed = (() => {
-      const i = cellOf("wash") && cellOf("wash").querySelector("ha-icon");
-      return i ? getComputedStyle(i).animationDuration : "(no cell)";
+    const jets = (sel) => Array.from(root().querySelectorAll(`${sel} .jet`))
+      .map((j) => getComputedStyle(j).animationName);
+    check("a live wash sprays: every drop rises off the arm",
+      jets(".phcell.now.ph-wash").length === 6
+        && jets(".phcell.now.ph-wash").every((a) => a === "sp-jet"),
+      jets(".phcell.now.ph-wash").join(" "));
+    /* Rising, so it can never be read as the fill's falling drop. */
+    const rise = (() => {
+      const j = root().querySelector(".phcell.now.ph-wash .jet");
+      return j ? parseFloat(getComputedStyle(j).getPropertyValue("--dy")) : NaN;
     })();
-    check("a live wash turns, slower than a spin",
-      anim(cellOf("wash")) === "sp-spin" && parseFloat(washSpeed) > 1.6,
-      `${anim(cellOf("wash"))} ${washSpeed}`);
-    check("and the hero shows the wash too",
-      q(".drumglyph.ph-wash") !== null, "no live wash in the drum");
+    check("upward, the opposite way to a fill", rise < 0, String(rise));
+    check("and the hero sprays too",
+      jets(".drumglyph.ph-wash").length === 6
+        && jets(".drumglyph.ph-wash").every((a) => a === "sp-jet"),
+      jets(".drumglyph.ph-wash").join(" ") || "no spray in the drum");
+    check("a finished wash cell is still, and still a spray",
+      jets(".phcell:not(.now).ph-wash").length === 6
+        && jets(".phcell:not(.now).ph-wash").every((a) => a === "none"),
+      jets(".phcell:not(.now).ph-wash").join(" "));
 
     // Left running, with something moving, for the reduced-motion pass.
     await show({ state: "running", phases: CYCLE });
@@ -356,7 +370,7 @@ const js = fs.readFileSync(file);
     el._signature = null;
     el.hass = el.hass;
     await new Promise((r) => requestAnimationFrame(r));
-    const washing = Array.from(root.querySelectorAll(".phcell ha-icon"))
+    const washing = Array.from(root.querySelectorAll(".phcell ha-icon, .phlive .jet"))
       .map((i) => getComputedStyle(i).animationName)
       .filter((a) => a !== "none");
     check("including a dishwasher's wash",
