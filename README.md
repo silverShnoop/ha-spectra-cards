@@ -1290,6 +1290,14 @@ controls underneath. A phone turned sideways gives the picture the whole
 screen, the bar fading over its top, and the controls become a drawer
 opened from the bar. Escape closes the view.
 
+**Turning the phone does not close it.** The panel moves every card into
+its side layout when a phone turns wide enough, and a moved card is off the
+page for an instant. The view used to take that as the card going away and
+closed on every rotation to landscape. It now waits a moment
+(`CAMERA_LEAVE_MS`), keeps the view and its stream for a card that comes
+straight back, and restarts the video a browser pauses when it leaves the
+page. A card really taken away still closes its stream.
+
 **Pinch to zoom.** Two fingers zoom about the point between them, one
 finger drags a zoomed picture around, a double tap zooms in or back out,
 and a mouse wheel works on a desktop. The picture is never let go of an

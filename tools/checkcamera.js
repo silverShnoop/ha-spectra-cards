@@ -332,6 +332,31 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     pe("pointerdown", 14, cx, cy); pe("pointerup", 14, cx, cy);
     pe("pointerdown", 15, cx, cy); pe("pointerup", 15, cx, cy);
     check("a double tap zooms in", el._ccSheet.zoom.s === 2.5, String(el._ccSheet.zoom.s));
+
+    /* Turning a phone moves every card into the side layout, which takes
+       each off the page for an instant. That is not closing it. */
+    const shown = el._cameraShown();
+    const elsewhere = document.createElement("div");
+    document.body.appendChild(elsewhere);
+    elsewhere.appendChild(el);
+    await wait(50);
+    check("a card moved on the page keeps its live view", !!el._ccSheet && !!q(".ccbox"), "view closed");
+    check("and its stream", shown && !shown.ended && el._cameraShown() === shown, "stream ended");
+    el.remove();
+    await wait(50);
+    check("a card off the page holds on for a moment", !!el._ccSheet, "closed at once");
+    await wait(1600);
+    check("then taking the card off the page ends the stream", !el._ccSheet && shown.ended, "sheet still held");
+
+    // ---- the activity rail
+    await show({ type: "rail", events: [
+      { area: "Anaya's Bedroom", kind: "crying", at: new Date().toISOString(), entity_id: CRY },
+      { area: "Anaya's Bedroom", kind: "person", at: new Date().toISOString(), entity_id: PERSON },
+    ] });
+    const railIcons = qa(".event ha-icon").map((i) => i.getAttribute("icon")).join(" ");
+    check("the rail names what a camera saw, with the card's own glyphs",
+      railIcons === "mdi:emoticon-cry-outline mdi:account"
+        && /Anaya's Bedroom · crying/.test(q(".event .name").textContent), railIcons);
     return problems;
   });
 
