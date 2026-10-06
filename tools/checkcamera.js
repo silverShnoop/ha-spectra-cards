@@ -196,7 +196,9 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     await show(BODY);
     const card = q(".card");
     q("[data-ccopen]").click();
-    await wait(400);
+    /* The offer is made after two websocket round trips and an SDP offer;
+       waited for, not guessed at, so a slow runner is not a failure. */
+    for (let i = 0; i < 40 && !subs.length; i += 1) await wait(50);
     check("tapping the picture opens the live view", !!q(".ccbox"), "no sheet");
     const full = q(".ccbox").getBoundingClientRect();
     check("and it takes the whole screen", full.left === 0 && full.top === 0
@@ -407,6 +409,9 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
       if (out.sideBtn) {
         q("[data-ccside]").click();
         out.sideOpened = getComputedStyle(side).display !== "none";
+        out.sideBg = getComputedStyle(side).backgroundColor;
+        const sr = side.getBoundingClientRect();
+        out.overlap = q(".cclive").getBoundingClientRect().right - sr.left;
       }
       q("[data-no]").click();
       return out;
@@ -426,6 +431,8 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     `${sideways.live.width}x${sideways.live.height}, side ${sideways.sideShown}`);
   pcheck("with the bar laid over its top", sideways.top.top === 0 && sideways.live.top === 0, JSON.stringify(sideways.top));
   pcheck("and the controls a drawer opened from the bar", sideways.sideBtn && sideways.sideOpened, JSON.stringify(sideways));
+  pcheck("the drawer is solid, not the picture showing through", /^rgb\(/.test(sideways.sideBg), sideways.sideBg);
+  pcheck("and the picture steps aside for it", sideways.overlap <= 0.5, `overlap ${sideways.overlap}px`);
   const panel = await layout(1200, 800);
   pcheck("a wall panel keeps the controls in a column beside the picture",
     panel.sideShown && !panel.sideBtn && Math.round(panel.live.width) === 880, `${panel.live.width}`);

@@ -1198,13 +1198,17 @@ ${TOKENS_DARK}
   .ccside { width:320px; max-height:none; height:100%; padding-top:16px; }
 }
 /* A phone turned sideways: the picture is the whole screen, and the
-   controls are a drawer over its right-hand side, opened from the bar. */
+   controls a drawer down its right-hand side, opened from the bar. The
+   drawer is solid and the picture steps aside for it: laid over the room
+   with the room showing through, the controls sat on whatever the camera
+   happened to be looking at. */
 @media (orientation: landscape) and (max-height: 500px) {
   .cctop .ccsidebtn { display:grid; }
   .ccside { position:absolute; top:0; right:0; bottom:0; width:min(320px, 50%);
-    max-height:none; z-index:3; background:rgba(36,34,31,.94); display:none; padding-top:60px; }
+    max-height:none; z-index:3; background:var(--sp-surface); display:none; }
   .ccfull.ccsideopen .ccside { display:flex; }
   .ccfull.ccsideopen .cctop { right:min(320px, 50%); }
+  .ccfull.ccsideopen .cclive { margin-right:min(320px, 50%); }
 }
 .ccbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .ccseg { display:inline-flex; border:2px solid var(--sp-sink); border-radius:6px; overflow:hidden; }
@@ -19840,6 +19844,8 @@ class SpectraCard extends HTMLElement {
     sideBtn.addEventListener("click", () => {
       const open = wrap.classList.toggle("ccsideopen");
       sideBtn.setAttribute("aria-expanded", String(open));
+      /* The picture just changed width; keep a zoomed one inside it. */
+      this._cameraPan(s.zoom.x, s.zoom.y);
     });
 
     /* A wall panel's screen going off hides the page and leaves the view
