@@ -370,6 +370,7 @@ const js = fs.readFileSync(file);
     check("the tray shows a planned recipe's first ingredients",
       text(E.querySelector(".mlglance")) === "500g chicken thighs · 2 peppers · 1 onion · 8 tortillas · +1",
       text(E.querySelector(".mlglance")));
+    const asksBefore = asked.filter((m) => m.service === "meal_recipe_ask").length;
     E.querySelectorAll(".mlgridview [data-meal]").forEach((c) => {
       if (c.getAttribute("data-meal") === `${day(2)}|dinner`) c.click();
     });
@@ -386,18 +387,14 @@ const js = fs.readFileSync(file);
     check("opened for a dinner, Suits dinner is already on",
       S.querySelector('[data-rp-chip="meal:dinner"]').getAttribute("aria-pressed") === "true"
       && !snames().includes("Overnight oats") && !snames().includes("Greek salad"), snames().join("|"));
-    const idea = asked.filter((m) => m.service === "meal_recipe_ask").pop();
-    check("and asks for a few good ones for that slot", idea && idea.service_data.date === day(2)
-      && idea.service_data.entry_type === "dinner" && idea.service_data.question === "", JSON.stringify(idea && idea.service_data));
-    check("pinned at the top with the reason", snames()[0] === "Nana's stew"
-      && text(srows()[0].querySelector(".rpwhy")) === "Not had yet, and it is Sunday."
-      && text(S.querySelector("[data-rp-note]")).startsWith("Suggested for"), `${snames().join("|")} ${text(S.querySelector("[data-rp-note]"))}`);
+    check("and asks no model anything just for opening it", asked.filter((m) => m.service === "meal_recipe_ask").length === asksBefore
+      && !S.querySelector("[data-rp-note]:not([hidden])"), JSON.stringify(asked.map((m) => m.service)));
     const peek = srows().find((li) => text(li).includes("Mushroom risotto"));
     await window.holdAt(peek.querySelector("[data-recipe-open]"));
     await settle();
     check("in the box a long press shows the first ingredients", peek.querySelector(".rping") && !peek.querySelector(".rping").hidden
       && text(peek.querySelector(".rping")).startsWith("300g arborio rice") && S.isConnected, peek.innerHTML.slice(0, 200));
-    srows()[0].querySelector("[data-recipe-open]").click();
+    srows().find((li) => text(li.querySelector(".rcname")).startsWith("Nana's stew")).querySelector("[data-recipe-open]").click();
     await settle();
     const set = asked.filter((m) => m.service === "meal_plan_set").pop();
     check("a tap plans it in that slot", set && set.service_data.recipe_id === "r4" && set.service_data.date === day(2)

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.160.0";
+const VERSION = "0.160.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -19004,19 +19004,9 @@ class SpectraCard extends HTMLElement {
         });
       });
     }
-    /* Opened for a slot: a few good ones, found while the list is already
-       there to choose from, so the picker is never held up by it. */
-    if (o.askSpec && o.meal && o.date && !st.ideas && !st.ideasAsked) {
-      st.ideasAsked = true;
-      st.busy = `Finding good ones for ${mealSlotWords(o.date, o.meal).replace(/^Today's|^Tomorrow's/, (w) => w.toLowerCase())}…`;
-      askFor("", 3).then((picks) => {
-        st.busy = "";
-        if (picks.length) {
-          st.ideas = { picks, title: `Suggested for ${mealSlotWords(o.date, o.meal).replace(/^Today's|^Tomorrow's/, (w) => w.toLowerCase())}` };
-        }
-        if (box.isConnected) apply();
-      }, () => { st.busy = ""; if (box.isConnected) apply(); });
-    }
+    /* Opened for a slot, nothing is asked of a model: choosing a recipe
+       already in the box is a person's choice, and suggestions are the
+       Suggest tab's, or Ask's when something is typed. */
 
     /* A press opens. A long press (or a right click) selects, where the
        list can select -- the Recipes card; elsewhere it shows the first few
