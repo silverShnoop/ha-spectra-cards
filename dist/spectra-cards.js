@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.161.0";
+const VERSION = "0.162.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -347,6 +347,14 @@ ha-icon { display:inline-flex; line-height:0; }
    to travel to opposite columns as single pieces. */
 .tbmain, .tbend { display:contents; }
 .tick { width:3px; height:12px; flex:none; background:var(--accent); }
+/* Opens the card full screen. Quiet ink beside the title rather than the
+   accent: it says what pressing does, it is not the card's identity. */
+.tbexpand { position:relative; display:inline-flex; flex:none; cursor:pointer; color:var(--sp-ink-3); }
+.titlebar .tbexpand ha-icon, .tbexpand .mdi { --mdc-icon-size:14px; width:14px; height:14px; color:var(--sp-ink-3); }
+.tbexpand::after {
+  content:""; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%); width:44px; height:44px;
+}
 .titlebar ha-icon { --mdc-icon-size:16px; color:var(--accent); }
 .titlebar h3 {
   font-size:11px; letter-spacing:.1em; text-transform:uppercase;
@@ -1126,36 +1134,58 @@ ${TOKENS_DARK}
 .cclive [hidden], .cclive .ccwait[hidden], .cclive .ccveil[hidden] { display:none; }
 .cclive .ccwait { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; }
 .cclive .ccwait .spinner { width:40px; height:40px; border-width:3px; color:#fff; border-color:rgba(255,255,255,.3); border-top-color:#fff; position:static; }
+/* The bar: close, the camera's name, and what the picture is -- its zoom
+   and its stream. Above the picture on a phone held upright, where laid
+   over it the close button sat on the top of the room; over the picture
+   when there is no room above it. */
 .cctop {
-  position:absolute; left:0; right:0; top:0; display:flex; align-items:center; gap:10px;
-  padding:10px 12px 24px; background:linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,0));
-  pointer-events:none;
+  position:relative; flex:none; display:flex; align-items:center; gap:10px;
+  padding:8px 12px; background:#000; z-index:2;
 }
-.cctop > * { pointer-events:auto; }
 .cctop .cctitle { flex:1 1 auto; min-width:0; font-size:15px; font-weight:600; color:#fff;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cczoom {
-  height:32px; padding:0 12px; border-radius:16px; border:0; cursor:pointer;
-  background:rgba(0,0,0,.58); color:#fff; font:inherit; font-size:13px; font-weight:600;
+  height:32px; padding:0 12px; border-radius:16px; border:0; cursor:pointer; flex:none;
+  background:rgba(255,255,255,.16); color:#fff; font:inherit; font-size:13px; font-weight:600;
   font-variant-numeric:tabular-nums;
 }
 .cczoom[hidden] { display:none; }
+.cctop .ccsidebtn { display:none; flex:none; }
 .ccside {
   flex:none; max-height:46%; overflow-y:auto; overscroll-behavior:contain;
   padding:12px 16px 16px; display:flex; flex-direction:column; gap:14px;
   background:var(--sp-surface);
 }
-/* Upright, the picture is as tall as it is wide allows and the controls
+/* Upright, the picture is as tall as its width allows and the controls
    have the rest: letterbox bars above and below a 16:9 room are screen
    the pad could have had. */
-@media not ((orientation: landscape) and (min-width: 700px)) {
+@media (orientation: portrait) {
   .cclive { flex:0 0 auto; aspect-ratio:16/9; max-height:60%; }
   .ccside { flex:1 1 auto; max-height:none; }
   .ccside .cctogs { width:100%; }
 }
-@media (orientation: landscape) and (min-width: 700px) {
+/* Sideways, the bar lies over the top of the picture, fading into it. */
+@media (orientation: landscape) {
+  .cctop { position:absolute; left:0; right:0; top:0; padding:10px 12px 24px;
+    background:linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,0)); pointer-events:none; }
+  .cctop > * { pointer-events:auto; }
+  .cctop .cctitle { pointer-events:none; }
+  .cczoom { background:rgba(0,0,0,.58); }
+}
+/* A wall panel: the controls in a column beside the picture. */
+@media (orientation: landscape) and (min-height: 501px) {
   .ccfull { flex-direction:row; }
+  .cctop { right:320px; }
   .ccside { width:320px; max-height:none; height:100%; padding-top:16px; }
+}
+/* A phone turned sideways: the picture is the whole screen, and the
+   controls are a drawer over its right-hand side, opened from the bar. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .cctop .ccsidebtn { display:grid; }
+  .ccside { position:absolute; top:0; right:0; bottom:0; width:min(320px, 50%);
+    max-height:none; z-index:3; background:rgba(36,34,31,.94); display:none; padding-top:60px; }
+  .ccfull.ccsideopen .ccside { display:flex; }
+  .ccfull.ccsideopen .cctop { right:min(320px, 50%); }
 }
 .ccbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .ccseg { display:inline-flex; border:2px solid var(--sp-sink); border-radius:6px; overflow:hidden; }
@@ -5485,6 +5515,15 @@ const BODY_TOOL = {
   },
 };
 
+/* The bodies that open a view of the whole screen, and whether this one
+   has anything to open. Each draws the same symbol beside its title, so a
+   card that opens full screen says so before it is pressed. */
+const BODY_EXPANDS = {
+  camera(b) {
+    return Boolean(b) && (cameraOn(b.privacy) || Boolean(safePicture(b.picture)));
+  },
+};
+
 /* What a body would say about itself in the title bar, where config cannot
    know it. Wherever this card names a scene it names it the same way — the
    word, the scene's own colour, and its symbol — so the title bar and the
@@ -6844,8 +6883,7 @@ const BODIES = {
         + `<div class="ccframe" data-ccframe data-src="${esc(picture)}"></div>`
         + (live.length ? `<span class="ccbadge tl on">${iconMarkup(live[0].icon)}${esc(live[0].name)}</span>` : "")
         + (night ? `<span class="ccbadge tr">${iconMarkup("mdi:weather-night")}Night vision</span>` : "")
-        + `<span class="ccbadge bl" data-ccage hidden></span>`
-        + `<span class="ccbadge br">${iconMarkup("mdi:arrow-expand")}Live</span></div>`;
+        + `<span class="ccbadge bl" data-ccage hidden></span></div>`;
     } else {
       out = `<div class="ccpic"><div class="ccveil">${iconMarkup("mdi:cctv-off")}<b>No picture</b>`
         + `<span>The camera is not answering.</span></div></div>`;
@@ -12810,6 +12848,10 @@ class SpectraCard extends HTMLElement {
         + `<span class="tick"></span>`
         + iconMarkup(icon)
         + (isBlank(title) ? "" : `<h3>${esc(title)}</h3>`)
+        + (BODY_EXPANDS[type] && BODY_EXPANDS[type](model.body)
+          ? `<span class="tbexpand" role="button" tabindex="0" aria-label="Open full screen" data-expand>`
+            + `${iconMarkup("mdi:arrow-expand")}</span>`
+          : "")
       + `</span>`
       + `<span class="tbend">`
         + (status
@@ -19519,7 +19561,7 @@ class SpectraCard extends HTMLElement {
      into it after every paint. A new frame is loaded off-screen and swapped
      in whole once it has arrived, so the picture never blinks. */
   _bindCamera(model) {
-    this._holder.querySelectorAll("[data-ccopen]").forEach((el) => {
+    this._holder.querySelectorAll("[data-ccopen], [data-expand]").forEach((el) => {
       const run = (event) => { event.stopPropagation(); this._cameraSheet(); };
       el.addEventListener("click", run);
       el.addEventListener("keydown", (event) => {
@@ -19638,13 +19680,16 @@ class SpectraCard extends HTMLElement {
         + `${pad("right", "mdi:chevron-right", "Pan right")}<span></span>${pad("down", "mdi:chevron-down", "Tilt down")}<span></span>`
         + `<p class="ccpadnote">Hold to move${ptz.home ? " · the middle goes home" : ""}</p></div>`
       : "";
-    wrap.innerHTML = `<div class="cclive" data-ccscreen>`
+    wrap.innerHTML = `<div class="cctop"><button type="button" class="camicon" aria-label="Close" data-no>${iconMarkup("mdi:close")}</button>`
+      + `<span class="cctitle">${esc(String(firstOf(model.title, "Camera")))}</span>`
+      + `<button type="button" class="cczoom" data-cczoom hidden aria-label="Back to the whole picture"></button>`
+      + (hasClear ? `<button type="button" class="cczoom" data-ccstream aria-label="Switch stream">Low</button>` : "")
+      + `<button type="button" class="camicon ccsidebtn" data-ccside aria-label="Camera controls" aria-expanded="false">${iconMarkup("mdi:tune-variant")}</button>`
+      + `</div>`
+      + `<div class="cclive" data-ccscreen>`
       + `<div class="ccstage"></div>`
       + `<div class="ccwait"><span class="spinner"></span></div>`
       + `<div class="ccveil" hidden>${iconMarkup("mdi:eye-off-outline")}<b>Privacy on</b><span>The camera is closed.</span></div>`
-      + `<div class="cctop"><button type="button" class="camicon" aria-label="Close" data-no>${iconMarkup("mdi:close")}</button>`
-      + `<span class="cctitle">${esc(String(firstOf(model.title, "Camera")))}</span>`
-      + `<button type="button" class="cczoom" data-cczoom hidden aria-label="Back to the whole picture"></button></div>`
       + `</div>`
       + `<div class="ccside"><div class="ccbar">`
       /* Low and High, not the camera's own Fluent and Clear: nobody reading
@@ -19716,6 +19761,15 @@ class SpectraCard extends HTMLElement {
 
     this._bindCameraZoom(wrap.querySelector("[data-ccscreen]"));
     wrap.querySelector("[data-cczoom]").addEventListener("click", () => this._cameraZoomTo(1));
+    /* The stream it is on, said where the zoom is said, and a tap to swap:
+       a phone held sideways has the picture and nothing else. */
+    const stream = wrap.querySelector("[data-ccstream]");
+    if (stream) stream.addEventListener("click", () => this._cameraWhich(s.which === "clear" ? "fluent" : "clear"));
+    const sideBtn = wrap.querySelector("[data-ccside]");
+    sideBtn.addEventListener("click", () => {
+      const open = wrap.classList.toggle("ccsideopen");
+      sideBtn.setAttribute("aria-expanded", String(open));
+    });
 
     /* A wall panel's screen going off hides the page and leaves the view
        up. Streaming to nobody holds the camera's Wi-Fi and a go2rtc session
@@ -19848,6 +19902,8 @@ class SpectraCard extends HTMLElement {
     if (!s) return;
     s.which = which;
     s.wrap.querySelectorAll("[data-ccwhich]").forEach((x) => x.setAttribute("aria-pressed", String(x.getAttribute("data-ccwhich") === which)));
+    const stream = s.wrap.querySelector("[data-ccstream]");
+    if (stream) stream.textContent = which === "clear" ? "High" : "Low";
     this._cameraStart();
   }
 
