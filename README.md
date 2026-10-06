@@ -1276,6 +1276,22 @@ the card does not repaint, because a repaint takes the sheet off the page
 for a moment and a `<video>` taken off the page stops; state changes are
 handed to the sheet instead.
 
+**The live view is the whole screen**, black in both themes, with the
+camera's controls in a column beside it on a wall panel and under it on a
+phone held upright. Close is top left; Escape closes it too.
+
+**Pinch to zoom, and it zooms the real picture.** Two fingers zoom about
+the point between them, one finger drags a zoomed picture around, a double
+tap zooms in or back out, and a mouse wheel works on a desktop. The picture
+is never let go of an edge, and a label says how far in it is; tapping it
+goes back to the whole room. Past the first step in (1.25×), the view
+moves itself to *High*: enlarging the small stream only enlarges its
+pixels, so a close look is taken of the full-resolution one. Zooming all
+the way out puts it back on *Low*, unless *High* was chosen by hand. The
+new stream is laid under the zoom while the old one is still showing, and
+the old one is let go only once the new one has a picture, so the switch
+never drops the room to black mid-pinch.
+
 **Hold to move.** A Reolink keeps turning after a move until it is told
 to stop, so the pad sends the direction on press and `stop` on every way a
 press can end: lift, cancel, the pointer escaping, and the sheet closing.

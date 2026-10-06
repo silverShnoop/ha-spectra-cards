@@ -197,7 +197,11 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     const card = q(".card");
     q("[data-ccopen]").click();
     await wait(400);
-    check("tapping the picture opens the live sheet", !!q(".ccbox"), "no sheet");
+    check("tapping the picture opens the live view", !!q(".ccbox"), "no sheet");
+    const full = q(".ccbox").getBoundingClientRect();
+    check("and it takes the whole screen", full.left === 0 && full.top === 0
+      && full.width === innerWidth && full.height === innerHeight,
+      `${full.left},${full.top} ${full.width}x${full.height} of ${innerWidth}x${innerHeight}`);
     check("it asks what the camera can stream", ws.some((m) => m.type === "camera/capabilities" && m.entity_id === CAM),
       JSON.stringify(ws.map((m) => m.type)));
     const offer = subs[subs.length - 1];
@@ -209,10 +213,10 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     const cands = ws.filter((m) => m.type === "camera/webrtc/candidate");
     check("candidates go with the session id once it has one", cands.every((m) => m.session_id === "S1" && m.entity_id === CAM && m.candidate && "candidate" in m.candidate),
       JSON.stringify(cands[0]));
-    check("the picture waits behind a spinner until a frame arrives", !q(".cclive .ccwait").hidden && q(".cclive video").hidden, "");
+    check("the picture waits behind a spinner until a frame arrives", !q(".cclive .ccwait").hidden && q(".cclayer").hidden, "");
     check("sound starts off", q(".cclive video").muted && q("[data-ccsound]").getAttribute("aria-pressed") === "false", "");
     q("[data-ccsound]").click();
-    check("and one tap turns it on", !q(".cclive video").muted && /Sound on/.test(q("[data-ccsound]").textContent), q("[data-ccsound]").textContent);
+    check("and one tap turns it on", /Sound on/.test(q("[data-ccsound]").textContent), q("[data-ccsound]").textContent);
 
     // ---- high
     check("the two streams are called Low and High", qa("[data-ccwhich]").map((b) => b.textContent.trim()).join("/") === "Low/High",
@@ -258,7 +262,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     check("the card does not repaint under the sheet", q(".card") === card && !!q(".ccbox"), "repainted");
     check("but the sheet hears the lens shut", !q(".cclive .ccveil").hidden && /Lens shut/.test(q(".cctog").textContent),
       q(".cctog").textContent);
-    check("and stops the stream", !q(".cclive img").getAttribute("src"), q(".cclive img").getAttribute("src"));
+    check("and stops the stream", !q(".cclive img"), "a layer is still up");
 
     // ---- closing
     next({ [PRIV]: st("off") });
@@ -281,6 +285,52 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     check("a camera with no WebRTC goes straight to the slow stream",
       subs.length === n && q(".cclive img").getAttribute("src") === `/api/camera_proxy_stream/${CAM}?token=T1`,
       q(".cclive img").getAttribute("src"));
+    await wait(200);
+    check("and shows it once a frame is in", !q(".cclayer").hidden && q(".cclive .ccwait").hidden, "");
+
+    // ---- pinch to zoom
+    const screen = q("[data-ccscreen]");
+    const box = screen.getBoundingClientRect();
+    const pe = (type, id, x, y) => screen.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, pointerId: id, clientX: box.left + x, clientY: box.top + y }));
+    const cx = box.width / 2;
+    const cy = box.height / 2;
+    pe("pointerdown", 11, cx - 40, cy); pe("pointerdown", 12, cx + 40, cy);
+    pe("pointermove", 11, cx - 100, cy); pe("pointermove", 12, cx + 100, cy);
+    const zoomed = q(".ccstage").style.transform;
+    check("two fingers apart zoom the picture", /scale\(2\.5/.test(zoomed), zoomed);
+    check("about the point between them", /translate\(-?\d/.test(zoomed)
+      && Math.abs(el._ccSheet.zoom.x + cx * 1.5) < 2, JSON.stringify(el._ccSheet.zoom));
+    check("and says how far", !q("[data-cczoom]").hidden && q("[data-cczoom]").textContent === "2.5\u00d7",
+      q("[data-cczoom]").textContent);
+    await wait(300);
+    const layers = qa(".cclayer");
+    check("zooming in fetches the real picture, not the small one enlarged",
+      layers.length === 1 && q(".cclive img").getAttribute("src") === `/api/camera_proxy_stream/${CLEAR}?token=C1`
+        && q('[data-ccwhich="clear"]').getAttribute("aria-pressed") === "true",
+      `${layers.length} layers, ${q(".cclive img") && q(".cclive img").getAttribute("src")}`);
+    pe("pointerup", 11, cx - 100, cy); pe("pointerup", 12, cx + 100, cy);
+
+    pe("pointerdown", 13, cx, cy); pe("pointermove", 13, cx + 5000, cy + 5000); pe("pointerup", 13, cx + 5000, cy + 5000);
+    check("a drag never pulls the picture off an edge", el._ccSheet.zoom.x === 0 && el._ccSheet.zoom.y === 0,
+      JSON.stringify(el._ccSheet.zoom));
+
+    q("[data-cczoom]").click();
+    await wait(300);
+    check("tapping the zoom goes back to the whole picture", q(".ccstage").style.transform === ""
+      && q("[data-cczoom]").hidden, q(".ccstage").style.transform);
+    check("and back to the light stream it chose itself", q(".cclive img").getAttribute("src") === `/api/camera_proxy_stream/${CAM}?token=T1`,
+      q(".cclive img").getAttribute("src"));
+
+    pe("pointerdown", 14, cx, cy); pe("pointerup", 14, cx, cy);
+    pe("pointerdown", 15, cx, cy); pe("pointerup", 15, cx, cy);
+    check("a double tap zooms in", el._ccSheet.zoom.s === 2.5, String(el._ccSheet.zoom.s));
+    q('[data-ccwhich="clear"]').click();
+    await wait(250);
+    q("[data-cczoom]").click();
+    await wait(250);
+    check("High chosen by hand stays when the zoom comes out",
+      q('[data-ccwhich="clear"]').getAttribute("aria-pressed") === "true", "went back to Low");
     el.remove();
     await wait(50);
     check("taking the card off the page ends the stream", !el._ccSheet, "sheet still held");
