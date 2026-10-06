@@ -7570,16 +7570,22 @@ const BODIES = {
     /* Nineteen hall trips in twelve minutes is one thing happening, not
        nineteen. Consecutive events from the same source collapse to a row
        carrying a count, so the rail still answers "what happened, in order"
-       instead of becoming one sensor's log. */
+       instead of becoming one sensor's log.
+
+       The feed folds them itself now, so that its cap counts rows rather
+       than happenings, and a folded row arrives carrying its own `count`.
+       Merging here still matters for a feed that does not fold, and the
+       counts add rather than each row counting as one. */
     const rows = [];
     for (const event of raw) {
       const previous = rows[rows.length - 1];
       const key = event.entity_id || `${event.area}|${event.kind}`;
+      const n = Number(event.count) > 0 ? Math.floor(Number(event.count)) : 1;
       if (b.collapse !== false && previous && previous.key === key) {
-        previous.count += 1;
+        previous.count += n;
         continue;
       }
-      rows.push({ key, count: 1, event });
+      rows.push({ key, count: n, event });
     }
 
     const limit = Number(b.max) > 0 ? Number(b.max) : rows.length;
