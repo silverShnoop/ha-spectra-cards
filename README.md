@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1317,7 +1317,99 @@ The middle button goes to the saved home position.
 press in a rileys_room costs more than the button could ever earn.
 
 **Any camera, not this one.** Nothing here knows it is a Reolink. The next
-camera, or Frigate's entities, is another card with different ids.
+camera is another card with different ids, and a Frigate camera adds
+`frigate` (below).
+
+### Frigate on the camera card
+
+```yaml
+body:
+  type: camera
+  picture: {entity: camera.front_gate, attribute: entity_picture}
+  live: {fluent: camera.front_gate}
+  detections:
+    - {name: Car, icon: mdi:car, on: {entity: binary_sensor.front_gate_car_occupancy}}
+    - {name: Person, icon: mdi:account, on: {entity: binary_sensor.front_gate_person_occupancy}}
+    - {name: Parcel, icon: mdi:package-variant-closed, on: {entity: binary_sensor.front_gate_package_occupancy}}
+  frigate:
+    camera: camera.front_gate     # a camera the Frigate integration made
+    hours: 12                     # the card's strip; default 12
+    labels: {vehicle: Car}        # optional; rename a group
+outline: {entity: sensor.camera_status, attribute: cameras, key: [front_gate, level]}
+```
+
+With `frigate`, the card also reads what Frigate made of the camera: its
+**review items**, each a stretch of time when something was seen, as an
+alert or a detection. The card draws the last `hours` as a strip, one mark
+per review, coloured by what it was; the latest review in Frigate's own
+words; and the newest four as pictures. Tapping a picture, or the latest
+review, opens the live view playing it.
+
+The live view gains a **timeline**, one lane per thing seen over 1, 6 or
+24 hours, with what was recorded shaded under it; filters by what was seen
+and alerts alone; a search over Frigate's descriptions; and the reviews as
+a list. Tapping a review plays it in place of the live picture, with five
+seconds either side, Frigate's description of the scene, what it
+recognised (a known face, a known plate), the zones it went through, and
+a download. Tapping the timeline away from any review plays the recording
+from there. **Back to live** stops the recording and starts the stream.
+The live stream stops while a recording plays: two streams from one
+camera over one tunnel is bandwidth spent on a picture nobody sees.
+Watching a review marks it reviewed in Frigate, and there is **Mark
+reviewed** for the rest of the list. That is optional, never a job.
+
+**Everything comes through the Frigate integration**, through the
+websocket commands its own media browser uses (`frigate/reviews/get`,
+`frigate/reviews/subscribe`, `frigate/recordings/get`,
+`frigate/reviews/viewed`), and the pictures and recordings through its
+proxy (`/api/frigate/<instance>/clips/…`, `…/recording/…`), signed so an
+`<img>` or a `<video>` can load them. The card needs no Frigate address or
+password, and works over Nabu Casa. The instance and Frigate's name for the
+camera are read off the camera entity's `client_id` and `camera_name`;
+`instance` and `name` set them outright.
+
+It is pushed, not polled: the integration's review subscription refetches
+within a couple of seconds of anything at this camera, and a refetch every
+minute covers a lost push. A Frigate that never answers says so on the
+card. One that stops answering keeps what it last said.
+
+**Alert and detection are weight, not colour.** An alert is outlined in
+ink. The marks wear decorative accents (person plum, vehicle teal, parcel
+slate, animal moss, anything else bone) and never a level: a car on the
+drive is a fact. The two things a camera sees that *are* jobs, a parcel
+left in view and a camera that has stopped, are rows in
+`home_signals`' `sensor.camera_status`, and the card takes its `outline`
+from that sensor's entry for this camera, as above.
+
+`tools/checkfrigate.js` holds all of it, against a stubbed integration.
+
+### `visits` — what came by today?
+
+```yaml
+type: custom:spectra-card
+title: Today at the gate
+tasks: {card: visits, tab: security}
+body:
+  type: visits
+  frigate: {camera: camera.front_gate, labels: {vehicle: Car}}
+  counts: [vehicle, person, package]   # default
+  summary: true                        # optional; or {script: script.gate_day}
+```
+
+A day at one camera, as facts: how many of each thing came by, a bar for
+every hour coloured by what was busiest, and the day's alerts in order with
+any known face or plate beside them. It reads the same reviews the camera
+card does, so it takes no fetch of its own when both are on one panel.
+
+`summary` adds **Summarise the day**, an optional button. By default it
+asks Frigate itself (`frigate.review_summarize`), which writes the report
+with the same model that described each review, so the words stay on the
+machine Frigate's model runs on. Frigate's report covers every camera on
+purpose: it relates an alert at the gate to what the other cameras saw at
+the same moment. `{script: …}` sends the day's reviews as text to a script
+instead, which answers `{text}`. Either way it is an AI task, blue while it
+runs and when it lands. The report is Markdown; the card reads it as plain
+words.
 
 ### `people` — who is in, who is out, and who nobody can say
 
@@ -3342,6 +3434,18 @@ at all, the live sheet sends Home Assistant's WebRTC offer and trickles
 candidates with the session id, an error or a camera without WebRTC
 falls back to the MJPEG stream, and every held arrow is followed by a
 stop, including the one interrupted by closing the sheet.
+
+```
+node tools/checkfrigate.js
+```
+
+Frigate on the camera card, the live view and the visits card, against
+the integration's websocket commands answered the way it answers them
+(Frigate's JSON as text). Which camera's reviews are fetched, that a push
+for another camera fetches nothing, that a review plays from a signed
+recording in place of the live stream and the stream comes back after it,
+that watching a review marks it reviewed, and that nothing Frigate says
+wears a level.
 
 ```
 node tools/checkclimate.js

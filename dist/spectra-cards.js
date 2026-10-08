@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.163.0";
+const VERSION = "0.164.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -1129,6 +1129,119 @@ ha-icon { display:inline-flex; line-height:0; }
 .ccdet i { font-style:normal; font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); }
 .ccdet.on { background:var(--accent); color:var(--sp-surface); font-weight:600; }
 .ccdet.on .mdi, .ccdet.on ha-icon, .ccdet.on i { color:var(--sp-surface); }
+
+/* Frigate on the camera card: a strip of the last hours, the latest
+   review in words, and the newest few as pictures. The marks wear
+   decorative accents (--fr), never a level: an alert is told apart by an
+   outline in ink, which is weight, not hue. */
+.frcard { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+.frhead2 { display:flex; justify-content:space-between; gap:8px; font-size:11px; color:var(--sp-ink-2); letter-spacing:.04em; }
+.frstrip { position:relative; height:26px; background:var(--sp-sink); border-radius:3px; overflow:hidden; }
+.frstrip.lanes { height:auto; min-height:32px; }
+.frmark { position:absolute; top:4px; height:14px; border-radius:2px; background:var(--fr, var(--sp-a2)); }
+.frstrip:not(.lanes) .frmark { top:4px; height:14px; }
+.frmark.alert { box-shadow:inset 0 0 0 2px var(--sp-ink); }
+.frstrip em { position:absolute; left:4px; font-style:normal; font-size:10px; line-height:14px; color:var(--sp-ink-3); pointer-events:none; z-index:1; }
+.frrec { position:absolute; left:0; right:0; bottom:0; height:5px; background:var(--sp-edge); }
+.frrec i { position:absolute; top:0; bottom:0; background:var(--sp-ink-3); }
+.frhead { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--sp-ink); z-index:2; }
+.fraxis { position:relative; height:12px; font:400 10px var(--sp-mono); color:var(--sp-ink-3); }
+.fraxis span { position:absolute; top:0; transform:translateX(-50%); white-space:nowrap; }
+.fraxis span:first-child { transform:none; }
+.fraxis .now { right:0; left:auto !important; transform:none; }
+.frkey { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:11px; color:var(--sp-ink-2); }
+.frkey span { display:inline-flex; align-items:center; gap:4px; }
+.frkey i { width:8px; height:8px; background:var(--fr, transparent); display:inline-block; }
+.frkey i.alert { box-shadow:inset 0 0 0 2px var(--sp-ink); }
+.frlatest { border-top:1px solid var(--sp-edge); padding-top:8px; margin-top:2px; cursor:pointer; display:flex; flex-direction:column; gap:3px; }
+.frwhen { margin:0; display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:11px; color:var(--sp-ink-2); }
+.frwhen b { font:500 11px var(--sp-mono); color:var(--sp-ink); }
+.frsev { font-size:11px; font-weight:500; color:var(--sp-ink); }
+.frsev.alert { font-weight:700; }
+.frwords { margin:0; font-size:14px; line-height:1.4; color:var(--sp-ink); }
+.frby { margin:0; font-size:11px; color:var(--sp-ink-3); }
+.frnote { margin:10px 0 0; font-size:12px; color:var(--sp-ink-3); }
+.frthumbs { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px; }
+.frthumb { all:unset; cursor:pointer; display:flex; flex-direction:column; gap:3px; min-width:0; }
+.frthumb:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.frpic { position:relative; display:block; aspect-ratio:16/10; border-radius:3px; overflow:hidden; background:var(--sp-sink); }
+.frpic img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+.frthumb.alert .frpic { box-shadow:inset 0 0 0 2px var(--sp-ink); }
+.frthumb.alert .frpic img { padding:2px; border-radius:3px; }
+.frcap { font:400 10px var(--sp-mono); color:var(--sp-ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* visits -- a day at one camera */
+.frday { display:flex; flex-direction:column; gap:10px; }
+.frstats { display:grid; grid-template-columns:repeat(auto-fit, minmax(64px, 1fr)); gap:8px; }
+.frstats div { display:flex; flex-direction:column; }
+.frstats b { font:500 26px var(--sp-mono); line-height:1; color:var(--sp-ink); font-variant-numeric:tabular-nums; }
+.frstats span { font-size:12px; color:var(--sp-ink-2); }
+.frbars { display:flex; align-items:flex-end; gap:2px; height:56px; border-bottom:1px solid var(--sp-edge); }
+.frbars i { flex:1 1 0; border-radius:1px 1px 0 0; background:var(--fr, var(--sp-sink)); }
+.fraxis.day { margin-top:-6px; }
+.frsum { background:var(--sp-zebra); border-radius:4px; padding:9px 10px; display:flex; flex-direction:column; gap:4px; }
+.frsum p { margin:0; font-size:14px; line-height:1.45; white-space:pre-line; }
+.frsum .frby { font-size:11px; }
+.frbtn {
+  align-self:flex-start; display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:0 14px;
+  border-radius:6px; border:2px solid var(--sp-sink); background:var(--sp-surface); color:var(--sp-ink);
+  font:inherit; font-size:13px; font-weight:500; cursor:pointer;
+}
+.frbtn:disabled { opacity:.55; cursor:default; }
+.frbtn .mdi, .frbtn ha-icon { --mdc-icon-size:16px; width:16px; height:16px; }
+.frcap2 { margin:0; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sp-ink-2); }
+.frlog { display:grid; grid-template-columns:44px minmax(0, 1fr) auto; gap:5px 10px; font-size:13px; align-items:baseline; }
+.frlog .t { font-family:var(--sp-mono); color:var(--sp-ink-2); }
+.frlog .w { min-width:0; }
+.frlog .n { font:400 11px var(--sp-mono); color:var(--sp-ink-3); }
+
+/* Frigate in the live view: playback, the timeline, and the reviews.
+   It sits at the top of the controls, so it is a column on a wall panel,
+   under the picture on a phone held upright and in the drawer sideways. */
+.frside { display:flex; flex-direction:column; gap:12px; }
+.frplaybar { display:flex; flex-direction:column; gap:8px; }
+.frplaybar[hidden] { display:none; }
+.frplayrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.frplayrow .frwhat { flex:1 1 auto; min-width:0; font-size:13px; color:var(--sp-ink); }
+.frplayrow .frwhat b { font-family:var(--sp-mono); font-weight:500; }
+.frlive { height:36px; padding:0 14px; border-radius:18px; border:0; background:var(--sp-ink); color:var(--sp-paper);
+  font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.frlink { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 12px; border-radius:6px;
+  border:2px solid var(--sp-sink); color:var(--sp-ink); text-decoration:none; font-size:13px; font-weight:500; background:none; cursor:pointer; font-family:inherit; }
+.frlink .mdi, .frlink ha-icon { --mdc-icon-size:16px; width:16px; height:16px; }
+.frdetail { display:flex; flex-direction:column; gap:6px; font-size:13px; }
+.frdetail p { margin:0; line-height:1.45; }
+.frdetail .k { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sp-ink-2); }
+.frtl { display:flex; flex-direction:column; gap:6px; }
+.frtlhead { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.frtlhead .k { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sp-ink-2); }
+.frspan { display:inline-flex; border:2px solid var(--sp-sink); border-radius:6px; overflow:hidden; }
+.frspan button { border:0; background:none; color:var(--sp-ink-2); font:500 12px var(--sp-mono); padding:0 10px; min-height:32px; cursor:pointer; }
+.frspan button[aria-pressed="true"] { background:var(--sp-sink); color:var(--sp-ink); }
+.frside .frstrip { cursor:pointer; touch-action:manipulation; }
+.frside .frstrip.lanes { padding-bottom:9px; }
+.frhint { margin:0; font-size:11px; color:var(--sp-ink-3); }
+.frchips { display:flex; flex-wrap:wrap; gap:6px; }
+.frchip {
+  display:inline-flex; align-items:center; gap:5px; min-height:32px; padding:0 11px; border-radius:16px;
+  border:1px solid var(--sp-edge); background:none; color:var(--sp-ink-2); font:inherit; font-size:12px; cursor:pointer;
+}
+.frchip i { width:8px; height:8px; border-radius:2px; background:var(--fr, transparent); }
+.frchip[aria-pressed="true"] { border-color:var(--sp-ink); color:var(--sp-ink); font-weight:600; }
+.frfind { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--sp-ink-2); }
+.frfind input { min-height:38px; border:2px solid var(--sp-sink); border-radius:6px; padding:0 10px; background:var(--sp-paper);
+  color:var(--sp-ink); font:inherit; font-size:14px; }
+.frlisthead { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.frlisthead .k { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sp-ink-2); }
+.frlist { display:flex; flex-direction:column; gap:8px; }
+.frrow { all:unset; cursor:pointer; display:grid; grid-template-columns:92px minmax(0, 1fr); gap:10px; align-items:start; }
+.frrow:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.frrow.playing .frpic { box-shadow:0 0 0 2px var(--accent); }
+.frrow .frwords { font-size:13px; }
+.frrow .frwhen { font-size:11px; }
+.frrow.seen .frwords { color:var(--sp-ink-2); }
+.frempty { margin:0; font-size:12px; color:var(--sp-ink-3); }
+.ccplay video { object-fit:contain; background:#000; }
 
 /* The live view takes the whole screen, black in both themes: a picture
    is a picture, and the room at night is a dark grey that a light sheet
@@ -6208,6 +6321,287 @@ function cameraStreamUrl(entity, token) {
   return `/api/camera_proxy_stream/${entity}?token=${encodeURIComponent(String(token))}`;
 }
 
+/* ------------------------------------------------------------------ *
+ * Frigate
+ *
+ * What Frigate makes of a camera: its review items -- a stretch of time
+ * when something was seen, as an alert or a detection, with the objects,
+ * the zones, and (with GenAI on) a title and a summary of what happened.
+ * They come from the Frigate integration's own websocket commands, the
+ * same ones its media browser uses, so nothing here reaches Frigate
+ * directly and nothing needs a Frigate address or password.
+ *
+ * Alert and detection are Frigate's words for how much a review matters.
+ * They are drawn by WEIGHT -- an alert is outlined -- and never by a level
+ * colour: a car on the drive is not a job, and yellow on a morning with
+ * nothing wrong is how a yellow stops meaning anything.
+ * ------------------------------------------------------------------ */
+
+/* The card's own ribbon, in hours. */
+const FRIGATE_HOURS = 12;
+/* How far back the live view's timeline can look, and so how much is
+   fetched: a day, which also covers "today" for the visits card. */
+const FRIGATE_FETCH_HOURS = 24;
+const FRIGATE_SPANS = [1, 6, 24];
+/* A review list is refetched this often even if the integration pushes
+   nothing, because a push can be lost and a stale list looks like a quiet
+   drive. */
+const FRIGATE_REFRESH_MS = 60000;
+/* A recording either side of a review, so it starts before the car does. */
+const FRIGATE_PAD_S = 5;
+/* Tapping the timeline away from any review plays this much from there. */
+const FRIGATE_SCRUB_S = 300;
+
+/* What Frigate can name, gathered into the few things a person reads off
+   a timeline. Each wears a decorative accent: teal, plum, slate, moss and
+   bone, never a level hue. Order is lane order. */
+const FRIGATE_GROUPS = [
+  { key: "person", name: "Person", slot: 6, icon: "mdi:account" },
+  { key: "vehicle", name: "Vehicle", slot: 4, icon: "mdi:car" },
+  { key: "package", name: "Parcel", slot: 5, icon: "mdi:package-variant-closed" },
+  { key: "animal", name: "Animal", slot: 3, icon: "mdi:paw" },
+  { key: "other", name: "Other", slot: 2, icon: "mdi:shape-outline" },
+];
+const FRIGATE_VEHICLES = new Set(["car", "motorcycle", "bicycle", "truck", "bus", "van", "boat", "license_plate"]);
+const FRIGATE_ANIMALS = new Set(["dog", "cat", "bird", "fox", "deer", "horse", "cow", "sheep", "bear",
+  "raccoon", "squirrel", "rabbit", "badger", "hedgehog", "goat", "animal"]);
+
+function frigateGroupOf(label) {
+  const l = String(label || "").toLowerCase().replace(/-verified$/, "");
+  if (l === "person" || l === "face") return "person";
+  if (l === "package") return "package";
+  if (FRIGATE_VEHICLES.has(l)) return "vehicle";
+  if (FRIGATE_ANIMALS.has(l)) return "animal";
+  return "other";
+}
+
+/* A group with the card's own word for it: `names: {vehicle: Car}`. */
+function frigateGroup(key, names) {
+  const g = FRIGATE_GROUPS.find((x) => x.key === key) || FRIGATE_GROUPS[FRIGATE_GROUPS.length - 1];
+  const own = names && typeof names === "object" && !isBlank(names[g.key]) ? String(names[g.key]) : g.name;
+  return { key: g.key, name: own, slot: g.slot, icon: g.icon };
+}
+
+/* The integration hands Frigate's JSON back as text; a test or a newer
+   build may hand back the parsed value. Either way, a list or nothing. */
+function frigateList(raw) {
+  let v = raw;
+  if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { return null; } }
+  return Array.isArray(v) ? v : null;
+}
+
+/* A sub-label is a name, or a [name, score] pair, depending on Frigate's
+   version. A known face or a known plate either way. */
+function frigateSubs(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((s) => (Array.isArray(s) ? s[0] : s))
+    .filter((s) => !isBlank(s))
+    .map(String);
+}
+
+/* One review, as the card reads it. Times are seconds, as Frigate's are. */
+function frigateReview(r) {
+  if (!r || typeof r !== "object" || isBlank(r.id)) return null;
+  const start = Number(r.start_time);
+  if (!Number.isFinite(start) || start <= 0) return null;
+  const endRaw = Number(r.end_time);
+  const end = r.end_time !== null && Number.isFinite(endRaw) && endRaw >= start ? endRaw : null;
+  const d = r.data && typeof r.data === "object" ? r.data : {};
+  const labels = (Array.isArray(d.objects) ? d.objects : []).map(String).filter(Boolean);
+  const groups = [];
+  labels.forEach((l) => { const g = frigateGroupOf(l); if (!groups.includes(g)) groups.push(g); });
+  if (!groups.length && Array.isArray(d.audio) && d.audio.length) groups.push("other");
+  const meta = d.metadata && typeof d.metadata === "object" ? d.metadata : null;
+  const thumb = String(r.thumb_path || "");
+  const at = thumb.indexOf("/clips/");
+  return {
+    id: String(r.id),
+    start,
+    end,
+    severity: r.severity === "alert" ? "alert" : "detection",
+    groups: FRIGATE_GROUPS.map((g) => g.key).filter((k) => groups.includes(k)),
+    labels,
+    zones: (Array.isArray(d.zones) ? d.zones : []).map(String),
+    subs: frigateSubs(d.sub_labels),
+    title: meta && !isBlank(meta.title) ? String(meta.title) : "",
+    summary: meta && !isBlank(meta.shortSummary) ? String(meta.shortSummary) : "",
+    scene: meta && !isBlank(meta.scene) ? String(meta.scene) : "",
+    reviewed: Boolean(r.has_been_reviewed),
+    thumb: at >= 0 ? thumb.slice(at + "/clips/".length) : "",
+  };
+}
+
+/* Newest first. Frigate orders by severity first, which is the wrong
+   question for a timeline. */
+function frigateReviews(raw) {
+  return (frigateList(raw) || []).map(frigateReview).filter(Boolean).sort((a, b) => b.start - a.start);
+}
+
+/* Merge recorded segments into the stretches they make, forgiving the
+   gap between one ten-second segment and the next. */
+function frigateRanges(raw) {
+  const rows = (frigateList(raw) || [])
+    .map((r) => [Number(r && r.start_time), Number(r && r.end_time)])
+    .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a)
+    .sort((x, y) => x[0] - y[0]);
+  const out = [];
+  for (const [a, b] of rows) {
+    const last = out[out.length - 1];
+    if (last && a - last[1] <= 15) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out;
+}
+
+function frigateClock(secs) {
+  const d = new Date(secs * 1000);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/* What a review is called, in order of what is worth reading: Frigate's
+   own summary, its title, else what was seen and where. */
+function frigateWords(r, names) {
+  if (r.summary) return r.summary;
+  if (r.title) return r.title;
+  const what = r.groups.map((k) => frigateGroup(k, names).name);
+  const seen = what.length ? what.join(" and ") : "Something";
+  return r.zones.length ? `${seen} in ${r.zones.map((z) => z.replace(/_/g, " ")).join(", ")}` : `${seen} seen`;
+}
+
+function frigateLength(r, nowS) {
+  const end = r.end === null ? nowS : r.end;
+  return shortDuration(Math.max(1, end - r.start));
+}
+
+/* A strip of time with each review on it, coloured by what it was. Pure:
+   the timeline in the live view is drawn by the same function, wider. */
+function frigateStrip(reviews, from, to, names, opts) {
+  const o = opts || {};
+  const span = Math.max(1, to - from);
+  const pct = (t) => Math.min(100, Math.max(0, ((t - from) / span) * 100));
+  const lanes = o.lanes ? FRIGATE_GROUPS.filter((g) => reviews.some((r) => r.groups.includes(g.key))) : null;
+  let marks = "";
+  for (const r of reviews) {
+    const end = r.end === null ? to : r.end;
+    if (end < from || r.start > to) continue;
+    const left = pct(r.start);
+    const width = Math.max(o.lanes ? 0.6 : 0.9, pct(end) - left);
+    const keys = lanes ? r.groups.filter((k) => lanes.some((l) => l.key === k)) : [r.groups[0] || "other"];
+    for (const k of keys) {
+      const g = frigateGroup(k, names);
+      const row = lanes ? lanes.findIndex((l) => l.key === k) : 0;
+      marks += `<i class="frmark${r.severity === "alert" ? " alert" : ""}" style="left:${left.toFixed(2)}%;`
+        + `width:${width.toFixed(2)}%;--fr:var(--sp-a${g.slot})${lanes ? `;top:${row * 18 + 4}px` : ""}"></i>`;
+    }
+  }
+  let rec = "";
+  if (Array.isArray(o.ranges)) {
+    rec = `<span class="frrec">` + o.ranges.filter(([a, b]) => b >= from && a <= to)
+      .map(([a, b]) => `<i style="left:${pct(a).toFixed(2)}%;width:${Math.max(0.3, pct(b) - pct(a)).toFixed(2)}%"></i>`)
+      .join("") + `</span>`;
+  }
+  const head = Number.isFinite(o.head) ? `<b class="frhead" style="left:${pct(o.head).toFixed(2)}%"></b>` : "";
+  const labels = lanes ? lanes.map((l, i) => `<em style="top:${i * 18 + 2}px">${esc(frigateGroup(l.key, names).name)}</em>`).join("") : "";
+  const height = lanes ? Math.max(1, lanes.length) * 18 + 14 : 0;
+  return `<div class="frstrip${lanes ? " lanes" : ""}"${height ? ` style="height:${height}px"` : ""}${o.attrs || ""}>`
+    + labels + marks + rec + head + `</div>`;
+}
+
+/* Ticks under a strip, every so often, ending at "now". */
+function frigateAxis(from, to) {
+  const span = to - from;
+  const step = span <= 3600 ? 900 : span <= 6 * 3600 ? 3600 : span <= 12 * 3600 ? 3 * 3600 : 6 * 3600;
+  const ticks = [];
+  const first = Math.ceil(from / step) * step;
+  for (let t = first; t < to - step * 0.4; t += step) ticks.push(t);
+  return `<div class="fraxis">` + ticks.map((t) => `<span style="left:${(((t - from) / span) * 100).toFixed(2)}%">${esc(frigateClock(t))}</span>`).join("")
+    + `<span class="now">now</span></div>`;
+}
+
+/* The key under the card's ribbon: only what is on it, and the outline. */
+function frigateKey(reviews, names) {
+  const present = FRIGATE_GROUPS.filter((g) => reviews.some((r) => r.groups[0] === g.key || (r.groups.length === 0 && g.key === "other")));
+  if (!present.length) return "";
+  return `<div class="frkey">` + present.map((g) => {
+    const own = frigateGroup(g.key, names);
+    return `<span><i style="--fr:var(--sp-a${own.slot})"></i>${esc(own.name)}</span>`;
+  }).join("") + (reviews.some((r) => r.severity === "alert") ? `<span><i class="alert"></i>Alert</span>` : "") + `</div>`;
+}
+
+/* The camera card's Frigate half: the ribbon, the latest review in words,
+   and the newest few as pictures. Nothing here is a job. */
+function frigateCardMarkup(fr) {
+  if (!fr) return "";
+  if (fr.failed) return `<p class="frnote">${esc(fr.failed)}</p>`;
+  if (!fr.ready) return `<p class="frnote">Waiting for Frigate…</p>`;
+  const names = fr.names;
+  const shown = fr.reviews.filter((r) => (r.end === null ? fr.to : r.end) >= fr.from);
+  const alerts = shown.filter((r) => r.severity === "alert").length;
+  let out = `<div class="frcard">`
+    + `<div class="frhead2"><span>Last ${fr.hours} hours</span>`
+    + `<span>${shown.length ? `${shown.length} review${shown.length === 1 ? "" : "s"}${alerts ? ` · ${alerts} alert${alerts === 1 ? "" : "s"}` : ""}` : "Nothing seen"}</span></div>`
+    + frigateStrip(shown, fr.from, fr.to, names)
+    + frigateAxis(fr.from, fr.to)
+    + frigateKey(shown, names);
+  const latest = shown[0];
+  if (latest) {
+    out += `<div class="frlatest" role="button" tabindex="0" data-frplay="${esc(latest.id)}" aria-label="Play this review">`
+      + `<p class="frwhen"><b>${esc(frigateClock(latest.start))}</b>`
+      + `<span class="frsev${latest.severity === "alert" ? " alert" : ""}">${latest.severity === "alert" ? "Alert" : "Detection"}</span>`
+      + `<span>${esc(latest.end === null ? "now" : frigateLength(latest, fr.to))}${latest.groups.length ? ` · ${esc(latest.groups.map((k) => frigateGroup(k, names).name).join(", "))}` : ""}</span></p>`
+      + `<p class="frwords">${esc(frigateWords(latest, names))}</p>`
+      + (latest.summary || latest.title ? `<p class="frby">Described by Frigate</p>` : "")
+      + `</div>`;
+  }
+  const few = shown.slice(0, 4);
+  if (few.length) {
+    out += `<div class="frthumbs">` + few.map((r) => {
+      const url = fr.thumbs && fr.thumbs[r.id];
+      const g = frigateGroup(r.groups[0] || "other", names);
+      return `<button type="button" class="frthumb${r.severity === "alert" ? " alert" : ""}" data-frplay="${esc(r.id)}"`
+        + ` aria-label="${esc(`${frigateClock(r.start)} ${g.name}`)}">`
+        + `<span class="frpic">${url ? `<img alt="" src="${esc(url)}" data-thumb>` : ""}</span>`
+        + `<span class="frcap">${esc(frigateClock(r.start))} · ${esc(g.name)}</span></button>`;
+    }).join("") + `</div>`;
+  }
+  return out + `</div>`;
+}
+
+/* A model's report is Markdown; the card is not. Headings and emphasis
+   marks go, the words and the line breaks stay. */
+function frigatePlain(text) {
+  return String(text).replace(/\r/g, "")
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1").replace(/__([^_]+)__/g, "$1")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1$2")
+    .replace(/^\s*[-*]\s+/gm, "· ")
+    .replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/* A day of one camera, counted. Pure, from the same reviews. */
+function frigateDay(reviews, midnight, names) {
+  const today = reviews.filter((r) => r.start >= midnight);
+  const counts = {};
+  FRIGATE_GROUPS.forEach((g) => { counts[g.key] = 0; });
+  today.forEach((r) => r.groups.forEach((k) => { counts[k] += 1; }));
+  const hours = [];
+  for (let h = 0; h < 24; h++) {
+    const inHour = today.filter((r) => r.start >= midnight + h * 3600 && r.start < midnight + (h + 1) * 3600);
+    const tally = {};
+    inHour.forEach((r) => r.groups.forEach((k) => { tally[k] = (tally[k] || 0) + 1; }));
+    const top = FRIGATE_GROUPS.map((g) => g.key).filter((k) => tally[k]).sort((a, b) => tally[b] - tally[a])[0] || null;
+    hours.push({ n: inHour.length, top });
+  }
+  return {
+    count: today.length,
+    alerts: today.filter((r) => r.severity === "alert").length,
+    counts,
+    hours,
+    alertsList: today.filter((r) => r.severity === "alert").slice().sort((a, b) => a.start - b.start),
+    names,
+  };
+}
+
 /* The activity feed's kinds and the glyph each one wears, shared by the
    rail and the floor plan so a kind cannot look one way down the list and
    another on the house. The last five are what a camera saw, named by what
@@ -6919,7 +7313,53 @@ const BODIES = {
         + `${iconMarkup(d.icon)}${esc(d.name)}${d.when ? ` <i>${esc(d.when)}</i>` : ""}</span>`).join("")
         + `</div>`;
     }
+    if (b.fr) out += frigateCardMarkup(b.fr);
     return out;
+  },
+
+  /* A day at one camera, as facts: how many of each, when it was busy,
+     the alerts in order, and -- when somebody asks for one -- a few
+     sentences about the day from whatever model the summary script uses.
+     Nothing here asks anybody to do anything, so it takes no level. */
+  visits(b) {
+    const fr = b && b.fr;
+    if (!fr) return `<p class="frnote">Set <code>frigate.camera</code> to a Frigate camera.</p>`;
+    if (fr.failed) return `<p class="frnote">${esc(fr.failed)}</p>`;
+    if (!fr.ready) return `<p class="frnote">Waiting for Frigate…</p>`;
+    const day = fr.day;
+    const names = day.names;
+    const want = Array.isArray(b.counts) && b.counts.length
+      ? b.counts.map((k) => String(k)).filter((k) => FRIGATE_GROUPS.some((g) => g.key === k))
+      : ["vehicle", "person", "package"];
+    let out = `<div class="frday">`
+      + `<div class="frstats">` + want.map((k) => {
+        const g = frigateGroup(k, names);
+        return `<div><b>${day.counts[k] || 0}</b><span>${esc(g.name)}</span></div>`;
+      }).join("") + `<div><b>${day.alerts}</b><span>${day.alerts === 1 ? "Alert" : "Alerts"}</span></div></div>`;
+    const peak = Math.max(1, ...day.hours.map((h) => h.n));
+    out += `<div class="frbars" role="img" aria-label="Reviews in each hour today">`
+      + day.hours.map((h) => `<i style="height:${h.n ? Math.max(6, Math.round((h.n / peak) * 100)) : 0}%`
+        + `${h.top ? `;--fr:var(--sp-a${frigateGroup(h.top, names).slot})` : ""}"></i>`).join("")
+      + `</div><div class="fraxis day"><span style="left:0%">00</span><span style="left:25%">06</span>`
+      + `<span style="left:50%">12</span><span style="left:75%">18</span><span class="now">24</span></div>`;
+    if (b.summary_enabled) {
+      if (fr.summary) {
+        out += `<div class="frsum"><p>${esc(fr.summary.text)}</p>`
+          + `<p class="frby">Day summary · ${esc(fr.summary.at)}</p></div>`;
+      }
+      out += `<button type="button" class="frbtn" data-frsummary${fr.summarising ? " disabled" : ""}>`
+        + `${iconMarkup("mdi:text-box-outline")}${fr.summarising ? "Summarising…" : fr.summary ? "Summarise again" : "Summarise the day"}</button>`;
+    }
+    if (day.alertsList.length) {
+      out += `<p class="frcap2">Alerts today</p><div class="frlog">` + day.alertsList.map((r) => {
+        const who = r.subs.length ? r.subs.join(", ") : "";
+        return `<span class="t">${esc(frigateClock(r.start))}</span><span class="w">${esc(r.title || frigateWords(r, names))}</span>`
+          + `<span class="n">${esc(who)}</span>`;
+      }).join("") + `</div>`;
+    } else {
+      out += `<p class="frnote">No alerts today.</p>`;
+    }
+    return out + `</div>`;
   },
 
   summary(b) {
@@ -11846,6 +12286,7 @@ class SpectraCard extends HTMLElement {
     this._followTask();
     this._reconcile();
     this._subscribeForecasts();
+    this._frigateEnsure();
     /* Only re-marshal when an entity this card actually reads has changed.
        A wall panel sees a lot of state it does not care about. */
     let changed = this._signature === null;
@@ -11879,6 +12320,7 @@ class SpectraCard extends HTMLElement {
       }
     }
     this._subscribeForecasts();
+    if (this._hass && this._config) this._frigateEnsure();
     if (!this._onOpenTask) {
       /* A Needs you row's Open. The first card that owns the task takes
          it, so two copies of a card on one page do not open it twice. */
@@ -11917,6 +12359,8 @@ class SpectraCard extends HTMLElement {
       }, CAMERA_LEAVE_MS);
     }
     if (this._cc && this._cc.timer) { clearTimeout(this._cc.timer); this._cc.timer = null; }
+    if (this._frTimer) { clearTimeout(this._frTimer); this._frTimer = null; }
+    clearTimeout(this._frSoon);
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
@@ -12508,6 +12952,11 @@ class SpectraCard extends HTMLElement {
     /* What is typed in the recipe box's search, so a repaint keeps it. */
     if (model.body && model.body.type === "recipes") {
       model.body.find = (this._rpState && this._rpState.find) || "";
+    }
+    /* What Frigate made of the camera, fetched and signed by the card. */
+    if (model.body && (model.body.type === "camera" || model.body.type === "visits") && this._config.body.frigate) {
+      model.body.fr = this._frigateModel(model.body);
+      if (model.body.type === "visits") model.body.summary_enabled = Boolean(this._config.body.summary);
     }
 
     const mode = this._mode;
@@ -14691,6 +15140,7 @@ class SpectraCard extends HTMLElement {
     press("[data-aitask]", (el) => this._openTask(el.dataset.aitask));
     press("[data-aidismiss]", (el) => onPress(el, () => this._callAction({
       service: "home_signals.dismiss", data: { item_id: el.dataset.aidismiss } })));
+    press("[data-frsummary]", (el) => { if (!el.disabled) this._frigateSummarise(); });
 
     /* A photo that will not load -- Mealie down, a recipe whose picture
        was removed -- takes itself away rather than leaving a broken frame. */
@@ -17676,7 +18126,7 @@ class SpectraCard extends HTMLElement {
     const type = this._config && this._config.body && this._config.body.type;
     return {
       card: cfg ? cfg.card : String(type || "card"),
-      tab: cfg && !isBlank(cfg.tab) ? String(cfg.tab) : (type === "todo" ? "lists" : "kitchen"),
+      tab: cfg && !isBlank(cfg.tab) ? String(cfg.tab) : (type === "todo" ? "lists" : type === "visits" || type === "camera" ? "security" : "kitchen"),
     };
   }
 
@@ -19642,6 +20092,20 @@ class SpectraCard extends HTMLElement {
      into it after every paint. A new frame is loaded off-screen and swapped
      in whole once it has arrived, so the picture never blinks. */
   _bindCamera(model) {
+    /* A review on the card opens the live view playing it. */
+    this._holder.querySelectorAll("[data-frplay]").forEach((el) => {
+      const run = (event) => {
+        event.stopPropagation();
+        const id = el.getAttribute("data-frplay");
+        this._cameraSheet();
+        const r = this._fr && this._fr.reviews.find((x) => x.id === id);
+        if (r) this._frigatePlay(r);
+      };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
     this._holder.querySelectorAll("[data-ccopen], [data-expand]").forEach((el) => {
       const run = (event) => { event.stopPropagation(); this._cameraSheet(); };
       el.addEventListener("click", run);
@@ -19858,12 +20322,15 @@ class SpectraCard extends HTMLElement {
        up. Streaming to nobody holds the camera's Wi-Fi and a go2rtc session
        all night, so the stream stops while hidden and comes back with it. */
     s.onVisible = () => {
-      if (document.hidden) this._cameraStop();
-      else if (!s.shut) this._cameraStart();
+      if (document.hidden) {
+        this._cameraStop();
+        if (s.play) { try { s.play.video.pause(); } catch (e) { /* not started */ } }
+      } else if (!s.shut) this._cameraStart();
     };
     document.addEventListener("visibilitychange", s.onVisible);
 
     this._holder.appendChild(wrap);
+    this._frigateSheetInit();
     s.refresh = (m) => this._cameraRefresh(m);
     s.refresh(model);
   }
@@ -20008,7 +20475,7 @@ class SpectraCard extends HTMLElement {
     if (shut !== s.shut) {
       s.shut = shut;
       wrap.querySelector(".cclive .ccveil").hidden = !shut;
-      if (shut) { this._cameraStop(); wrap.querySelector(".cclive .ccwait").hidden = true; }
+      if (shut) { this._frigateStopPlay(); this._cameraStop(); wrap.querySelector(".cclive .ccwait").hidden = true; }
       else this._cameraStart();
     }
     const box = wrap.querySelector("[data-cctogs]");
@@ -20059,7 +20526,8 @@ class SpectraCard extends HTMLElement {
      zoom and never drops the room to black. */
   _cameraStart() {
     const s = this._ccSheet;
-    if (!s || s.shut) return;
+    /* Not while a recording is playing in its place; see _frigatePlay. */
+    if (!s || s.shut || s.play) return;
     const wrap = s.wrap;
     /* Anything still connecting is superseded; what is showing stays. */
     s.sessions = s.sessions.filter((old) => {
@@ -20151,6 +20619,7 @@ class SpectraCard extends HTMLElement {
     const s = this._ccSheet;
     if (!s) return;
     if (s.end) s.end();
+    this._frigateStopPlay();
     this._cameraStop();
     if (s.onVisible) document.removeEventListener("visibilitychange", s.onVisible);
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
@@ -20158,6 +20627,478 @@ class SpectraCard extends HTMLElement {
     this._ccSheet = null;
     this._signature = null;
     if (this._hass && this._config) this._update();
+  }
+
+  /* ---- Frigate ----
+     A card with `frigate` reads what Frigate made of its camera: the
+     review items, from the integration's own websocket commands, pushed
+     by its review subscription and refetched every minute in case a push
+     is lost. Bodies stay pure: they are handed the reviews and the
+     addresses of any pictures that are already signed, and a repaint
+     follows when the rest arrive. */
+
+  /* Which Frigate instance and camera, read off the camera entity the
+     integration made: its `client_id` and `camera_name`. Either can be
+     given outright for a camera whose state is not to hand. The last
+     answer is kept, because an unavailable camera loses its attributes
+     and that is exactly when the card should keep its history. */
+  _frigateCfg() {
+    const b = this._config && this._config.body;
+    const f = b && b.frigate;
+    if (!f) return null;
+    const spec = typeof f === "string" ? { camera: f } : f;
+    const entity = String(spec.camera || "");
+    const st = this._hass && this._hass.states ? this._hass.states[entity] : null;
+    const attrs = (st && st.attributes) || {};
+    const instance = String(firstOf(spec.instance, attrs.client_id, this._frCam && this._frCam.instance, "frigate"));
+    const camera = String(firstOf(spec.name, attrs.camera_name, this._frCam && this._frCam.camera, ""));
+    if (!camera) return null;
+    const hours = Math.min(FRIGATE_FETCH_HOURS, Math.max(1, Number(spec.hours) || FRIGATE_HOURS));
+    this._frCam = { instance, camera };
+    return { entity, instance, camera, hours, names: spec.labels && typeof spec.labels === "object" ? spec.labels : {} };
+  }
+
+  /* Fetch when it is due, and keep the push subscription up. Cheap to call
+     on every hass: it does nothing until a minute has passed. */
+  _frigateEnsure() {
+    const cfg = this._frigateCfg();
+    if (!cfg || !this._hass || typeof this._hass.callWS !== "function" || !this.isConnected) return;
+    const fr = this._fr || (this._fr = { key: "", at: 0, reviews: [], ready: false, failed: "", busy: false });
+    const key = `${cfg.instance}|${cfg.camera}`;
+    if (fr.key !== key) Object.assign(fr, { key, at: 0, reviews: [], ready: false, failed: "" });
+    this._frigateSubscribe(cfg);
+    if (fr.busy || Date.now() - fr.at < FRIGATE_REFRESH_MS) return;
+    this._frigateFetch(cfg);
+  }
+
+  _frigateFetch(cfg) {
+    const fr = this._fr;
+    if (!fr || fr.busy) return;
+    fr.busy = true;
+    fr.at = Date.now();
+    const after = Date.now() / 1000 - FRIGATE_FETCH_HOURS * 3600;
+    Promise.resolve(this._hass.callWS({
+      type: "frigate/reviews/get", instance_id: cfg.instance, cameras: [cfg.camera], after, limit: 500,
+    })).then((raw) => {
+      const list = frigateList(raw);
+      if (!list) throw new Error("no review list in the answer");
+      fr.reviews = frigateReviews(list);
+      fr.ready = true;
+      fr.failed = "";
+    }).catch((error) => {
+      LOGGER_WARN(`spectra-card: could not read Frigate's reviews for ${cfg.camera}`, error);
+      /* A list already on screen stays: one failed refetch is not a camera
+         with nothing to say. Only a card that never got one says so. */
+      if (!fr.ready) fr.failed = "Frigate is not answering.";
+      fr.at = Date.now() - FRIGATE_REFRESH_MS + 15000;
+    }).then(() => {
+      fr.busy = false;
+      this._signature = null;
+      this._update();
+      if (this._ccSheet && this._ccSheet.fr) this._frigateSide();
+      this._frigateArm();
+    });
+  }
+
+  /* The next refetch, whether or not anything is pushed. */
+  _frigateArm() {
+    if (this._frTimer) clearTimeout(this._frTimer);
+    this._frTimer = setTimeout(() => {
+      this._frTimer = null;
+      if (this.isConnected && !document.hidden) this._frigateEnsure();
+      else this._frigateArm();
+    }, FRIGATE_REFRESH_MS + 500);
+  }
+
+  /* Frigate pushes every review for every camera; this card only wants
+     its own, and a burst of updates is one refetch, not ten. */
+  _frigateSubscribe(cfg) {
+    const conn = this._hass && this._hass.connection;
+    const key = `frigate|${cfg.instance}`;
+    if (!conn || typeof conn.subscribeMessage !== "function" || this._subscriptions.has(key)) return;
+    const pending = Promise.resolve(conn.subscribeMessage((event) => {
+      let msg = event;
+      if (typeof msg === "string") { try { msg = JSON.parse(msg); } catch (e) { msg = null; } }
+      const camera = msg && (msg.after || msg.before || {}).camera;
+      if (camera && camera !== cfg.camera) return;
+      clearTimeout(this._frSoon);
+      this._frSoon = setTimeout(() => {
+        const now = this._frigateCfg();
+        if (now && this._fr && this.isConnected) { this._fr.at = 0; this._frigateEnsure(); }
+      }, 1500);
+    }, { type: "frigate/reviews/subscribe", instance_id: cfg.instance }));
+    pending.catch((error) => {
+      this._subscriptions.delete(key);
+      LOGGER_WARN("spectra-card: no Frigate review subscription; refetching on a timer instead", error);
+    });
+    this._subscriptions.set(key, pending);
+  }
+
+  /* An address signed so an <img> or a <video> can load it. Signed for an
+     hour and kept for fifty minutes; "" until it is in hand, and a repaint
+     once it is. */
+  _signedPath(path, onReady) {
+    if (!this._signCache) this._signCache = new Map();
+    const hit = this._signCache.get(path);
+    const now = Date.now();
+    if (hit && hit.until > now) return hit.url;
+    if (!this._hass || typeof this._hass.callWS !== "function") return "";
+    const entry = { url: hit ? hit.url : "", until: now + 50 * 60 * 1000 };
+    this._signCache.set(path, entry);
+    Promise.resolve(this._hass.callWS({ type: "auth/sign_path", path, expires: 3600 }))
+      .then((r) => { entry.url = r && r.path ? String(r.path) : ""; }, () => { entry.until = Date.now() + 10 * 60 * 1000; })
+      .then(() => {
+        if (onReady) onReady(entry.url);
+        else { this._signature = null; this._update(); }
+      });
+    return entry.url;
+  }
+
+  _frigatePath(cfg, rest) {
+    return `/api/frigate/${encodeURIComponent(cfg.instance)}/${rest}`;
+  }
+
+  _frigateThumbs(cfg, reviews) {
+    const out = {};
+    for (const r of reviews) {
+      if (!r.thumb) continue;
+      const url = this._signedPath(this._frigatePath(cfg, `clips/${r.thumb.split("/").map(encodeURIComponent).join("/")}`));
+      if (url) out[r.id] = url;
+    }
+    return out;
+  }
+
+  /* What the body is handed. Times are rounded to the minute, so the card
+     repaints when a minute passes and not on every state in the house. */
+  _frigateModel(body) {
+    const cfg = this._frigateCfg();
+    if (!cfg) return { ready: false, failed: "That camera is not one of Frigate's.", reviews: [] };
+    this._frigateEnsure();
+    const fr = this._fr || { ready: false, failed: "", reviews: [] };
+    const to = Math.ceil(Date.now() / 60000) * 60;
+    const from = to - cfg.hours * 3600;
+    const out = { ready: fr.ready, failed: fr.failed, hours: cfg.hours, from, to, names: cfg.names };
+    if (body.type === "visits") {
+      const midnight = new Date();
+      midnight.setHours(0, 0, 0, 0);
+      out.day = frigateDay(fr.reviews, midnight.getTime() / 1000, cfg.names);
+      const s = this._frSummary;
+      out.summary = s && s.day === midnight.toDateString() && s.text ? { text: s.text, at: s.at } : null;
+      out.summarising = Boolean(s && s.running);
+      return out;
+    }
+    const recent = fr.reviews.filter((r) => (r.end === null ? to : r.end) >= from);
+    out.reviews = recent.map((r) => ({
+      id: r.id, start: r.start, end: r.end, severity: r.severity, groups: r.groups, zones: r.zones,
+      title: r.title, summary: r.summary,
+    }));
+    out.thumbs = this._frigateThumbs(cfg, recent.slice(0, 4));
+    return out;
+  }
+
+  /* The day in words, as an AI task. By default Frigate writes it itself
+     -- `frigate.review_summarize`, from the same model that described each
+     review, so it stays on whatever machine Frigate's model runs on. A
+     `summary.script` is called instead when one is given, with the day's
+     reviews as text. A task either way, so it is blue on the card and in
+     Needs you while it runs and when it lands, like every AI call here.
+
+     Frigate's summary covers every camera, on purpose: it correlates an
+     alert at the gate with what the drive camera saw at the same time. */
+  _frigateSummarise() {
+    const b = this._config.body || {};
+    const cfg = this._frigateCfg();
+    if (!b.summary || !cfg || !this._fr || !this._fr.ready) return;
+    const script = typeof b.summary === "string" ? b.summary
+      : (b.summary && typeof b.summary === "object" && !isBlank(b.summary.script) ? String(b.summary.script) : "");
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const day = midnight.toDateString();
+    const stamp = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} `
+      + `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    const name = String(firstOf(this._config.title, "the camera"));
+    let action = "frigate.review_summarize";
+    let data = { start_time: stamp(midnight), end_time: stamp(new Date()) };
+    if (/^script\./.test(script)) {
+      const today = this._fr.reviews.filter((r) => r.start >= midnight.getTime() / 1000).slice().sort((x, y) => x.start - y.start);
+      action = script;
+      data = {
+        camera: cfg.camera, name, date: day,
+        reviews: today.map((r) => `${frigateClock(r.start)} ${r.severity}: ${r.scene || frigateWords(r, cfg.names)}`
+          + (r.subs.length ? ` (${r.subs.join(", ")})` : "")).join("\n"),
+      };
+    }
+    this._frSummary = { day, text: this._frSummary && this._frSummary.day === day ? this._frSummary.text : "", at: "", running: true };
+    this._signature = null;
+    this._update();
+    this._aiCall(action, data, {
+      title: `Summarise the day at ${name}`, require: action === "frigate.review_summarize" ? "summary" : "text", missing: "No summary came back",
+    }).then((answer) => {
+      const text = answer && typeof answer === "object" ? firstOf(answer.summary, answer.text) : answer;
+      this._frSummary = { day, text: isBlank(text) ? "" : frigatePlain(String(text)), at: frigateClock(Date.now() / 1000), running: false };
+    }, () => {
+      this._frSummary = Object.assign({}, this._frSummary, { running: false });
+    }).then(() => {
+      this._signature = null;
+      this._update();
+    });
+  }
+
+  /* ---- Frigate in the live view ---- */
+
+  _frigateSheetInit() {
+    const s = this._ccSheet;
+    const cfg = this._frigateCfg();
+    if (!s || !cfg) return;
+    s.fr = { span: 6, hide: new Set(), alertsOnly: false, find: "", ranges: null, rangesFor: "" };
+    const side = s.wrap.querySelector(".ccside");
+    const box = document.createElement("div");
+    box.className = "frside";
+    box.innerHTML = `<div class="frplaybar" data-frplaybar hidden></div>`
+      + `<div class="frtl" data-frtl></div>`
+      + `<div class="frchips" data-frchips></div>`
+      + `<label class="frfind">Search what Frigate saw<input type="search" data-frfind enterkeyhint="search" autocomplete="off" placeholder="white van"></label>`
+      + `<div class="frlisthead"><span class="k">Reviews</span><span data-frall></span></div>`
+      + `<div class="frlist" data-frlist></div>`;
+    side.insertBefore(box, side.firstChild);
+    const find = box.querySelector("[data-frfind]");
+    find.addEventListener("input", () => { s.fr.find = find.value; this._frigateList(); });
+    /* One tap on the timeline: the review under the finger, or the
+       recording from that moment when there is none. */
+    box.addEventListener("click", (event) => {
+      const strip = event.target.closest && event.target.closest("[data-frscrub]");
+      if (!strip) return;
+      const r = strip.getBoundingClientRect();
+      const span = s.fr.span * 3600;
+      const to = Date.now() / 1000;
+      const t = to - span + ((event.clientX - r.left) / Math.max(1, r.width)) * span;
+      const slack = span * 0.012;
+      const hit = this._frigateShown().find((x) => x.start - slack <= t && (x.end === null ? to : x.end) + slack >= t);
+      if (hit) this._frigatePlay(hit);
+      else this._frigatePlay({ start: t, end: Math.min(to, t + FRIGATE_SCRUB_S) });
+    });
+    this._frigateSide();
+  }
+
+  /* The reviews the sheet's filters let through, newest first. */
+  _frigateShown() {
+    const s = this._ccSheet;
+    const fr = this._fr;
+    if (!s || !s.fr || !fr) return [];
+    const from = Date.now() / 1000 - s.fr.span * 3600;
+    const words = String(s.fr.find || "").trim().toLowerCase();
+    return fr.reviews.filter((r) => (r.end === null ? Infinity : r.end) >= from
+      && (!s.fr.alertsOnly || r.severity === "alert")
+      && (!r.groups.length || r.groups.some((k) => !s.fr.hide.has(k)))
+      && (!words || [r.title, r.summary, r.scene, r.labels.join(" "), r.zones.join(" "), r.subs.join(" ")]
+        .join(" ").toLowerCase().includes(words)));
+  }
+
+  /* Everything in the Frigate half of the sheet but the search box, which
+     is left alone so a repaint never takes the caret out of it. */
+  _frigateSide() {
+    const s = this._ccSheet;
+    const cfg = this._frigateCfg();
+    if (!s || !s.fr || !cfg) return;
+    const wrap = s.wrap;
+    const fr = this._fr || { reviews: [], ready: false };
+    const to = Date.now() / 1000;
+    const from = to - s.fr.span * 3600;
+    const rangesFor = `${cfg.camera}|${s.fr.span}|${Math.floor(to / 300)}`;
+    if (s.fr.rangesFor !== rangesFor) {
+      s.fr.rangesFor = rangesFor;
+      Promise.resolve(this._hass.callWS({
+        type: "frigate/recordings/get", instance_id: cfg.instance, camera: cfg.camera,
+        after: Math.floor(from), before: Math.ceil(to),
+      })).then((raw) => { if (this._ccSheet === s) { s.fr.ranges = frigateRanges(raw); this._frigateSide(); } },
+        (error) => LOGGER_WARN("spectra-card: could not read Frigate's recordings", error));
+    }
+    const shown = this._frigateShown();
+    const play = s.play;
+    const head = play ? play.start + (play.video && Number.isFinite(play.video.currentTime) ? play.video.currentTime : 0) : to;
+    wrap.querySelector("[data-frtl]").innerHTML = `<div class="frtlhead"><span class="k">Timeline</span>`
+      + `<span class="frspan" role="group" aria-label="How far back">`
+      + FRIGATE_SPANS.map((h) => `<button type="button" data-frspan="${h}" aria-pressed="${s.fr.span === h}">${h}h</button>`).join("")
+      + `</span></div>`
+      + frigateStrip(shown, from, to, cfg.names, {
+        lanes: true, ranges: s.fr.ranges || [], head,
+        attrs: ` data-frscrub aria-label="Timeline. Tap a review to play it, or anywhere else to play the recording from there."`,
+      })
+      + frigateAxis(from, to)
+      + `<p class="frhint">${fr.ready ? "Tap the timeline to play from there · grey: recorded · outlined: alert" : "Waiting for Frigate…"}</p>`;
+    wrap.querySelectorAll("[data-frspan]").forEach((el) => el.addEventListener("click", () => {
+      s.fr.span = Number(el.getAttribute("data-frspan"));
+      this._frigateSide();
+    }));
+    const present = FRIGATE_GROUPS.filter((g) => fr.reviews.some((r) => r.groups.includes(g.key)));
+    wrap.querySelector("[data-frchips]").innerHTML = present.map((g) => {
+      const own = frigateGroup(g.key, cfg.names);
+      return `<button type="button" class="frchip" data-frgroup="${g.key}" aria-pressed="${!s.fr.hide.has(g.key)}">`
+        + `<i style="--fr:var(--sp-a${own.slot})"></i>${esc(own.name)}</button>`;
+    }).join("") + `<button type="button" class="frchip" data-fralerts aria-pressed="${s.fr.alertsOnly}">Alerts only</button>`;
+    wrap.querySelectorAll("[data-frgroup]").forEach((el) => el.addEventListener("click", () => {
+      const k = el.getAttribute("data-frgroup");
+      if (s.fr.hide.has(k)) s.fr.hide.delete(k); else s.fr.hide.add(k);
+      this._frigateSide();
+    }));
+    wrap.querySelector("[data-fralerts]").addEventListener("click", () => {
+      s.fr.alertsOnly = !s.fr.alertsOnly;
+      this._frigateSide();
+    });
+    this._frigateList();
+    this._frigatePlaybar();
+  }
+
+  _frigateList() {
+    const s = this._ccSheet;
+    const cfg = this._frigateCfg();
+    if (!s || !s.fr || !cfg) return;
+    const wrap = s.wrap;
+    const shown = this._frigateShown().slice(0, 40);
+    const to = Date.now() / 1000;
+    const unseen = shown.filter((r) => !r.reviewed).map((r) => r.id);
+    const all = wrap.querySelector("[data-frall]");
+    all.innerHTML = unseen.length
+      ? `<button type="button" class="frlink" data-frseenall>${iconMarkup("mdi:check-all")}Mark ${unseen.length} reviewed</button>` : "";
+    const btn = all.querySelector("[data-frseenall]");
+    if (btn) btn.addEventListener("click", () => onPress(btn, () => this._frigateViewed(unseen)));
+    const list = wrap.querySelector("[data-frlist]");
+    list.innerHTML = shown.length ? shown.map((r) => {
+      const url = r.thumb ? this._signedPath(this._frigatePath(cfg, `clips/${r.thumb.split("/").map(encodeURIComponent).join("/")}`),
+        () => { if (this._ccSheet === s) this._frigateList(); }) : "";
+      const playing = s.play && s.play.id === r.id;
+      return `<button type="button" class="frrow${r.reviewed ? " seen" : ""}${playing ? " playing" : ""}" data-frrow="${esc(r.id)}">`
+        + `<span class="frpic">${url ? `<img alt="" src="${esc(url)}" data-thumb>` : ""}</span>`
+        + `<span><span class="frwhen"><b>${esc(frigateClock(r.start))}</b>`
+        + `<span class="frsev${r.severity === "alert" ? " alert" : ""}">${r.severity === "alert" ? "Alert" : "Detection"}</span>`
+        + `<span>${esc(r.end === null ? "now" : frigateLength(r, to))}${r.groups.length ? ` · ${esc(r.groups.map((k) => frigateGroup(k, cfg.names).name).join(", "))}` : ""}</span></span>`
+        + `<span class="frwords">${esc(frigateWords(r, cfg.names))}</span></span></button>`;
+    }).join("") : `<p class="frempty">${this._fr && this._fr.ready ? "Nothing in this stretch." : "Waiting for Frigate…"}</p>`;
+    list.querySelectorAll("[data-frrow]").forEach((el) => el.addEventListener("click", () => {
+      const r = (this._fr ? this._fr.reviews : []).find((x) => x.id === el.getAttribute("data-frrow"));
+      if (r) this._frigatePlay(r);
+    }));
+    list.querySelectorAll("img[data-thumb]").forEach((img) => img.addEventListener("error", () => img.remove(), { once: true }));
+  }
+
+  /* Reviewed is Frigate's own flag, per Home Assistant user. Optional, and
+     never a job: a review nobody marks stays a fact. */
+  _frigateViewed(ids) {
+    const cfg = this._frigateCfg();
+    if (!cfg || !ids.length) return Promise.resolve();
+    return Promise.resolve(this._hass.callWS({ type: "frigate/reviews/viewed", instance_id: cfg.instance, ids, viewed: true }))
+      .then(() => {
+        (this._fr ? this._fr.reviews : []).forEach((r) => { if (ids.includes(r.id)) r.reviewed = true; });
+        if (this._ccSheet) this._frigateSide();
+      });
+  }
+
+  /* Play a review -- or a stretch of recording -- in place of the live
+     picture. The live stream stops while it plays: two streams from one
+     camera over one tunnel is bandwidth spent on a picture nobody sees. */
+  _frigatePlay(what) {
+    const s = this._ccSheet;
+    const cfg = this._frigateCfg();
+    if (!s || !cfg || !what) return;
+    const nowS = Date.now() / 1000;
+    const start = Math.max(0, Math.floor(what.start - (what.id ? FRIGATE_PAD_S : 0)));
+    const end = Math.ceil(Math.min(nowS, (what.end === null || what.end === undefined ? nowS : what.end) + (what.id ? FRIGATE_PAD_S : 0)));
+    const path = this._frigatePath(cfg, `recording/${encodeURIComponent(cfg.camera)}/start/${start}/end/${Math.max(end, start + 1)}`);
+    this._frigateStopPlay();
+    this._cameraStop();
+    const layer = document.createElement("div");
+    layer.className = "cclayer ccplay";
+    layer.innerHTML = `<video playsinline controls preload="auto"></video>`;
+    s.wrap.querySelector(".ccstage").appendChild(layer);
+    const video = layer.querySelector("video");
+    video.muted = !s.sound;
+    s.play = { id: what.id || null, review: what.id ? what : null, start, end, path, layer, video, url: "" };
+    const wait = s.wrap.querySelector(".cclive .ccwait");
+    wait.hidden = false;
+    video.onplaying = () => { wait.hidden = true; };
+    video.onerror = () => {
+      wait.hidden = true;
+      s.wrap.querySelector("[data-ccnote]").textContent = "That recording could not be played.";
+    };
+    let last = 0;
+    video.ontimeupdate = () => {
+      if (Date.now() - last < 1000) return;
+      last = Date.now();
+      const headEl = s.wrap.querySelector("[data-frtl] .frhead");
+      if (headEl) {
+        const span = s.fr.span * 3600;
+        const t = start + video.currentTime;
+        headEl.style.left = `${Math.min(100, Math.max(0, ((t - (Date.now() / 1000 - span)) / span) * 100)).toFixed(2)}%`;
+      }
+    };
+    const go = (url) => {
+      if (this._ccSheet !== s || !s.play || s.play.video !== video || !url) {
+        if (!url && s.play && s.play.video === video) { wait.hidden = true; s.wrap.querySelector("[data-ccnote]").textContent = "That recording could not be played."; }
+        return;
+      }
+      s.play.url = url;
+      video.src = url;
+      const p = video.play();
+      if (p && p.catch) p.catch(() => {});
+      this._frigatePlaybar();
+    };
+    const ready = this._signedPath(path, go);
+    if (ready) go(ready);
+    if (what.id && this._fr) {
+      const r = this._fr.reviews.find((x) => x.id === what.id);
+      if (r && !r.reviewed) this._frigateViewed([r.id]).catch(() => {});
+    }
+    this._frigateSide();
+  }
+
+  _frigateStopPlay() {
+    const s = this._ccSheet;
+    if (!s || !s.play) return;
+    const v = s.play.video;
+    v.onplaying = null; v.onerror = null; v.ontimeupdate = null;
+    try { v.pause(); } catch (e) { /* not started */ }
+    v.removeAttribute("src");
+    try { v.load(); } catch (e) { /* nothing loaded */ }
+    if (s.play.layer.parentNode) s.play.layer.parentNode.removeChild(s.play.layer);
+    s.play = null;
+  }
+
+  /* Back to the camera as it is now. */
+  _frigateLive() {
+    const s = this._ccSheet;
+    if (!s) return;
+    this._frigateStopPlay();
+    s.wrap.querySelector("[data-ccnote]").textContent = "";
+    this._cameraStart();
+    this._frigateSide();
+  }
+
+  /* What is playing, the way back, and what Frigate said about it. */
+  _frigatePlaybar() {
+    const s = this._ccSheet;
+    const cfg = this._frigateCfg();
+    if (!s || !s.fr || !cfg) return;
+    const bar = s.wrap.querySelector("[data-frplaybar]");
+    const play = s.play;
+    bar.hidden = !play;
+    if (!play) { bar.innerHTML = ""; return; }
+    const r = play.id && this._fr ? this._fr.reviews.find((x) => x.id === play.id) : null;
+    let html = `<div class="frplayrow"><span class="frwhat"><b>${esc(frigateClock(play.start + (play.id ? FRIGATE_PAD_S : 0)))}</b> · `
+      + `${r ? (r.severity === "alert" ? "Alert" : "Detection") : "Recording"}</span>`
+      + `<button type="button" class="frlive" data-frlive>Back to live</button></div>`
+      + `<div class="frplayrow">`
+      + (play.url ? `<a class="frlink" href="${esc(play.url)}" download="${esc(`${cfg.camera}-${frigateClock(play.start).replace(":", "")}.mp4`)}">${iconMarkup("mdi:download")}Download</a>` : "")
+      + `</div>`;
+    if (r) {
+      const what = r.labels.length ? r.labels.map((l) => l.replace(/_/g, " ")).join(", ") : "";
+      html += `<div class="frdetail">`
+        + (r.scene || r.summary || r.title ? `<span class="k">What happened</span><p>${esc(r.scene || r.summary || r.title)}</p><p class="frby">Described by Frigate</p>` : "")
+        + (what ? `<span class="k">Seen</span><p>${esc(what)}${r.subs.length ? ` · ${esc(r.subs.join(", "))}` : ""}</p>` : "")
+        + (r.zones.length ? `<span class="k">Zones</span><p>${esc(r.zones.map((z) => z.replace(/_/g, " ")).join(" → "))}</p>` : "")
+        + `</div>`;
+    }
+    bar.innerHTML = html;
+    bar.querySelector("[data-frlive]").addEventListener("click", () => this._frigateLive());
   }
 
   /* One WebRTC session, the way Home Assistant's own player opens it:
