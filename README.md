@@ -456,7 +456,7 @@ title: Downstairs
 meta: {entity: sensor.activity_feed, format: relative, prefix: "Quiet "}
 body:
   type: floorplan
-  image: /hacsfiles/ha-spectra-cards/ground-floor.webp
+  image: /local/floor-plan.webp   # your own picture, in config/www/
   size: [1392, 1010]          # the picture's pixels; points are in these
   areas: {entity: sensor.activity_feed, attribute: by_area}
   fade: 60                    # minutes
@@ -471,8 +471,10 @@ body:
       points: [[795,42],[1305,42],[1305,687],[795,687],[795,477],[670,477],[670,337],[795,337]]
 ```
 
-`ground-floor.webp` ships in `dist/`, so HACS serves it beside the card; any
-root-relative path works (`/local/...` for a picture of your own). A room's
+The picture is yours: put it in Home Assistant's `config/www/` and it is
+served at `/local/...`. Any root-relative path works. No plan ships with the
+card, because a picture of a house belongs in that house's config and not in
+a public repository. A room's
 `area` matches the feed's area name, case aside, and may be a list. `label:
 [x, y]` moves its marker off the middle of its bounding box, which is where
 it goes by default.
@@ -1314,7 +1316,7 @@ press can end: lift, cancel, the pointer escaping, and the sheet closing.
 The middle button goes to the saved home position.
 
 **No siren.** The camera has one, and it is left off on purpose: one stray
-press in a rileys_room costs more than the button could ever earn.
+press in a bedroom at night costs more than the button could ever earn.
 
 **Any camera, not this one.** Nothing here knows it is a Reolink. The next
 camera is another card with different ids, and a Frigate camera adds

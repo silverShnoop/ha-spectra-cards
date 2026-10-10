@@ -1782,7 +1782,7 @@ ${TOKENS_DARK}
 
    One height, pressed or not. It used to sit at 16px and grow to 30 under
    a finger, which meant the thing you were aiming at changed size as you
-   touched it and shoved the row below it down the card. the owner asked for the
+   touched it and shoved the row below it down the card. The owner asked for the
    pressed height all the time: a bar read from across a room is better the
    size it is when it is being used. */
 .picker { position:relative; touch-action:none; cursor:pointer; }
