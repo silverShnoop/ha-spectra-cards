@@ -1136,7 +1136,7 @@ body:
     unlock:
       service: lock.unlock
       target: {entity_id: lock.front_door}
-      confirm: {title: Unlock the front door?, ok: Unlock, accent: 1}
+      confirm: {title: Unlock the front door?, ok: Unlock, accent: 1}   # optional: an unlock asks anyway
 ```
 
 Not `control` wearing a lock glyph. `control` answers *what can I set, and
@@ -1175,11 +1175,16 @@ tint. It is *not* coloured by the act: a terracotta `Unlock` on a calm card
 spends the alert colour on nothing, and a moss `Lock` on a red one argues
 with the card it is sitting in.
 
-**Whether it asks first is config.** The action carries a `confirm` or it
-does not — unlocking a front door from a wall panel is the one direction
-worth a question, and locking it is not. Same rule as the washer's
-emergency stop: which presses need asking about is a fact about the house,
-not about the body.
+**Unlocking asks first by default.** Unlocking a front door from a wall
+panel is the one direction worth a question, and locking it is not, so
+`lock.unlock` and `lock.open` ask whether or not the action carries a
+`confirm` — a bare `{service: lock.unlock, target: ...}` gets "Unlock the
+door?". The action keeps the last word: its own `confirm` replaces the
+question with yours, and `confirm: false` switches it off. `lock.lock`
+never asks, and the body adds no question of its own. The same default
+holds wherever an unlock can be pressed — a control row's button, a Needs
+you row, a card's `tap_action`, the dock — so a config that forgot the
+question is still asked it. `tools/checklock.js` holds it to that.
 
 **The disc is filled, not inverted.** Inversion is step 7 of the emphasis
 ladder and is rationed to one thing on screen at a time; a door that is
@@ -2708,7 +2713,18 @@ action:
 ```
 
 It is a property of the **action**, not of the body, so nothing needs new
-code to gain one. `tools/checkconfirm.js` holds every control surface to
+code to gain one.
+
+Three services ask **by default**, with no `confirm` written anywhere:
+`lock.unlock`, `lock.open` and `alarm_control_panel.alarm_disarm`. They
+open the house, which is the one direction a mis-tap on a wall panel is
+costly in, and a config that forgot the question should not be the thing
+that decides. An action naming one of them gets "Unlock the door?" (or
+"Open the door?", "Disarm the alarm?") unless it carries a `confirm` of
+its own, which replaces the default, or `confirm: false`, which removes
+it. Locking and arming are never asked about.
+
+`tools/checkconfirm.js` holds every control surface to
 that sentence, because the one way this fails is silent: a control that
 calls straight through ignores a `confirm` without complaining, and the
 config still reads as safe. A control row's buttons did exactly that until
@@ -2718,9 +2734,10 @@ native dialog cannot be styled or dismissed with a thumb, and it blocks the
 whole frontend while it is open.
 
 Anything that is not an explicit yes is a no — Escape, the backdrop, Cancel.
-An action **without** a `confirm` is still called synchronously, in the same
-tick as the press; routing every press through the dialog's promise made
-every existing button fire a microtask late.
+An action **without** a `confirm` — and not one of the three that ask by
+default — is still called synchronously, in the same tick as the press;
+routing every press through the dialog's promise made every existing button
+fire a microtask late.
 
 ## `spectra-dock` — the domain rail
 

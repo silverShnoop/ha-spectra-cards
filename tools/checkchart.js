@@ -16,6 +16,11 @@
  * NOT told: a chart with nothing declared says nothing about units, which
  * is the only honest default.
  *
+ * Two colour checks ride along at the end, for the same reason: a colour
+ * from config that lands in markup has to be a colour. The arc's segment
+ * colours land in svg attributes, and the festival's wash and palette in
+ * the card's own style -- both went round cssColor for a while.
+ *
  *   node tools/checkchart.js [path/to/spectra-cards.js]
  */
 const { chromium } = require("playwright");
@@ -172,6 +177,80 @@ const js = fs.readFileSync(file);
     check("two points are a shape, and do draw",
       !!(pair.shadowRoot || pair).querySelector("svg.chart"),
       "nothing drawn");
+
+    /* ---- the arc's colours are attributes
+       A segment colour lands in `stroke=` and `fill=` on the svg, which is
+       markup rather than CSS: a value with a quote in it closes the
+       attribute and the rest of it is tags. The strip built its segments
+       through cssColor from the start; the arc took `segments` raw. */
+    const hostile = '"><img src=x onerror=1>';
+    const arc = document.createElement("spectra-card");
+    arc.setConfig({
+      type: "custom:spectra-card", accent: 2, title: "Today's light",
+      body: { type: "arc", active_index: 0, segments: [
+        { index: 0, color: hostile, label: "Bright", start: 0, minutes: 720 },
+        { index: 1, color: "#ff8800", label: "Dim", start: 720, minutes: 720 },
+      ] },
+    });
+    document.getElementById("a").appendChild(arc);
+    arc.hass = { states: {} };
+    await frame();
+    const aroot = arc.shadowRoot || arc;
+    const strokes = Array.from(aroot.querySelectorAll("svg path"))
+      .map((p) => p.getAttribute("stroke"));
+    const dot = aroot.querySelector("svg circle");
+    check("a segment colour that is not a colour never reaches the arc's markup",
+      !aroot.querySelector("img") && !aroot.innerHTML.includes("onerror")
+        && strokes.length === 2,
+      `${strokes.length} paths, ${aroot.querySelector("img") ? "an img" : "no img"}`);
+    check("...the segment is drawn in the sink colour instead",
+      strokes[0] === "var(--sp-sink)", strokes.join("|"));
+    check("...and so is the dot that wears the live segment's colour",
+      dot && dot.getAttribute("fill") === "var(--sp-sink)",
+      dot ? dot.getAttribute("fill") : "no dot");
+    check("while a colour that is one still comes through",
+      strokes[1] === "#ff8800", strokes.join("|"));
+
+    /* ---- a festival wash is a colour, not a stylesheet
+       The shell writes `wash` into the card's style attribute as --fg and
+       hangs `palette` on the perimeter bulbs' styles. The body checked
+       both through cssColor; the shell re-read them raw off the same
+       config. */
+    const fest = document.createElement("spectra-card");
+    document.getElementById("a").appendChild(fest);
+    const dress = async (wash) => {
+      fest.setConfig({
+        type: "custom:spectra-card", accent: 3, title: "Today",
+        body: {
+          type: "festival", decor: ["wash", "perimeter"], wash,
+          palette: ["#c8102e", "red;background:url(x)", "#ffd700"],
+          text: "A day off.",
+        },
+      });
+      fest.hass = { states: {} };
+      await frame();
+      await frame();
+      const root = fest.shadowRoot || fest;
+      const card = root.querySelector(".card");
+      return { root, card, style: card ? card.getAttribute("style") || "" : "" };
+    };
+    const bad = await dress("red;background:url(x)");
+    check("a wash that is not a colour writes no background into the card's style",
+      bad.card && !/background/.test(bad.style) && !/url\(/.test(bad.style),
+      bad.style);
+    check("...and the card is not dressed as festive",
+      bad.card && !bad.card.classList.contains("festive"),
+      bad.card ? bad.card.className : "no card");
+    const good = await dress("#c8102e");
+    check("a wash that is a colour still washes the card",
+      good.card && good.card.classList.contains("festive")
+        && good.style.includes("--fg:#c8102e"),
+      good.style);
+    const bulbs = Array.from(good.root.querySelectorAll(".pb"))
+      .map((b) => b.getAttribute("style") || "");
+    check("and the perimeter bulbs skip a palette entry that is not a colour",
+      bulbs.length > 0 && !bulbs.some((s) => /url\(/.test(s)),
+      bulbs.find((s) => /url\(/.test(s)) || `${bulbs.length} bulbs`);
 
     return problems;
   });

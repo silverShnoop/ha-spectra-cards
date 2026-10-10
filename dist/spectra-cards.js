@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.164.0";
+const VERSION = "0.164.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6001,6 +6001,15 @@ function festCount(kind, day, of, palette) {
     + ` aria-label="Day ${done} of ${total}">${cells.join("")}</div>`;
 }
 
+/* The colours a festival may paint with. Read here by the body and by the
+   shell, which dresses the card from the same config, so the two can never
+   disagree about what counts as a colour: anything cssColor refuses is
+   dropped before it reaches a style attribute. */
+function festPalette(b) {
+  return (b && Array.isArray(b.palette) ? b.palette : [])
+    .filter((c) => typeof c === "string" && cssColor(c));
+}
+
 /* Bulbs placed by percentage rather than measurement, so the strand fits
    whatever width the panel gives the card without being told. */
 function festPerimeter(palette) {
@@ -7529,8 +7538,18 @@ const BODIES = {
      centre (170,140), r 130, stroke 15, butt caps. Round caps make the
      segment joins overlap. */
   arc(b) {
+    /* Built the way the strip builds its own, field by field, so a colour
+       reaches the svg only once cssColor has passed it: `stroke` and
+       `fill` are attributes, and a raw string there is a quote away from
+       markup. */
     const segments = Array.isArray(b.segments) && b.segments.length
-      ? b.segments
+      ? b.segments.filter(Boolean).map((seg) => ({
+        index: seg.index,
+        color: cssColor(seg.color) || "var(--sp-sink)",
+        label: seg.label,
+        start: seg.start,
+        minutes: seg.minutes,
+      }))
       : segmentsFromTimeslots(b.timeslots, b.sun);
     if (!segments.length) return "";
 
@@ -7765,11 +7784,12 @@ const BODIES = {
    */
   festival(b) {
     if (!b || typeof b !== "object") return "";
-    const palette = (Array.isArray(b.palette) ? b.palette : [])
-      .filter((c) => typeof c === "string" && cssColor(c));
+    const palette = festPalette(b);
     const decor = Array.isArray(b.decor) ? b.decor : [];
     const has = (name) => decor.indexOf(name) >= 0;
-    const washed = has("wash") && !isBlank(b.wash);
+    /* The same test the shell applies before it wears the wash, so the
+       body never says "washed" over a card the shell left plain. */
+    const washed = has("wash") && Boolean(cssColor(b.wash));
 
     /* No box of its own. The wash and the bulbs belong to the card's real
        border and background — a decorated card drawing its own rounded
@@ -11863,6 +11883,27 @@ function lockGlyph(word) {
 
    Unknown offers Lock. You can always try to shut a door you cannot read;
    offering to open one is the wrong way to be wrong. */
+/* Opening the house asks by default. Unlocking or opening a door and
+   disarming the alarm are the one direction a wall panel can be wrong in
+   from across a room, so an action naming one of these services gets a
+   question whether or not its config remembered to carry one. The action
+   still has the last word: a `confirm` of its own replaces the default
+   question, and `confirm: false` switches it off. Locking and arming never
+   ask -- shutting a door is the right way to be wrong. */
+const ASKS_FIRST = {
+  "lock.unlock": { title: "Unlock the door?", ok: "Unlock" },
+  "lock.open": { title: "Open the door?", ok: "Open" },
+  "alarm_control_panel.alarm_disarm": { title: "Disarm the alarm?", ok: "Disarm" },
+};
+
+function confirmFor(action) {
+  if (!action || typeof action !== "object") return null;
+  if (action.confirm !== undefined) return action.confirm;
+  const name = action.service || action.perform_action || action.action;
+  const ask = typeof name === "string" ? ASKS_FIRST[name] : null;
+  return ask ? Object.assign({ accent: 1 }, ask) : null;
+}
+
 function lockAction(b) {
   const action = b.action || {};
   const word = lockWord(b.state);
@@ -13085,8 +13126,13 @@ class SpectraCard extends HTMLElement {
     /* A festival dresses the card itself rather than a div inside it, so the
        wash reaches the real edge and the bulbs sit on the real border. */
     const fb = type === "festival" ? (model.body || {}) : null;
+    /* The wash lands in the card's style attribute and the palette in the
+       bulbs', so both are checked here exactly as the body checks them:
+       a wash that is not a colour is no wash, not a stylesheet. */
+    const wash = fb ? cssColor(fb.wash) : null;
+    const festPaint = fb ? festPalette(fb) : [];
     const festive = Boolean(fb && Array.isArray(fb.decor)
-      && fb.decor.indexOf("wash") >= 0 && !isBlank(fb.wash));
+      && fb.decor.indexOf("wash") >= 0 && wash);
     /* Bulbs hang on the border and glow inwards, so a card wearing them needs
        room or the first word of every line sits under a light. */
     const lit = Boolean(fb && Array.isArray(fb.decor)
@@ -13112,7 +13158,7 @@ class SpectraCard extends HTMLElement {
       `<div class="${classes}${aside ? " split" : ""}"`,
       ` style="${accentStyle(model.accent)}`
         + `${outline ? levelStyle(outline) : ""}`
-        + `${festive ? `;--fg:${esc(fb.wash)}` : ""}"`,
+        + `${festive ? `;--fg:${esc(wash)}` : ""}"`,
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
       /* Behind the words and anchored to the card, so snow falls the full
@@ -13120,7 +13166,7 @@ class SpectraCard extends HTMLElement {
       festive && Array.isArray(fb.decor) && fb.decor.indexOf("snow") >= 0
         ? festSnow() : "",
       festive && Array.isArray(fb.decor) && fb.decor.indexOf("bursts") >= 0
-        ? festBursts(Array.isArray(fb.palette) ? fb.palette : []) : "",
+        ? festBursts(festPaint) : "",
       this._titlebar(model, this._phase),
       aiTaskStrip(model.tasks),
       waiting
@@ -13128,7 +13174,7 @@ class SpectraCard extends HTMLElement {
         : BODIES[type](model.body),
       aside ? `<span class="aside">${aside}</span>` : "",
       /* Last, so the glow sits over everything including the wash. */
-      lit ? festPerimeter(Array.isArray(fb.palette) ? fb.palette : []) : "",
+      lit ? festPerimeter(festPaint) : "",
       `</div>`,
     ].join("");
 
@@ -15158,7 +15204,7 @@ class SpectraCard extends HTMLElement {
       if (!action) return;
       const run = (event) => {
         event.stopPropagation();
-        this._guard(action.confirm,
+        this._guard(confirmFor(action),
           () => onPress(el, () => this._work(() => this._callAction(action))));
       };
       el.addEventListener("click", run);
@@ -15347,7 +15393,7 @@ class SpectraCard extends HTMLElement {
       if (!chosen) return;
       const run = (event) => {
         event.stopPropagation();
-        this._guard(chosen.confirm,
+        this._guard(confirmFor(chosen),
           () => onPress(el, () => this._work(() => this._callAction(chosen))));
       };
       el.addEventListener("click", run);
@@ -15373,7 +15419,7 @@ class SpectraCard extends HTMLElement {
       const want = action.label === "Unlock" ? "Unlocked" : "Locked";
       const run = (event) => {
         event.stopPropagation();
-        this._guard(action.confirm, () => {
+        this._guard(confirmFor(action), () => {
           /* Order matters, and getting it wrong is invisible in code and
              obvious on the wall. Rendering here would replace this very
              button before it could flash -- which is the whole reason
@@ -15405,7 +15451,7 @@ class SpectraCard extends HTMLElement {
            and a door being opened. The press already has its own answer:
            the button flashes, and spins until the house agrees. */
         const action = row && (el.dataset.alt ? row.secondary_action : row.action);
-        this._guard(action && action.confirm, () => {
+        this._guard(confirmFor(action), () => {
           onPress(el, () => this._callAction(action));
         });
       };
@@ -15472,7 +15518,7 @@ class SpectraCard extends HTMLElement {
            button is pointing is a fact about the house, not about the
            card, so the rule is the same everywhere: the action carries
            the question or it does not. */
-        this._guard(command && command.action && command.action.confirm,
+        this._guard(confirmFor(command && command.action),
           () => onPress(el, () => this._callAction(command && command.action)));
       };
       el.addEventListener("click", run);
@@ -15716,15 +15762,15 @@ class SpectraCard extends HTMLElement {
         }
         break;
       case "url":
-        if (a.url_path) window.open(a.url_path, a.target || "_blank");
+        if (a.url_path) window.open(a.url_path, a.target || "_blank", "noopener");
         break;
       case "call-service":
       case "perform-action":
-        this._callAction({
+        this._guard(confirmFor(a), () => this._callAction({
           service: a.service || a.perform_action,
           data: a.data || a.service_data,
           target: a.target,
-        });
+        }));
         break;
     }
   }
@@ -20499,7 +20545,7 @@ class SpectraCard extends HTMLElement {
       const run = (event) => {
         event.stopPropagation();
         if (!action) return;
-        this._guard(action.confirm, () => {
+        this._guard(confirmFor(action), () => {
           /* Claimed on the knob straight away; the next state the house
              reports redraws the row with whatever is true. */
           el.classList.toggle("on");
@@ -21209,54 +21255,14 @@ class SpectraCard extends HTMLElement {
      review sheet was written to inherit them instead. Now there is one
      place to set them and both use it. */
   _wearAccent(element, accent) {
-    const a = accentNumber(accent) || 4;
-    element.style.setProperty("--accent", `var(--sp-a${a})`);
-    element.style.setProperty("--accent-soft", `var(--sp-a${a}-soft)`);
-    element.style.setProperty("--accent-on", `var(--sp-a${a}-on)`);
+    wearAccent(element, accent);
   }
 
+  /* The dialog itself lives outside the class (`confirmDialog`) because the
+     dock has to ask the same question of its own buttons: the rule that an
+     unlock asks first has to hold wherever an unlock can be pressed. */
   _confirm(spec) {
-    if (!spec) return Promise.resolve(true);
-    const wrap = document.createElement("div");
-    wrap.className = "confirmwrap";
-    this._wearAccent(wrap, Number(spec.accent) || 1);
-    wrap.innerHTML = `<div class="confirmbox" role="alertdialog" aria-modal="true">`
-      + `<div class="confirmhead"><ha-icon icon="${esc(firstOf(spec.icon, "mdi:alert"))}"></ha-icon>`
-      + `<span>${esc(firstOf(spec.title, "Are you sure?"))}</span></div>`
-      + (isBlank(spec.text) ? "" : `<p class="confirmtext">${esc(spec.text)}</p>`)
-      + (isBlank(spec.note) ? "" : `<p class="confirmtext quiet">${esc(spec.note)}</p>`)
-      + `<div class="confirmbtns">`
-      + `<button type="button" class="confirmno" data-no>${esc(firstOf(spec.cancel, "Cancel"))}</button>`
-      + (isBlank(spec.alt) ? "" : `<button type="button" class="confirmno" data-alt>${esc(spec.alt)}</button>`)
-      + `<button type="button" class="confirmyes" data-yes>${esc(firstOf(spec.ok, "Confirm"))}</button>`
-      + `</div></div>`;
-
-    return new Promise((resolve) => {
-      let done = false;
-      const finish = (answer) => {
-        if (done) return;
-        done = true;
-        document.removeEventListener("keydown", onKey, true);
-        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
-        resolve(answer);
-      };
-      const onKey = (event) => {
-        if (event.key === "Escape") { event.preventDefault(); finish(false); }
-      };
-      wrap.querySelector("[data-no]").addEventListener("click", () => finish(false));
-      wrap.querySelector("[data-yes]").addEventListener("click", () => finish(true));
-      const alt = wrap.querySelector("[data-alt]");
-      if (alt) alt.addEventListener("click", () => finish("alt"));
-      /* Only the backdrop, never the box -- a mis-tap inside the dialog
-         must not count as either answer. */
-      wrap.addEventListener("click", (event) => {
-        if (event.target === wrap) finish(false);
-      });
-      document.addEventListener("keydown", onKey, true);
-      this._holder.appendChild(wrap);
-      const no = wrap.querySelector("[data-no]");
-      if (no && no.focus) no.focus();
-    });
+    return confirmDialog(this._holder, spec);
   }
 
   getCardSize() {
@@ -21277,6 +21283,63 @@ class SpectraCard extends HTMLElement {
   }
 }
 
+/* The three properties everything in a dialog takes its colour from. See
+   `_wearAccent` on the card for why they are set on the dialog itself. */
+function wearAccent(element, accent) {
+  const a = accentNumber(accent) || 4;
+  element.style.setProperty("--accent", `var(--sp-a${a})`);
+  element.style.setProperty("--accent-soft", `var(--sp-a${a}-soft)`);
+  element.style.setProperty("--accent-on", `var(--sp-a${a}-on)`);
+}
+
+/* Ask before an action that cannot be taken back. Appended to the caller's
+   holder -- a card's or the dock's -- and resolved with true, false, or
+   "alt" for the optional third button. Anything that is not an explicit
+   yes is a no. */
+function confirmDialog(holder, spec) {
+  if (!spec) return Promise.resolve(true);
+  const wrap = document.createElement("div");
+  wrap.className = "confirmwrap";
+  wearAccent(wrap, Number(spec.accent) || 1);
+  wrap.innerHTML = `<div class="confirmbox" role="alertdialog" aria-modal="true">`
+    + `<div class="confirmhead"><ha-icon icon="${esc(firstOf(spec.icon, "mdi:alert"))}"></ha-icon>`
+    + `<span>${esc(firstOf(spec.title, "Are you sure?"))}</span></div>`
+    + (isBlank(spec.text) ? "" : `<p class="confirmtext">${esc(spec.text)}</p>`)
+    + (isBlank(spec.note) ? "" : `<p class="confirmtext quiet">${esc(spec.note)}</p>`)
+    + `<div class="confirmbtns">`
+    + `<button type="button" class="confirmno" data-no>${esc(firstOf(spec.cancel, "Cancel"))}</button>`
+    + (isBlank(spec.alt) ? "" : `<button type="button" class="confirmno" data-alt>${esc(spec.alt)}</button>`)
+    + `<button type="button" class="confirmyes" data-yes>${esc(firstOf(spec.ok, "Confirm"))}</button>`
+    + `</div></div>`;
+
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (answer) => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      resolve(answer);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); finish(false); }
+    };
+    wrap.querySelector("[data-no]").addEventListener("click", () => finish(false));
+    wrap.querySelector("[data-yes]").addEventListener("click", () => finish(true));
+    const alt = wrap.querySelector("[data-alt]");
+    if (alt) alt.addEventListener("click", () => finish("alt"));
+    /* Only the backdrop, never the box -- a mis-tap inside the dialog
+       must not count as either answer. */
+    wrap.addEventListener("click", (event) => {
+      if (event.target === wrap) finish(false);
+    });
+    document.addEventListener("keydown", onKey, true);
+    holder.appendChild(wrap);
+    const no = wrap.querySelector("[data-no]");
+    if (no && no.focus) no.focus();
+  });
+}
+
 if (!customElements.get("spectra-card")) {
   /* The part of the screen the on-screen keyboard leaves, as two custom
    properties every card's sheets inherit through their shadow roots. Set
@@ -21295,6 +21358,7 @@ if (!customElements.get("spectra-card")) {
   vv.addEventListener("scroll", set);
   set();
 })();
+
 
 customElements.define("spectra-card", SpectraCard);
 }
@@ -21529,9 +21593,15 @@ class SpectraDock extends HTMLElement {
     const name = action.service || action.perform_action;
     if (typeof name !== "string" || !name.includes(".")) return;
     const [domain, service] = name.split(".");
-    return Promise.resolve(
+    const call = () => Promise.resolve(
       this._hass.callService(domain, service, action.data || {}, action.target || undefined),
     ).catch((error) => LOGGER_WARN(`spectra-dock: ${name} failed`, error));
+    /* Same rule as the card: an unlock asks first unless told not to. */
+    const ask = confirmFor(action);
+    if (!ask) return call();
+    confirmDialog(this._holder, ask).then((yes) => {
+      if (yes) call();
+    });
   }
 
   disconnectedCallback() {
