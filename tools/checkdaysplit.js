@@ -205,6 +205,67 @@ const js = fs.readFileSync(file);
     check("...in the base's colour", legendFirst.getAttribute("fill") === "var(--sp-ink-3)",
       legendFirst.getAttribute("fill"));
 
+    /* ---- the figures under the columns
+       They can outlive the columns: a week's total comes from statistics
+       kept for ever, while the columns need days the integration wrote
+       down itself. So each half has to stand without the other. */
+    const FIGS = [
+      { value: "\u00a329.80", label: "last 7 days" },
+      { value: "\u00a326.55", label: "7 days before" },
+      { value: "\u00a327.90", label: "average \u00b7 6 weeks" },
+    ];
+    const withFigs = await draw({ days: [SAT, MON], slots: 7, figures: FIGS });
+    const figText = [...withFigs.svg.querySelectorAll("text")]
+      .map((t) => t.textContent);
+    check("the figures draw under the columns",
+      FIGS.every((f) => figText.includes(f.value)), figText.join("|"));
+    check("...each labelled with the window it covers",
+      FIGS.every((f) => figText.includes(f.label)), figText.join("|"));
+    check("...and the card grows to hold them",
+      withFigs.svg.getBoundingClientRect().height
+        > two.svg.getBoundingClientRect().height,
+      "no taller than without");
+
+    const figsOnly = await draw({ days: [], figures: FIGS });
+    check("figures without columns still draw",
+      !!figsOnly.svg && [...figsOnly.svg.querySelectorAll("text")]
+        .map((t) => t.textContent).includes(FIGS[0].value), "nothing drawn");
+
+    check("...without a key, which would have nothing left to decode",
+      figsOnly.svg.querySelectorAll("rect").length === 0,
+      `${figsOnly.svg.querySelectorAll("rect").length} swatches`);
+
+    /* A month chart carries both a note line and a figures row, and they
+       are the two things drawn below the labels. They were written apart
+       and have to be checked together: the rule above the figures sat at a
+       fixed height before the notes existed, which would have put it
+       through the part-month line. */
+    const noted = await draw({
+      slots: 12, keep_empty: true, figures: [FIGS[0]],
+      days: [month("Sep", { cost: [5.8, 14.2, 18.9, 13.1], kwh: [23, 57, 76, 53],
+        total_cost_text: "\u00a352", total_kwh: 209, note: "11/30 days" })],
+    });
+    const noteY = [...noted.svg.querySelectorAll("text")]
+      .filter((t) => t.textContent === "11/30 days")
+      .map((t) => Number(t.getAttribute("y")))[0];
+    const ruleY = Number(noted.svg.querySelector("line").getAttribute("y1"));
+    check("the rule above the figures clears the part-month note",
+      ruleY > noteY, `rule ${ruleY} vs note ${noteY}`);
+    const figY = [...noted.svg.querySelectorAll("text")]
+      .filter((t) => t.textContent === FIGS[0].value)
+      .map((t) => Number(t.getAttribute("y")))[0];
+    check("...and the figure sits below the rule, inside the box",
+      figY > ruleY && figY < noted.svg.viewBox.baseVal.height,
+      `figure ${figY}, rule ${ruleY}, height ${noted.svg.viewBox.baseVal.height}`);
+
+    const half = await draw({ days: [SAT, MON], slots: 7, figures: [
+      FIGS[0], { label: "7 days before" },
+    ] });
+    check("a figure with no value is left out, not drawn blank",
+      [...half.svg.querySelectorAll("text")].map((t) => t.textContent)
+        .filter((t) => t === "7 days before").length === 0,
+      "an empty figure was labelled");
+
     // ---- the size it draws at, same failure the line chart had
     document.getElementById("a").style.width = "1200px";
     const big = await draw({ days: [SAT, MON], slots: 7 });
