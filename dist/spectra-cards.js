@@ -1156,7 +1156,7 @@ ha-icon { display:inline-flex; line-height:0; }
 .frhead2 { display:flex; justify-content:space-between; gap:8px; font-size:11px; color:var(--sp-ink-2); letter-spacing:.04em; }
 .frstrip { position:relative; height:26px; background:var(--sp-sink); border-radius:3px; overflow:hidden; }
 .frstrip.lanes { height:auto; min-height:32px; }
-.frmark { position:absolute; top:4px; height:14px; border-radius:2px; background:var(--fr, var(--sp-a2)); }
+.frmark { position:absolute; top:4px; height:14px; border-radius:2px; background:var(--fr, var(--sp-ink-3)); }
 .frstrip:not(.lanes) .frmark { top:4px; height:14px; }
 .frmark.alert { box-shadow:inset 0 0 0 2px var(--sp-ink); }
 .frstrip em { position:absolute; left:4px; font-style:normal; font-size:10px; line-height:14px; color:var(--sp-ink-3); pointer-events:none; z-index:1; }
@@ -16102,8 +16102,14 @@ class SpectraCard extends HTMLElement {
            so Change, Move and Clear are there when the recipe is shut.
            A note, or two meals in the slot, opens the tray as before. */
         const only = here.length === 1 ? here[0] : null;
+        /* `_mealPick !== key`: a second tap on the slot already open is
+           "shut", the same as it is for a slot with no recipe behind it.
+           Without it the recipe path swallows every tap on this cell, so
+           the tap meant to put the tray away reopened the recipe instead
+           and the slot could not be closed from the grid at all. The
+           tray's own Open recipe tile is how it is asked for again. */
         if (only && only.recipe && !isBlank(only.recipe.recipe_id) && body.recipe !== false
-          && this._mealSources.size) {
+          && this._mealSources.size && this._mealPick !== key) {
           const [source] = this._mealSources.values();
           this._mealPick = key;
           this._voiceSay("idle", "");

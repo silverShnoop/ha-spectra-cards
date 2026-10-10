@@ -231,8 +231,27 @@ const shots = process.env.SHOTS || "";
         q(week, ".mldetail [data-meal-recipe]") && !q(week, ".mldetail [data-meal-change]")
         && !q(week, ".mldetail [data-meal-move]") && !q(week, ".mldetail [data-meal-clear]"),
         q(week, ".mldetail") && text(q(week, ".mldetail")));
+      /* Where the card has a recipe source, tapping a planned meal is
+         wanting the recipe, so the sheet opens with the tray behind it.
+         Both halves are asserted, because the tray behind the sheet is
+         the whole reason Change, Move and Clear are still there when the
+         recipe is shut. */
+      check("...and its recipe opens, with the tray behind it",
+        !!R_(week).querySelector(".confirmwrap") && !!q(week, ".mldetail"),
+        `sheet ${!!R_(week).querySelector(".confirmwrap")}, tray ${!!q(week, ".mldetail")}`);
+      R_(week).querySelector(".confirmwrap [data-no]").click();
+      await settle();
+      check("Close puts the recipe away and leaves the tray",
+        !R_(week).querySelector(".confirmwrap") && !!q(week, ".mldetail"),
+        `sheet ${!!R_(week).querySelector(".confirmwrap")}, tray ${!!q(week, ".mldetail")}`);
       q(week, `.mlgridview [data-meal="${day(-1)}|dinner"]`).click();
       await settle();
+      /* The same cell again shuts it, exactly as on Home. This is the
+         tap the recipe path used to swallow -- it reopened the sheet, and
+         a slot with a recipe behind it could never be closed. */
+      check("the same cell again shuts the tray, not reopens the recipe",
+        !q(week, ".mldetail") && !R_(week).querySelector(".confirmwrap"),
+        `tray ${!!q(week, ".mldetail")}, sheet ${!!R_(week).querySelector(".confirmwrap")}`);
       const emptyGone = TYPES.map((t) => `${day(-1)}|${t}`)
         .find((k) => !plan.some((e) => `${e.mealplan_date}|${e.entry_type}` === k));
       if (emptyGone) {
@@ -260,15 +279,15 @@ const shots = process.env.SHOTS || "";
         .every((s) => !q(week, s)),
       ["[data-meal-week]", "[data-meal-words]", "[data-meal-fridge]", ".mlacts", ".mlweek", ".mllong", ".mlshort"]
         .filter((s) => q(week, s)).join(" "));
-    check("the menu is shut to begin with", !q(week, ".mlmenu"), "open");
+    check("the menu is shut to begin with", !q(week, ".mlfoot .mlmenu"), "open");
     q(week, "[data-meal-menu]").click();
     await settle();
-    const items = all(week, ".mlmenu [role=menuitem]").map((b) => b.getAttributeNames().find((a) => a.startsWith("data-meal-")));
+    const items = all(week, ".mlfoot .mlmenu [role=menuitem]").map((b) => b.getAttributeNames().find((a) => a.startsWith("data-meal-")));
     check("⋮ opens the menu: shop the week, select, the recipe box, meals shown",
       items.join(",") === "data-meal-shopweek,data-meal-select,data-meal-box,data-meal-shown", items.join(","));
     q(week, "[data-meal-menushut]").click();
     await settle();
-    check("and pressing beside it shuts it", !q(week, ".mlmenu"), "still open");
+    check("and pressing beside it shuts it", !q(week, ".mlfoot .mlmenu"), "still open");
 
     /* Plan: the week shown, on the Suggest tab -- which meals, then one kind at a time. */
     q(week, "[data-meal-plan]").click();
