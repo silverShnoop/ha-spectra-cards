@@ -17,7 +17,18 @@ const file = process.argv[2]
   || path.join(__dirname, "..", "dist", "spectra-cards.js");
 const shot = process.argv[3];
 const js = fs.readFileSync(file);
-const plan = fs.readFileSync(path.join(path.dirname(file), "ground-floor.webp"));
+/* A stand-in plan rather than a picture of a real house: five grey rooms in
+ * the places the README's example polygons expect, at the same pixel size. */
+const plan = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1392" height="1010" viewBox="0 0 1392 1010">'
+  + '<rect width="1392" height="1010" fill="#f2f0ea"/>'
+  + '<g fill="#e4e0d6" stroke="#b9b3a6" stroke-width="4">'
+  + '<rect x="70" y="47" width="295" height="217"/>'
+  + '<rect x="70" y="284" width="295" height="136"/>'
+  + '<path d="M385 42H765V142H670V477H525V507H385Z"/>'
+  + '<path d="M65 444H360V507H525V482H760V857H65Z"/>'
+  + '<path d="M795 42H1305V687H795V477H670V337H795Z"/>'
+  + "</g></svg>");
 
 (async () => {
   console.log(`floorplan: ${path.relative(process.cwd(), file)}`);
@@ -25,8 +36,8 @@ const plan = fs.readFileSync(path.join(path.dirname(file), "ground-floor.webp"))
     if (req.url.startsWith("/card.js")) {
       res.writeHead(200, { "Content-Type": "text/javascript" });
       res.end(js);
-    } else if (req.url.startsWith("/plan.webp")) {
-      res.writeHead(200, { "Content-Type": "image/webp" });
+    } else if (req.url.startsWith("/plan.svg")) {
+      res.writeHead(200, { "Content-Type": "image/svg+xml" });
       res.end(plan);
     } else {
       res.writeHead(200, { "Content-Type": "text/html" });
@@ -66,7 +77,7 @@ const plan = fs.readFileSync(path.join(path.dirname(file), "ground-floor.webp"))
     const show = async (body) => {
       el.setConfig({
         type: "custom:spectra-card", accent: 4, icon: "mdi:floor-plan", title: "Downstairs",
-        body: Object.assign({ type: "floorplan", image: "/plan.webp", size: [1392, 1010], rooms }, body),
+        body: Object.assign({ type: "floorplan", image: "/plan.svg", size: [1392, 1010], rooms }, body),
       });
       el._signature = null;
       el.hass = hass;

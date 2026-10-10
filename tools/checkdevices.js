@@ -134,8 +134,8 @@ const js = fs.readFileSync(file);
         { name: "Wi-Fi & cloud", online: 25, offline: 0, partial: 2 },
       ],
       problems: [
-        { name: "Gym", area: "Anaya's Room", network: "Tado", state: "partial", detail: "1 reading missing", since: ago(5 * 1440) },
-        { name: "Gym Speaker", area: "Anaya's Room", network: "Cast", state: "offline" },
+        { name: "Gym", area: "Riley's Room", network: "Tado", state: "partial", detail: "1 reading missing", since: ago(5 * 1440) },
+        { name: "Gym Speaker", area: "Riley's Room", network: "Cast", state: "offline" },
         { name: "Bedroom TV", area: "Bedroom", network: "Cast", state: "offline" },
         { name: "Peugeot 5008", area: "Driveway", network: "Wi-Fi & cloud", state: "partial", detail: "14 of 29 missing", since: ago(2000) },
         { name: "Ensuite Master 2", area: "Ensuite", network: "Hue", state: "offline" },

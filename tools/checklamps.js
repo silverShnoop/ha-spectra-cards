@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Lamps inside their room.
  *
- * The Bedroom's Far light and Jaina's lamp are Hue zones of one bulb each,
+ * The Bedroom's Far light and Casey's lamp are Hue zones of one bulb each,
  * and both bulbs are Bedroom bulbs. Recorder history shows what that means:
  * recalling the Far light's scene ends the Bedroom's, within 30 ms, and the
  * Bedroom's scene does not come back when the lamp goes off. So the lamps
@@ -77,9 +77,9 @@ const js = fs.readFileSync(file);
       { name: "Read", entity_id: "scene.bedroom_read", color: "#ffad66", scheduled: false },
       { name: "Relax", entity_id: "scene.bedroom_relax", color: "#ff942b", scheduled: false },
     ];
-    const JAINA = [
-      { name: "Bright", entity_id: "scene.jaina_bright", color: "#ffa759", scheduled: false },
-      { name: "Read", entity_id: "scene.jaina_read", color: "#ffad66", scheduled: false },
+    const CASEY = [
+      { name: "Bright", entity_id: "scene.casey_bright", color: "#ffa759", scheduled: false },
+      { name: "Read", entity_id: "scene.casey_read", color: "#ffad66", scheduled: false },
     ];
     const FAR = [
       { name: "Bright", entity_id: "scene.far_bright", color: "#ffa657", scheduled: false },
@@ -93,9 +93,9 @@ const js = fs.readFileSync(file);
     set("light.far", "off", {});
     set("sensor.far_active_scene", "none",
       { effective_scene: null, scenes: FAR, group_name: "Bedroom Far Light" });
-    set("light.jaina", "on", { brightness: 77 });
-    set("sensor.jaina_active_scene", "none",
-      { effective_scene: null, scenes: JAINA, group_name: "Jaina's lamp" });
+    set("light.casey", "on", { brightness: 77 });
+    set("sensor.casey_active_scene", "none",
+      { effective_scene: null, scenes: CASEY, group_name: "Casey's lamp" });
 
     const scenesOf = (entity) => ({
       from: { entity, attribute: "scenes" },
@@ -124,7 +124,7 @@ const js = fs.readFileSync(file);
         drawer_scenes: scenesOf("sensor.bedroom_active_scene"),
         lamps: [
           lamp("Far light", "light.far", "sensor.far_active_scene"),
-          lamp("Jaina's lamp", "light.jaina", "sensor.jaina_active_scene"),
+          lamp("Casey's lamp", "light.casey", "sensor.casey_active_scene"),
         ],
       } });
     document.getElementById("a").appendChild(el);
@@ -142,7 +142,7 @@ const js = fs.readFileSync(file);
         && r.querySelector(".lampchev").previousElementSibling.classList.contains("name")),
       rows.map((r) => r.innerHTML).join(" | "));
     check("named as configured", rows.map((r) => r.querySelector(".name").textContent)
-      .join("|") === "Far light|Jaina's lamp", rows.map((r) => r.textContent).join("|"));
+      .join("|") === "Far light|Casey's lamp", rows.map((r) => r.textContent).join("|"));
     check("a dark lamp says Off", /Off/.test(rows[0].querySelector(".lampscene").textContent),
       rows[0].textContent);
     check("a lit lamp on no scene of its own follows the room",
@@ -162,13 +162,13 @@ const js = fs.readFileSync(file);
     // ---- the line opens the lamp's own controls
     rows[1].click();
     await tick();
-    const jaina = q('[data-drawer="lamp-1"]');
+    const casey = q('[data-drawer="lamp-1"]');
     check("tapping the line opens that lamp's drawer",
-      !!jaina && jaina.classList.contains("open"), jaina && jaina.className);
+      !!casey && casey.classList.contains("open"), casey && casey.className);
     check("with the lamp's own scenes",
-      !!jaina && jaina.querySelectorAll(".scenetrack .bands i").length === 2, "wrong scenes");
+      !!casey && casey.querySelectorAll(".scenetrack .bands i").length === 2, "wrong scenes");
     check("and the lamp's brightness, on the lamp's light",
-      !!jaina && jaina.querySelector("[data-dim]").getAttribute("data-light") === "light.jaina",
+      !!casey && casey.querySelector("[data-dim]").getAttribute("data-light") === "light.casey",
       "wrong dimmer");
     q('[data-lamppower="0"]').click();
     await tick();
@@ -196,7 +196,7 @@ const js = fs.readFileSync(file);
     await settle();
     check("choosing a lamp scene turns on the lamp's scene",
       calls.some((c) => c.service === "scene.turn_on"
-        && JSON.stringify(c).includes("scene.jaina_read")), JSON.stringify(calls));
+        && JSON.stringify(c).includes("scene.casey_read")), JSON.stringify(calls));
     check("the lamp's line names it at once",
       /Read/.test(qa(".lamprow")[1].textContent), qa(".lamprow")[1].textContent);
     check("and the room's strip does not claim it -- the room has a Read too",
@@ -205,15 +205,15 @@ const js = fs.readFileSync(file);
       q(".scenetrack.lead .bands i.on") && q(".scenetrack.lead .bands i.on").getAttribute("data-label"));
 
     // ---- what Hue then does: the room loses Dimmed to the lamp
-    set("sensor.jaina_active_scene", "Read",
-      { effective_scene: "Read", scenes: JAINA, group_name: "Jaina's lamp" });
-    room("none", { previous_scene: "Dimmed", ended_by: "Jaina's lamp" });
+    set("sensor.casey_active_scene", "Read",
+      { effective_scene: "Read", scenes: CASEY, group_name: "Casey's lamp" });
+    room("none", { previous_scene: "Dimmed", ended_by: "Casey's lamp" });
     set("light.far", "on", { brightness: 200 });
     await feed();
     check("the room says which scene it was on",
       /Was Dimmed/.test(text(".titlebar")), text(".titlebar"));
     check("and does not name its own lamp there -- the lamp's line does",
-      !/Jaina/.test(text(".titlebar")), text(".titlebar"));
+      !/Casey/.test(text(".titlebar")), text(".titlebar"));
     const lost = q(".scenetrack.lead .bands i.was");
     check("the lost scene is ringed in a dash on the room's strip",
       !!lost && lost.getAttribute("data-label") === "Dimmed", lost && lost.outerHTML);
@@ -242,8 +242,8 @@ const js = fs.readFileSync(file);
     await feed();
 
     // ---- a zone from outside the room takes the scene
-    set("sensor.jaina_active_scene", "none",
-      { effective_scene: null, scenes: JAINA, group_name: "Jaina's lamp" });
+    set("sensor.casey_active_scene", "none",
+      { effective_scene: null, scenes: CASEY, group_name: "Casey's lamp" });
     room("none", { previous_scene: "Dimmed", ended_by: "Upstairs" });
     await feed();
     check("a zone that is not one of the lamps is named in the title bar",

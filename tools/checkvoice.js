@@ -74,7 +74,7 @@ const js = fs.readFileSync(file);
       items: [
         { name: "Milk", specification: "2 pints" },
         { name: "Tenderstem", specification: "" },
-        { name: "Crumpets", specification: "for Anaya" },
+        { name: "Crumpets", specification: "for Riley" },
       ],
     };
     let scriptFails = false;
@@ -215,7 +215,7 @@ const js = fs.readFileSync(file);
       } else {
         sub.cb({
           type: "stt-end",
-          data: { stt_output: { text: options.heard || "milk, tenderstem and crumpets for Anaya" } },
+          data: { stt_output: { text: options.heard || "milk, tenderstem and crumpets for Riley" } },
         });
       }
       await settle();
@@ -478,7 +478,7 @@ const js = fs.readFileSync(file);
       items: [
         { name: "Milk", specification: "2 pints" },
         { name: "Tenderstem", specification: "" },
-        { name: "Crumpets", specification: "for Anaya" },
+        { name: "Crumpets", specification: "for Riley" },
       ],
     };
 
@@ -498,7 +498,7 @@ const js = fs.readFileSync(file);
       items: [
         { name: "Milk", specification: "2 pints" },
         { name: "Tenderstem", specification: "" },
-        { name: "Crumpets", specification: "for Anaya" },
+        { name: "Crumpets", specification: "for Riley" },
       ],
     };
 

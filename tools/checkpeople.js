@@ -69,7 +69,7 @@ const js = fs.readFileSync(file);
     };
 
     await show([
-      { name: "James", state: "home", since: "3h" },
+      { name: "Morgan", state: "home", since: "3h" },
       { name: "Sam", state: "not_home", since: "2h" },
       { name: "Alex", state: "unknown" },
       { name: "Robin", state: "" },
@@ -133,7 +133,7 @@ const js = fs.readFileSync(file);
     /* A zone the card was never told about still draws -- as a site plan --
        and a zone it WAS told about takes its own sketch and badge. */
     await show([
-      { name: "James", state: "Work" },
+      { name: "Morgan", state: "Work" },
       { name: "Sam", state: "Gym" },
       { name: "Alex", state: "Allotment" },
     ], 4, { work: { icon: "mdi:briefcase", art: "office" }, Gym: { art: "none" } });
@@ -161,7 +161,7 @@ const js = fs.readFileSync(file);
     /* Home is the moss role, not the card's accent. Asserted by MOVING
        the accent, which is the only way to tell a green that means
        something from a green that is a coincidence. */
-    const HOUSE = [{ name: "James", state: "home" }, { name: "Sam", state: "not_home" }];
+    const HOUSE = [{ name: "Morgan", state: "home" }, { name: "Sam", state: "not_home" }];
     await show(HOUSE, 4);
     const homeOnTeal = band(0);
     await show(HOUSE, 1);
@@ -175,16 +175,16 @@ const js = fs.readFileSync(file);
     el.setConfig({
       type: "custom:spectra-card", accent: 4, title: "Who's home",
       body: { type: "people", rows: [{
-        name: "James", state: { entity: "person.james" },
+        name: "Morgan", state: { entity: "person.morgan" },
         since: { entity: "sensor.people_status", attribute: "presence",
-          key: ["person.james", "since"], format: "since" },
+          key: ["person.morgan", "since"], format: "since" },
       }] },
     });
     el._signature = null;
     el.hass = { states: {
-      "person.james": { state: "home", attributes: {}, last_changed: new Date().toISOString() },
+      "person.morgan": { state: "home", attributes: {}, last_changed: new Date().toISOString() },
       "sensor.people_status": { state: "clear", attributes: {
-        presence: { "person.james": { state: "home", since: arrived } } } },
+        presence: { "person.morgan": { state: "home", since: arrived } } } },
     } };
     await new Promise((r) => requestAnimationFrame(r));
     const since = (root().querySelector(".psince") || {}).textContent || "";
