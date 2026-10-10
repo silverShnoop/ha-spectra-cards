@@ -1782,7 +1782,7 @@ ${TOKENS_DARK}
 
    One height, pressed or not. It used to sit at 16px and grow to 30 under
    a finger, which meant the thing you were aiming at changed size as you
-   touched it and shoved the row below it down the card. JAMES asked for the
+   touched it and shoved the row below it down the card. The owner asked for the
    pressed height all the time: a bar read from across a room is better the
    size it is when it is being used. */
 .picker { position:relative; touch-action:none; cursor:pointer; }
@@ -1800,7 +1800,7 @@ ${TOKENS_DARK}
 /* The chosen scene is outlined as well as bright, so "which one" does not
    rest on a brightness difference alone and still reads from across a room.
 
-   Ink, not a per-scene contrast colour: JAMES asked for one ring that is dark
+   Ink, not a per-scene contrast colour: the owner asked for one ring that is dark
    on paper and pale in the dark, the same ink the marker circle is drawn in,
    so the two read as one piece of furniture rather than the ring changing
    character as it travels. The cost is that it is quieter on a scene close to
@@ -1861,7 +1861,7 @@ ${TOKENS_DARK}
    panel the whole group drops to its own line rather than the buttons
    splitting away from the state they act on. */
 .pickend { margin-left:auto; display:flex; align-items:center; gap:6px; }
-/* Reserved whether or not it has anything to say: JAMES asked that nothing
+/* Reserved whether or not it has anything to say: the owner asked that nothing
    move when state changes, and a line that comes and goes moves everything
    under it. */
 
@@ -4585,7 +4585,7 @@ function readEntity(hass, spec) {
   }
   /* One entry out of an attribute that holds a map. `key` is a list so an
      entity id -- which has a dot in it -- can be one step of the path:
-     `attribute: presence, key: [person.james, since]`. Added for the Who's
+     `attribute: presence, key: [person.morgan, since]`. Added for the Who's
      home card, whose "3h ago" lives on sensor.people_status because a
      person's own last_changed is reset by every restart. */
   if (v !== null && v !== undefined && spec.key !== undefined) {
@@ -5974,7 +5974,7 @@ function pad2(n) {
    hosted images is a panel that breaks when the host moves. */
 
 /* The count device. A festival with five nights shows five lamps, two lit —
-   which is the duration JAMES asked for, shown rather than spelled out. */
+   which is the duration the owner asked for, shown rather than spelled out. */
 function festCount(kind, day, of, palette) {
   const total = Math.max(0, Math.min(31, Math.round(Number(of) || 0)));
   if (!total) return "";
@@ -6605,7 +6605,7 @@ function frigateDay(reviews, midnight, names) {
 /* The activity feed's kinds and the glyph each one wears, shared by the
    rail and the floor plan so a kind cannot look one way down the list and
    another on the house. The last five are what a camera saw, named by what
-   it was -- "Anaya's Bedroom · crying" -- the same glyphs the camera card
+   it was -- "Riley's Room · crying" -- the same glyphs the camera card
    puts on its detections. */
 const FEED_ICONS = {
   motion: "mdi:walk",
@@ -13543,7 +13543,7 @@ class SpectraCard extends HTMLElement {
          scale passing a fixed marker, not a list being scrolled. The scale
          travels against the finger for the same reason the scale on a fader
          does: the thing you are moving is the reading, not the paper. Both
-         "up" cues then agree, which is what JAMES asked for. */
+         "up" cues then agree, which is what the owner asked for. */
       offset = Math.min(0, Math.max(-last * DIAL_CELL, startOffset - (event.clientY - startY)));
       place(offset);
       const next = Math.min(last, Math.max(0, Math.round(-offset / DIAL_CELL)));

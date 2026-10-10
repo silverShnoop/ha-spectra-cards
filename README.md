@@ -456,7 +456,7 @@ title: Downstairs
 meta: {entity: sensor.activity_feed, format: relative, prefix: "Quiet "}
 body:
   type: floorplan
-  image: /hacsfiles/ha-spectra-cards/ground-floor.webp
+  image: /local/floor-plan.webp   # your own picture, in config/www/
   size: [1392, 1010]          # the picture's pixels; points are in these
   areas: {entity: sensor.activity_feed, attribute: by_area}
   fade: 60                    # minutes
@@ -471,8 +471,10 @@ body:
       points: [[795,42],[1305,42],[1305,687],[795,687],[795,477],[670,477],[670,337],[795,337]]
 ```
 
-`ground-floor.webp` ships in `dist/`, so HACS serves it beside the card; any
-root-relative path works (`/local/...` for a picture of your own). A room's
+The picture is yours: put it in Home Assistant's `config/www/` and it is
+served at `/local/...`. Any root-relative path works. No plan ships with the
+card, because a picture of a house belongs in that house's config and not in
+a public repository. A room's
 `area` matches the feed's area name, case aside, and may be a list. `label:
 [x, y]` moves its marker off the middle of its bounding box, which is where
 it goes by default.
@@ -1206,28 +1208,28 @@ locked, then amber and red as the Needs-you row escalates.
 ```yaml
 body:
   type: camera
-  picture: {entity: camera.anaya_s_room_anayas_room_camera_fluent, attribute: entity_picture}
+  picture: {entity: camera.rileys_room_camera_fluent, attribute: entity_picture}
   refresh: 10                      # seconds between stills; default 10, floor 3
-  privacy: {entity: switch.anaya_s_room_anayas_room_camera_privacy_mode}
-  night: {entity: sensor.anaya_s_room_anayas_room_camera_day_night_state, map: {night: true}, default: false}
+  privacy: {entity: switch.rileys_room_camera_privacy_mode}
+  night: {entity: sensor.rileys_room_camera_day_night_state, map: {night: true}, default: false}
   detections:
     - name: Person
       icon: mdi:account
-      on: {entity: binary_sensor.anaya_s_room_anayas_room_camera_person}
+      on: {entity: binary_sensor.rileys_room_camera_person}
       since: {entity: sensor.camera_sightings, attribute: sightings,
-              key: [binary_sensor.anaya_s_room_anayas_room_camera_person, since], format: relative}
+              key: [binary_sensor.rileys_room_camera_person, since], format: relative}
   live:                            # what the sheet streams; an address, not a value
-    fluent: camera.anaya_s_room_anayas_room_camera_fluent
-    clear: camera.anayas_room_clear  # optional; adds Low / High
+    fluent: camera.rileys_room_camera_fluent
+    clear: camera.rileys_room_clear  # optional; adds Low / High
   ptz:                             # optional; button entities
-    left: button.anaya_s_room_anayas_room_camera_ptz_left
-    right: button.anaya_s_room_anayas_room_camera_ptz_right
-    up: button.anaya_s_room_anayas_room_camera_ptz_up
-    down: button.anaya_s_room_anayas_room_camera_ptz_down
-    stop: button.anaya_s_room_anayas_room_camera_ptz_stop
-    home: button.anaya_s_room_anayas_room_camera_guard_go_to
+    left: button.rileys_room_camera_ptz_left
+    right: button.rileys_room_camera_ptz_right
+    up: button.rileys_room_camera_ptz_up
+    down: button.rileys_room_camera_ptz_down
+    stop: button.rileys_room_camera_ptz_stop
+    home: button.rileys_room_camera_guard_go_to
   toggles:                         # optional; switches in the sheet
-    - {name: Privacy, icon: mdi:eye-off-outline, on: {entity: switch.anaya_s_room_anayas_room_camera_privacy_mode},
+    - {name: Privacy, icon: mdi:eye-off-outline, on: {entity: switch.rileys_room_camera_privacy_mode},
        on_text: Lens shut, off_text: Lens open}
 ```
 
@@ -1314,7 +1316,7 @@ press can end: lift, cancel, the pointer escaping, and the sheet closing.
 The middle button goes to the saved home position.
 
 **No siren.** The camera has one, and it is left off on purpose: one stray
-press in a nursery costs more than the button could ever earn.
+press in a bedroom at night costs more than the button could ever earn.
 
 **Any camera, not this one.** Nothing here knows it is a Reolink. The next
 camera is another card with different ids, and a Frigate camera adds
@@ -1414,15 +1416,15 @@ words.
 ### `people` — who is in, who is out, and who nobody can say
 
 ```yaml
-meta: {count: [person.james, person.jaina], state: home, suffix: " home"}
+meta: {count: [person.morgan, person.casey], state: home, suffix: " home"}
 body:
   type: people
   rows:                               # one per person; leave anyone out by not listing them
-    - name: James
-      state: {entity: person.james}
-      picture: {entity: person.james, attribute: entity_picture}
+    - name: Morgan
+      state: {entity: person.morgan}
+      picture: {entity: person.morgan, attribute: entity_picture}
       since: {entity: sensor.people_status, attribute: presence,
-              key: [person.james, since], format: since}
+              key: [person.morgan, since], format: since}
   places:                             # optional; a zone's name → badge icon and sketch
     Work: {icon: mdi:briefcase, art: office}
     Allotment: {art: none}
@@ -1667,7 +1669,7 @@ wall panel is constantly.
 #### `voice` — saying what to add
 
 A microphone under the list. Press it, say *two pints of milk, some
-tenderstem and crumpets for Anaya*, and a sheet comes back with three
+tenderstem and crumpets for Riley*, and a sheet comes back with three
 rows on it; press **Add 3** and they go on the list the phone and Bring
 read. Nothing is written before that press.
 

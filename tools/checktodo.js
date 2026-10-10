@@ -64,7 +64,7 @@ const js = fs.readFileSync(file);
     const SHOP = [
       { uid: "u1", summary: "Milk", status: "needs_action", description: "" },
       { uid: "u2", summary: "Broccoli", status: "needs_action", description: "Tenderstem" },
-      { uid: "u3", summary: "Snacks", status: "needs_action", description: "Anaya" },
+      { uid: "u3", summary: "Snacks", status: "needs_action", description: "Riley" },
       { uid: "u4", summary: "Crumpets", status: "needs_action", description: "" },
       { uid: "u5", summary: "Bagels", status: "needs_action", description: "" },
     ];

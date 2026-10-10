@@ -113,7 +113,7 @@ customElements.define("fake-section", FakeSection);
             .map((label) => ({ label, summary: "Fine" })) }] },
         { type: "grid", column_span: 3, background: { color: "#2a2825", opacity: 60 },
           cards: [card("Downstairs", 2), card("Kitchen", 3), card("Living", 3), card("Hall", 2), card("Study", 4)] },
-        { type: "grid", column_span: 3, cards: [card("Upstairs", 2), card("Bedroom", 3), card("Ensuite", 2), card("Guest", 4), card("Landing", 3), card("Nursery", 4), card("Loft", 5)] },
+        { type: "grid", column_span: 3, cards: [card("Upstairs", 2), card("Bedroom", 3), card("Ensuite", 2), card("Guest", 4), card("Landing", 3), card("Riley's Room", 4), card("Loft", 5)] },
         { type: "grid", column_span: 1, cards: [card("Other tab", 2)] },
         { type: "grid", column_span: 1, spectra_slot: "side", cards: [card("Clock", 1)] },
       ];

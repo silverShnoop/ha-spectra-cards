@@ -67,12 +67,12 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-    const CAM = "camera.nursery_fluent";
-    const CLEAR = "camera.nursery_clear";
-    const PRIV = "switch.nursery_privacy";
-    const PERSON = "binary_sensor.nursery_person";
-    const CRY = "binary_sensor.nursery_cry";
-    const NIGHT = "sensor.nursery_day_night";
+    const CAM = "camera.rileys_room_fluent";
+    const CLEAR = "camera.rileys_room_clear";
+    const PRIV = "switch.rileys_room_privacy";
+    const PERSON = "binary_sensor.rileys_room_person";
+    const CRY = "binary_sensor.rileys_room_cry";
+    const NIGHT = "sensor.rileys_room_day_night";
     const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
     const st = (state, attributes, minutes) => ({
       state, attributes: attributes || {}, last_changed: ago(minutes || 5), last_updated: ago(minutes || 5),
@@ -133,7 +133,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     const show = async (body) => {
       holder.innerHTML = "";
       el = document.createElement("spectra-card");
-      el.setConfig({ type: "custom:spectra-card", accent: 4, icon: "mdi:cctv", title: "Nursery", body });
+      el.setConfig({ type: "custom:spectra-card", accent: 4, icon: "mdi:cctv", title: "Riley's Room", body });
       holder.appendChild(el);
       el.hass = hass;
       await frame();
@@ -146,7 +146,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     // ---- the card
     await show(BODY);
     const img = q(".ccframe img");
-    check("the picture is drawn in the frame", img && /camera_proxy\/camera\.nursery_fluent\?token=T1&_=\d+/.test(img.getAttribute("src") || ""),
+    check("the picture is drawn in the frame", img && /camera_proxy\/camera\.rileys_room_fluent\?token=T1&_=\d+/.test(img.getAttribute("src") || ""),
       img && img.getAttribute("src"));
     check("each detection says when it last fired",
       qa(".ccdet").map((d) => d.textContent.trim()).join(" | ") === "Person 2h ago | Crying 5h ago",
@@ -352,13 +352,13 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
     // ---- the activity rail
     await show({ type: "rail", events: [
-      { area: "Anaya's Bedroom", kind: "crying", at: new Date().toISOString(), entity_id: CRY },
-      { area: "Anaya's Bedroom", kind: "person", at: new Date().toISOString(), entity_id: PERSON },
+      { area: "Riley's Room", kind: "crying", at: new Date().toISOString(), entity_id: CRY },
+      { area: "Riley's Room", kind: "person", at: new Date().toISOString(), entity_id: PERSON },
     ] });
     const railIcons = qa(".event ha-icon").map((i) => i.getAttribute("icon")).join(" ");
     check("the rail names what a camera saw, with the card's own glyphs",
       railIcons === "mdi:emoticon-cry-outline mdi:account"
-        && /Anaya's Bedroom · crying/.test(q(".event .name").textContent), railIcons);
+        && /Riley's Room · crying/.test(q(".event .name").textContent), railIcons);
     return problems;
   });
 
@@ -372,11 +372,11 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
         console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : "  -> " + got}`);
         if (!ok) problems.push(`${name}: ${got}`);
       };
-      const CAM = "camera.nursery_fluent";
+      const CAM = "camera.rileys_room_fluent";
       const hass = {
         states: {
           [CAM]: { state: "idle", attributes: { entity_picture: `/api/camera_proxy/${CAM}?token=T1`, access_token: "T1" } },
-          "camera.nursery_clear": { state: "idle", attributes: { access_token: "C1" } },
+          "camera.rileys_room_clear": { state: "idle", attributes: { access_token: "C1" } },
         },
         themes: { darkMode: false }, callService: () => Promise.resolve(),
         callWS: () => Promise.resolve({ frontend_stream_types: [] }),
@@ -385,9 +385,9 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
       const holder = document.getElementById("a");
       holder.innerHTML = "";
       const el = document.createElement("spectra-card");
-      el.setConfig({ type: "custom:spectra-card", accent: 4, icon: "mdi:cctv", title: "Nursery", body: {
+      el.setConfig({ type: "custom:spectra-card", accent: 4, icon: "mdi:cctv", title: "Riley's Room", body: {
         type: "camera", picture: { entity: CAM, attribute: "entity_picture" },
-        live: { fluent: CAM, clear: "camera.nursery_clear" },
+        live: { fluent: CAM, clear: "camera.rileys_room_clear" },
         ptz: { left: "b.l", right: "b.r", up: "b.u", down: "b.d", stop: "b.s" } } });
       holder.appendChild(el);
       el.hass = hass;
