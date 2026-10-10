@@ -158,9 +158,15 @@ const js = fs.readFileSync(file);
     check("and the summary says the same thing in words",
       (btn(0).querySelector(".docksum").textContent || "").includes("to hang"),
       btn(0).querySelector(".docksum").textContent);
-    check("a filled button takes the level's ground, not a decorative one",
-      getComputedStyle(btn(0)).backgroundColor === token("attention-soft"),
-      getComputedStyle(btn(0)).backgroundColor);
+    /* A filled button used to take the level's soft ground. It competed
+       with Needs you, which is where the job is, so the rail now says the
+       level on its edge -- border and ring -- and leaves the ground to the
+       list. Still the level's hue, never a decorative one. */
+    check("a filled button wears the level on its edge and ring, not as a ground",
+      getComputedStyle(btn(0)).borderTopColor === token("attention")
+        && getComputedStyle(btn(0)).boxShadow.includes(token("attention"))
+        && getComputedStyle(btn(0)).backgroundColor !== token("attention-soft"),
+      `${getComputedStyle(btn(0)).borderTopColor} ${getComputedStyle(btn(0)).boxShadow} ${getComputedStyle(btn(0)).backgroundColor}`);
 
     /* ---- config resolves a level off an attribute.
        The shape the dashboard actually uses: the sensor publishes the

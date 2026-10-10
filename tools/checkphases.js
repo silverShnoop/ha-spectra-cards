@@ -95,7 +95,10 @@ const js = fs.readFileSync(file);
       el.hass = hass;
       await new Promise((r) => requestAnimationFrame(r));
     };
-    const kinds = () => all(".phcell ha-icon").map((i) => i.getAttribute("icon"));
+    const kinds = () => all(".phglyph").map((g) => {
+      const i = g.querySelector("ha-icon");
+      return i ? i.getAttribute("icon") : g.querySelector(".washglyph") ? "spray" : "?";
+    });
     const names = () => all(".phcell").map((c) => c.getAttribute("aria-label") || "");
 
     // ---- when it appears at all
@@ -170,7 +173,7 @@ const js = fs.readFileSync(file);
 
     // ---- the live cell moves the way the machine does
     const anim = (el) => {
-      const i = el && el.querySelector("ha-icon");
+      const i = el && el.querySelector("ha-icon, .jet");
       return i ? getComputedStyle(i).animationName : "(no cell)";
     };
     const cellOf = (kind) => root().querySelector(`.phcell.now.ph-${kind}`);
@@ -298,6 +301,40 @@ const js = fs.readFileSync(file);
         && all(".phcell.now")[0] === all(".phcell")[1],
       `${all(".phcell.now").length} live`);
 
+    // ---- a dishwasher: heat or wash, and nothing a drum does
+    const DISHES = [
+      { kind: "wash", started_at: ago(70), seconds: 600 },
+      { kind: "heat", started_at: ago(60), seconds: 900 },
+      { kind: "wash", started_at: ago(45), seconds: 0 },
+    ];
+    await show({ state: "running", phases: DISHES, machine: "mdi:dishwasher" });
+    check("a dishwasher's strip is its own two glyphs",
+      kinds().join(" ") === "spray mdi:thermometer spray",
+      kinds().join(" "));
+    check("and says it is washing, never tumbling",
+      /^Washing\b/.test(names()[2]) && !names().some((n) => /Tumbl/.test(n)),
+      names().join(" | "));
+    const jets = (sel) => Array.from(root().querySelectorAll(`${sel} .jet`))
+      .map((j) => getComputedStyle(j).animationName);
+    check("a live wash sprays: every drop rises off the arm",
+      jets(".phcell.now.ph-wash").length === 6
+        && jets(".phcell.now.ph-wash").every((a) => a === "sp-jet"),
+      jets(".phcell.now.ph-wash").join(" "));
+    /* Rising, so it can never be read as the fill's falling drop. */
+    const rise = (() => {
+      const j = root().querySelector(".phcell.now.ph-wash .jet");
+      return j ? parseFloat(getComputedStyle(j).getPropertyValue("--dy")) : NaN;
+    })();
+    check("upward, the opposite way to a fill", rise < 0, String(rise));
+    check("and the hero sprays too",
+      jets(".drumglyph.ph-wash").length === 6
+        && jets(".drumglyph.ph-wash").every((a) => a === "sp-jet"),
+      jets(".drumglyph.ph-wash").join(" ") || "no spray in the drum");
+    check("a finished wash cell is still, and still a spray",
+      jets(".phcell:not(.now).ph-wash").length === 6
+        && jets(".phcell:not(.now).ph-wash").every((a) => a === "none"),
+      jets(".phcell:not(.now).ph-wash").join(" "));
+
     // Left running, with something moving, for the reduced-motion pass.
     await show({ state: "running", phases: CYCLE });
     return problems;
@@ -326,6 +363,19 @@ const js = fs.readFileSync(file);
       .filter((a) => a !== "none");
     check("reduced motion stops every one of them",
       moving.length === 0, moving.join(" "));
+    /* Again with the one kind that only a dishwasher sends. */
+    const conf = JSON.parse(JSON.stringify(el._config));
+    conf.body.phases = [{ kind: "wash", started_at: new Date().toISOString(), seconds: 0 }];
+    el.setConfig(conf);
+    el._signature = null;
+    el.hass = el.hass;
+    await new Promise((r) => requestAnimationFrame(r));
+    const washing = Array.from(root.querySelectorAll(".phcell ha-icon, .phlive .jet"))
+      .map((i) => getComputedStyle(i).animationName)
+      .filter((a) => a !== "none");
+    check("including a dishwasher's wash",
+      washing.length === 0 && root.querySelector(".phcell.ph-wash") !== null,
+      washing.join(" ") || "no wash cell");
     return problems;
   });
 

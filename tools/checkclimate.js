@@ -54,6 +54,8 @@ const pos = (t) => Math.min(100, Math.max(0, ((t - SMIN) / (SMAX - SMIN)) * 100)
 const near = (a, b) => Math.abs(a - b) < 0.05;
 /* inset(0 R% 0 L%) -> [R, L]; the browser writes 0 as 0px. */
 const inset = (clip) => {
+  /* ...and inset(0 0% 0 0%) comes back shortened to inset(0px 0%). */
+  if (/^inset\(0(?:px)? 0(?:%|px)\)$/.test(clip || "")) return [0, 0];
   const m = /inset\(0(?:px)? ([\d.]+)(?:%|px) 0(?:px)? ([\d.]+)(?:%|px)\)/.exec(clip || "");
   return m ? [Number(m[1]), Number(m[2])] : null;
 };
@@ -187,10 +189,11 @@ const card = (extra) => ({
     near(shape.thumb, pos(20.5)), `${shape.thumb}% vs ${pos(20.5)}%`);
   check("the needle stands at the reading",
     near(shape.needle, pos(19.4)), `${shape.needle}% vs ${pos(19.4)}%`);
-  /* The gap is a SPAN, clipped from both ends -- not a fill from the edge. */
+  /* Lit from the cold end to the reading, whatever the target: the dimmed
+     part of the track means one thing only -- warmer than the room is. */
   const g = inset(shape.clip);
-  check("the gap runs from the needle to the thumb",
-    !!g && near(g[0], 100 - pos(20.5)) && near(g[1], pos(19.4)), shape.clip);
+  check("the track is lit from the cold end to the needle",
+    !!g && near(g[0], 100 - pos(19.4)) && near(g[1], 0), shape.clip);
   check("the target is read out on the mode line", shape.inRow, String(shape.inRow));
   check("and says what was asked for", shape.target === "20.5°", shape.target);
   check("what the room IS stays in the title bar",
@@ -201,22 +204,10 @@ const card = (extra) => ({
     Number(shape.zNeedle) > Number(shape.zThumb),
     `${shape.zNeedle} vs ${shape.zThumb}`);
 
-  /* Tado takes 5..25 and the scale is 15..30, so only the warm end is
-     past what can be set -- the cold end is veiled only when the
-     thermostat stops short of it. */
-  check("what cannot be set is veiled, and only that",
-    shape.dead.length === 1 && near(shape.dead[0].left, pos(MAX)),
+  /* The settable limit is not drawn: the thumb stopping is the mark. A
+     veil there made the dimmed stretch mean the limit OR the reading. */
+  check("what cannot be set is not veiled", shape.dead.length === 0,
     JSON.stringify(shape.dead));
-  await mount(card({ adjust: Object.assign({}, card().body.adjust, { min: 17 }) }));
-  const both = await page.evaluate(() => {
-    const root = window.__card.shadowRoot || window.__card;
-    return Array.from(root.querySelectorAll(".rampdead")).map((d) => ({
-      left: parseFloat(d.style.left), width: parseFloat(d.style.width || "NaN"),
-    }));
-  });
-  check("a thermostat that stops short of the cold end is veiled there too",
-    both.length === 2 && both[0].left === 0 && near(both[0].width, pos(17)),
-    JSON.stringify(both));
 
   // ---- 8. the gap is VISIBLE, not merely clipped right ----------------
   /* The first build clipped the gap perfectly and then painted the veil on
@@ -229,7 +220,7 @@ const card = (extra) => ({
     const t = root.querySelector(".dimtrack").getBoundingClientRect();
     return { x: t.x, w: t.width, y: t.y + t.height / 2 };
   });
-  const gx = mid.x + mid.w * ((pos(16) + pos(24)) / 200);
+  const gx = mid.x + mid.w * (pos(16) / 200);
   const gClip = { x: Math.round(gx - 3), y: Math.round(mid.y - 3), width: 6, height: 6 };
   const lit = await page.screenshot({ clip: gClip });
   await page.evaluate(() => {
@@ -305,16 +296,15 @@ const card = (extra) => ({
     cold.left === 0, `${cold.left}%`);
   check("and says it is beyond that one", /\bunder\b/.test(cold.cls), cold.cls);
 
-  /* The gap still has to be honest in direction: a room above the scale
-     and a target inside it are a span running to the warm end. */
+  /* A room above the scale lights the whole track. */
   await mount(card({ now: "43.0" }));
   const hotGap = await page.evaluate(() => {
     const root = window.__card.shadowRoot || window.__card;
     return root.querySelector("[data-rampgap]").style.clipPath;
   });
   const hg = inset(hotGap);
-  check("the gap runs from the target to the warm end",
-    !!hg && near(hg[0], 0) && near(hg[1], pos(20.5)), hotGap);
+  check("a room above the scale lights the whole track",
+    !!hg && near(hg[0], 0) && near(hg[1], 0), hotGap);
 
   // ---- 1, 2 and 6. the drag ------------------------------------------
   await mount(card());

@@ -139,6 +139,72 @@ const js = fs.readFileSync(file);
       hollow.el.hidden || getComputedStyle(hollow.el).display === "none"
         || !hollow.svg, "still rendered");
 
+    // ---- a year of months: empty ones keep their place
+    const month = (label, extra) => Object.assign(
+      { label, cost: [], kwh: [], total_cost_text: null, total_kwh: null, note: null },
+      extra || {});
+    const AUG = month("Aug");
+    const SEP = month("Sep", { cost: [5.8, 14.2, 18.9, 13.1], kwh: [23, 57, 76, 53],
+      total_cost: 52.0, total_cost_text: "£52", total_kwh: 209, note: "11/30 days" });
+    const OCT = month("Oct", { note: null });
+    const year = await draw({ days: [AUG, SEP, OCT], slots: 12, keep_empty: true });
+    const ytexts = [...year.svg.querySelectorAll("text")].map((t) => t.textContent);
+    check("an empty month keeps its label", ytexts.includes("Aug") && ytexts.includes("Oct"),
+      ytexts.join("|"));
+    check("...and shows a dash, not a zero",
+      ytexts.filter((t) => t === "\u2014").length === 2 && !ytexts.includes("£0"),
+      ytexts.join("|"));
+    check("a part-month says how much of it there is", ytexts.includes("11/30 days"),
+      ytexts.join("|"));
+    const ysegs = [...year.svg.querySelectorAll("rect")]
+      .filter((r) => Number(r.getAttribute("y")) > 20 && Number(r.getAttribute("height")) > 2);
+    check("only the filled month draws segments", ysegs.length === 4, `${ysegs.length}`);
+    const vb = year.svg.viewBox.baseVal;
+    check("twelve columns widen the box instead of squeezing it", vb.width > 320,
+      `${vb.width}`);
+    check("...and the cap widens with it, so the type stays a week's size",
+      parseFloat(year.svg.style.maxWidth) === Math.round(460 * vb.width / 320),
+      year.svg.style.maxWidth);
+    const xs = [...year.svg.querySelectorAll("text")]
+      .filter((t) => ["Aug", "Sep", "Oct"].includes(t.textContent))
+      .map((t) => Number(t.getAttribute("x")));
+    check("columns sit far enough apart for whole-pound figures",
+      xs[1] - xs[0] >= 40, `${(xs[1] - xs[0]).toFixed(1)}`);
+    const emptyYear = await draw({ days: [AUG, OCT], slots: 12, keep_empty: true });
+    check("a year with nothing in it at all still hides",
+      emptyYear.el.hidden || getComputedStyle(emptyYear.el).display === "none"
+        || !emptyYear.svg, "still rendered");
+    const dropped = await draw({ days: [AUG, SEP], slots: 7 });
+    const dtexts = [...dropped.svg.querySelectorAll("text")].map((t) => t.textContent);
+    check("without keep_empty an empty column is still dropped, as for days",
+      !dtexts.includes("Aug"), dtexts.join("|"));
+
+    // ---- the standing charge as the base of the stack
+    const based = await draw({
+      names: ["Standing", ...NAMES], base: true, slots: 12, keep_empty: true,
+      days: [AUG, { label: "Sep", cost: [5.3, 5.4, 12.64, 19.04, 13.29],
+        kwh: [0, 21.8, 51.3, 77.1, 53.9], total_cost: 55.67,
+        total_cost_text: "£56", total_kwh: 204, note: "11/30 days" }],
+    });
+    const brects = [...based.svg.querySelectorAll("rect")]
+      .filter((r) => Number(r.getAttribute("y")) > 20 && Number(r.getAttribute("height")) > 2);
+    const bottom = brects.reduce((a, r) =>
+      (Number(r.getAttribute("y")) > Number(a.getAttribute("y")) ? r : a));
+    check("with base, five segments are drawn", brects.length === 5, `${brects.length}`);
+    check("...the bottom one is the neutral base, not a time of day",
+      bottom.getAttribute("fill") === "var(--sp-ink-3)", bottom.getAttribute("fill"));
+    check("...and the blocks keep the ramp from its first step",
+      brects.some((r) => r.getAttribute("fill") === "var(--sp-b1)")
+        && brects.some((r) => r.getAttribute("fill") === "var(--sp-b4)"),
+      brects.map((r) => r.getAttribute("fill")).join(","));
+    const btexts = [...based.svg.querySelectorAll("text")].map((t) => t.textContent);
+    check("...and the legend names the base first",
+      btexts.indexOf("Standing") > -1 && btexts.indexOf("Standing") < btexts.indexOf("Overnight"),
+      btexts.join("|"));
+    const legendFirst = based.svg.querySelector("rect");
+    check("...in the base's colour", legendFirst.getAttribute("fill") === "var(--sp-ink-3)",
+      legendFirst.getAttribute("fill"));
+
     /* ---- the figures under the columns
        They can outlive the columns: a week's total comes from statistics
        kept for ever, while the columns need days the integration wrote
@@ -164,6 +230,33 @@ const js = fs.readFileSync(file);
     check("figures without columns still draw",
       !!figsOnly.svg && [...figsOnly.svg.querySelectorAll("text")]
         .map((t) => t.textContent).includes(FIGS[0].value), "nothing drawn");
+
+    check("...without a key, which would have nothing left to decode",
+      figsOnly.svg.querySelectorAll("rect").length === 0,
+      `${figsOnly.svg.querySelectorAll("rect").length} swatches`);
+
+    /* A month chart carries both a note line and a figures row, and they
+       are the two things drawn below the labels. They were written apart
+       and have to be checked together: the rule above the figures sat at a
+       fixed height before the notes existed, which would have put it
+       through the part-month line. */
+    const noted = await draw({
+      slots: 12, keep_empty: true, figures: [FIGS[0]],
+      days: [month("Sep", { cost: [5.8, 14.2, 18.9, 13.1], kwh: [23, 57, 76, 53],
+        total_cost_text: "\u00a352", total_kwh: 209, note: "11/30 days" })],
+    });
+    const noteY = [...noted.svg.querySelectorAll("text")]
+      .filter((t) => t.textContent === "11/30 days")
+      .map((t) => Number(t.getAttribute("y")))[0];
+    const ruleY = Number(noted.svg.querySelector("line").getAttribute("y1"));
+    check("the rule above the figures clears the part-month note",
+      ruleY > noteY, `rule ${ruleY} vs note ${noteY}`);
+    const figY = [...noted.svg.querySelectorAll("text")]
+      .filter((t) => t.textContent === FIGS[0].value)
+      .map((t) => Number(t.getAttribute("y")))[0];
+    check("...and the figure sits below the rule, inside the box",
+      figY > ruleY && figY < noted.svg.viewBox.baseVal.height,
+      `figure ${figY}, rule ${ruleY}, height ${noted.svg.viewBox.baseVal.height}`);
 
     const half = await draw({ days: [SAT, MON], slots: 7, figures: [
       FIGS[0], { label: "7 days before" },

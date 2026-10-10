@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `chart`, `daysplit`, `climate`, `clock`, `control`, `festival`, `forecast`, `list`, `lock`, `people`, `pie`, `picker`, `quote`, `rail`, `scenes`, `stat`, `status`, `strip`, `summary`, `todo`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -63,13 +63,24 @@ number in `outline` buys nothing at all.
 
 | Level | Timeline | Treatment | Light | Dark |
 | --- | --- | --- | --- | --- |
+| `notice` | none: something you asked for is under way or ready | 2px border | `#0E79E0` | `#1C6FE8` |
 | `attention` | today or tomorrow | 2px border | `#B6862A` | `#D9A63F` |
-| `waiting` | the next 30 minutes | border + 1px inset ring | `#B0512C` | `#E08054` |
+| `waiting` | the next 30 minutes | border + 1px inset ring | `#B0512C` | `#EC6124` |
 | `critical` | now | ring + soft ground | `#8E0C14` | `#E2333F` |
 
 The levels are ordered and the accents are not, which is why the levels are
 named and the accents numbered: a slot number is an arbitrary label, whereas
 `waiting` carries a timeline a reviewer can check a row against.
+
+**Notice is the quiet one, and it is blue.** It is the only level with no
+deadline in it: work the house did on somebody's behalf — an AI task that
+has finished, or failed — waiting to be looked at. It draws exactly what
+attention draws, the border, because blue against yellow is the one pair the
+hue alone carries to normal vision and to deutan alike. Its nearest
+neighbour is slate (`a5`): ΔE00 15.9 by eye and 13.6 deutan in light, 15.6
+and 16.4 in dark — and that is a rail button beside a rail button, so it is
+the pair to watch. Dark is the darker blue, not a lifted one: lifted, it
+walks into the dark slate.
 
 **Yellow, orange and red are reserved.** No decorative slot may be one of
 them, which is why `a1` and `a2` are a brown and a bone rather than the
@@ -142,6 +153,59 @@ changes colour.
 **Accents are picked by role, never by hue.** A bin stream is slate because it
 is a secondary series, not because blue suits rubbish. There are six and there
 is never a seventh: if a new meaning appears, map it onto one of the six.
+
+## AI tasks: `tasks`
+
+```yaml
+type: custom:spectra-card
+title: Meals
+tasks: meals          # or {card: meals, entity: sensor.ai_tasks, tab: kitchen}
+```
+
+Every AI call a card makes goes through `_aiCall`, which runs it as a
+home_signals task rather than waiting on the script in the browser. That is
+the link import, a recipe from a photo or a name, writing recipes for new
+ideas, tagging, dictating, suggesting and arranging meals, ideas for a slot,
+the fridge, planning in words or by voice, asking the box, and reading
+ingredients or speech onto the shopping list. The flow still gets its answer
+and shows it as it always did.
+
+A card with `tasks` shows the tasks it started, from home_signals'
+`sensor.ai_tasks`, and wears the `notice` the sensor gives it (the louder of
+that and its own `outline`) from the moment one starts. Running, the line is
+a spinner, **Running** and its step, with **Dismiss**, which quietens it
+until it lands. Finished, the line says which way it went before anything else:
+**Done** with a tick, or **Failed** with an alert and the reason. It has two
+buttons, as its Needs you row does: **Dismiss**, which clears the card, the
+tab and the row together, and **Open** when the answer can be shown again —
+a saved recipe opens on its sheet, an unsaved draft in the form, an import
+in its review. Two minutes after it lands it goes on its own.
+
+A call that answers without the thing asked for is **Failed**, not Done:
+each flow names the key its answer must have (`require` -- a recipe's
+name, a page's slug, the meals planned) and what the row says when it is
+missing ("No recipe found in the photo"). The flow gets the same rejection
+a failed call gives it, so the card and the row agree.
+
+An answer that is put in front of somebody as it lands — a sheet still
+open, a form or review popping up on a panel being looked at — is seen, so
+its notice clears at once. One that lands with nobody looking stays blue.
+
+Without `tasks` a card files its tasks under its body type (`meals`,
+`recipes`, `todo`), on Kitchen, or Lists for a to-do card.
+
+Opt-in, because a level is a card's to claim: the Meals card on Home shows
+the same plan as the one on Kitchen, and Home never wears a level.
+
+The link import uses it whenever home_signals has `start_ai_task`: the
+sheet says the reading can be closed, follows it through its steps, and
+shows the split if it is still open when the answer lands. Closed, the
+answer goes to Needs you, whose **Open** carries `open_task` instead of a
+service — the panel moves to the row's tab and the card that owns the task
+opens it.
+
+A list row takes a second button, `secondary_action` and `secondary_label`,
+drawn quieter and before the main one. `checkaitasks` holds all of it.
 
 ## Values: literals or entity references
 
@@ -309,6 +373,18 @@ right, in order of precedence, an action button, a `pill`, a `bar`, or a
 `value`. `title` and `detail` are accepted as aliases of `name` and `sub`, so
 a row coming straight from `home_signals`' `items` contract renders as-is.
 
+**A row that resolves to nothing is not drawn.** Write a row as a `cases`
+with no `else` and it appears only while its case is true — which is how
+a fixed list of breakfast, lunch and dinner shows just the meals planned
+today. A list whose every row is nothing counts as empty and hides.
+
+```yaml
+rows:
+  - cases:
+      - when: {entity: calendar.mealie_dinner, map: {on: true}, default: false}
+        then: {name: Dinner, value: {entity: calendar.mealie_dinner, attribute: message}}
+```
+
 A row with a tone takes its soft wash, which **overrides zebra** — never
 both. That is step 4 on the emphasis ladder; zebra is step 2 and carries no
 meaning at all.
@@ -349,7 +425,10 @@ body:
 
 Each event carries `area`, `kind` and either `ago` or `at` (a timestamp the
 rail turns into "2m ago"). The icon comes from `kind` — `motion`, `occupancy`,
-`button`, `lock`, `door` — overridable with `iconMap`.
+`button`, `lock`, `door`, and what a camera saw: `person`, `animal`,
+`vehicle`, `crying`, `camera` — overridable with `iconMap`. The floor plan
+draws the same kinds with the same glyphs, and a camera's are the ones its
+card puts on its detections.
 
 **Consecutive events from the same source collapse into one row with a
 count.** Nineteen hall trips in twelve minutes is one thing happening, not
@@ -362,6 +441,66 @@ read as broken, a rail of grey rows with three bright locks from the same two
 minutes looking like the only thing that had happened. Whether the door is
 locked is answered in the present tense by its own cell — the rail only says
 *when*, and an hour-old lock is as old as an hour-old anything.
+
+### `floorplan` — which rooms, lately?
+
+The rail's feed drawn on the house. Each room glows in the card's accent by
+how much has happened there and how recently, fading to nothing over `fade`
+minutes; the room's newest event sits on it as a marker, kind and age.
+
+```yaml
+type: custom:spectra-card
+accent: 4
+icon: mdi:floor-plan
+title: Downstairs
+meta: {entity: sensor.activity_feed, format: relative, prefix: "Quiet "}
+body:
+  type: floorplan
+  image: /local/floor-plan.webp   # your own picture, in config/www/
+  size: [1392, 1010]          # the picture's pixels; points are in these
+  areas: {entity: sensor.activity_feed, attribute: by_area}
+  fade: 60                    # minutes
+  rooms:
+    - {area: Study,  points: [[70,47],[365,47],[365,264],[70,264]]}
+    - {area: Toilet, points: [[70,284],[365,284],[365,420],[70,420]]}
+    - area: Hall
+      points: [[385,42],[765,42],[765,142],[670,142],[670,477],[525,477],[525,507],[385,507]]
+    - area: Kitchen
+      points: [[65,444],[360,444],[360,507],[525,507],[525,482],[760,482],[760,857],[65,857]]
+    - area: Living Room
+      points: [[795,42],[1305,42],[1305,687],[795,687],[795,477],[670,477],[670,337],[795,337]]
+```
+
+The picture is yours: put it in Home Assistant's `config/www/` and it is
+served at `/local/...`. Any root-relative path works. No plan ships with the
+card, because a picture of a house belongs in that house's config and not in
+a public repository. A room's
+`area` matches the feed's area name, case aside, and may be a list. `label:
+[x, y]` moves its marker off the middle of its bounding box, which is where
+it goes by default.
+
+**Heat is summed and squashed.** Every event contributes what is left of its
+life — one when it happens, nothing at `fade` — and the room glows by
+`1 − e^−sum`. One fresh trip reads clearly; twenty cannot do more than fill
+the room. The marker turns `ink-3` at half of `fade`.
+
+**Read `by_area`, not `events`, when the feed has it.** `events` is the
+rail's twenty rows, which is about ten minutes of an ordinary evening; a plan
+fading over an hour drawn from ten minutes shows a busy house going quiet.
+`by_area` is the feed's last hour per room. `events:` still works, for a feed
+that has no `by_area`, and simply under-reads.
+
+**The heat is never yellow, orange or red.** A heat map wants to be, and
+those three are the levels: a hot hall painted orange claims a job that does
+not exist. How busy a room was is a fact, and it wears the tab's accent.
+
+**A plan is one floor and the house is not.** Rooms with activity that the
+plan does not draw — upstairs, the garden — are named under it, newest first
+(`max_elsewhere`, default 4), for as long as they would have glowed.
+
+The picture is dimmed in dark mode: a daylit render is otherwise the
+brightest thing on a dark panel. The card ticks every 30 seconds on its own,
+because the fade must keep going in a house where nothing is happening.
 
 ### `strip` — where are we in a cycle?
 
@@ -495,17 +634,47 @@ so re-cutting the day is a change to the sensor and not to this card.
 each `{value, label}` — a week's total, the week before, the average week.
 They can **outlive the columns**: a week's total comes from statistics kept
 for ever, while the columns need days the sensor wrote down itself, so a
-card with one and not the other draws the one it has. A figure with no
-`value` is left out rather than labelled blank.
-
-The same body draws a **month** per column: one segment is the whole, so
-passing `names: []` drops the legend and each column becomes a month's
-total. Re-cutting the period is a change to the sensor, not to this.
+card with one and not the other draws the one it has. With no columns at
+all it is the figures alone, and the legend goes with the columns, having
+nothing left to decode. A figure with no `value` is left out rather than
+labelled blank.
 
 `slots` lays the card out for that many columns even when fewer have
 arrived, so a week filling up does not restretch every morning. A day whose
 blocks are missing is a **gap** rather than a column of nothing — the house
 never used nothing, and a flat column under a real date would say it did.
+
+The same body draws a year of months:
+
+```yaml
+body:
+  type: daysplit
+  slots: 12
+  keep_empty: true
+  names: {entity: sensor.energy_day, attribute: block_names}
+  days:  {entity: sensor.energy_day, attribute: month_blocks}
+```
+
+`keep_empty` is the one difference. A month nothing was recorded for is not
+a figure that predates the blocks — it is a month — so it keeps its column:
+a hairline on the baseline, a dash where the money would be, and its label.
+A column may carry a `note` ("so far", "11/30 days"), printed under its
+label, because a part-month is otherwise just a short bar and reads as a
+cheap month. A chart with no filled column at all still hides.
+
+`base: true` makes the first segment of every column a base rather than a
+block: drawn at the bottom in the ink's grey, off the time-of-day ramp, and
+named first in the legend. The month chart uses it for the standing charge,
+so the bar is the whole bill:
+
+```yaml
+  base: true
+  names: {entity: sensor.energy_day, attribute: month_block_names}
+```
+
+More than seven slots widen the box instead of squeezing the columns, and
+the size cap widens with it, so the type is the size it is on a week. Twelve
+months want a card two columns wide.
 
 Colour is one hue getting lighter through the day, because time of day is
 *ordered*: four unrelated hues would say the blocks are four kinds of thing
@@ -551,6 +720,98 @@ order because they share a lightness by design. So `--sp-w1`…`--sp-w4`
 alternate lightness as well as hue, which is what buys the separation:
 adjacent wedges clear 24.5 by eye and 22.8 simulated, with dark mode
 stepped against its own surface.
+
+### `batteries` — which one needs changing, and how do the rest stand?
+
+```yaml
+type: custom:spectra-card
+accent: 5
+icon: mdi:battery-heart-variant
+title: Batteries
+outline: {entity: sensor.system_health, attribute: battery_level}
+body:
+  type: batteries
+  items:     {entity: sensor.system_health, attribute: batteries}
+  threshold: {entity: sensor.system_health, attribute: battery_threshold}
+```
+
+The flat ones are **rows**, at the top and worst first, because they are the
+part a person reads. Everything else is a **pip** on one 0–100 axis, stacked
+into ten bins: a battery at 80% does not need its name on a wall panel, it
+needs to be visibly nowhere near the line. A house of thirty batteries is
+three rows of pips, and the one creeping towards the line is the pip standing
+on its own — which is also the one the line underneath names: `18 fine ·
+lowest Water Softener 30%`.
+
+`low` is the **sensor's** word. `threshold` only draws the dashed line, so the
+card and `Needs you` cannot disagree about which side of it a battery is on.
+A battery with no reading is left out rather than drawn at 0.
+
+Flat rows and flat pips wear `attention`, because a `Needs you` row stands
+behind every one of them; healthy pips wear the card's accent and the low zone
+is shaded neutral, so a morning with nothing flat has no yellow in it. The
+card's `outline` reads `battery_level`, which is `attention` exactly while
+something is flat — the same level the Maintenance tab's rail button wears.
+
+### `devices` — how many devices are answering, and which are not?
+
+```yaml
+type: custom:spectra-card
+accent: 4
+icon: mdi:lan-connect
+title: Devices
+outline: {entity: sensor.devices, attribute: level}
+body:
+  type: devices
+  connected: {entity: sensor.devices, attribute: connected}
+  offline:   {entity: sensor.devices, attribute: offline}
+  partial:   {entity: sensor.devices, attribute: partial}
+  problems:  {entity: sensor.devices, attribute: problems}
+  networks:  {entity: sensor.devices, attribute: networks}
+```
+
+Three numbers first — connected, offline, partly offline — because they are
+the part read from the doorway.
+
+**Then the house's networks as a map**, at every width: Home Assistant in
+the middle, a hub per network with its `53/56`, and a dot per device clustered
+past it. Trouble is yellow — a dashed spoke, a yellow hub, the problem dots on
+the cluster's outside edge — so five dead speakers read as one sick Cast
+cluster without a word of explanation. Networks sit evenly round the map in
+the sensor's order, the first on the left.
+
+**Under it, a list** — under it on a phone — of every device not fully
+answering, grouped by network in the map's order, offline first: the name,
+its room, what is missing (`offline`, `No temperature`, `5 of 8 missing`) and
+**how long**: `offline · 3d`. Networks with nothing wrong are one quiet line
+at the end: `All answering: Zigbee 7`. A problem whose network is not on the
+map is still a row, under *Other*.
+
+The map names nothing and the list is not numbered against it. Labels at the
+side of the map, and then numbers on its dots, were both tried and read as
+clutter on the panel: the map shows where, the list says what.
+
+**Under the numbers, the map, and the list fills the space beside it first.**
+On a card three columns wide the map spans two of them, on a card two wide it
+takes one, and the list starts in the column beside it — that space is there
+whatever the list does, so it is the first to be used. Groups go beside the
+map in its order while they fit its height; whatever is left carries on under
+the map in as many columns as the card spans, cut so that no column runs on
+past the others. A phone gets the numbers, the map, and then one column.
+
+The card cannot ask the panel how many columns it spans, so it reads its own
+width: three from 880px, two from 560px. The panel's columns are 280px at
+their narrowest, so those are the widths at which a card of that span can
+first appear. Give the section `column_span: 3` on the panel. Give the section `column_span: 2` or more on a panel.
+
+The time is the sensor's, remembered across restarts. A problem whose time is
+unknown shows none: Home Assistant's own `last_changed` would say it died at
+the last reboot, and a confident wrong number is worse than no number.
+
+Offline and partial wear `attention`, because the offline row in `Needs you`
+stands behind them — a dot, its spoke, and the hub of a network with one.
+With everything answering there is no yellow on the card, and no key either:
+the key is only there to decode the yellow.
 
 ### `forecast` — what will it be like later?
 
@@ -850,6 +1111,61 @@ Text colour on a chip is the one colour the theme does not choose. It sits on
 that scene's own hex, so relative luminance decides whether it is ink or
 paper.
 
+### A room's lamps, inside the room's `picker`
+
+A lamp that is a Hue zone of one bulb out of a room is not a room of its
+own, and a card of its own beside the room said it was. The two cannot be
+changed separately. Switching a lamp on or off, changing its colour, or
+recalling its own scene ends the room's scene, and the room stays on no scene
+when the lamp goes back. Dimming a lamp is the exception: brightness is an
+adjustment the scene survives. All of this was tested live in the Bedroom. A room scene works
+the other way and overwrites the lamp.
+
+So the lamps go on the room's card, as `lamps`. Each one is shaped like a
+small room:
+
+```yaml
+body:
+  type: picker
+  light: light.bedroom
+  active: {entity: sensor.bedroom_active_scene, attribute: effective_scene}
+  previous: {entity: sensor.bedroom_active_scene, attribute: previous_scene}
+  ended_by: {entity: sensor.bedroom_active_scene, attribute: ended_by}
+  # ...on, brightness, drawer_scenes as for any room
+  lamps:
+    - name: Far light
+      light: light.bedroom_far_light
+      on: {entity: light.bedroom_far_light, map: {on: true, off: false}}
+      active: {entity: sensor.bedroom_far_light_active_scene, attribute: effective_scene}
+      group: {entity: sensor.bedroom_far_light_active_scene, attribute: group_name}
+      brightness: {entity: light.bedroom_far_light, attribute: brightness}
+      drawer_scenes: {from: {entity: sensor.bedroom_far_light_active_scene, attribute: scenes}, each: ...}
+```
+
+Each lamp gets one line under the room's scenes: its name, what it is
+showing and its switch. It shows its own scene in that scene's colour,
+otherwise **Room scene** (or **No scene** while the room is on none), or
+**Off**. A chevron beside the name marks the line as one that opens. Tapping
+the line opens the lamp's own scenes and brightness beneath
+it. This uses the same fold as the room's drawer, and only one drawer is open
+at a time. A lamp's press is the lamp's. Its scene is claimed on its own line
+and never rings the room's strip, which matters because the two often share
+scene names.
+
+`previous` and `ended_by` come from `hue_active_scene` 0.6.0. While the room
+is lit and on no scene, the title bar says **Was Dimmed** and the room's strip
+rings Dimmed in a dash. The dash is not a claim that Dimmed is selected. It
+marks the one press that puts the room back. When the scene was ended by
+something other than one of the card's own lamps, that is named too:
+**Was Dimmed · Upstairs**. A lamp is recognised by its `group` (the Hue
+zone's name, which the sensor reports as `group_name`) or its `name`. A room
+that is switched off shows **Off** and rings nothing, because someone
+switching a room off is not a lost scene.
+
+Only a zone whose bulbs all sit in one room belongs here. A zone that
+crosses rooms has no single room to sit in. It gets a card of its own, and
+the rooms it touches name it through `ended_by`.
+
 ### `lock` — is it shut, and what do I do about it?
 
 ```yaml
@@ -933,15 +1249,269 @@ later. The spinner is what covers that gap.
 Urgency rides the card's `outline`, not the title accent: plain when
 locked, then amber and red as the Needs-you row escalates.
 
-### `people` — who is in, who is out, and who nobody can say
+### `camera` — what is that room doing right now?
 
 ```yaml
 body:
-  type: people
-  rows:
-    from: {entity: sensor.household, attribute: people}
-    each: {name: {field: name}, state: {field: state}, since: {field: since}}
+  type: camera
+  picture: {entity: camera.rileys_room_camera_fluent, attribute: entity_picture}
+  refresh: 10                      # seconds between stills; default 10, floor 3
+  privacy: {entity: switch.rileys_room_camera_privacy_mode}
+  night: {entity: sensor.rileys_room_camera_day_night_state, map: {night: true}, default: false}
+  detections:
+    - name: Person
+      icon: mdi:account
+      on: {entity: binary_sensor.rileys_room_camera_person}
+      since: {entity: sensor.camera_sightings, attribute: sightings,
+              key: [binary_sensor.rileys_room_camera_person, since], format: relative}
+  live:                            # what the sheet streams; an address, not a value
+    fluent: camera.rileys_room_camera_fluent
+    clear: camera.rileys_room_clear  # optional; adds Low / High
+  ptz:                             # optional; button entities
+    left: button.rileys_room_camera_ptz_left
+    right: button.rileys_room_camera_ptz_right
+    up: button.rileys_room_camera_ptz_up
+    down: button.rileys_room_camera_ptz_down
+    stop: button.rileys_room_camera_ptz_stop
+    home: button.rileys_room_camera_guard_go_to
+  toggles:                         # optional; switches in the sheet
+    - {name: Privacy, icon: mdi:eye-off-outline, on: {entity: switch.rileys_room_camera_privacy_mode},
+       on_text: Lens shut, off_text: Lens open}
 ```
+
+The card is the room as a still, and what the camera has noticed with
+when it last did. Tapping the picture opens the **live sheet**: the stream,
+a direction pad and the camera's switches. Nothing on the card is a job,
+so it takes no level; the controls are optional and live one tap away.
+
+**The still is the card's, not the body's.** A card repaints whenever
+anything it reads changes, and a camera card reads motion sensors that
+flip all day. An `<img>` in the markup was rebuilt by every one of those
+paints, went black and fetched again. So the body draws an empty frame
+and the card puts the same element back into it after every paint, loading
+each new frame off-screen and swapping it in whole. Fetching stops while
+the tab is hidden or the sheet is open. A fresh picture carries no time;
+one the camera has stopped replacing says how old it is, so a room that
+looks quiet is not mistaken for a room that is quiet now.
+
+**`since` is when it last saw something, not when its sensor last moved.**
+A detection sensor's `last_changed` moves whenever the camera goes into
+privacy mode and out again, reloads or restarts, so reading it said
+"Crying 5s ago" in a house where nobody had cried. `home_signals` keeps
+`sensor.camera_sightings`, which writes down only a sighting starting and
+ending and holds it across restarts. A detection that has never fired has
+no time at all, and the chip is its name alone.
+
+**Privacy fetches nothing.** With the lens shut the picture is replaced by
+a plain panel saying so, and no request is made at all.
+
+**An active detection wears the card's accent, not a level.** Crying
+fills teal on a Security card, the way an active state does anywhere else.
+It is not yet a `Needs you` row, because a level is a promise and the
+camera's hearing has not been tested against this house. When it has, the
+level belongs in `home_signals`, with the row and the rail button.
+
+**Live is WebRTC first.** The sheet asks Home Assistant for a WebRTC
+session (`camera/webrtc/offer`, the same API Home Assistant's own player
+uses), which go2rtc serves without re-encoding: smooth, with the room's
+sound, muted until somebody taps *Sound*. If the camera offers no WebRTC,
+the session fails, or nothing has arrived after twelve seconds, it falls
+back to the MJPEG stream, which is a still fetched over and over, a couple
+of frames a second and silent, and says so under the picture. The sheet
+opens on *Low* (`fluent`); *High* switches to `clear`. The buttons say Low
+and High rather than the camera's own names for its two streams. While the sheet is up
+the card does not repaint, because a repaint takes the sheet off the page
+for a moment and a `<video>` taken off the page stops; state changes are
+handed to the sheet instead.
+
+**The live view is the whole screen**, black in both themes. A card that
+opens one says so with a symbol beside its title (`BODY_EXPANDS`), and the
+symbol opens it as the picture does. The bar along the top carries close,
+the camera's name, the zoom, and the stream it is playing, Low or High, as
+a pill that swaps it on a tap.
+
+It lays itself out for how the screen is held. A wall panel has the
+controls in a column beside the picture, with the bar laid over the
+picture's top. A phone held upright has the bar *above* the picture, where
+laid over it the close button sat on the top of the room, and the
+controls underneath. A phone turned sideways gives the picture the whole
+screen, the bar fading over its top, and the controls become a drawer
+opened from the bar. Escape closes the view.
+
+**Turning the phone does not close it.** The panel moves every card into
+its side layout when a phone turns wide enough, and a moved card is off the
+page for an instant. The view used to take that as the card going away and
+closed on every rotation to landscape. It now waits a moment
+(`CAMERA_LEAVE_MS`), keeps the view and its stream for a card that comes
+straight back, and restarts the video a browser pauses when it leaves the
+page. A card really taken away still closes its stream.
+
+**Pinch to zoom.** Two fingers zoom about the point between them, one
+finger drags a zoomed picture around, a double tap zooms in or back out,
+and a mouse wheel works on a desktop. The picture is never let go of an
+edge, and a label says how far in it is; tapping it goes back to the whole
+room. Zoom is only zoom: it never changes the stream. *Low* or *High* is
+the choice of whoever is holding the panel, and for a close look *High*
+is the one with the detail in it. Switching keeps the zoom, and the new
+stream is laid under it while the old one is still showing, so the room
+never drops to black.
+
+**Hold to move.** A Reolink keeps turning after a move until it is told
+to stop, so the pad sends the direction on press and `stop` on every way a
+press can end: lift, cancel, the pointer escaping, and the sheet closing.
+The middle button goes to the saved home position.
+
+**No siren.** The camera has one, and it is left off on purpose: one stray
+press in a bedroom at night costs more than the button could ever earn.
+
+**Any camera, not this one.** Nothing here knows it is a Reolink. The next
+camera is another card with different ids, and a Frigate camera adds
+`frigate` (below).
+
+### Frigate on the camera card
+
+```yaml
+body:
+  type: camera
+  picture: {entity: camera.front_gate, attribute: entity_picture}
+  live: {fluent: camera.front_gate}
+  detections:
+    - {name: Car, icon: mdi:car, on: {entity: binary_sensor.front_gate_car_occupancy}}
+    - {name: Person, icon: mdi:account, on: {entity: binary_sensor.front_gate_person_occupancy}}
+    - {name: Parcel, icon: mdi:package-variant-closed, on: {entity: binary_sensor.front_gate_package_occupancy}}
+  frigate:
+    camera: camera.front_gate     # a camera the Frigate integration made
+    hours: 12                     # the card's strip; default 12
+    labels: {vehicle: Car}        # optional; rename a group
+outline: {entity: sensor.camera_status, attribute: cameras, key: [front_gate, level]}
+```
+
+With `frigate`, the card also reads what Frigate made of the camera: its
+**review items**, each a stretch of time when something was seen, as an
+alert or a detection. The card draws the last `hours` as a strip, one mark
+per review, coloured by what it was; the latest review in Frigate's own
+words; and the newest four as pictures. Tapping a picture, or the latest
+review, opens the live view playing it.
+
+The live view gains a **timeline**, one lane per thing seen over 1, 6 or
+24 hours, with what was recorded shaded under it; filters by what was seen
+and alerts alone; a search over Frigate's descriptions; and the reviews as
+a list. Tapping a review plays it in place of the live picture, with five
+seconds either side, Frigate's description of the scene, what it
+recognised (a known face, a known plate), the zones it went through, and
+a download. Tapping the timeline away from any review plays the recording
+from there. **Back to live** stops the recording and starts the stream.
+The live stream stops while a recording plays: two streams from one
+camera over one tunnel is bandwidth spent on a picture nobody sees.
+Watching a review marks it reviewed in Frigate, and there is **Mark
+reviewed** for the rest of the list. That is optional, never a job.
+
+**Everything comes through the Frigate integration**, through the
+websocket commands its own media browser uses (`frigate/reviews/get`,
+`frigate/reviews/subscribe`, `frigate/recordings/get`,
+`frigate/reviews/viewed`), and the pictures and recordings through its
+proxy (`/api/frigate/<instance>/clips/…`, `…/recording/…`), signed so an
+`<img>` or a `<video>` can load them. The card needs no Frigate address or
+password, and works over Nabu Casa. The instance and Frigate's name for the
+camera are read off the camera entity's `client_id` and `camera_name`;
+`instance` and `name` set them outright.
+
+It is pushed, not polled: the integration's review subscription refetches
+within a couple of seconds of anything at this camera, and a refetch every
+minute covers a lost push. A Frigate that never answers says so on the
+card. One that stops answering keeps what it last said.
+
+**Alert and detection are weight, not colour.** An alert is outlined in
+ink. The marks wear decorative accents (person plum, vehicle teal, parcel
+slate, animal moss, anything else bone) and never a level: a car on the
+drive is a fact. The two things a camera sees that *are* jobs, a parcel
+left in view and a camera that has stopped, are rows in
+`home_signals`' `sensor.camera_status`, and the card takes its `outline`
+from that sensor's entry for this camera, as above.
+
+`tools/checkfrigate.js` holds all of it, against a stubbed integration.
+
+### `visits` — what came by today?
+
+```yaml
+type: custom:spectra-card
+title: Today at the gate
+tasks: {card: visits, tab: security}
+body:
+  type: visits
+  frigate: {camera: camera.front_gate, labels: {vehicle: Car}}
+  counts: [vehicle, person, package]   # default
+  summary: true                        # optional; or {script: script.gate_day}
+```
+
+A day at one camera, as facts: how many of each thing came by, a bar for
+every hour coloured by what was busiest, and the day's alerts in order with
+any known face or plate beside them. It reads the same reviews the camera
+card does, so it takes no fetch of its own when both are on one panel.
+
+`summary` adds **Summarise the day**, an optional button. By default it
+asks Frigate itself (`frigate.review_summarize`), which writes the report
+with the same model that described each review, so the words stay on the
+machine Frigate's model runs on. Frigate's report covers every camera on
+purpose: it relates an alert at the gate to what the other cameras saw at
+the same moment. `{script: …}` sends the day's reviews as text to a script
+instead, which answers `{text}`. Either way it is an AI task, blue while it
+runs and when it lands. The report is Markdown; the card reads it as plain
+words.
+
+### `people` — who is in, who is out, and who nobody can say
+
+```yaml
+meta: {count: [person.morgan, person.casey], state: home, suffix: " home"}
+body:
+  type: people
+  rows:                               # one per person; leave anyone out by not listing them
+    - name: Morgan
+      state: {entity: person.morgan}
+      picture: {entity: person.morgan, attribute: entity_picture}
+      since: {entity: sensor.people_status, attribute: presence,
+              key: [person.morgan, since], format: since}
+  places:                             # optional; a zone's name → badge icon and sketch
+    Work: {icon: mdi:briefcase, art: office}
+    Allotment: {art: none}
+```
+
+Each person is a **drum**, the way the washer is: a soft track, a band in
+the state's colour, a paper face with their photo or initial, and a small
+circle on the rim saying where they are. The tile itself stays plain
+whatever the state. It used to be washed green for home, and two green
+tiles beside the one that needed a look made the good news the loudest
+thing on the card.
+
+Behind each ring is a **sketch of the place**, drawn the way an architect
+sketches: straight ink lines that overrun their corners, loose washes that
+miss their edges, fading out before the words. The ring sits on a clean
+halo of the tile's own ground, so none of the drawing shows inside it.
+
+| Where | Badge | Sketch |
+| --- | --- | --- |
+| `home` | `mdi:home` | `house` |
+| any other zone | `mdi:map-marker`, or `places.<zone>.icon` | `plan` (a site plan with a pin), or `places.<zone>.art` |
+| `not_home` | `mdi:walk` | none — out is not a place |
+| unknown | `mdi:help` | `fog` — a drawing never finished |
+
+Sketches are `house`, `office`, `plan` and `fog`; `art: none` turns one
+off. `places` keys match the zone's name as the person entity reports it,
+case-insensitively. A row can also carry `icon` to override its badge.
+
+The sketches are a **depiction**, like `--sp-sun`: slate, lawn and sky,
+and never yellow, orange or red, which belong to the levels. The ink is
+`--sp-ink`, so it turns light on a dark panel, and the washes step back
+further than the ink does there.
+
+`since` comes from `home_signals`, not from the person. A person's own
+`last_changed` is reset by every Home Assistant restart, so reading it
+told the panel everybody had just walked in. `key` picks one entry out
+of an attribute that holds a map; it is a list so an entity id, dot and
+all, can be one step.
+
+The meta counts **the people on the card**, not `zone.home`. The zone
+counts everybody in the house, including anyone deliberately left off.
 
 **Home is the moss role, not the card's accent.** Three states means
 three *meanings* — in, out, no idea — and a meaning wears a role colour
@@ -954,13 +1524,14 @@ that is not this house. "Unknown" is the *absence* of a reading: the
 trackers have gone quiet and nobody knows anything at all. Drawn alike,
 the second reads as the first, and the card ends up telling you somebody
 went out when it does not know that and cannot know it. So out is grey
-and unknown is ochre, the warning role, because the thing to do about it
-is not to expect them home — it is to find out why the tracker stopped
-reporting.
+and unknown is ochre, the attention level, because the thing to do about
+it is not to expect them home — it is to find out why the tracker stopped
+reporting. That is a job, so it has a `sensor.people_status` row, and on
+the tab that owns it the card takes `outline` from that sensor's `level`.
 
-The unknown circle is also drawn as a **dashed ring rather than a fill**.
-A gap in the line says *missing* in a way no solid shape does, and it
-still says it to somebody who cannot tell the ochre from the grey.
+The unknown ring is also drawn **dashed rather than solid**. A gap in the
+line says *missing* in a way no solid shape does, and it still says it to
+somebody who cannot tell the ochre from the grey.
 
 **The colour follows the state, never the label.** `status` can override
 the words on a tile, and the one way this rots is a tile reading
@@ -996,7 +1567,17 @@ body:
     icon: mdi:microphone             # optional
     agent: ai_task.google_gemini_2_5_flash_lite   # optional; the script decides otherwise
     max_seconds: 15                  # optional; the cap on one take
+  add:                               # optional; a box to type onto the list
+    placeholder: "Friday: Pizza"
+    preview: meal_routine            # optional; reads each line back as the routine script will
 ```
+
+**`add` is a box to type onto the list**, for a list that is written
+rather than said. Enter or **+** calls `todo.add_item` on `list`. With
+`preview: meal_routine` each line is read back as it is typed, the way
+`script.meal_routine_apply` will read it: "Fills dinner on Friday with
+Pizza, when nothing else is planned." A line the script would ignore (no
+colon, or no day) says how to write one and is not added.
 
 **This is the one card control that finishes something, and it is allowed
 for a reason.** The house rule is that jobs live in `Needs you`, because a
@@ -1241,6 +1822,8 @@ body:
   state: {entity: sensor.washing_machine}          # off | idle | running
   powered: {entity: sensor.washing_machine, attribute: powered}
   leak: {entity: sensor.washing_machine, attribute: leak}
+  leak_alarm: {entity: sensor.washing_machine, attribute: leak_alarm}
+  wet_since: {entity: sensor.washing_machine, attribute: leak_since}
   machine: mdi:washing-machine       # idle; a dryer sets mdi:tumble-dryer
   machine_off: mdi:washing-machine-off
   door_open: {entity: sensor.washing_machine, attribute: door_open}
@@ -1313,6 +1896,19 @@ Tumble and spin are both the drum going round, so they differ in form
 rather than direction: `mdi:sync` (two arrows opposed — the drum reverses)
 against `mdi:rotate-right` (one arrow, flat out). Mirror images were the
 obvious pair and the worst one; at 17px, handedness is not a difference.
+
+**A dishwasher has a fifth: `wash`.** Its draw says only *element* or
+*pump*, so it reports `heat` and `wash` and nothing else. `wash` is drawn
+rather than borrowed, because no icon set has a spray arm and a droplet
+turning round only ever read as a droplet turning round: a bar with three
+faint jets fanning up from it, and drops riding the jets upward, two to a
+jet half a beat apart. Rising is the point — the fill's drop falls, so the
+two can never be confused. Still or finished, the drops rest part-way up
+their jets, so it stays a spray. It is not tumble: a dishwasher card saying *Tumbling* would be
+the dryer wearing a washing machine all over again. Configure it as any
+washer body with `machine: mdi:dishwasher` and `machine_off:
+mdi:dishwasher-off`, and leave out `pending`, `leak` and the `hanging`
+field — it has none of them.
 
 **`cost` is the one figure that earned a chip back.** There is no wattage
 chip, because the draw is already in the card's `meta` and a card does not
@@ -1402,6 +1998,16 @@ other.** A leak pad stays damp long after the floor has been dealt with, and
 the cycle still has to be finished, so a wet sensor must never make the card
 claim the machine is off while somebody is standing in front of it.
 
+**A wet pad is an alarm only until somebody acts on it.** `leak` is the
+pad; `leak_alarm` is whether that is still news. Switching the plug back on
+over a wet pad is a person who has looked at the floor deciding to finish
+the wash, so from then on the card shows the cycle — no "Leaking", no water
+drum, no red. The `Sensor wet` chip stays, at **attention**: the cutoff
+fires only on the pad *going* wet, so until it dries a second leak would cut
+nothing. `home_signals` raises a matching attention row. Leave `leak_alarm`
+out and every wet pad is an alarm, as before. With `wet_since`, the chip says how long
+rather than when — `Wet for 12m` — and counts up by itself.
+
 **Colour says which machine; the glyph says what is happening.** It was
 the other way round, and the cost was that a washer and a dryer sitting
 one above the other were tellable apart only while both were idle — the
@@ -1450,7 +2056,8 @@ identity the first time.
 | washing waiting | the count | **attention** |
 | full drum | `mdi:basket-unfill` | **attention** |
 | **no power** | `machine_off` | **waiting, on every machine** |
-| **leak** | `mdi:water` | **critical, on every machine** |
+| **leak** (`leak_alarm`) | `mdi:water` | **critical, on every machine** |
+| wet, power restored since | whatever the cycle is | the card's accent; `Sensor wet` chip at attention |
 
 **Two exceptions, and only two.** A leak and a dead plug have to catch the
 eye *before* anybody reads a word, so they keep their roles everywhere.
@@ -1495,6 +2102,637 @@ the machine has no power: a circle with a power glyph, on a card that also
 has a power button, reads as a second button — and the first thing anyone
 did with an earlier draft was try to press it. Off is a struck-through
 machine on a broken ring.
+
+### `softener` — how much salt is left in each side, and is that still true?
+
+Two salt blocks, each drawn inside the outline of its tank.
+
+```yaml
+body:
+  type: softener
+  sides:
+    - label: Left
+      level: {entity: sensor.my_water_softener_salt_left_side_percentage}
+      days: {entity: sensor.my_water_softener_salt_left_side_time_remaining}
+    - label: Right
+      level: {entity: sensor.my_water_softener_salt_right_side_percentage}
+      days: {entity: sensor.my_water_softener_salt_right_side_time_remaining}
+  read_at: {entity: sensor.my_water_softener_last_update}   # a raw timestamp
+  stale_after_hours: 54                                      # the default
+```
+
+**A block loses height, not size.** Salt dissolves from the top down, so
+the block keeps its width and depth and gets shorter. Scaling it evenly was
+tried first. It made a low block look like a far-away one, and the empty
+side, drawn as an outline of a full block, was the biggest thing on the card.
+
+**Empty is crumbs.** At 0% the tank holds the last few fragments. A side
+with no reading at all draws an empty tank with nothing in it, and its line
+says `No reading`. No reading is not the same as no salt.
+
+**The tank is drawn so the space means something.** Without it, the room
+above a low block is blank card, and the two sides only look the same size
+while both hold similar amounts.
+
+**The view** is turned 20° and looks down 14°. At 45° both faces of the
+block are the same width and neither leads. Looking further down makes the
+top face the largest thing in the drawing, and the top is not what changes.
+
+**`read_at` is when the salt was read, not when Home Assistant heard.**
+The softener reports once a day, and the reading arrives anything from a few
+hours to most of a day later. So the line says `Read 7h ago · 12:04`, which
+is how old the figures are. It goes hollow and says `No new reading · last …`
+only after `stale_after_hours`. The default of 54 is a daily reading plus
+the longest lag seen, which was nearly 23 hours. At 26 the line went hollow
+every other day on a softener that was working.
+
+A missed reading is a fact and not a job, so it never takes ochre. **The
+card's outline is the dashboard's to set** through `outline`, and only while
+the salt row is in Needs you. The body paints no level of its own.
+
+### `meals` — what are we eating this week?
+
+A row per day, a slot per meal, read from and written to
+[Mealie](https://mealie.io) through Home Assistant's Mealie integration.
+
+```yaml
+body:
+  type: meals
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 7}   # Mealie's config entry id
+  days: 7
+  types: [dinner]                                     # or [breakfast, lunch, dinner]
+  say: {script: script.meal_plan_say}
+  shop: {script: script.meal_ingredients_to_items, list: todo.phoenix}
+  pick: {script: script.meal_plan_pick}
+  move: {script: script.meal_plan_move}
+  week: {script: script.meal_plan_week}
+  shop_week: {script: script.meal_week_to_items, list: todo.phoenix}
+  recipes:
+    save: home_signals.save_recipe
+    delete: home_signals.delete_recipe
+    dictate: script.meal_recipe_from_speech
+```
+
+**Days run down, not across.** A calendar app lays a week out in seven
+columns. On a card a third of the panel wide, that leaves each dinner about
+fifty pixels, enough for "Sea". One row per day keeps the whole name, and
+the name is the only thing on the card anybody reads.
+
+### Today, at a glance
+
+`layout: today` is the read-only summary for a Home tab: today's meals, one
+line each, with the recipe's photo beside it (`images: true`). A meal with
+no photo — a note, or a recipe Mealie has no picture for — shows its
+type's icon, so the column of pictures has no gaps. With nothing planned
+today the card stays and says **Nothing planned today** (`empty:` changes
+the words) -- an unplanned day is worth knowing about. Planning stays on
+the full card.
+
+```yaml
+body:
+  type: meals
+  layout: today
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 1}
+  types: [breakfast, lunch, dinner, snack]
+  images: true
+```
+
+`tools/checkmealtoday.js` pins it.
+
+### The grid: a column per day, a row per meal
+
+`layout: grid` lays the plan out the way a calendar does. It suits two
+shapes, a card on Home for today and tomorrow and a card on a tab of its
+own for the whole week:
+
+```yaml
+# Home: today and tomorrow, every meal
+body:
+  type: meals
+  layout: grid
+  days: 2
+  types: [breakfast, lunch, dinner, snack]
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 2}
+
+# Kitchen: Monday to Sunday, this week or next
+body:
+  type: meals
+  layout: grid
+  start: monday
+  types: [breakfast, lunch, dinner, snack]
+  plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}   # this week and next
+  pick: {script: script.meal_plan_pick, types: [lunch, dinner]}
+  week: {script: script.meal_plan_week, types: [dinner]}
+  # ...and say, shop, move, shop_week and recipes as above
+```
+
+- **The rows come from `types`, in the order given.** Each has its own icon.
+  Mealie's `side`, `dessert` and `drink` work too.
+- **An empty cell is a faint plus, not words.** On a Monday morning most of
+  the week is empty, and twenty-eight "Nothing planned"s would be the
+  loudest thing on the card.
+- **Today's column is tinted.** The meal due next today wears the accent
+  and says **Up next**, by the clock: breakfast until 10:30, lunch until
+  14:30, snack until 17:00, dinner until 21:00.
+- **A meal with no recipe behind it is set in italics.** It is still a
+  meal, but it has nothing to open or shop for.
+- **A tapped cell opens its controls under the grid**, headed with the
+  day, the meal and its name. A tray inside a cell a seventh of the card
+  wide would be all wrapping.
+- **`start: monday` shows Monday to Sunday**, with a **This week / Next
+  week** switch and a count of how full the week shown is. Days that have
+  gone are faded. They can be opened to read the recipe, but not planned.
+  A move onto one is ignored. `plan` needs `start: monday` too, and
+  `days: 14` so that next week is already there when the switch is
+  pressed.
+- **A narrow card shows one day at a time.** Seven columns on a phone
+  would leave each meal forty pixels, so under 700px the week becomes a
+  strip of days, each with a dot per meal planned, above that day's meals
+  as rows. The card's own width decides, through a container query,
+  because a card cannot know how wide it is until it has been laid out.
+- **Fill empty days asks which meals**, starting with those in
+  `week.types` (dinner when that is not set), and plans one kind at a
+  time. It covers the days shown that have not gone, and sends them to the
+  script as `start_date` and `days`. **Shop for the week** covers the same
+  days.
+- **`pick.types` limits Pick one** to the meals it makes sense for. A
+  random dinner is a fair suggestion for lunch, but not for breakfast.
+
+### Planning with the card, not at it
+
+Four optional keys turn the card from a view of the plan into a way to
+make one. Each needs a script that answers in a fixed shape:
+
+```yaml
+  place: {script: script.meal_plan_set}          # puts one meal in one slot
+  write: {script: script.meal_recipe_from_name}  # drafts a recipe for a name
+  fridge:
+    save: home_signals.save_photo                # keeps the photo for the AI
+    script: script.meal_fridge_ideas             # suggests meals from it
+```
+
+**One button plans; everything else is a fact or a menu.** The card's
+controls follow the patterns people already know from a photo gallery or
+a mail app:
+
+- **Plan** is the one button on the week's bar. It opens the Plan sheet
+  for whatever is in hand: one slot, the meals selected, or, with nothing
+  selected, the empty meals of the week shown.
+- **Tap opens, hold selects.** Tapping a planned meal opens it; tapping an
+  empty day ahead goes straight to Plan for that slot. Holding any meal
+  down (or right-clicking it) starts selecting, with that meal ticked.
+- **Actions follow the selection.** While meals are selected the week's
+  bar becomes the selection's bar, with the same verbs every time.
+- **⋮** holds the whole-week things and this device's settings.
+
+The week's bar, at the top of the week:
+
+| Control | Shown when | Does |
+| --- | --- | --- |
+| **‹ This week ›** | `start: monday` | the week shown, and how full it is (*9 of 28 planned*) |
+| **Plan** | any of `week`, `sentence`, `ideas` or a recipe box with `place` | opens the Plan sheet |
+| **⋮ → Add the week to shopping list** | `shop_week` is set | every planned recipe's items combined, on the review sheet |
+| **⋮ → Prep for the week** | the week has prep | the week's prep sittings; says how many meals are not in one |
+| **⋮ → Select meals** | `place` is set | starts selecting with nothing ticked |
+| **⋮ → Recipe box** | `recipes` is set | the whole box, by name |
+| **⋮ → Meals shown here** | more than one meal type | which meals this device shows |
+
+**The Plan sheet** has a tab for each way of planning. Each tab is shown
+only when its script is set, and the last one used is remembered:
+
+| Tab | For several meals | For one slot |
+| --- | --- | --- |
+| **Suggest** | `week.script` with `suggest: true`, the meals chosen and **Anything to bear in mind?** (typed, or hint chips like *Quick* or *No fish*). **Use what's in the fridge** takes up to four photos first (`fridge.save`, then `fridge.script`) | `ideas.script`: a few ideas for that slot, one tap to plan |
+| **Describe** | the week in a sentence, said or typed (`sentence.script`) | said or typed (`say.script`, with `transcript`, `date` and `entry_type`) |
+| **Choose** | tick recipes in the box; `arrange.script` places them sensibly. With meals selected, one recipe goes into all of them | the box, headed with the slot, plus quick notes: *Leftover fajitas*, *Takeaway*, *Eating out*, *From the freezer*. Opened from Change, **Keep … too** adds the recipe beside what is there |
+| **Copy** | the same meals as last week, or two weeks ago | — |
+
+**Nothing for several meals is written unseen.** Suggest, Describe, Choose
+and Copy all end on **Suggested meals**: each row says whether it is a
+saved **Recipe** or only an **Idea**, can be unticked, moved to another
+day (onto a planned day, the two swap) or asked again (the circular
+arrow sends `avoid` with everything already listed). **Plan N meals**
+sends each row to `place` with `only_if_empty: true`, because the plan
+may have changed while the list was being read. One slot is planned
+straight away, with Undo.
+
+A photo is shrunk to 1600px on its long edge and sent as a JPEG before
+anything else happens. A websocket message is limited to a few
+megabytes, and a model reads a fridge no better at twelve megapixels.
+
+**The slots come from `days` and `types`, not from the plan.** A day with
+nothing planned still has its slot, as a faint plus, so the card never
+hides itself just because the week is empty. It stands down only while
+the plan has not arrived yet.
+
+**Tap a planned meal to open it.** Under the week, what it is, and the
+same verbs the selection's bar uses, each shown only when it has
+something to do:
+
+| Control | Shown when | Does |
+| --- | --- | --- |
+| **Open recipe** | the meal is a recipe | opens it on a sheet over the card. Set `recipe: false` to hide it |
+| **Change** | `place` and a way to plan are set | the Plan sheet for this slot |
+| **Add to shopping list** | the meal is a recipe and `shop` is set | `shop.script` reads the recipe; its items go on the list's review sheet |
+| **Prep** | the recipe has prep not yet planned | the prep sheet for this meal |
+| **Write a recipe** | the meal is only a name and `write` is set | `write.script` drafts a recipe; the edit form opens under **Check the recipe, then save**, and the slot is pointed at it once saved |
+| **Move** | `move` is set | the card asks for a day; tap one and `move.script` moves the meal there, swapping if that day was planned |
+| **Clear** | always | deletes the meal, with Undo |
+
+**Selecting several.** Hold a meal down, or ⋮ → Select meals. Every meal
+from today on has a checkbox, and so does each day's heading and each
+meal's row label, which select the whole day or every dinner. The bar
+counts them (*5 selected · 3 empty*) and offers:
+
+| Control | Does |
+| --- | --- |
+| **Plan** | the Plan sheet for the selection; only the empty ones are filled |
+| **Add to shopping list** | `shop_week.script` with the selected meals' `slots` |
+| **Move** | with exactly one planned meal selected: asks for a day |
+| **Clear** | clears the planned ones, with one Undo for the lot |
+| **×** | stops selecting |
+
+The selection's bar is the week's bar in place, at the same height, and a
+day's checkbox sits beside its name, so selecting moves nothing.
+
+**On the panel's grid, drag a meal to another day.** A mouse drags as soon
+as it moves. A finger holds, then keeps moving; let go without moving and
+the meal is selected instead. Dropped on a planned day, the two swap.
+
+A whole-week answer ("3 days planned") is written on the week's bar,
+because it belongs to no one day. On a phone that line can be a screen
+away from the button that asked, so when it is out of sight the answer
+is also shown for a moment at the bottom of the screen.
+
+**On a phone, swipe between days.** The one-day view takes a sideways
+swipe as the next or previous day. Only a mostly-sideways one, so a
+scroll down the page that drifts is still a scroll.
+
+**A wall panel goes back to today.** Two minutes after the last touch,
+with no sheet open, nothing being typed and the mic idle, an open slot
+shuts, the menu and any selection close, Next week goes back to This
+week and the chosen day goes back to today. The next person to look
+expects today.
+
+### Prep ahead
+
+Needs home_signals 0.15 (`sensor.meal_prep`, and `prep` noted in place on
+recipes). Nothing to configure: with the sensor present, a meals card
+shows prep, and without it, it shows none.
+
+**A recipe sheet is its sections, one after another**: Ingredients, then
+the method as **Prep** and **Cook**, each a section of its own opening with
+a band in its colour, in the recipe's order (where prep sits in the middle,
+the sections repeat: Cook, Prep, Cook). A recipe with nothing to prep has
+one **Method** section. Prepping is optional and the method is never
+reordered; within each section are the recipe's titled groups of steps
+(*The chicken*, *The sauce*, *To finish*) from Mealie's own section titles.
+
+Three signs, said once in a key at the top of the recipe and used by icon
+alone after that:
+
+- **Prep** (knife, teal) and **Cook** (flame, the card's accent) are what
+  kind of work a step is. Every step's number wears its phase's colour;
+- **If made ahead** (the clock, in no phase's colour) is only ever an
+  option, never assumed. Beside a group's title it says how far ahead that
+  group can be made, what it needs and where it keeps ("Up to 3 days ahead
+  · Fridge"), the clocks aligned down the right-hand side. After a group's
+  steps, as one more step with the clock where its number would be, are the
+  lines that only apply when it is made ahead, each with the icon of the
+  phase it happens in: how to keep it (knife: "Cover and chill") and what
+  that changes when cooking (flame: "Take it out 20 mins before grilling",
+  "Reheat the sauce"). The same-day cook skips them.
+
+**Doing ahead belongs to a group, not a step**, and a group can be a single
+step. A group made ahead is used when cooking, never only by another group
+made ahead: the onion chopped for a sauce is part of the sauce, and keeps
+as the sauce does. A step that is part ahead and part cooking is two
+halves: *5a* in its Prep group, and *5b* at the head of the next Cook
+section, where it is cooked (the halves stay together, the second with the
+flame, when no Cook section follows). A group only partly done ahead (an older
+split) says which steps.
+
+Cooking shows the group beside the step count (*Step 3 of 8 · The sauce*),
+in either version. A recipe with no titles still groups what can be done
+ahead, named by its steps.
+
+**Cook asks "Did you prep ahead?"**, unless Home Tasks already knows the
+sitting was done. *Yes* starts at the first cook step with the prep shown as
+done; *No* cooks the whole method in order. The form's **No prep / Some
+ahead** and per-step **Prep ahead / At cook** save the notes without
+touching the method. An older split, with its prep moved first, still reads
+in its two halves.
+- **Each meal with prep says so, as a fact**, with the clock: *Prep Mon 19:30*, *Prepped*
+  or *Prep not planned*. The open slot's tray adds a line and a **Prep**
+  tile.
+- **Prep** (a meal) shows each part's window and offers, in order: joining
+  a sitting already on Home Tasks, the house's prep times, or any time. A
+  part the time cannot serve is left to the day, and the sheet says why.
+- **Prep N meals** in the week's bar is offered while any meal's prep is
+  not in a sitting. It packs the week into the fewest sittings the windows
+  allow, each one Home Tasks item; every row can be moved. It replaces the
+  tasks made meal by meal.
+- **The plan keeps the prep honest.** A meal moved takes its prep with it;
+  a meal cleared takes it off the task; Undo on the meal brings it back.
+- **Cooking knows.** Prepped, Cook starts at the first cook step; not, the
+  prep comes first with what that costs, and **Skip the prep**.
+- **Shop for the week** says the shopping is needed by the first sitting.
+- **Home Tasks** shows a due time on an item that has one, and only then.
+- **Times** in the week's prep sheet edits when meals are eaten and when the
+  house preps (days and a time for each), kept by home_signals.
+
+The job itself -- prep due today, or late with the meal still ahead -- is
+a `Needs you` row raised by home_signals. It belongs to the Kitchen, so the
+meals card's `outline` reads `sensor.needs_you` `card_meals` and the rail
+button's `accent` and `fill` read `tab_kitchen`, as every other tab does;
+the card draws no level of its own.
+
+With `import.split`, **From a link** waits for the split after saving and
+shows it once, as the sheet will: **Looks right**, **No prep** or **Edit**.
+
+### Where a recipe came from
+
+A small mark at the end of a step says AI had a hand in it, and which kind:
+
+| Mark | Icon | Meaning |
+| --- | --- | --- |
+| Interpreted | `mdi:eye-outline` | read from a page, video or photo by AI |
+| Created | `mdi:creation` | written by AI, with no source |
+| Enhanced | `mdi:auto-fix` | added to by AI: a split half, an *If made ahead* line |
+
+Tapping a mark says who and when (*Enhanced by Claude Sonnet 5 · 28 Sep*).
+A step a person rewrites loses its mark. **About this recipe**, folded at
+the foot of the sheet, has where it came from and when it was added, and a
+line for everything AI did to it: read, written, split, tagged. It all
+comes from the recipe's `provenance` in the home_signals index, and a
+recipe with none shows no marks and no About.
+
+### Recipe photos
+
+```yaml
+  images: true      # on a meals or a recipes body
+```
+
+With `images: true`, a recipe that has a photo in Mealie shows it: across
+the top of its grid cell, beside its name in the one-day view and the
+recipe box, and at the top of the recipe sheet. A recipe with no photo has
+no picture rather than a grey box. The photos come through
+[`home_signals`](https://github.com/silverShnoop/ha-home-signals)
+(0.12.0 or later), which serves `/api/home_signals/recipe_image/{id}/{size}`
+from Mealie. The card signs each address with `auth/sign_path`, because an
+`<img>` cannot send a token. Signed for an hour and re-signed after fifty
+minutes, so a panel left up all day keeps its pictures. A photo that fails
+to load removes itself.
+
+### Cooking, a step at a time
+
+A recipe sheet with a method has **Cook**. It shows one step in large type,
+**Step 2 of 6** with a bar of progress, **Back** and **Next** (or a swipe),
+and **Ingredients** a tap away above the step rather than a scroll away.
+Where the browser allows it the screen is kept on while cooking. **Done**
+goes back to the whole recipe.
+
+**The recipe is fetched when it is opened**, not with the plan. A week of
+recipes is a lot to carry for the one that gets read, and the sheet is
+written for reading at the hob: bigger type than the card, and scrolled
+inside the sheet so a long method never pushes Close off the card.
+
+**Every sheet covers the screen, not the card.** A card on Home is a third
+of the panel wide, and a sheet the size of the card spilled over its
+neighbours. So sheets are laid over the whole screen, and on a phone they
+rise from the bottom. They are sized to what the keyboard leaves (the
+visual viewport), and Save and Cancel stay pinned at the bottom of the
+sheet, so a keyboard never hides the button that finishes the form. On a
+touch screen a form does not focus its first field by itself: a keyboard
+that jumps up over the thing just opened is not an invitation to type.
+
+**Writing recipes.** With `recipes.save` set, the recipe sheet has an
+**Edit** button, and the recipe box a **New recipe** one. Both open the
+recipe as a form: name, time, serves, then ingredients and method as one
+line each, which is how a recipe is written on paper and all a textarea can
+do without becoming an app. Save calls `recipes.save` with `recipe` (the
+slug, omitted for a new one), `name`, `total_time`, `servings`,
+`ingredients`, `method` and `config_entry_id`. `recipes.delete`, when set,
+adds a Delete that asks first. The two actions ship in
+[`home_signals`](https://github.com/silverShnoop/ha-home-signals), because
+Home Assistant's own Mealie integration cannot write a recipe at all.
+
+`recipes.dictate` adds a mic to the form. What was read out goes to that
+script as `transcript`, and its answer (`name`, `total_time`, `servings`,
+`ingredients`, `method`) **fills the form, never saves it**: a model's
+reading of a recipe read aloud is two guesses deep, and the form is the
+sheet a person checks.
+
+**Nothing paints while the form is open.** A sheet survives a repaint
+(it is moved across the swap), but moving it takes the caret out of the
+field, and on a phone that also shuts the keyboard. So the card holds its
+paints until the form closes, then paints whatever was held back.
+
+**The mic writes straight to the plan. The ingredients go past the sheet.**
+That split is deliberate. A spoken dinner lands in the slot in front of the
+person who said it, and "Say something else" or Clear undoes it in one press.
+A shopping list is on three phones a second later, and it is where the salt
+and the oil already in the cupboard get dropped.
+
+**Both parses belong to scripts, not to this file**, for the same reason the
+list's does. The card sends `transcript`, `date` and `entry_type` to `say`,
+and expects `{planned}` back. It sends `recipe` and `list` to `shop`, and
+expects `{items: [{name, specification}], recipe, already}` back: the same
+item shape as the list's mic, so both use one sheet and one writer.
+
+**The plan is fetched, not read off an entity.** Mealie's calendars carry a
+summary and a date, but not the entry id or the recipe, and the card needs
+both to clear a slot or shop for it. So `plan` calls `mealie.get_mealplan`
+directly. Nothing the card can watch moves when the plan changes, because a
+meal planned on a phone changes no state until the day it is eaten. So the
+plan is fetched again every five minutes, and at once after every change the
+card makes itself.
+
+`days` is local days starting today. At twenty past midnight in summer the
+UTC date is still yesterday, and a card working in UTC would plan tonight's
+dinner on the wrong day.
+
+### `recipes` — what is in the recipe box?
+
+The whole box on a card of its own. The meals card opens the same list as
+a sheet, for choosing a recipe for a slot or just browsing. It is one
+picker in every place, so an improvement to one is an improvement to all.
+
+```yaml
+type: custom:spectra-card
+accent: 6
+icon: mdi:book-open-variant
+title: Recipes
+body:
+  type: recipes
+  box: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, recipes: true}
+  edit:                                    # optional; without it the box is read-only
+    save: home_signals.save_recipe
+    delete: home_signals.delete_recipe
+    dictate: script.meal_recipe_from_speech
+    tag: script.meal_recipe_tag            # optional: AI tags a new recipe nobody tagged
+  ask: {script: script.meal_recipe_ask}    # optional: "Ask" the box, and suggestions for a slot
+  import: {script: script.meal_import_recipe, split: script.meal_recipe_split}   # optional: + → "From a link"; split: check its prep once
+  schedule: {script: script.meal_plan_set, types: [breakfast, lunch, dinner, snack]}  # optional: "Plan"
+  arrange: {script: script.meal_place_several}                                       # optional: several recipes placed sensibly
+  shop: {script: script.meal_ingredients_to_items, list: todo.phoenix}               # optional: "Add to shopping list"
+  photo: {save: home_signals.save_photo, script: script.meal_recipe_from_photo}      # optional: + → "From a photo"
+  planned: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}             # optional: "Tue" beside a recipe
+  images: true                                                                       # optional: photos. See "Recipe photos"
+```
+
+**`planned` says when a recipe is next on the plan**: *Today*, *Tomorrow*,
+*Tue*. Only the next time from today on, because the box answers "is this
+coming up?", not "list the fortnight". It is the same plan source as the
+meals card's `plan`.
+
+A name opens its recipe on the same sheet the meals card uses: **Plan** and
+**Cook**, with Edit, Add to shopping list and Plan prep under **⋮**.
+
+**+** beside the search adds a recipe, on one sheet with a tab for each
+way in, remembering the last one used:
+
+- **From a link** takes a pasted address. The whole message can be
+  pasted, because the first link in it is the one sent. The card expects
+  the script to answer `{recipe}`, and when the page has no recipe on it
+  the sheet says so and stays open.
+- **From a photo** reads a cookbook page or a handwritten card into the
+  new-recipe form, for checking before it is saved. **Take a photo** opens
+  the card's own camera, laid out like the phone's: the picture full screen,
+  a round shutter, the gallery to its left and a flip where there are two
+  cameras; on a phone held sideways the controls stand in a column on the
+  right instead. The whole picture is the shutter too, for a phone held in one
+  hand; it stands still under a spinner the moment it is pressed. The
+  photo is then shown first, with **Retake**, **Crop** (drag the corners or
+  move the box), **Enhance** (white balance, levels, a little colour; press
+  again to undo) and **Use photo**, so a blurred or dim page is caught
+  before it is read. And **Choose a
+  photo** picks one already taken. The camera is the card's own because the
+  Home Assistant app on Android opens the gallery for every file picker,
+  whatever the page asks for; where the camera cannot be had, Take falls
+  back to the picker. When the script's answer has `dish`
+  (`{left, top, right, bottom}`, each 0–100 per cent of the photo, and
+  `turn`, 0, 90, 180 or 270 degrees clockwise), the card also sends the
+  script a copy of the page with a labelled 8×8 grid on it (`grid_photo`,
+  A–H across, 1–8 down), because a model names the squares a picture covers
+  far more exactly than it guesses percentages; a script that knows about it
+  answers its box from those squares. The box is where the dish is
+  looked for, not its edges: a model's box is rough, and often takes in
+  half the page. Inside it the card finds the food by its colour (food is
+  coloured; paper and type are not), turns it upright, and cuts 4:3 around
+  it with the food in the middle, reaching past the box if it has to. A
+  box with nothing coloured in it is cut 4:3 about its middle. That is the
+  recipe's photo; with none,
+  the recipe has no photo until one is given.
+- **Type it** opens the empty form.
+
+The recipe form has a **Photo** row: the photo the recipe has, and **Take**
+or **Choose** for a new one (cut to 4:3 about its middle, like every recipe
+photo), sent with Save (`home_signals.save_recipe`'s
+`image`, home_signals 0.17.0 or later). A new photo can be removed before
+saving; Mealie's own stays until it is replaced.
+
+From a link is left off the wall panel: a panel has no clipboard to paste
+from, and the phone's share sheet is how a link arrives there.
+
+**Hold a recipe down to select it** (or right-click it). The search row
+gives way to the selection's bar: **Plan** (one recipe: which days; several:
+into the coming week's empty dinners, through Suggested meals), **Add to
+shopping list** (needs `shop`; the recipes' items combined, on one review
+sheet) and **Delete** (asked once; meals planned with them stay on the plan
+as notes).
+
+### The picker
+
+Each row has the photo, the name (with a heart for a favourite), the time,
+and when it was last had: *planned tomorrow*, *last had 3 weeks ago*,
+*never made*.
+
+**Search reads the name, the ingredients and the tags.** Every word has to
+appear somewhere, in any order: "chicken" finds the fajitas, and the row says
+*with 500g chicken thighs* so it is clear why it is there. Search, chips and
+sort move and hide the rows already drawn and never repaint, because a
+repaint would take the keyboard away after every letter. Enter closes the
+keyboard; the cross clears. On the Recipes card the search, chips and sort
+survive the five-minute reread.
+
+**Filter chips**: the four meals (or, opened for a slot, *Suits dinner*,
+already on), **Quick** (tagged Quick, or 30 minutes or less), **Favourites**,
+**Not had lately** (never made, or not for three weeks, and not already
+planned), then the diets and main ingredients the box actually has. Chips of
+different kinds narrow together; the meal chips widen each other. A recipe
+with no meal tags counts as suiting every meal, so a new recipe never
+vanishes from the list just for being new.
+
+**Sort**: A to Z, quickest, longest since we had it, newest. Remembered per
+device.
+
+**A long press** (or a right click) shows the first few ingredients in the
+row, to tell two similar recipes apart.
+
+**Ask the box.** With `ask` set, a search of three words or more, or one that
+finds nothing, offers *Ask: "…"*. `ask.script` gets `question` and answers
+`{picks: [{recipe_id, reason}]}`; the picks move to the top with their reason.
+It chooses from the box only. Opened for a slot, the picker asks the same
+script with no question and that slot's `date` and `entry_type`, and pins a
+few suggestions under *Suggested for Wednesday dinner* while the list is
+already there to choose from.
+
+**Favourites and tags.** A recipe sheet has a heart that saves `favourite`
+through `edit.save`. The edit form shows the recipe's tags as chips: meals,
+effort and diet always, main ingredient and cuisine folded away unless one is
+chosen. The diets are Vegetarian, Vegan, Dairy-free, Gluten-free and **Suitable
+for weaning**, which is also a filter chip once any recipe has it. Tags are sent only when they changed. A new recipe saved with none is
+handed to `edit.tag`, which tags it in the background.
+
+**The tray shows the first ingredients** of a planned recipe, under its name.
+
+`box` is the plan source with `recipes: true`. With
+[`home_signals`](https://github.com/silverShnoop/ha-home-signals) 0.13 or
+later it reads `home_signals.recipe_index`, which carries tags, ingredients,
+last made and favourites; otherwise `mealie.get_recipes`, and the picker
+still works on names. The box is kept once per Mealie for every card on the
+page, reread on the same timer as the plan and straight after anything the
+card saves, deletes or imports.
+
+## Wide cards
+
+A `clock` or `quote` given two columns — Today and the affirmation on a
+tablet's Home tab — sizes itself from its own width, instead of sitting
+small in the corner of a wide empty card: the time, day and date grow
+with the card, and a quote grows and balances its lines. At one column
+both are exactly the size they always were. A `recipes` card 720px or
+wider — three columns on the Kitchen tab — lays its recipes out as a
+grid; narrower, it is the list it always was. `tools/checkwide.js` pins
+all of it, the narrow halves included.
+
+## Long sheets on a wide screen
+
+The long sheets — a recipe, the box, the suggestions, the Plan sheet, the
+form, cooking — were a 460px strip down the middle of a tablet, with two
+thirds of the screen dimmed either side. On a screen at least 960px wide
+they take the width (up to 1200px) and lay themselves out across it:
+
+- **a recipe** in two columns: the photo, the facts and the ingredients
+  on the left, staying put, and the method down the right;
+- **the box and the Plan sheet's Choose** as a grid of recipes;
+- **the ideas** as a grid of cards;
+- **the form** with Ingredients and Method side by side;
+- **cooking** with the ingredients always beside the step, so there is
+  nothing to tap to see them.
+
+The suggestions stay one column, in a narrower sheet, so a day never
+breaks from its heading. The switch is a container query on the sheet,
+not a media query on the window, so each layout answers to the width it
+actually has. On a phone nothing changes.
+
+`tools/shotsheets.js` opens every long sheet with realistic data at
+1280×800, 1920×1080 and 800×1280 and saves a screenshot of each, plus an
+outline of each sheet's DOM, for a before-and-after look:
+
+```
+node tools/shotsheets.js [path/to/spectra-cards.js] --out DIR [--sizes 1280x800,1920x1080]
+```
 
 ## Confirming an action
 
@@ -1585,8 +2823,16 @@ Colour on this rail means **status**, and nothing else:
 | | Device | For |
 |---|---|---|
 | `live` | accent on the edge | something is happening in here |
-| `fill` | accent as the background | this domain's state is the reason the button exists |
-| *selected* | no colour at all | which set of cards is on screen |
+| `fill` | accent on the edge, with an inset ring | this domain's state is the reason the button exists |
+| *selected* | no colour at all, and the only ground on the rail | which set of cards is on screen |
+
+**The rail has no coloured grounds.** `fill` used to paint the button's
+background, and three amber blocks across the top of the panel pulled the
+eye away from Needs you — which is where the job actually is, and the one
+thing that says what to do. So a filled button now says its state on its
+edge and a ring, one step louder than `live`, and the ground went to the
+Needs you tiles instead. The only filled button on the rail is the page
+you are on, in a neutral ground that no level ever wears.
 
 `fill` is the loud one, and it is **earned where the reassuring state is
 itself information**. Security filled green is not decoration: "everything
@@ -1742,6 +2988,153 @@ chips:
 
 Optional on purpose: most chips are a measurement, and a measurement has no
 icon.
+
+## `spectra-panel` — a view that keeps the chrome still
+
+Not a card: a **view type**. It takes the same `sections` a sections view
+does, and lifts two of them out of the scroll.
+
+```yaml
+views:
+  - title: Home
+    path: home
+    type: custom:spectra-panel
+    max_columns: 3            # as on a sections view
+    needs_width: 340          # optional: the side column, px
+    needs_max_height: 36      # optional: upright cap on Needs you, % of height
+    side_min_width: 900       # optional: narrowest width that goes sideways
+    phone_max_width: 600      # optional: widest screen that gets the phone rail
+    needs_entity: sensor.needs_you  # optional: lets Needs you fold to a bar on a phone
+    column_min_width: 280     # optional: narrowest column, px (default 320)
+    masonry: true             # optional: pack sections with no row gaps
+    sections:
+      - type: grid
+        spectra_slot: needs   # this section is Needs you
+        cards: [...]
+      - type: grid            # holds a spectra-dock, so it is the rail
+        cards: [...]
+      - type: grid
+        spectra_slot: side    # under Needs you when it is a column
+        cards: [...]
+      - ...                   # everything else scrolls
+```
+
+**Needs you and the rail never scroll.** The page itself does not scroll at
+all: the panel is exactly as tall as the screen that is left under Home
+Assistant's header — measured, so kiosk mode needs no setting — and only the
+content below the rail scrolls, inside itself. A job cannot scroll out of
+sight, and the tabs are always a thumb away.
+
+**On a phone the rail goes to the bottom and is icons only.** At or below
+`phone_max_width` (default 600) the rail pins to the bottom edge, where a
+thumb is, and its selection bar and caret flip to point up at the cards.
+The rail itself turns icons-only whenever it is narrower than 560px,
+wherever it is placed: eight labels cannot share a phone's width. The
+words are not lost — each button reads its label and summary to a screen
+reader, and anything the house wants done is spelled out in Needs you.
+
+**On a phone Needs you folds to one line.** Given `needs_entity` — a sensor
+whose state is the count and whose `items` are the jobs, each with a
+`title` and a `level`, as `home_signals` publishes them — a phone shows a
+single bar instead of the list: "3 to do" and the most urgent job's title,
+wearing the loudest level the way a card does (border, ring, ground). Press
+it and the full list opens over the cards; press it again, or the cards
+behind it, and it folds. With nothing to do there is no bar. Without
+`needs_entity` the list is shown in full, as on a tablet.
+
+**Upright, Needs you goes across the top; sideways, down the left.** A strip
+across the top spends the scarce dimension of a landscape screen on a list,
+so held sideways (wider than tall, and at least `side_min_width`) it becomes
+a full-height column, one job to a line. Upright it stays across the top but
+is capped, scrolling inside itself, so a busy morning cannot push the rail
+off the bottom. With nothing to do it takes no room in either.
+
+**The rest is laid out as a sections view lays it out** — as many 320px
+columns as fit, up to `max_columns`, never more than the visible sections
+can fill, `column_span` honoured, and each section's own 12-column grid
+spread across its span. So a card with `grid_options: {columns: 12}` is one
+column wide: in a span-3 section it sits two or three to a row on a tablet
+and alone on a phone, where `columns: full` would be a single column
+everywhere. A section `background` is drawn as it would be there.
+
+**`spectra_slot: side` uses the rest of that column.** Needs you is rarely
+tall enough to fill a landscape screen, so a section marked `side` rides
+underneath it there — a clock, who is home — and joins the grid in its
+written place when the screen is upright. The column scrolls if a busy
+morning makes it overflow, and goes altogether when it has nothing in it.
+
+**`column: N` on a section pins it to that column.** Packing alone puts
+each section wherever it fits first, which on a busy tab reads as a
+jumble; pinned, a tab reads the way it was written — the clock and the
+weather in the first column, the calendar in the third — and sections in
+one column keep their written order. A screen too narrow to have column
+N places the section as usual, so the same view still works on a phone.
+
+**`masonry: true` packs instead of aligning rows.** A sections view lines
+its sections up in rows, so a clock beside the week's weather holds open a
+gap as tall as the weather. With masonry each section takes exactly its own
+height and the next one fills in underneath the shortest column — which is
+what lets a tab of eleven small cards fit one screen. It is measured, and
+re-measured whenever a section changes height. It suits a tab of one-card
+sections; a span-3 group reads the same either way.
+
+**Tabs belong to the browser, not the house.** A rail button with `tab`
+switches the panel in *this* browser and calls nothing:
+
+```yaml
+views:
+  - type: custom:spectra-panel
+    default_tab: Home          # shown until this browser has chosen one
+    sections:
+      - type: grid
+        cards:
+          - type: custom:spectra-dock
+            buttons:
+              - {label: Home, icon: mdi:home, tab: Home}
+              - {label: Lights, icon: mdi:lightbulb-group, tab: Lights}
+      - type: grid
+        spectra_tab: Lights    # or a list; none means every tab
+        cards: [...]
+```
+
+This used to be an `input_select` that every section's `visibility` read,
+and the rail wrote. A helper is one value for the whole house, so choosing
+Lights on a phone switched the wall panel to Lights as well. The choice is
+now kept in the browser's localStorage, one per dashboard page, so it still
+survives a reload but each screen has its own. A rail without `tab`
+buttons behaves as before, `selected` and `tap_action` included.
+
+Switching tab starts the new tab at the top. There is no edit mode for this
+view in the dashboard editor; switch the view's `type` to `sections` to edit
+it there, and back.
+
+`tools/checkpanel.js` renders it upright, sideways and on a phone, scrolls
+the content to the bottom, and fails if Needs you or the rail moved a pixel
+or the page scrolled at all. It also checks that under masonry a section
+lands directly beneath a short one, a gap and no more below it.
+
+**It says why the page loaded.** Each page load writes one line to the Home
+Assistant log under the logger `spectra.panel`, and so does each websocket
+reconnect:
+
+```
+spectra panel: load=reload discarded=no from=- prev=pagehide prev_quiet=4s
+  prev_lived=2830s prev_ws_drops=0 device=Android 14 Chrome 154 webview user=Panel
+```
+
+- `load` — the browser's own word: `reload` (somebody, or the app, reloaded
+  it) or `navigate` (a fresh open, or a redirect back from login)
+- `discarded=yes` — the browser threw the tab away to free memory and
+  rebuilt it
+- `prev` — how the page before this one ended: `pagehide` is an ordinary
+  unload; `visible` means it stopped while on screen with no unload at all,
+  which is a crash or a killed WebView
+- `prev_quiet`, `prev_lived`, `prev_ws_drops` — how long ago that was, how
+  long that page had been up, and how often its connection dropped
+
+It is read from a heartbeat the bundle keeps in `localStorage` every 30
+seconds. Set `no_load_report: true` on the view to turn it off.
+`tools/checkloadreport.js` covers it.
 
 ## Rows from a collection
 
@@ -2077,6 +3470,30 @@ the offset the panel's Roboto needed.
 So the probe is now empty and zero-height, and every card is measured through
 five unrelated font stacks. An offset that only lines up in one of them is
 not lined up.
+
+```
+node tools/checkcamera.js
+```
+
+The camera card, against a served 1x1 picture rather than a camera. It
+counts requests and service calls: the picture is one element kept
+across a repaint, a repaint fetches nothing, a shut lens fetches nothing
+at all, the live sheet sends Home Assistant's WebRTC offer and trickles
+candidates with the session id, an error or a camera without WebRTC
+falls back to the MJPEG stream, and every held arrow is followed by a
+stop, including the one interrupted by closing the sheet.
+
+```
+node tools/checkfrigate.js
+```
+
+Frigate on the camera card, the live view and the visits card, against
+the integration's websocket commands answered the way it answers them
+(Frigate's JSON as text). Which camera's reviews are fetched, that a push
+for another camera fetches nothing, that a review plays from a signed
+recording in place of the live stream and the stream comes back after it,
+that watching a review marks it reviewed, and that nothing Frigate says
+wears a level.
 
 ```
 node tools/checkclimate.js
