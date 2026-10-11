@@ -776,17 +776,46 @@ body:
   partial:   {entity: sensor.devices, attribute: partial}
   problems:  {entity: sensor.devices, attribute: problems}
   networks:  {entity: sensor.devices, attribute: networks}
+  icons:
+    home: mdi:home
+    Hue: mdi:lightbulb
+    Zigbee: mdi:access-point
+    Cast: mdi:cast
 ```
 
 Three numbers first — connected, offline, partly offline — because they are
 the part read from the doorway.
 
-**Then the house's networks as a map**, at every width: Home Assistant in
-the middle, a hub per network with its `53/56`, and a dot per device clustered
-past it. Trouble is yellow — a dashed spoke, a yellow hub, the problem dots on
-the cluster's outside edge — so five dead speakers read as one sick Cast
-cluster without a word of explanation. Networks sit evenly round the map in
-the sensor's order, the first on the left.
+**Then the house's networks as a map**, at every width: HOME on the left, a
+trunk down from it, and a hub per network branching off in the sensor's
+order. Each row carries its icon, its name, a bar saying how much of that
+network is answering, and its `53/56` at the end — one row rather than a
+pill beside a bar. Trouble is yellow — a dashed branch, a yellow icon, and yellow in
+the bar — so five dead speakers read as one sick Cast network without a word
+of explanation. **The icon is the part that says "something here", the bar
+the part that says "how much"**: a network with one device down out of sixty
+draws as very nearly healthy, and that is exactly the case a composition bar
+cannot carry on its own.
+
+`icons` is a glyph per network, keyed by the name the sensor reports, plus
+`home` for the house itself. **It comes from the dashboard and not from
+here**: a card has no business knowing that Hue is a lightbulb, and a house
+that renames a network or adds one should not need a card release. A network
+with no icon named gets the generic one. The same glyph appears beside its
+group in the list, so the two halves are read together.
+
+**Every bar is the same length**, because each one is its own network's
+composition rather than its size. Scaled by device count the one network
+actually in trouble is the smallest mark on the card: three of eight
+answering, drawn an eighth as wide as a healthy sixty. How many devices a
+network has is on the hub, which is where a number belongs; what the bar is
+for is how much of it is down.
+
+It was a wheel with a dot per device, and both halves of that were wrong. A
+wheel's bounding box is a square and its content is a ring, so the corners are
+empty at every width — which is most of the drawing in one column. And the
+dots carried a count the hub already prints exactly, at two and a half pixels
+across.
 
 **Under it, a list** — under it on a phone — of every device not fully
 answering, grouped by network in the map's order, offline first: the name,
@@ -795,9 +824,14 @@ its room, what is missing (`offline`, `No temperature`, `5 of 8 missing`) and
 at the end: `All answering: Zigbee 7`. A problem whose network is not on the
 map is still a row, under *Other*.
 
-The map names nothing and the list is not numbered against it. Labels at the
-side of the map, and then numbers on its dots, were both tried and read as
-clutter on the panel: the map shows where, the list says what.
+The map names nothing beyond its networks and the list is not numbered
+against it. Labels at the side of the map, and then numbers on its marks, were
+both tried and read as clutter on the panel: the map shows where, the list
+says what.
+
+The map is as tall as the house has networks — a row each — so the space
+beside it is worked out from the drawing rather than from a constant, which
+is what a fixed square could get away with.
 
 **Under the numbers, the map, and the list fills the space beside it first.**
 On a card three columns wide the map spans two of them, on a card two wide it

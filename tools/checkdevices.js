@@ -57,6 +57,8 @@ const js = fs.readFileSync(file);
       if (!ok) problems.push(`${name}: ${got}`);
     };
     const frame = () => new Promise((r) => requestAnimationFrame(r));
+    /* A group header leads with its icon now, so the name is its span. */
+    const headName = (h) => (h.querySelector("span") || h).textContent;
     const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString();
 
     /* The house on 24 Sep 2026, as sensor.devices reports it. */
@@ -99,7 +101,7 @@ const js = fs.readFileSync(file);
     // ---- the list: by network, a row per problem, nothing linking it to the map
     const rows = [...lay(today.root).querySelectorAll(".devrow")];
     check("a row per problem", rows.length === 3, rows.length);
-    const heads = [...lay(today.root).querySelectorAll(".devroom")].map((r) => r.firstChild.textContent);
+    const heads = [...lay(today.root).querySelectorAll(".devroom")].map((r) => headName(r));
     check("rows grouped by network, a problem off the map under Other", heads.join("|") === "Hue|Other", heads.join("|"));
     check("an offline row says offline, for how long, and the room",
       /offline/.test(rows[0].textContent) && /3d/.test(rows[0].textContent) && /Ensuite/.test(rows[0].textContent), rows[0].textContent);
@@ -187,12 +189,47 @@ const js = fs.readFileSync(file);
         check(`${label}: groups in one column, in order`, tops.every((t, i) => !i || t > tops[i - 1])
           && groups.every((g) => Math.abs(rect(g).left - rect(groups[0]).left) < 1), tops.join(","));
       }
-      const dots = map.querySelectorAll(".on, .off, .part").length;
-      check(`${label}: a dot per device`, dots === 130, dots);
-      check(`${label}: a yellow dot per problem`, map.querySelectorAll(".off, .part").length === 12, map.querySelectorAll(".off, .part").length);
+      /* The bars replaced a dot per device. What is checked is what the
+         dots could not do: a network two thirds down has to LOOK two
+         thirds down, whatever its size. */
+      const bars = [...map.querySelectorAll(".devbar")];
+      check(`${label}: a bar per network`,
+        new Set(bars.map((b) => Math.round(Number(b.getAttribute("y"))))).size === 5, bars.length);
+      const rowSpan = (y) => {
+        const row = bars.filter((b) => Math.round(Number(b.getAttribute("y"))) === y);
+        const l = Math.min(...row.map((b) => Number(b.getAttribute("x"))));
+        const r = Math.max(...row.map((b) => Number(b.getAttribute("x")) + Number(b.getAttribute("width"))));
+        return r - l;
+      };
+      const ys = [...new Set(bars.map((b) => Math.round(Number(b.getAttribute("y")))))];
+      const spans = ys.map(rowSpan);
+      check(`${label}: every bar the same length, whatever the network's size`,
+        Math.max(...spans) - Math.min(...spans) < 1.5, spans.map((v) => v.toFixed(1)).join(","));
+      /* Cast is 3 of 8 and Hue 53 of 56. Scaled by device count Cast was
+         an eighth the width of Hue and the sickest network on the card
+         was the least visible thing on it. */
+      const yellowOf = (y) => bars.filter((b) => Math.round(Number(b.getAttribute("y"))) === y
+        && !b.classList.contains("on")).reduce((t, b) => t + Number(b.getAttribute("width")), 0);
+      const worst = ys.reduce((a, y) => (yellowOf(y) > yellowOf(a) ? y : a), ys[0]);
+      const castRow = ys[[...map.querySelectorAll(".hubname")]
+        .map((t) => t.textContent).indexOf("Cast")];
+      check(`${label}: the sickest network carries the most yellow`, worst === castRow,
+        `worst row ${worst}, Cast row ${castRow}`);
+      check(`${label}: a network with nothing wrong is all one segment`,
+        bars.filter((b) => Math.round(Number(b.getAttribute("y")))
+          === ys[[...map.querySelectorAll(".hubname")].map((t) => t.textContent).indexOf("Zigbee")]).length === 1,
+        "segmented");
+      /* The pill went with the dots. The network's own icon carries the
+         level now -- which is the one thing a composition bar cannot say,
+         because a network with one device down out of sixty still draws
+         as very nearly healthy. */
+      const art = [...map.querySelectorAll(".devart")].filter((a) => !a.classList.contains("home"));
+      check(`${label}: an icon per network, and the house's own`,
+        art.length === 5 && map.querySelectorAll(".devart.home").length === 1, art.length);
       check(`${label}: a network with a problem wears the level; one without does not`,
-        map.querySelectorAll(".hub.hot").length === 4 && map.querySelectorAll(".hub").length === 5, "hubs");
-      const order = [...list.querySelectorAll(".devroom")].map((h) => h.firstChild.textContent);
+        art.filter((a) => a.classList.contains("hot")).length === 4,
+        art.filter((a) => a.classList.contains("hot")).length);
+      const order = [...list.querySelectorAll(".devroom")].map((h) => headName(h));
       check(`${label}: networks in the map's order, the healthy one left out`,
         order.join("|") === "Hue|Tado|Cast|Wi-Fi & cloud", order.join("|"));
       check(`${label}: every problem is a row`, list.querySelectorAll(".devrow").length === 12, list.querySelectorAll(".devrow").length);
@@ -226,14 +263,24 @@ const js = fs.readFileSync(file);
       check(`busy ${ncols} wide: and in every column under it`,
         bcols.length === ncols && bcols.every((col) => col.querySelector(".devgroup")),
         bcols.map((col) => col.querySelectorAll(".devgroup").length).join(","));
-      const border = [...blay.querySelectorAll(".devroom")].map((h) => h.firstChild.textContent);
+      const border = [...blay.querySelectorAll(".devroom")].map((h) => headName(h));
       check(`busy ${ncols} wide: beside, then the columns left to right, walks the networks in order`,
         border.join("|") === NETS6.map((n) => n.name).join("|"), border.join("|"));
       check(`busy ${ncols} wide: nothing overlaps`,
         !overlaps([...blay.querySelectorAll(".devgroup"), blay.querySelector(".devmap")]), "overlap");
       const bottoms = bcols.map((col) => rect(col).bottom);
-      check(`busy ${ncols} wide: the columns under the map end near level`,
-        Math.max(...bottoms) - Math.min(...bottoms) < 140, bottoms.map(Math.round).join(" / "));
+      /* A network's rows stay together, so a column can only ever be
+         shortened by moving a whole group -- which means the best
+         possible imbalance is one group tall, and a fixed pixel budget
+         here is really a statement about the fixture's group sizes. The
+         invariant is what gets checked: no column is more than one group
+         adrift of the shortest. */
+      const colGap = parseFloat(getComputedStyle(bcols[0]).rowGap) || 0;
+      const tallestGroup = Math.max(...[...blay.querySelectorAll(".devgroup")]
+        .map((g) => rect(g).height)) + colGap;
+      check(`busy ${ncols} wide: no column is more than one group adrift`,
+        Math.max(...bottoms) - Math.min(...bottoms) <= tallestGroup + 1,
+        `${bottoms.map(Math.round).join(" / ")}, one group ${Math.round(tallestGroup)}`);
     }
 
     // ---- no networks: no map, but the problems are still rows

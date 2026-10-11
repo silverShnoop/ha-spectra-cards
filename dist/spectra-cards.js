@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.166.0";
+const VERSION = "0.167.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3388,6 +3388,15 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devmap .on { fill:var(--accent); opacity:.55; }
 .devmap .off { fill:var(--sp-attention); }
 .devmap .part { fill:var(--sp-surface); stroke:var(--sp-attention); stroke-width:1.8; }
+.devmap .devart { display:flex; align-items:center; justify-content:center; color:var(--sp-ink-2); }
+.devmap .devart .mdi, .devmap .devart ha-icon { width:100%; height:100%; }
+.devmap .devart.hot { color:var(--sp-attention); }
+.devmap .devart.home { color:var(--sp-ink); }
+.devroom { align-items:center; }
+.devroom .devroomart { width:13px; height:13px; --mdc-icon-size:13px; color:var(--sp-ink-3); flex:none; }
+.devmap .devbar.on { fill:var(--accent); opacity:.55; }
+.devmap .devbar.off { fill:var(--sp-attention); }
+.devmap .devbar.part { fill:var(--sp-surface); stroke:var(--sp-attention); stroke-width:1.6; }
 .devmap .halo { fill:none; stroke:var(--sp-attention); stroke-width:1; opacity:.5; }
 
 /* control — the one body you touch rather than read. Same row metrics as
@@ -6170,68 +6179,103 @@ function planHeat(b) {
   return out;
 }
 
-/* The house's networks as a map, in a 420x330 box that scales with its
-   column: Home Assistant in the middle, a hub per network with how many
-   answer, and a dot per device clustered past it, laid out as a sunflower so
-   a cluster of 60 stays round.
+/* The house's networks as a map: HOME on the left, a trunk down from it,
+   and a row per network branching off -- an icon, its name, a bar saying
+   how much of it is answering, and the count at the end.
 
-   The map names nothing. It says where the trouble is -- a dashed yellow
-   spoke, a yellow hub, yellow dots in the cluster -- and the list beside it
-   says what. Linking the two with labels or numbers was tried and read as
-   clutter on the panel, so they are two separate things to read.
+   It was a wheel with a dot per device, and both halves of that were
+   wrong. A wheel's bounding box is a square and its content is a ring, so
+   the corners are empty at every width -- which is most of the drawing in
+   one column. And the dots carried a count the row already prints exactly,
+   at two and a half pixels across.
 
-   A problem dot takes the seats of its cluster that face away from the
-   middle, so a cluster's trouble is on its outside edge where it shows. */
-function devicesMap(networks, problems, stateOf) {
+   The bars are all the same length on purpose. Scaled by device count the
+   one network actually in trouble is the smallest mark on the card --
+   three of eight answering, drawn an eighth as wide as a healthy sixty.
+   Each bar is its own network's composition instead, so a network that is
+   two thirds down looks two thirds down whatever its size.
+
+   `icons` comes from the dashboard, not from here: a card has no business
+   knowing that Hue is a lightbulb, and the house's own names live in the
+   dashboard YAML beside everything else real. A network the map has no
+   icon for gets the generic one rather than nothing. */
+function devicesMap(networks, problems, stateOf, icons) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-  const W = 420, H = 330, cx = 210, cy = 165;
-  const HUB = [88, 80], CL = [146, 124];
-  const golden = Math.PI * (3 - Math.sqrt(5));
+  const ROW = 32, W = 420, PAD = 10, BH = 11;
+  const H = networks.length * ROW + PAD * 2;
   const f = (v) => v.toFixed(1);
-  const pol = ([rx, ry], a) => [cx + rx * Math.cos(a), cy + ry * Math.sin(a)];
-  const biggest = Math.max(1, ...networks.map((n) => num(n.online) + num(n.offline) + num(n.partial)));
-  const S = Math.min(4.2, 28 / Math.sqrt(biggest));
+  /* An icon is HTML -- `ha-icon` for anything the bundle has no path for --
+     so it reaches the drawing through a foreignObject. The alternative was
+     bundling a path per network, which would put the card right back in
+     the business of knowing what networks a house has. */
+  const art = (name, x, y, size, cls) => `<foreignObject x="${f(x)}" y="${f(y)}"`
+    + ` width="${size}" height="${size}"><div class="devart ${cls}"`
+    + ` style="width:${size}px;height:${size}px;--mdc-icon-size:${size}px">`
+    + `${iconMarkup(name)}</div></foreignObject>`;
 
-  let spokes = "", seats = "", hubs = "", named = 0;
+  const HOME_S = 30, HOME_X = 8, TRUNK = HOME_X + HOME_S + 16;
+  const ICON_S = 16, ICON_X = TRUNK + 12, NAME_X = ICON_X + ICON_S + 7;
+  const total = (n) => num(n.online) + num(n.offline) + num(n.partial);
+  /* The name and the count are the two ends of a row, so each gets a
+     column as wide as the longest of them and the bars line up between. */
+  const NAME_W = Math.max(...networks.map((n) => String(n.name).length * 6.3)) + 10;
+  const OF_W = Math.max(...networks.map((n) => String(`${num(n.online)}/${total(n)}`).length * 6.3)) + 6;
+  const BAR_X = NAME_X + NAME_W, BAR_W = W - 8 - OF_W - 6 - BAR_X;
+  const mid = PAD + (networks.length * ROW) / 2;
+
+  let spokes = "", bars = "", text = "", glyphs = "", named = 0;
+  spokes += `<path class="spoke" d="M${TRUNK},${f(PAD + ROW / 2)} L${TRUNK},${f(H - PAD - ROW / 2)}"/>`;
+
   networks.forEach((n, i) => {
-    const a = Math.PI + (2 * Math.PI * i) / networks.length;
+    const y = PAD + i * ROW + ROW / 2;
     const on = num(n.online), off = num(n.offline), part = num(n.partial);
+    const all = total(n);
     const hot = off + part > 0;
-    const [hx, hy] = pol(HUB, a), [kx, ky] = pol(CL, a);
-    spokes += `<path class="spoke${hot ? " hot" : ""}" d="M${cx},${cy} L${f(hx)},${f(hy)} L${f(kx)},${f(ky)}"/>`;
+    named += problems.filter((p) => String(p.network) === String(n.name)).length;
+    spokes += `<path class="spoke${hot ? " hot" : ""}" d="M${TRUNK},${f(y)} L${f(ICON_X - 5)},${f(y)}"/>`;
+    /* The icon carries the yellow as well as the bar. A network with one
+       device down out of sixty is a bar that still reads as healthy, and
+       "something here wants looking at" is worth saying on its own. */
+    glyphs += art(devIcon(icons, n.name), ICON_X, y - ICON_S / 2, ICON_S, hot ? "hot" : "");
+    text += `<text class="hubname" x="${f(NAME_X)}" y="${f(y + 4)}">${esc(n.name)}</text>`
+      + `<text class="hubof" x="${W - 8}" y="${f(y + 4)}" text-anchor="end">${on}/${all}</text>`;
 
-    const mine = problems.filter((p) => String(p.network) === String(n.name));
-    named += mine.length;
-    const count = Math.max(on + off + part, mine.length);
-    const all = Array.from({ length: count }, (_, k) => {
-      const r = S * Math.sqrt(k + 0.5) + 2, t = k * golden;
-      return { x: kx + r * Math.cos(t), y: ky + r * Math.sin(t) };
+    /* Answering, then partly, then offline -- the order the key is in and
+       the order the list is in, so the three say the same thing. */
+    const parts = [[on, "on"], [part, "part"], [off, "off"]].filter(([c]) => c > 0);
+    if (!parts.length) return;
+    const GAP = 2, MIN = 3;
+    const avail = BAR_W - (parts.length - 1) * GAP;
+    const widths = parts.map(([c]) => Math.max(MIN, (c / Math.max(all, 1)) * avail));
+    /* A floor on each segment can push the bar past its end, which would
+       make one network's bar longer than another's and undo the only
+       thing the equal lengths are for. The widest gives the width back. */
+    const over = widths.reduce((t, w) => t + w, 0) - avail;
+    if (over > 0) {
+      const widest = widths.indexOf(Math.max(...widths));
+      widths[widest] = Math.max(MIN, widths[widest] - over);
+    }
+    let x = BAR_X;
+    parts.forEach(([, cls], k) => {
+      bars += `<rect class="devbar ${cls}" x="${f(x)}" y="${f(y - BH / 2)}"`
+        + ` width="${f(widths[k])}" height="${BH}" rx="2.5"/>`;
+      x += widths[k] + GAP;
     });
-    const out = Math.atan2(ky - cy, kx - cx);
-    const reach = (p) => (p.x - kx) * Math.cos(out) + (p.y - ky) * Math.sin(out);
-    const facing = [...all].sort((p, q) => reach(q) - reach(p)).slice(0, mine.length);
-    const taken = new Set(facing);
-    for (const s of all) if (!taken.has(s)) seats += `<circle class="on" cx="${f(s.x)}" cy="${f(s.y)}" r="2.8"/>`;
-    facing.forEach((s, k) => {
-      seats += `<circle class="halo" cx="${f(s.x)}" cy="${f(s.y)}" r="5.5"/>`
-        + (stateOf(mine[k]) === "offline"
-          ? `<circle class="off" cx="${f(s.x)}" cy="${f(s.y)}" r="3.2"/>`
-          : `<circle class="part" cx="${f(s.x)}" cy="${f(s.y)}" r="2.6"/>`);
-    });
-
-    const of = `${on}/${on + off + part}`;
-    const w = String(n.name).length * 6.3 + of.length * 6.3 + 26;
-    const h = hot ? " hot" : "";
-    hubs += `<rect class="hub${h}" x="${f(hx - w / 2)}" y="${f(hy - 11.5)}" width="${f(w)}" height="23" rx="11.5"/>`
-      + `<text class="hubname${h}" x="${f(hx - w / 2 + 10)}" y="${f(hy + 4)}">${esc(n.name)}</text>`
-      + `<text class="hubof${h}" x="${f(hx + w / 2 - 10)}" y="${f(hy + 4)}" text-anchor="end">${of}</text>`;
   });
 
   return `<svg class="devmap" viewBox="0 0 ${W} ${H}" role="img" `
     + `aria-label="${esc(`${networks.length} networks, ${named} device${named === 1 ? "" : "s"} not fully answering`)}">`
-    + spokes + seats + hubs
-    + `<rect class="core" x="${cx - 30}" y="${cy - 12}" width="60" height="24" rx="4"/>`
-    + `<text class="coretxt" x="${cx}" y="${cy + 3.5}" text-anchor="middle">HOME</text></svg>`;
+    + spokes + bars + text + glyphs
+    + art(devIcon(icons, null), HOME_X, mid - HOME_S / 2, HOME_S, "home")
+    + `</svg>`;
+}
+
+/* Which glyph a network wears. `null` asks for the house itself. */
+function devIcon(icons, name) {
+  const map = icons && typeof icons === "object" ? icons : {};
+  if (name === null) return isBlank(map.home) ? "mdi:home" : String(map.home);
+  const own = map[name];
+  return isBlank(own) ? "mdi:lan-connect" : String(own);
 }
 
 /* Every device not fully answering, grouped by network in the map's order,
@@ -6241,7 +6285,7 @@ function devicesMap(networks, problems, stateOf) {
    quiet line at the end, so "Zigbee is fine" is still said. A problem on a
    network the map does not draw is still a row, under "Other": the list
    may never be shorter than the Needs you row behind it. */
-function devicesGroups(networks, problems, what, stateOf) {
+function devicesGroups(networks, problems, what, stateOf, icons) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const rank = (p) => (p.state === "offline" ? 0 : 1);
   const byName = (p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name));
@@ -6260,7 +6304,8 @@ function devicesGroups(networks, problems, what, stateOf) {
       continue;
     }
     mine.forEach((p) => placed.add(p));
-    group(`<p class="devroom">${esc(n.name)}<span class="of">${on}/${all}</span></p>`, mine);
+    group(`<p class="devroom">${iconMarkup(devIcon(icons, n.name), "devroomart")}`
+      + `<span>${esc(n.name)}</span><span class="of">${on}/${all}</span></p>`, mine);
   }
   const other = problems.filter((p) => !placed.has(p)).sort(byName);
   if (other.length) group(`<p class="devroom">${networks.length ? "Other" : "Not answering"}</p>`, other);
@@ -6283,13 +6328,23 @@ function devicesGroups(networks, problems, what, stateOf) {
    about how tall it draws at the widths a card of that span has. A group
    may run a row or so past the map rather than leave a gap above the
    columns. A phone gets the numbers, the map, then one column. */
-const DEV_MAP_ROWS = { 2: 8, 3: 14 };
-function devicesLayout(tiles, map, groups, quiet, cols) {
+/* The map's height, counted in list rows, so the layout knows how much
+   list fits beside it. It stopped being a constant when the map stopped
+   being a fixed square: the spine grows a row per network, so three
+   networks draw a shorter map than eight.
+
+   The drawing is `38 * networks + 24` tall in a 420-wide viewBox, and a
+   list row measures 33px against a panel column, which is what these two
+   coefficients are. At five networks they give 4.9 and 9.0 -- where the
+   wheel, being half as tall again, was 8 and 14. Both forms assume the
+   panel's own column width; neither can ask for it. */
+const devMapRows = (cols, n) => (cols === 3 ? 1.6 * n + 1.0 : 0.87 * n + 0.55);
+function devicesLayout(tiles, map, groups, quiet, cols, nets) {
   const html = (gs) => gs.map((g) => g.html).join("");
   if (cols === 1 || !map) {
     return `<div class="devlay n${cols} solo">${tiles}${map}${html(groups)}${quiet}</div>`;
   }
-  const room = DEV_MAP_ROWS[cols] + 1.5;
+  const room = devMapRows(cols, nets) + 1.5;
   let beside = 0, used = 0;
   while (beside < groups.length && used + groups[beside].rows <= room) used += groups[beside++].rows;
   const rest = groups.slice(beside);
@@ -6302,15 +6357,30 @@ function devicesLayout(tiles, map, groups, quiet, cols) {
     const rows = rest.map((g) => g.rows);
     const sum = (from, to) => rows.slice(from, to).reduce((t, r) => t + r, 0);
     const n = rest.length;
-    /* Every way to cut the rest into `cols` ordered runs (n is a handful). */
-    let best = null, bestH = Infinity;
+    /* Every way to cut the rest into `cols` ordered runs (n is a handful).
+       Ties are broken towards the flattest set of columns, not just the
+       shortest tallest one: two cuts can share a tallest column and leave
+       very different gaps under the short ones. */
+    let best = null, bestH = Infinity, bestSpread = Infinity;
     const cut = (start, c, acc, cuts) => {
       if (c === cols - 1) {
-        const tallest = Math.max(acc, sum(start, n) + tail);
-        if (tallest < bestH - 1e-9) { bestH = tallest; best = [...cuts, n]; }
+        const last = sum(start, n) + tail;
+        const tallest = Math.max(acc, last);
+        const heights = [...cuts, n].map((end, i, ends) =>
+          sum(i ? ends[i - 1] : 0, end) + (i === cols - 1 ? tail : 0));
+        const spread = Math.max(...heights) - Math.min(...heights);
+        if (tallest < bestH - 1e-9
+          || (tallest < bestH + 1e-9 && spread < bestSpread - 1e-9)) {
+          bestH = tallest; bestSpread = spread; best = [...cuts, n];
+        }
         return;
       }
-      for (let end = start; end <= n; end++) cut(end, c + 1, Math.max(acc, sum(start, end)), [...cuts, end]);
+      /* A run may not be empty while there are groups to go round: an
+         empty column under the map is a hole, and the search will happily
+         find one now the map is short enough to push everything below it.
+         Only a house with fewer groups than columns gets one. */
+      const first = n - start > cols - c ? start + 1 : start;
+      for (let end = first; end <= n; end++) cut(end, c + 1, Math.max(acc, sum(start, end)), [...cuts, end]);
     };
     cut(0, 0, 0, []);
     columns = `<div class="devgrid">` + best.map((end, c) => `<div class="devcol">`
@@ -8894,10 +8964,10 @@ const BODIES = {
       + `${tile(offline, "offline", offline > 0)}${tile(partial, "partly offline", partial > 0)}${key}</div>`;
     let out = `<div class="devbox">`;
 
-    const { groups, quiet } = devicesGroups(networks, problems, what, stateOf);
-    const map = networks.length ? devicesMap(networks, problems, stateOf) : "";
+    const { groups, quiet } = devicesGroups(networks, problems, what, stateOf, b.icons);
+    const map = networks.length ? devicesMap(networks, problems, stateOf, b.icons) : "";
     out += `<div class="devbody">`
-      + [1, 2, 3].map((cols) => devicesLayout(tiles, map, groups, quiet, cols)).join("") + `</div>`;
+      + [1, 2, 3].map((cols) => devicesLayout(tiles, map, groups, quiet, cols, networks.length)).join("") + `</div>`;
     return out + `</div>`;
   },
   list(b) {
