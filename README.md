@@ -768,6 +768,11 @@ body:
   partial:   {entity: sensor.devices, attribute: partial}
   problems:  {entity: sensor.devices, attribute: problems}
   networks:  {entity: sensor.devices, attribute: networks}
+  icons:
+    home: mdi:home
+    Hue: mdi:lightbulb
+    Zigbee: mdi:access-point
+    Cast: mdi:cast
 ```
 
 Three numbers first — connected, offline, partly offline — because they are
@@ -775,10 +780,21 @@ the part read from the doorway.
 
 **Then the house's networks as a map**, at every width: HOME on the left, a
 trunk down from it, and a hub per network branching off in the sensor's
-order. Each hub carries its `53/56` and a bar saying how much of that network
-is answering. Trouble is yellow — a dashed branch, a yellow hub, and yellow in
+order. Each row carries its icon, its name, a bar saying how much of that
+network is answering, and its `53/56` at the end — one row rather than a
+pill beside a bar. Trouble is yellow — a dashed branch, a yellow icon, and yellow in
 the bar — so five dead speakers read as one sick Cast network without a word
-of explanation.
+of explanation. **The icon is the part that says "something here", the bar
+the part that says "how much"**: a network with one device down out of sixty
+draws as very nearly healthy, and that is exactly the case a composition bar
+cannot carry on its own.
+
+`icons` is a glyph per network, keyed by the name the sensor reports, plus
+`home` for the house itself. **It comes from the dashboard and not from
+here**: a card has no business knowing that Hue is a lightbulb, and a house
+that renames a network or adds one should not need a card release. A network
+with no icon named gets the generic one. The same glyph appears beside its
+group in the list, so the two halves are read together.
 
 **Every bar is the same length**, because each one is its own network's
 composition rather than its size. Scaled by device count the one network

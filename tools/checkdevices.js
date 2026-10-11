@@ -57,6 +57,8 @@ const js = fs.readFileSync(file);
       if (!ok) problems.push(`${name}: ${got}`);
     };
     const frame = () => new Promise((r) => requestAnimationFrame(r));
+    /* A group header leads with its icon now, so the name is its span. */
+    const headName = (h) => (h.querySelector("span") || h).textContent;
     const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString();
 
     /* The house on 24 Sep 2026, as sensor.devices reports it. */
@@ -99,7 +101,7 @@ const js = fs.readFileSync(file);
     // ---- the list: by network, a row per problem, nothing linking it to the map
     const rows = [...lay(today.root).querySelectorAll(".devrow")];
     check("a row per problem", rows.length === 3, rows.length);
-    const heads = [...lay(today.root).querySelectorAll(".devroom")].map((r) => r.firstChild.textContent);
+    const heads = [...lay(today.root).querySelectorAll(".devroom")].map((r) => headName(r));
     check("rows grouped by network, a problem off the map under Other", heads.join("|") === "Hue|Other", heads.join("|"));
     check("an offline row says offline, for how long, and the room",
       /offline/.test(rows[0].textContent) && /3d/.test(rows[0].textContent) && /Ensuite/.test(rows[0].textContent), rows[0].textContent);
@@ -217,9 +219,17 @@ const js = fs.readFileSync(file);
         bars.filter((b) => Math.round(Number(b.getAttribute("y")))
           === ys[[...map.querySelectorAll(".hubname")].map((t) => t.textContent).indexOf("Zigbee")]).length === 1,
         "segmented");
+      /* The pill went with the dots. The network's own icon carries the
+         level now -- which is the one thing a composition bar cannot say,
+         because a network with one device down out of sixty still draws
+         as very nearly healthy. */
+      const art = [...map.querySelectorAll(".devart")].filter((a) => !a.classList.contains("home"));
+      check(`${label}: an icon per network, and the house's own`,
+        art.length === 5 && map.querySelectorAll(".devart.home").length === 1, art.length);
       check(`${label}: a network with a problem wears the level; one without does not`,
-        map.querySelectorAll(".hub.hot").length === 4 && map.querySelectorAll(".hub").length === 5, "hubs");
-      const order = [...list.querySelectorAll(".devroom")].map((h) => h.firstChild.textContent);
+        art.filter((a) => a.classList.contains("hot")).length === 4,
+        art.filter((a) => a.classList.contains("hot")).length);
+      const order = [...list.querySelectorAll(".devroom")].map((h) => headName(h));
       check(`${label}: networks in the map's order, the healthy one left out`,
         order.join("|") === "Hue|Tado|Cast|Wi-Fi & cloud", order.join("|"));
       check(`${label}: every problem is a row`, list.querySelectorAll(".devrow").length === 12, list.querySelectorAll(".devrow").length);
@@ -253,7 +263,7 @@ const js = fs.readFileSync(file);
       check(`busy ${ncols} wide: and in every column under it`,
         bcols.length === ncols && bcols.every((col) => col.querySelector(".devgroup")),
         bcols.map((col) => col.querySelectorAll(".devgroup").length).join(","));
-      const border = [...blay.querySelectorAll(".devroom")].map((h) => h.firstChild.textContent);
+      const border = [...blay.querySelectorAll(".devroom")].map((h) => headName(h));
       check(`busy ${ncols} wide: beside, then the columns left to right, walks the networks in order`,
         border.join("|") === NETS6.map((n) => n.name).join("|"), border.join("|"));
       check(`busy ${ncols} wide: nothing overlaps`,

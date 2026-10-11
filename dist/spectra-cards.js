@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.166.0";
+const VERSION = "0.167.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3388,6 +3388,12 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .devmap .on { fill:var(--accent); opacity:.55; }
 .devmap .off { fill:var(--sp-attention); }
 .devmap .part { fill:var(--sp-surface); stroke:var(--sp-attention); stroke-width:1.8; }
+.devmap .devart { display:flex; align-items:center; justify-content:center; color:var(--sp-ink-2); }
+.devmap .devart .mdi, .devmap .devart ha-icon { width:100%; height:100%; }
+.devmap .devart.hot { color:var(--sp-attention); }
+.devmap .devart.home { color:var(--sp-ink); }
+.devroom { align-items:center; }
+.devroom .devroomart { width:13px; height:13px; --mdc-icon-size:13px; color:var(--sp-ink-3); flex:none; }
 .devmap .devbar.on { fill:var(--accent); opacity:.55; }
 .devmap .devbar.off { fill:var(--sp-attention); }
 .devmap .devbar.part { fill:var(--sp-surface); stroke:var(--sp-attention); stroke-width:1.6; }
@@ -6155,41 +6161,51 @@ function planHeat(b) {
   return out;
 }
 
-/* The house's networks as a map: HOME on the left, a hub per network
-   stacked beside it, and a bar per hub saying how much of that network is
-   answering.
+/* The house's networks as a map: HOME on the left, a trunk down from it,
+   and a row per network branching off -- an icon, its name, a bar saying
+   how much of it is answering, and the count at the end.
 
    It was a wheel with a dot per device, and both halves of that were
    wrong. A wheel's bounding box is a square and its content is a ring, so
    the corners are empty at every width -- which is most of the drawing in
-   one column. And the dots carried a count that the hub already prints
-   exactly, at a size nobody can resolve: two and a half pixels across.
+   one column. And the dots carried a count the row already prints exactly,
+   at two and a half pixels across.
 
    The bars are all the same length on purpose. Scaled by device count the
    one network actually in trouble is the smallest mark on the card --
    three of eight answering, drawn an eighth as wide as a healthy sixty.
    Each bar is its own network's composition instead, so a network that is
-   two thirds down looks two thirds down whatever its size. How many
-   devices it has is on the hub, which is where a number belongs. */
-function devicesMap(networks, problems, stateOf) {
+   two thirds down looks two thirds down whatever its size.
+
+   `icons` comes from the dashboard, not from here: a card has no business
+   knowing that Hue is a lightbulb, and the house's own names live in the
+   dashboard YAML beside everything else real. A network the map has no
+   icon for gets the generic one rather than nothing. */
+function devicesMap(networks, problems, stateOf, icons) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-  const ROW = 38, W = 420, PAD = 12, BH = 11;
+  const ROW = 32, W = 420, PAD = 10, BH = 11;
   const H = networks.length * ROW + PAD * 2;
   const f = (v) => v.toFixed(1);
-  const HOME_X = 10, HOME_W = 54, TRUNK = HOME_X + HOME_W + 14;
-  const HUB_X = TRUNK + 16;
-  /* One pill width for every network, so the names line up, the counts
-     line up, and every bar starts in the same place -- which is what lets
-     one network's bar be read against another's at all. */
+  /* An icon is HTML -- `ha-icon` for anything the bundle has no path for --
+     so it reaches the drawing through a foreignObject. The alternative was
+     bundling a path per network, which would put the card right back in
+     the business of knowing what networks a house has. */
+  const art = (name, x, y, size, cls) => `<foreignObject x="${f(x)}" y="${f(y)}"`
+    + ` width="${size}" height="${size}"><div class="devart ${cls}"`
+    + ` style="width:${size}px;height:${size}px;--mdc-icon-size:${size}px">`
+    + `${iconMarkup(name)}</div></foreignObject>`;
+
+  const HOME_S = 30, HOME_X = 8, TRUNK = HOME_X + HOME_S + 16;
+  const ICON_S = 16, ICON_X = TRUNK + 12, NAME_X = ICON_X + ICON_S + 7;
   const total = (n) => num(n.online) + num(n.offline) + num(n.partial);
-  const HUB_W = Math.max(...networks.map((n) => String(n.name).length * 6.3
-    + String(`${num(n.online)}/${total(n)}`).length * 6.3 + 26));
-  const BAR_X = HUB_X + HUB_W + 14, BAR_W = W - 10 - BAR_X;
+  /* The name and the count are the two ends of a row, so each gets a
+     column as wide as the longest of them and the bars line up between. */
+  const NAME_W = Math.max(...networks.map((n) => String(n.name).length * 6.3)) + 10;
+  const OF_W = Math.max(...networks.map((n) => String(`${num(n.online)}/${total(n)}`).length * 6.3)) + 6;
+  const BAR_X = NAME_X + NAME_W, BAR_W = W - 8 - OF_W - 6 - BAR_X;
   const mid = PAD + (networks.length * ROW) / 2;
 
-  let spokes = "", bars = "", hubs = "", named = 0;
-  /* One trunk down from HOME with a branch per network. A tree says "one
-     house, several networks" in a rectangle; a wheel needs a square. */
+  let spokes = "", bars = "", text = "", glyphs = "", named = 0;
   spokes += `<path class="spoke" d="M${TRUNK},${f(PAD + ROW / 2)} L${TRUNK},${f(H - PAD - ROW / 2)}"/>`;
 
   networks.forEach((n, i) => {
@@ -6198,20 +6214,18 @@ function devicesMap(networks, problems, stateOf) {
     const all = total(n);
     const hot = off + part > 0;
     named += problems.filter((p) => String(p.network) === String(n.name)).length;
-    spokes += `<path class="spoke${hot ? " hot" : ""}" d="M${TRUNK},${f(y)} L${f(HUB_X)},${f(y)}"/>`;
-
-    const of = `${on}/${all}`;
-    const h = hot ? " hot" : "";
-    hubs += `<rect class="hub${h}" x="${f(HUB_X)}" y="${f(y - 11.5)}" width="${f(HUB_W)}" height="23" rx="11.5"/>`
-      + `<text class="hubname${h}" x="${f(HUB_X + 10)}" y="${f(y + 4)}">${esc(n.name)}</text>`
-      + `<text class="hubof${h}" x="${f(HUB_X + HUB_W - 10)}" y="${f(y + 4)}" text-anchor="end">${of}</text>`;
+    spokes += `<path class="spoke${hot ? " hot" : ""}" d="M${TRUNK},${f(y)} L${f(ICON_X - 5)},${f(y)}"/>`;
+    /* The icon carries the yellow as well as the bar. A network with one
+       device down out of sixty is a bar that still reads as healthy, and
+       "something here wants looking at" is worth saying on its own. */
+    glyphs += art(devIcon(icons, n.name), ICON_X, y - ICON_S / 2, ICON_S, hot ? "hot" : "");
+    text += `<text class="hubname" x="${f(NAME_X)}" y="${f(y + 4)}">${esc(n.name)}</text>`
+      + `<text class="hubof" x="${W - 8}" y="${f(y + 4)}" text-anchor="end">${on}/${all}</text>`;
 
     /* Answering, then partly, then offline -- the order the key is in and
        the order the list is in, so the three say the same thing. */
     const parts = [[on, "on"], [part, "part"], [off, "off"]].filter(([c]) => c > 0);
     if (!parts.length) return;
-    /* A hairline of surface between segments, the same reason the stacked
-       columns have one: two neighbours must never read as one. */
     const GAP = 2, MIN = 3;
     const avail = BAR_W - (parts.length - 1) * GAP;
     const widths = parts.map(([c]) => Math.max(MIN, (c / Math.max(all, 1)) * avail));
@@ -6233,9 +6247,17 @@ function devicesMap(networks, problems, stateOf) {
 
   return `<svg class="devmap" viewBox="0 0 ${W} ${H}" role="img" `
     + `aria-label="${esc(`${networks.length} networks, ${named} device${named === 1 ? "" : "s"} not fully answering`)}">`
-    + spokes + bars + hubs
-    + `<rect class="core" x="${HOME_X}" y="${f(mid - 12)}" width="${HOME_W}" height="24" rx="4"/>`
-    + `<text class="coretxt" x="${HOME_X + HOME_W / 2}" y="${f(mid + 3.5)}" text-anchor="middle">HOME</text></svg>`;
+    + spokes + bars + text + glyphs
+    + art(devIcon(icons, null), HOME_X, mid - HOME_S / 2, HOME_S, "home")
+    + `</svg>`;
+}
+
+/* Which glyph a network wears. `null` asks for the house itself. */
+function devIcon(icons, name) {
+  const map = icons && typeof icons === "object" ? icons : {};
+  if (name === null) return isBlank(map.home) ? "mdi:home" : String(map.home);
+  const own = map[name];
+  return isBlank(own) ? "mdi:lan-connect" : String(own);
 }
 
 /* Every device not fully answering, grouped by network in the map's order,
@@ -6245,7 +6267,7 @@ function devicesMap(networks, problems, stateOf) {
    quiet line at the end, so "Zigbee is fine" is still said. A problem on a
    network the map does not draw is still a row, under "Other": the list
    may never be shorter than the Needs you row behind it. */
-function devicesGroups(networks, problems, what, stateOf) {
+function devicesGroups(networks, problems, what, stateOf, icons) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const rank = (p) => (p.state === "offline" ? 0 : 1);
   const byName = (p, q) => rank(p) - rank(q) || String(p.name).localeCompare(String(q.name));
@@ -6264,7 +6286,8 @@ function devicesGroups(networks, problems, what, stateOf) {
       continue;
     }
     mine.forEach((p) => placed.add(p));
-    group(`<p class="devroom">${esc(n.name)}<span class="of">${on}/${all}</span></p>`, mine);
+    group(`<p class="devroom">${iconMarkup(devIcon(icons, n.name), "devroomart")}`
+      + `<span>${esc(n.name)}</span><span class="of">${on}/${all}</span></p>`, mine);
   }
   const other = problems.filter((p) => !placed.has(p)).sort(byName);
   if (other.length) group(`<p class="devroom">${networks.length ? "Other" : "Not answering"}</p>`, other);
@@ -8923,8 +8946,8 @@ const BODIES = {
       + `${tile(offline, "offline", offline > 0)}${tile(partial, "partly offline", partial > 0)}${key}</div>`;
     let out = `<div class="devbox">`;
 
-    const { groups, quiet } = devicesGroups(networks, problems, what, stateOf);
-    const map = networks.length ? devicesMap(networks, problems, stateOf) : "";
+    const { groups, quiet } = devicesGroups(networks, problems, what, stateOf, b.icons);
+    const map = networks.length ? devicesMap(networks, problems, stateOf, b.icons) : "";
     out += `<div class="devbody">`
       + [1, 2, 3].map((cols) => devicesLayout(tiles, map, groups, quiet, cols, networks.length)).join("") + `</div>`;
     return out + `</div>`;
