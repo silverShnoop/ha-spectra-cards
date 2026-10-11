@@ -4302,6 +4302,24 @@ function sinceBoth(value) {
   return `${ago} ago \u00b7 ${when}`;
 }
 
+/* A row's second line, with its time worded here rather than by whoever
+   sent the row. home_signals sends `since` as a timestamp and, optionally,
+   `since_label` ("Quiet", "Wet", "Unlocked"); the words come from
+   sinceBoth, the same as every other past time on the panel. Before this
+   the integration wrote its own "quiet since 21:47" into `detail`, which
+   is how a tracker quiet for thirteen days came to read as a time this
+   evening while the Who's home card beside it said 13d.
+
+   The time leads: "how long" is the half you act on. A `since` that is not
+   a timestamp (a list that has already worded it) is left alone. */
+function rowSub(r) {
+  const sub = firstOf(r.sub, r.detail);
+  const ago = isBlank(r.since) ? null : sinceBoth(r.since);
+  if (ago === null) return sub;
+  const when = isBlank(r.since_label) ? ago : `${r.since_label} ${ago}`;
+  return isBlank(sub) ? when : `${when} \u00b7 ${sub}`;
+}
+
 /* Home Assistant resolves "auto" against the operating system for us, so
    hass.themes.darkMode is already the answer to "is this panel dark right
    now" — no need to watch the media query separately. Stamping it on the
@@ -8978,7 +8996,7 @@ const BODIES = {
       const r = source || {};
       /* home_signals' Needs you contract names these title and detail. */
       const name = firstOf(r.name, r.title);
-      const sub = firstOf(r.sub, r.detail);
+      const sub = rowSub(r);
       const label = firstOf(r.action_label, r.button);
       const hasAction = Boolean(r.action) && !isBlank(label);
       /* A second, quieter button -- Dismiss beside Open on a finished AI
