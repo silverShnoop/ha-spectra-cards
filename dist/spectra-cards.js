@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.165.1";
+const VERSION = "0.165.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4224,7 +4224,7 @@ function spanOf(start, end) {
   return rest ? `${hours}h ${rest}m` : `${hours}h`;
 }
 
-/** "2m", "1h 12m", "3d 4h" — the rail's and the strip's unit of time. */
+/** "2m", "1h 12m", "1d 4h", "13d" — the rail's and the strip's unit of time. */
 /* How long, in the panel's one way of saying it.
  *
  * Split out of `shortSince` when the phase strip needed to say how long a
@@ -4239,7 +4239,11 @@ function shortDuration(secs) {
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return hours + "h" + (mins % 60 ? ` ${mins % 60}m` : "");
+  /* From two days on, days alone: nobody acts differently on the hours of
+     a fortnight, and "13d 14h" is two numbers where one will do. The
+     Needs you rows (home_signals' `_duration`) cut at the same place. */
   const days = Math.floor(hours / 24);
+  if (days >= 2) return `${days}d`;
   return days + "d" + (hours % 24 ? ` ${hours % 24}h` : "");
 }
 
