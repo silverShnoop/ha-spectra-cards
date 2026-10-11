@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.165.2";
+const VERSION = "0.165.3";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -5600,11 +5600,19 @@ function pickerInfo(extra, manual, nextText) {
    instead -- the same rooms, the same names, the same colours, reported by
    the same sensor. Reading both here is what lets one card serve a room with
    a schedule and a room without, rather than the absence of a catalogue
-   quietly costing the second one its scene colour and symbol. */
+   quietly costing the second one its scene colour and symbol.
+
+   Both, not either. A hand-written `scenes` list names the smart scene and
+   whichever others somebody thought to type, and the scenes the schedule
+   actually runs were never among them -- so every block on the strip had no
+   entity, and a drag along it chose nothing. The sensor's list is complete,
+   so it fills in whatever the config left out; the config still wins on a
+   name both carry, for its symbol. */
 function sceneCatalogue(b) {
-  if (Array.isArray(b.scenes) && b.scenes.length) return b.scenes;
-  if (Array.isArray(b.drawer_scenes)) return b.drawer_scenes;
-  return [];
+  const own = Array.isArray(b.scenes) ? b.scenes.filter(Boolean) : [];
+  const reported = Array.isArray(b.drawer_scenes) ? b.drawer_scenes.filter(Boolean) : [];
+  const named = new Set(own.map((scene) => String(scene.name)));
+  return own.concat(reported.filter((scene) => !named.has(String(scene.name))));
 }
 
 /* The catalogue entry for a scene the schedule names, if there is one. The
