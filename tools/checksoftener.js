@@ -151,7 +151,7 @@ const js = fs.readFileSync(file);
     await show(sides(30, 0, { read_at: hoursAgo(60) }));
     check("past the lag it goes hollow", !!q(".saltread.stale"), line());
     check("and says there is no new reading",
-      /^No new reading · last 2d 12h ago/.test(line() || ""), line());
+      /^No new reading · last 2d ago/.test(line() || ""), line());
 
     await show(sides(30, 0, { read_at: hoursAgo(30), stale_after_hours: 26 }));
     check("stale_after_hours moves the line", !!q(".saltread.stale"), line());
