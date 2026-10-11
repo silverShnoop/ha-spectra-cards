@@ -7,6 +7,8 @@
  *   - so lifting on a block that is not the current one calls scene.turn_on
  *     for that block's scene
  *   - and the config's symbol still wins for a scene both lists name
+ *   - from Auto, the card says Manual from the lift, not when the bridge
+ *     catches up; and Auto pressed over that pending pick goes back to Auto
  *
  * Found on the panel: on a room following its schedule, no block could be
  * chosen at all, because the strip's scenes were missing from the config list
@@ -106,6 +108,37 @@ const js = fs.readFileSync(file);
   const hit = calls.find((c) => c.domain === "scene" && c.service === "turn_on");
   const target = hit && JSON.stringify(hit.target || hit.data);
   check("lifting on Sleepy turns Sleepy on", Boolean(target) && target.includes("scene.kitchen_sleepy"), JSON.stringify(calls));
+
+  /* The bridge has not answered: the sensor still says Golden hours. The
+     card says Manual anyway, from the lift. */
+  const shown = await page.evaluate(() => {
+    const root = card.shadowRoot;
+    const thumb = root.querySelector("[data-pick] .thumb");
+    const button = root.querySelector("[data-pickmode]");
+    const on = root.querySelector("[data-pick] .strip i.on");
+    return {
+      autoThumb: thumb.classList.contains("auto"),
+      button: button && button.getAttribute("aria-pressed"),
+      mode: button && button.getAttribute("data-pickmode"),
+      info: root.querySelector(".pickinfo").textContent,
+      on: on && on.getAttribute("data-label"),
+    };
+  });
+  check("the chosen block stays ringed", shown.on === "Sleepy", JSON.stringify(shown));
+  check("the circle leaves the clock", !shown.autoThumb, JSON.stringify(shown));
+  check("the auto button goes out", shown.button === "false" && shown.mode === "auto", JSON.stringify(shown));
+  check("the line says Manual", shown.info.startsWith("Manual"), JSON.stringify(shown));
+
+  /* And Auto pressed while that pick is still pending hands the room back. */
+  await page.evaluate(() => card.shadowRoot.querySelector("[data-pickmode]").click());
+  await page.waitForTimeout(200);
+  const back = await page.evaluate(() => ({
+    autoThumb: card.shadowRoot.querySelector("[data-pick] .thumb").classList.contains("auto"),
+    info: card.shadowRoot.querySelector(".pickinfo").textContent,
+    last: window.calls[window.calls.length - 1],
+  }));
+  check("Auto over a pending pick goes back to Auto", back.autoThumb && back.info.startsWith("Auto"), JSON.stringify(back));
+  check("and turns the smart scene on", JSON.stringify(back.last).includes("scene.kitchen_golden_hours"), JSON.stringify(back.last));
 
   await browser.close();
   server.close();
