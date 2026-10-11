@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.165.3";
+const VERSION = "0.165.4";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -15305,6 +15305,15 @@ class SpectraCard extends HTMLElement {
       this._signature = null;
       this._update();
     }, 12000);
+    /* Choosing a scene for a scheduled room is leaving its schedule, and
+       says so from the press. Claiming only the scene moved the block but
+       left the room in Auto until the bridge caught up: the circle went
+       back to the clock wearing the auto symbol, the button stayed lit and
+       the line went on promising the next slot -- a choice that looked
+       refused for a second or two. A lamp's pick is the lamp's own, and a
+       room with no schedule has no mode to leave. */
+    const body = this._model && this._model.body;
+    if (!/^lamp-/.test(key || "") && body && pickerState(body)) this._wantMode("manual");
     this._work(() => this._callAction({
       service: "scene.turn_on", target: { entity_id: entity },
     }));
@@ -15847,9 +15856,20 @@ class SpectraCard extends HTMLElement {
            the render that follows is built from the wanted state so the
            answer survives it. */
         if (mode === "auto" || mode === "manual") {
+          /* Handing the room back outranks a scene still waiting on the
+             bridge: that pick would otherwise go on claiming Manual. */
+          const dropped = mode === "auto" && this._pick && !/^lamp-/.test(this._pick.key || "");
+          if (dropped) {
+            this._pick = null;
+            if (this._pickGiveUp) { clearTimeout(this._pickGiveUp); this._pickGiveUp = null; }
+          }
           el.classList.toggle("on", mode === "auto");
           el.setAttribute("aria-pressed", mode === "auto" ? "true" : "false");
           this._wantMode(mode);
+          /* The button can answer for itself, but the circle and the line
+             are still drawn from the pick; with the spinner already running
+             nothing else would redraw them until the bridge speaks. */
+          if (dropped) { this._signature = null; this._update(); }
         }
         this._pressedAt = Date.now();
         flashPress(el);
