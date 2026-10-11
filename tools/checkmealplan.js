@@ -346,7 +346,12 @@ const js = fs.readFileSync(file);
       const f = new File([blob], "big.png", { type: "image/png" });
       /* shrinkPhoto is module scope; reach it through _mealPhoto's input. */
       let got = null;
-      const fake = { _voiceSay() {}, _holder: document.body,
+      /* `_pickPhoto` is borrowed rather than stubbed: the real one is what
+         makes the file input, and a stub of it would leave this testing a
+         fixture instead of the card. It holds the card still while the
+         camera is up, so the stub carries the two fields that touches. */
+      const fake = { _voiceSay() {}, _holder: document.body, _update() {},
+        _camera: false, _signature: null, _pickPhoto: rc._pickPhoto,
         _mealCall: (s, d) => { got = d.image; return Promise.resolve({ media_content_id: "m" }); } };
       const p = rc._mealPhoto.call(fake, "home_signals.save_photo", "cookbook");
       const input = document.body.querySelector('input[type="file"]');
