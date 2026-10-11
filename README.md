@@ -223,7 +223,7 @@ rows: {entity: sensor.needs_you, attribute: items}
 | `entity` | Required; marks the object as a reference. |
 | `attribute` | Read this attribute instead of the state. |
 | `index` | With `forecast`: take one entry rather than a series, for a metric that wants a number. |
-| `format` | `since` (a past timestamp as `47m ago · 13:51` — **the default for anything that has already happened**), `relative` (the duration half alone, `2m`, `1h 12m`, `3d 4h`), `time` (a timestamp as local `19:15`, for times still to come), `round` with `digits`, `title`. |
+| `format` | `since` (a past timestamp as `47m ago · 13:51` — **the default for anything that has already happened**), `relative` (the duration half alone, `2m`, `1h 12m`, `1d 4h`, and days alone from two days on, `13d`), `time` (a timestamp as local `19:15`, for times still to come), `round` with `digits`, `title`. |
 | `map` | Value-to-value lookup, applied before `format`. |
 | `prefix`, `suffix` | Concatenated onto the result. |
 | `fallback` | Used when the entity is missing, `unknown` or `unavailable`. |
@@ -400,10 +400,18 @@ An action row:
 - icon: mdi:hanger
   level: attention
   title: Hang the washing
-  detail: Door opened 14m ago
+  since: "2026-09-19T08:00:00+01:00"
+  since_label: Finished
   action: {service: script.laundry_done}
   action_label: Done
 ```
+
+A row's time is a timestamp in `since`, never words in `detail`. The list
+writes it the way every past time on the panel is written, led by
+`since_label` and followed by any `detail`: `Finished 2h ago · 08:00`. A row
+that worded its own time is how a tracker quiet for thirteen days once read
+"quiet since 21:47" beside a Who's home card saying 13d. A `since` that is
+not a timestamp is ignored.
 
 The button is drawn at the reference size and given a 44px hit area; the row
 grows to contain it, so two stacked buttons cannot overlap each other's
