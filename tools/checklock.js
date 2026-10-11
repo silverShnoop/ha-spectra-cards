@@ -8,6 +8,11 @@
  * the distinction: it is not a state of the door, it is why the door did
  * not reach one.
  *
+ * And the one act that opens the house asks first by default. An
+ * `unlock` whose config forgot its `confirm` used to fire the moment it
+ * was touched; now only `confirm: false` makes it do that, and `lock`
+ * never asks.
+ *
  *   node tools/checklock.js [path/to/spectra-cards.js]
  */
 const { chromium } = require("playwright");
@@ -164,6 +169,48 @@ const js = fs.readFileSync(file);
     check("and an escalating door is outlined",
       q(".card").classList.contains("outlined"), q(".card").className);
 
+    // ---- the question is the default, not a courtesy of the config
+    /* lock.unlock opens the house, so it asks whether or not the action
+       carries a `confirm`. The config keeps the last word: its own
+       `confirm` replaces the question, and `confirm: false` removes it. */
+    const BARE = { service: "lock.unlock", target: { entity_id: "lock.front_door" } };
+    await show({ type: "lock", state: "Locked", accent: 3,
+      sub: "3h 12m ago \u00b7 11:40", action: { lock: ACTS.lock, unlock: BARE } });
+    calls.length = 0;
+    q(".lockbtn").click();
+    await settle();
+    check("an unlock with no confirm key still asks first",
+      !!q(".confirmwrap") && calls.length === 0,
+      `${q(".confirmwrap") ? "asked" : "no dialog"}, ${calls.join(",") || "no calls"}`);
+    check("...with a question that names the act",
+      /unlock/i.test(txt(".confirmhead") || ""), txt(".confirmhead"));
+    if (q("[data-yes]")) q("[data-yes]").click();
+    await settle();
+    check("...and goes through once answered",
+      calls.join(",") === "lock.unlock", calls.join(",") || "no calls");
+
+    await show({ type: "lock", state: "Locked", accent: 3,
+      sub: "3h 12m ago \u00b7 11:40",
+      action: { lock: ACTS.lock, unlock: Object.assign({ confirm: false }, BARE) } });
+    calls.length = 0;
+    q(".lockbtn").click();
+    await settle();
+    check("confirm: false switches the question off and fires straight away",
+      !q(".confirmwrap") && calls.join(",") === "lock.unlock",
+      `${q(".confirmwrap") ? "asked" : "no dialog"}, ${calls.join(",") || "no calls"}`);
+
+    /* Shutting a door is the right way to be wrong, so lock.lock never
+       asks -- with a bare action here, and with the full one in the
+       "locking does not ask" check above. */
+    await show({ type: "lock", state: "Unlocked", accent: 2,
+      sub: "3m ago \u00b7 14:51", action: { lock: ACTS.lock, unlock: BARE } });
+    calls.length = 0;
+    q(".lockbtn").click();
+    await settle();
+    check("lock.lock never asks",
+      !q(".confirmwrap") && calls.join(",") === "lock.lock",
+      `${q(".confirmwrap") ? "asked" : "no dialog"}, ${calls.join(",") || "no calls"}`);
+
     // ---- jammed
     /* The hero vocabulary is two words. A jam is the mechanism failing to
        reach one of them, and the honest reading is that the door is not
@@ -226,6 +273,10 @@ const js = fs.readFileSync(file);
     await new Promise((r) => requestAnimationFrame(r));
     q(".lockbtn").click();
     await settle();
+    /* This unlock carries no `confirm`, so it asks by default; the press
+       that is answered below is the one that says yes. */
+    if (q("[data-yes]")) q("[data-yes]").click();
+    await settle();
     /* Nothing re-renders for PRESS_HOLD_MS, on purpose: a render here
        would replace the button before it could flash, and the flash is
        what answers the press in the first 280ms. checkpress covers that
@@ -261,7 +312,7 @@ const js = fs.readFileSync(file);
 
   console.log(fails.length
     ? `FAILED (${fails.length})`
-    : "OK (lock: three words, one act, and it asks)");
+    : "OK (lock: three words, one act, and it asks -- by default)");
   await browser.close();
   server.close();
   process.exit(fails.length ? 1 : 0);
