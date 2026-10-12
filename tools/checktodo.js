@@ -675,6 +675,75 @@ const js = fs.readFileSync(file);
     check("with no list to write to, a tick calls nothing",
       calls.length === 0, JSON.stringify(calls));
 
+    /* ---- Deadlines ------------------------------------------------
+       A list of routines: every row has a time, and the chip wears the
+       level a Needs you row would -- attention on the day, waiting once
+       the time has gone -- so the two cannot disagree. Opt-in, because
+       those colours promise the row exists. */
+    await show({});
+    await rest();
+    const iso = (d) => {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+    };
+    const now = new Date();
+    const inAnHour = new Date(now.getTime() + 3600000);
+    const anHourAgo = new Date(now.getTime() - 3600000);
+    const threeDays = new Date(now.getTime() + 3 * 86400000);
+    const lastWeek = new Date(now.getTime() - 6 * 86400000);
+    const ROUTINES = [
+      { uid: "r1", summary: "Feed the cat", status: "needs_action", due: iso(inAnHour) },
+      { uid: "r2", summary: "Bins out", status: "needs_action", due: iso(anHourAgo) },
+      { uid: "r3", summary: "Water the plants", status: "needs_action", due: iso(threeDays) },
+      { uid: "r4", summary: "Clean the filter", status: "needs_action", due: iso(lastWeek) },
+      { uid: "r5", summary: "Empty dishwasher", status: "completed", due: iso(anHourAgo) },
+    ];
+    await show({ list: "todo.routines", items: ROUTINES, columns: 1, deadlines: true });
+    const chipOf = (name) => {
+      const row = all(".tditem").find((x) => x.querySelector(".tdname").firstChild.textContent === name);
+      return row ? row.querySelector(".tdby") : null;
+    };
+    const hhmm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const sameDay = inAnHour.getDate() === now.getDate() && anHourAgo.getDate() === now.getDate();
+    if (sameDay) {
+      check("a deadline later today says by when, in ochre",
+        chipOf("Feed the cat") && chipOf("Feed the cat").textContent === `by ${hhmm(inAnHour)}`
+          && chipOf("Feed the cat").classList.contains("today"),
+        chipOf("Feed the cat") && chipOf("Feed the cat").outerHTML);
+      check("one that has passed says was, in orange",
+        chipOf("Bins out") && chipOf("Bins out").textContent === `was ${hhmm(anHourAgo)}`
+          && chipOf("Bins out").classList.contains("late"),
+        chipOf("Bins out") && chipOf("Bins out").outerHTML);
+      const tone = (el) => getComputedStyle(el).borderColor;
+      check("and the two are different colours",
+        tone(chipOf("Feed the cat")) !== tone(chipOf("Bins out")),
+        `${tone(chipOf("Feed the cat"))} / ${tone(chipOf("Bins out"))}`);
+    } else {
+      console.log("  (skipped the same-day chips: running within an hour of midnight)");
+    }
+    check("a deadline later in the week names the day, in no colour",
+      chipOf("Water the plants") && /^[A-Z][a-z]{2} \d\d:\d\d$/.test(chipOf("Water the plants").textContent)
+        && !chipOf("Water the plants").classList.contains("today")
+        && !chipOf("Water the plants").classList.contains("late"),
+      chipOf("Water the plants") && chipOf("Water the plants").outerHTML);
+    check("one missed last week says which day it was",
+      chipOf("Clean the filter") && /^was [A-Z][a-z]{2}$/.test(chipOf("Clean the filter").textContent)
+        && chipOf("Clean the filter").classList.contains("late"),
+      chipOf("Clean the filter") && chipOf("Clean the filter").textContent);
+    check("a ticked row has no chip: the deadline is met",
+      chipOf("Empty dishwasher") === null, "has a chip");
+    check("and no quiet due line is drawn alongside the chips",
+      all(".tddue").length === 0, all(".tddue").length);
+    check("the chip ticks by the clock, so by becomes was on time",
+      el._live === true, el._live);
+
+    await show({ list: "todo.routines", items: ROUTINES, columns: 1 });
+    check("without deadlines the list draws as before: a line, no chip",
+      all(".tdby").length === 0 && all(".tddue").length === 4,
+      `${all(".tdby").length} chips, ${all(".tddue").length} lines`);
+    check("and does not tick",
+      el._live === false, el._live);
+
     return problems;
   });
 
