@@ -6874,7 +6874,15 @@ const BODIES = {
      sets one, and it shipped as an empty second line under all
      thirty-one rows. */
   todo(b) {
-    const all = Array.isArray(b.items) ? b.items : [];
+    const given = Array.isArray(b.items) ? b.items : [];
+    /* On a list of routines a ticked row is today's done, not a row
+       waiting to leave: it goes to the Done section below, and comes
+       back up tomorrow unticked when the integration rolls it over. So
+       the items are split here, and `done` need not be configured --
+       though a configured `done` still wins, for a list that gets its
+       finished rows from a sensor that stamps them. */
+    const splitDone = Boolean(b.deadlines) && !Array.isArray(b.done);
+    const all = splitDone ? given.filter((i) => !(i && i.status === "completed")) : given;
     const limit = Number(b.limit) > 0 ? Number(b.limit) : all.length;
     const shown = all.slice(0, limit);
     const two = Number(b.columns) === 2;
@@ -6988,7 +6996,8 @@ const BODIES = {
     };
 
     const cells = section(shown, "");
-    const doneItems = Array.isArray(b.done) ? b.done : [];
+    const doneItems = Array.isArray(b.done) ? b.done
+      : (splitDone ? given.filter((i) => i && i.status === "completed") : []);
     const doneCells = section(doneItems, "done:");
 
     /* An empty list used to return here and nothing else was drawn.

@@ -1768,6 +1768,17 @@ rows home_signals raises. The chip and the row then wear the same level,
 which is the point of taking the level from the same clock: the card and
 the row cannot disagree about which side of 19:00 it is.
 
+**A ticked routine goes to Done today.** On an ordinary list a ticked row
+is on its way out and is struck through where it stands. On a list of
+routines it is today's done: it moves to the Done section under the
+list, ticked, where it can be put back with the same box, and the
+integration brings it back up unticked at the next rollover. So the day's
+record is the section, and it empties itself overnight. `done` need not
+be configured for this; a configured `done` still wins, for a list whose
+finished rows come from a sensor that stamps them. The `items` read must
+not filter by status (`{todo: todo.chores}`, not `status: needs_action`),
+or the ticked rows never reach the card at all.
+
 **It ticks.** `by 19:00` has to become `was 19:00` at 19:00 with nothing
 else on the card moving, so a body with `deadlines` is live, the way a
 `since` is, and re-renders every thirty seconds. Without `deadlines` a

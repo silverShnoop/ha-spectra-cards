@@ -732,10 +732,36 @@ const js = fs.readFileSync(file);
       chipOf("Clean the filter") && chipOf("Clean the filter").textContent);
     check("a ticked row has no chip: the deadline is met",
       chipOf("Empty dishwasher") === null, "has a chip");
+    /* A ticked routine is today's done, not a row waiting to leave: it
+       sits in the Done section underneath, and comes back up tomorrow
+       when the integration rolls it over. No `done` source needed. */
+    const inDone = (name) => Array.from(root().querySelectorAll(".tddone .tdname"))
+      .some((n) => n.firstChild.textContent === name);
+    const inList = (name) => Array.from(root().querySelectorAll(".todolist:not(.tddone .todolist) .tdname"))
+      .filter((n) => !n.closest(".tddone")).some((n) => n.firstChild.textContent === name);
+    check("a ticked routine sits in Done today, under the list",
+      inDone("Empty dishwasher") && !inList("Empty dishwasher"),
+      `done:${inDone("Empty dishwasher")} list:${inList("Empty dishwasher")}`);
+    check("and the ones still to do stay in the list",
+      inList("Feed the cat") && !inDone("Feed the cat"), "misplaced");
+    check("the Done section says Done today and counts them",
+      /done today/i.test(text(".tddonehead") || "") && (text(".tddonecount") || "") === "1",
+      `${text(".tddonehead")} / ${text(".tddonecount")}`);
+    const splitBox = root().querySelector(".tddone .tdbox");
+    check("and the done row's box is ticked, to put it back with",
+      splitBox && splitBox.classList.contains("ticked"), splitBox && splitBox.className);
     check("and no quiet due line is drawn alongside the chips",
       all(".tddue").length === 0, all(".tddue").length);
     check("the chip ticks by the clock, so by becomes was on time",
       el._live === true, el._live);
+
+    /* A configured `done` still wins: a list whose finished rows come
+       from a sensor that stamps them keeps that. */
+    await show({ list: "todo.routines", items: ROUTINES, columns: 1, deadlines: true,
+      done: [{ uid: "d9", summary: "Hoover", status: "completed" }] });
+    check("a configured done source is used instead of the split",
+      inDone("Hoover") && !inDone("Empty dishwasher"),
+      `hoover:${inDone("Hoover")} dishwasher:${inDone("Empty dishwasher")}`);
 
     await show({ list: "todo.routines", items: ROUTINES, columns: 1 });
     check("without deadlines the list draws as before: a line, no chip",
