@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.167.0";
+const VERSION = "0.167.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6201,7 +6201,11 @@ function planHeat(b) {
    icon for gets the generic one rather than nothing. */
 function devicesMap(networks, problems, stateOf, icons) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-  const ROW = 32, W = 420, PAD = 10, BH = 11;
+  /* The text is sized against the list beside it: the drawing renders at
+     about three quarters of its viewBox, so 15 here reads at roughly the
+     list's own 12px. At 10.5 it was eight -- smaller than anything else on
+     the card, on the one part meant to be read from across the room. */
+  const ROW = 38, W = 420, PAD = 12, BH = 13, NAME_FS = 15, OF_FS = 14;
   const H = networks.length * ROW + PAD * 2;
   const f = (v) => v.toFixed(1);
   /* An icon is HTML -- `ha-icon` for anything the bundle has no path for --
@@ -6213,14 +6217,14 @@ function devicesMap(networks, problems, stateOf, icons) {
     + ` style="width:${size}px;height:${size}px;--mdc-icon-size:${size}px">`
     + `${iconMarkup(name)}</div></foreignObject>`;
 
-  const HOME_S = 30, HOME_X = 8, TRUNK = HOME_X + HOME_S + 16;
-  const ICON_S = 16, ICON_X = TRUNK + 12, NAME_X = ICON_X + ICON_S + 7;
+  const HOME_S = 34, HOME_X = 8, TRUNK = HOME_X + HOME_S + 16;
+  const ICON_S = 20, ICON_X = TRUNK + 12, NAME_X = ICON_X + ICON_S + 8;
   const total = (n) => num(n.online) + num(n.offline) + num(n.partial);
   /* The name and the count are the two ends of a row, so each gets a
      column as wide as the longest of them and the bars line up between. */
-  const NAME_W = Math.max(...networks.map((n) => String(n.name).length * 6.3)) + 10;
-  const OF_W = Math.max(...networks.map((n) => String(`${num(n.online)}/${total(n)}`).length * 6.3)) + 6;
-  const BAR_X = NAME_X + NAME_W, BAR_W = W - 8 - OF_W - 6 - BAR_X;
+  const NAME_W = Math.max(...networks.map((n) => String(n.name).length * NAME_FS * 0.6)) + 12;
+  const OF_W = Math.max(...networks.map((n) => String(`${num(n.online)}/${total(n)}`).length * OF_FS * 0.6)) + 6;
+  const BAR_X = NAME_X + NAME_W, BAR_W = W - 8 - OF_W - 8 - BAR_X;
   const mid = PAD + (networks.length * ROW) / 2;
 
   let spokes = "", bars = "", text = "", glyphs = "", named = 0;
@@ -6237,8 +6241,10 @@ function devicesMap(networks, problems, stateOf, icons) {
        device down out of sixty is a bar that still reads as healthy, and
        "something here wants looking at" is worth saying on its own. */
     glyphs += art(devIcon(icons, n.name), ICON_X, y - ICON_S / 2, ICON_S, hot ? "hot" : "");
-    text += `<text class="hubname" x="${f(NAME_X)}" y="${f(y + 4)}">${esc(n.name)}</text>`
-      + `<text class="hubof" x="${W - 8}" y="${f(y + 4)}" text-anchor="end">${on}/${all}</text>`;
+    text += `<text class="hubname" x="${f(NAME_X)}" y="${f(y + NAME_FS * 0.35)}"`
+      + ` style="font-size:${NAME_FS}px">${esc(n.name)}</text>`
+      + `<text class="hubof" x="${W - 8}" y="${f(y + OF_FS * 0.35)}" text-anchor="end"`
+      + ` style="font-size:${OF_FS}px">${on}/${all}</text>`;
 
     /* Answering, then partly, then offline -- the order the key is in and
        the order the list is in, so the three say the same thing. */
