@@ -5523,9 +5523,12 @@ function collectSources(spec, found) {
     return found;
   }
   if (typeof spec.todo === "string") {
+    /* `status: all` fetches both, which is what a list that keeps its
+       ticked rows on show (a day's routines) needs: a completed item
+       is still a row, not a row that has left. */
     found.todos.set(todoKey(spec), {
       entity: spec.todo,
-      status: spec.status || "needs_action",
+      status: spec.status === "all" ? ["needs_action", "completed"] : (spec.status || "needs_action"),
     });
     return found;
   }

@@ -763,6 +763,26 @@ const js = fs.readFileSync(file);
       inDone("Hoover") && !inDone("Empty dishwasher"),
       `hoover:${inDone("Hoover")} dishwasher:${inDone("Empty dishwasher")}`);
 
+    /* The fetch itself. `status: all` is what puts the ticked rows in
+       front of the body at all: the default asks only for what is still
+       to do, and a ticked row simply stopped coming back. */
+    const asked = [];
+    const el2 = document.createElement("spectra-card");
+    el2.setConfig({ type: "custom:spectra-card", title: "Chores",
+      body: { type: "todo", list: "todo.chores", deadlines: true,
+        items: { todo: "todo.chores", status: "all" } } });
+    document.getElementById("a").appendChild(el2);
+    el2.hass = { states: { "todo.chores": { state: "2", attributes: {} } },
+      callService: () => Promise.resolve(),
+      callWS: (msg) => { asked.push(msg); return Promise.resolve({ response: { "todo.chores": { items: [] } } }); } };
+    await new Promise((r) => setTimeout(r, 50));
+    const fetch = asked.find((m) => m.domain === "todo" && m.service === "get_items");
+    check("status: all asks Home Assistant for ticked rows as well",
+      fetch && Array.isArray(fetch.service_data.status)
+        && fetch.service_data.status.includes("completed") && fetch.service_data.status.includes("needs_action"),
+      fetch && JSON.stringify(fetch.service_data));
+    el2.remove();
+
     await show({ list: "todo.routines", items: ROUTINES, columns: 1 });
     check("without deadlines the list draws as before: a line, no chip",
       all(".tdby").length === 0 && all(".tddue").length === 4,

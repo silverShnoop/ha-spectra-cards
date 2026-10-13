@@ -1739,7 +1739,7 @@ underneath.
 body:
   type: todo
   list: todo.chores
-  items: {todo: todo.chores}         # no status filter: today's ticks stay, ticked
+  items: {todo: todo.chores, status: all}   # ticked rows too: today's done stay on show
   deadlines: true
 ```
 
@@ -1776,8 +1776,9 @@ integration brings it back up unticked at the next rollover. So the day's
 record is the section, and it empties itself overnight. `done` need not
 be configured for this; a configured `done` still wins, for a list whose
 finished rows come from a sensor that stamps them. The `items` read must
-not filter by status (`{todo: todo.chores}`, not `status: needs_action`),
-or the ticked rows never reach the card at all.
+ask for `status: all`: the default fetches only what is still to do, so a
+ticked row would simply stop coming back and leave the list, which is
+exactly what happened the first evening.
 
 **It ticks.** `by 19:00` has to become `was 19:00` at 19:00 with nothing
 else on the card moving, so a body with `deadlines` is live, the way a
@@ -3295,6 +3296,9 @@ rows:
     sub:  {field: due}
     icon: mdi:checkbox-blank-outline
 ```
+
+`status` is `needs_action` (the default), `completed`, or `all` for both
+at once — the last for a list that keeps the day's ticked rows on show.
 
 The entity itself is watched, so when someone ticks an item off on their
 phone the count moves, the cache is dropped and the list refetches. Nothing
