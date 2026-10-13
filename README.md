@@ -3302,7 +3302,9 @@ views:
 ```
 
 A square over the cards, bottom right, exactly its own size, that the
-content scrolls under. Pressed, a sheet opens in the middle of the screen
+content scrolls under. 140px by default; `quick_size: 180` on the view
+makes it larger, and the icon and the name grow with it. On a phone it is
+capped at 96px. Pressed, a sheet opens in the middle of the screen
 with the dashboard dimmed behind it: the steps it will take, each with what
 it targets, and **Not yet** and **Confirm**. Nothing is called until
 Confirm. Then the steps run **in writing order, one at a time**: a ring
@@ -3344,7 +3346,7 @@ steps after it are not called, and the sheet says which step and what the
 house answered, in place of the done line. That sheet stays until it is
 dismissed, because a thing the house could not do is worth reading.
 
-On a phone the square sits above the rail and is a little smaller.
+On a phone the square sits above the rail.
 
 `tools/checkquickactions.js` holds the panel to all of it: the window, the
 wrapped window, that nothing is called before Confirm, the order of the
