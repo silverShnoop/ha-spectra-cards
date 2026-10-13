@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.167.1";
+const VERSION = "0.168.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -22060,7 +22060,226 @@ const PANEL_SHEET = `
 .panel.side .needs { width:var(--pn-needs-width, 340px); max-height:none;
   align-self:stretch; padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)); }
 
+/* ---- Quick actions: a scheduled button in the corner ----
+   A square over the cards, bottom right, exactly its own size, that the
+   content scrolls under. Pressed, a sheet opens in the middle of the
+   screen with the dashboard dimmed behind it: the steps it will take,
+   Not yet and Confirm. Confirmed, the steps run in order and each one
+   ticks off as it lands; then one line, and thirty seconds later the
+   sheet goes by itself.
+
+   Not a card and not the rail. It is ink on paper where the rail is
+   surface with an edge, a square where a rail button is a wide
+   rectangle, and it names a thing to do rather than a state -- so it
+   never wears a level or an accent. Moss appears only on a tick, after
+   the step has happened. */
+.quick { position:absolute; right:var(--pn-gap); bottom:16px; z-index:7;
+  display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+.quick:empty { display:none; }
+.panel.phone .quick { bottom:calc(var(--pn-rail-h, 76px) + 10px); right:12px; }
+.qa { position:relative; display:inline-flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:7px; width:112px; height:112px; padding:0 8px; margin:0;
+  box-sizing:border-box; border-radius:6px; cursor:pointer;
+  font:inherit; font-size:15px; font-weight:600; letter-spacing:.01em; line-height:1.15; text-align:center;
+  background:var(--sp-ink); color:var(--sp-paper); border:2px solid var(--sp-ink);
+  /* A hard halo, not a blur: it cuts the square out of whatever card is under it. */
+  box-shadow:0 0 0 3px var(--sp-paper);
+  transition:background 240ms, color 240ms, border-color 240ms, transform 140ms;
+  -webkit-tap-highlight-color:transparent; }
+.qa ha-icon, .qa .mdi { --mdc-icon-size:36px; width:36px; height:36px; flex:none; }
+.qa .qalbl { max-width:96px; }
+.qa:active { transform:scale(.97); }
+.qa.open { background:var(--sp-surface); color:var(--sp-ink); }
+.qa.done { background:var(--sp-a3); border-color:var(--sp-a3); color:var(--sp-surface); }
+.qa:focus-visible { outline:2px solid var(--sp-notice); outline-offset:4px; }
+.panel.phone .qa { width:92px; height:92px; font-size:13px; }
+.panel.phone .qa ha-icon, .panel.phone .qa .mdi { --mdc-icon-size:30px; width:30px; height:30px; }
+
+.qdim { position:absolute; inset:0; z-index:8; background:rgba(0,0,0,.62);
+  display:flex; align-items:center; justify-content:center; padding:24px; box-sizing:border-box;
+  animation:qdim-in 240ms ease-out; }
+.qdim.out { animation:qdim-out 320ms ease-in forwards; pointer-events:none; }
+@keyframes qdim-in { from { opacity:0; } to { opacity:1; } }
+@keyframes qdim-out { to { opacity:0; } }
+.panel.phone .qdim { padding:12px; }
+.qp { position:relative; width:min(640px, 100%); box-sizing:border-box; max-height:100%; overflow-y:auto;
+  background:var(--sp-surface); border:2px solid var(--sp-ink); border-radius:12px;
+  padding:28px 32px 24px; color:var(--sp-ink);
+  transform-origin:center; animation:qp-in 240ms cubic-bezier(.2,.8,.2,1); }
+.qdim.out .qp { animation:qp-out 320ms ease-in forwards; }
+@keyframes qp-in { from { opacity:0; transform:scale(.96) translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes qp-out { to { opacity:0; transform:scale(.98) translateY(6px); } }
+.panel.phone .qp { padding:18px 18px 16px; }
+.qph { display:flex; align-items:center; gap:12px; font-size:22px; font-weight:600; }
+.qph ha-icon, .qph .mdi { --mdc-icon-size:28px; width:28px; height:28px; flex:none; }
+.qph .qn { margin-left:auto; font-size:12px; font-weight:500; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--sp-ink-3); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.qpsub { font-size:15px; color:var(--sp-ink-2); margin:4px 0 14px; min-height:1.5em; }
+.qsteps { list-style:none; margin:0; padding:0; }
+.qstep { display:flex; align-items:flex-start; gap:14px; padding:14px 0; border-bottom:1px solid var(--sp-edge); }
+.qstep:last-child { border-bottom:none; }
+
+/* The tick box. Three moments, and each hands over to the next rather
+   than cutting: the ring grows in and turns while the step runs; when it
+   lands the ring closes into a full circle, the box fills moss with a
+   little overshoot, and the tick draws itself across it. */
+.qtick { flex:none; width:34px; height:34px; border-radius:8px; margin-top:1px; position:relative;
+  box-sizing:border-box; border:2px solid var(--sp-edge); background:transparent;
+  transition:border-color 220ms ease, background 260ms cubic-bezier(.2,.8,.2,1); }
+.qtick svg { position:absolute; inset:0; width:100%; height:100%; fill:none; stroke-linecap:round; stroke-linejoin:round; overflow:visible; }
+.qspin { opacity:0; transform:scale(.4); stroke:var(--sp-ink); stroke-width:2.4;
+  transition:opacity 220ms ease, transform 300ms cubic-bezier(.34,1.56,.64,1); }
+.qspin circle { stroke-dasharray:.3 1; transform-box:fill-box; transform-origin:center; animation:qspin 1s linear infinite;
+  transition:stroke-dasharray 280ms ease-in, stroke 200ms ease; }
+.qstep.running .qtick { border-color:var(--sp-ink); }
+.qstep.running .qspin { opacity:1; transform:scale(1); }
+.qstep.done .qtick { background:var(--sp-a3); border-color:var(--sp-a3);
+  transition-delay:240ms, 240ms; animation:qpop 460ms cubic-bezier(.34,1.56,.64,1) 240ms; }
+.qstep.done .qspin { opacity:0; transform:scale(1); transition:opacity 200ms ease 260ms, transform 300ms; }
+.qstep.done .qspin circle { stroke-dasharray:1 1; stroke:var(--sp-a3); }
+.qchk { stroke:var(--sp-surface); stroke-width:2.8; stroke-dasharray:1; stroke-dashoffset:1; }
+.qstep.done .qchk { stroke-dashoffset:0; transition:stroke-dashoffset 380ms cubic-bezier(.2,.8,.2,1) 360ms; }
+/* A step that failed: the box goes red with a cross, and nothing after
+   it runs. Red here is the level it is -- damage is not accruing, but a
+   house that was asked to do a thing and could not has to say so. */
+.qex { stroke:var(--sp-critical-on); stroke-width:2.8; opacity:0; transition:opacity 200ms ease 200ms; }
+.qstep.failed .qtick { border-color:var(--sp-critical); background:var(--sp-critical-soft); }
+.qstep.failed .qspin { opacity:0; }
+.qstep.failed .qex { opacity:1; }
+@keyframes qspin { to { transform:rotate(360deg); } }
+@keyframes qpop { 0% { transform:scale(1); } 45% { transform:scale(1.18); } 100% { transform:scale(1); } }
+.qname { font-size:18px; line-height:1.3; color:var(--sp-ink-2); transition:color 240ms ease; }
+.qstep.running .qname, .qstep.done .qname, .qstep.failed .qname { color:var(--sp-ink); }
+.qstep.running .qname { font-weight:500; }
+.qspec { font-size:13px; color:var(--sp-ink-3); font-family:var(--sp-mono, ui-monospace, monospace); margin-top:3px;
+  overflow-wrap:anywhere; }
+
+/* The bottom of the sheet is one fixed-height area, so the sheet is the
+   same size before, during and after: the buttons live there first, then
+   a quiet line while the steps run, then the message. */
+.qtail { min-height:176px; display:flex; flex-direction:column; justify-content:center;
+  margin-top:10px; padding-top:14px; border-top:2px solid var(--sp-edge); }
+.qbtns { display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; animation:qp-in 240ms ease-out; }
+.qbtns button { font:inherit; font-size:16px; border-radius:6px; padding:12px 22px; min-height:54px; cursor:pointer; }
+.qno { border:1px solid var(--sp-edge); background:none; color:var(--sp-ink); }
+.qyes { border:2px solid var(--sp-ink); background:var(--sp-ink); color:var(--sp-paper); font-weight:600; min-width:170px; }
+.qyes:focus-visible, .qno:focus-visible { outline:2px solid var(--sp-notice); outline-offset:2px; }
+.qwait { text-align:center; font-size:15px; color:var(--sp-ink-3); animation:qp-in 300ms ease-out; }
+.qmsg { display:flex; flex-direction:column; align-items:center; text-align:center; }
+.qmsg .qring { width:52px; height:52px; border-radius:50%; background:var(--sp-a3); color:var(--sp-surface);
+  display:inline-flex; align-items:center; justify-content:center; animation:qring-in 520ms cubic-bezier(.34,1.56,.64,1) both; }
+.qmsg .qring ha-icon, .qmsg .qring .mdi { --mdc-icon-size:30px; width:30px; height:30px; }
+.qmsg.failed .qring { background:var(--sp-critical-soft); color:var(--sp-critical-on); }
+.qmsg .qbig { font-size:28px; font-weight:600; letter-spacing:-.01em; margin-top:10px; animation:qrise 420ms cubic-bezier(.2,.8,.2,1) 160ms both; }
+.qmsg .qsmall { font-size:15px; color:var(--sp-ink-2); margin-top:4px; animation:qrise 420ms cubic-bezier(.2,.8,.2,1) 260ms both; overflow-wrap:anywhere; }
+@keyframes qring-in { from { opacity:0; transform:scale(.3); } to { opacity:1; transform:scale(1); } }
+@keyframes qrise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+.qdrain { height:3px; border-radius:2px; background:var(--sp-sink); margin-top:18px; overflow:hidden; animation:qrise 300ms ease-out 400ms both; }
+.qdrain > i { display:block; height:100%; background:var(--sp-ink-3); width:100%; transform-origin:left;
+  animation:qdrain var(--qdur, 30s) linear 500ms forwards; }
+@keyframes qdrain { to { transform:scaleX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .qdim, .qp, .qstep.done .qtick, .qmsg .qring, .qmsg .qbig, .qmsg .qsmall, .qdrain, .qbtns, .qwait { animation:none; }
+  .qspin circle { animation-duration:2.4s; }
+  .qtick, .qspin, .qchk, .qname { transition-duration:0s; }
+}
 `;
+
+/* A quick action's window: `show: {from: "19:00", until: "02:00"}`, read
+   off this browser's clock. One that crosses midnight is the two halves
+   of the day either side of it. No `show` means always. */
+function quickMinutes(text) {
+  const m = /^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(String(text === undefined || text === null ? "" : text));
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2] || 0);
+  if (h > 24 || min > 59) return null;
+  return (h * 60 + min) % 1440;
+}
+
+function quickWindowOpen(show, now) {
+  if (!show || typeof show !== "object") return true;
+  const from = quickMinutes(show.from);
+  const until = quickMinutes(show.until);
+  if (from === null && until === null) return true;
+  const at = now.getHours() * 60 + now.getMinutes();
+  if (from === null) return at < until;
+  if (until === null) return at >= from;
+  if (from === until) return true;
+  return from < until ? (at >= from && at < until) : (at >= from || at < until);
+}
+
+function quickStepSpec(action) {
+  if (!action || typeof action !== "object") return "";
+  const target = action.target && typeof action.target === "object" ? action.target : {};
+  const ids = [].concat(target.entity_id || [], target.area_id || [], target.floor_id || [], target.device_id || [])
+    .filter((v) => !isBlank(v)).map(String);
+  return ids.join(", ");
+}
+
+function quickHeadNote(st) {
+  const n = Array.isArray(st.action.steps) ? st.action.steps.length : 0;
+  if (st.phase === "done") return "Done";
+  if (st.phase === "failed") return "Stopped";
+  if (st.phase === "running") return `${st.done} of ${n}`;
+  return n === 1 ? "1 step" : `${n} steps`;
+}
+
+function quickSubLine(st) {
+  if (st.phase === "done") return "All done.";
+  if (st.phase === "failed") return "Stopped at the step marked.";
+  if (st.phase === "running") return "Working, in order.";
+  return "In this order. Nothing happens until you confirm.";
+}
+
+function quickErrorText(error) {
+  if (!error) return "did not finish";
+  const text = error && (error.message || (typeof error === "string" ? error : ""));
+  return isBlank(text) ? "did not finish" : String(text);
+}
+
+function quickTailMarkup(st) {
+  if (st.phase === "open") {
+    return `<div class="qbtns"><button type="button" class="qno" data-qno>${esc(firstOf(st.action.cancel, "Not yet"))}</button>`
+      + `<button type="button" class="qyes" data-qyes>${esc(firstOf(st.action.ok, "Confirm"))}</button></div>`;
+  }
+  if (st.phase === "done") {
+    const hold = Math.max(1000, Number(st.action.hold) || 30000);
+    return `<div class="qmsg"><span class="qring">${iconMarkup("mdi:check")}</span>`
+      + `<div class="qbig">${esc(firstOf(st.action.done, "Done"))}</div>`
+      + (isBlank(st.action.note) ? "" : `<div class="qsmall">${esc(st.action.note)}</div>`)
+      + `</div><div class="qdrain"><i style="--qdur:${hold}ms"></i></div>`;
+  }
+  if (st.phase === "failed") {
+    return `<div class="qmsg failed"><span class="qring">${iconMarkup("mdi:alert")}</span>`
+      + `<div class="qbig">${esc(firstOf(st.action.failed, "Could not finish"))}</div>`
+      + `<div class="qsmall">${esc(st.error)}</div></div>`;
+  }
+  return `<div class="qwait">One moment.</div>`;
+}
+
+function quickSheetMarkup(st) {
+  const a = st.action;
+  const steps = (Array.isArray(a.steps) ? a.steps : []).map((step, i) => {
+    const spec = quickStepSpec(step && step.action);
+    /* A sheet brought back mid-run, or after it, opens as it was. */
+    const cls = i < st.done ? " done"
+      : st.phase === "running" && i === st.done ? " running"
+      : st.phase === "failed" && i === st.done ? " failed" : "";
+    return `<li class="qstep${cls}"><span class="qtick">`
+      + `<svg class="qspin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" pathLength="1"/></svg>`
+      + `<svg class="qchk" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.6l4.1 4.1L18.2 8" pathLength="1"/></svg>`
+      + `<svg class="qex" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 7.5l9 9M16.5 7.5l-9 9"/></svg>`
+      + `</span><div><div class="qname">${esc(firstOf(step && step.name, "Step"))}</div>`
+      + (isBlank(spec) ? "" : `<div class="qspec">${esc(spec)}</div>`) + `</div></li>`;
+  }).join("");
+  return `<div class="qp" role="dialog" aria-modal="true" aria-label="${esc(firstOf(a.name, "Quick action"))}" aria-live="polite">`
+    + `<div class="qph">${iconMarkup(firstOf(a.icon, "mdi:flash"))}<span>${esc(firstOf(a.name, "Quick action"))}</span>`
+    + `<span class="qn">${esc(quickHeadNote(st))}</span></div>`
+    + `<div class="qpsub">${esc(quickSubLine(st))}</div>`
+    + `<ul class="qsteps">${steps}</ul>`
+    + `<div class="qtail" data-phase="${st.phase}">${quickTailMarkup(st)}</div></div>`;
+}
 
 class SpectraPanel extends HTMLElement {
   constructor() {
@@ -22076,7 +22295,8 @@ class SpectraPanel extends HTMLElement {
       + '<ha-icon icon="mdi:chevron-down"></ha-icon></button>'
       + '<div class="scrim"></div><div class="needs gone"></div>'
       + '<div class="main"><div class="rail gone"></div>'
-      + '<div class="scroll"><div class="grid"></div></div></div>';
+      + '<div class="scroll"><div class="grid"></div></div></div>'
+      + '<div class="quick"></div>';
     root.appendChild(this._panel);
     this._needs = this._panel.querySelector(".needs");
     this._needs.innerHTML = '<div class="needsbox"></div><div class="sidebox"></div>';
@@ -22123,10 +22343,31 @@ class SpectraPanel extends HTMLElement {
     };
     this.addEventListener("section-visibility-changed", this._onVisibility);
     this.addEventListener("card-visibility-changed", this._onVisibility);
+
+    /* Quick actions: the corner, and the sheet over the dashboard. */
+    this._quickLayer = this._panel.querySelector(".quick");
+    this._quickActions = [];
+    this._quick = null;
+    this._quickKey = "";
+    this._quickLayer.addEventListener("click", (event) => {
+      const button = event.target.closest(".qa");
+      if (!button) return;
+      this._quickPress(Number(button.dataset.qa));
+    });
+    this._onQuickKey = (event) => {
+      if (event.key === "Escape" && this._quick && !this._quick.hidden) {
+        event.preventDefault();
+        this._quickClose();
+      }
+    };
   }
 
   setConfig(config) {
     this._config = config || {};
+    this._quickActions = Array.isArray(this._config.quick_actions)
+      ? this._config.quick_actions.filter((a) => a && typeof a === "object") : [];
+    this._quickKey = "";
+    this._renderQuick();
     const set = (name, value, unit) => {
       if (value === undefined || value === null || value === "") this.style.removeProperty(name);
       else this.style.setProperty(name, typeof value === "number" ? `${value}${unit}` : String(value));
@@ -22155,6 +22396,10 @@ class SpectraPanel extends HTMLElement {
   set badges(v) { this._badges = v; }
   set hass(v) {
     this._hass = v;
+    /* The panel's own chrome -- the folded bar, the quick actions -- reads
+       the palette off :root, so the panel publishes it too rather than
+       waiting for the first card to. */
+    publishTokens(v);
     this._updateBar();
     if (!this._config.no_load_report) loadReport.see(v);
   }
@@ -22236,12 +22481,19 @@ class SpectraPanel extends HTMLElement {
       for (const w of this._wrappers) this._sizer.observe(w.wrap);
     }
     window.addEventListener("resize", this._relayout);
+    document.addEventListener("keydown", this._onQuickKey, true);
+    /* The schedule is read off the clock, so the corner is looked at
+       every half minute: a button due at 19:00 appears within 30s of it. */
+    if (!this._quickTimer) this._quickTimer = setInterval(() => this._renderQuick(), 30000);
+    this._renderQuick();
     this._layout();
   }
 
   disconnectedCallback() {
     window.removeEventListener(TAB_EVENT, this._onTab);
     window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
+    document.removeEventListener("keydown", this._onQuickKey, true);
+    if (this._quickTimer) { clearInterval(this._quickTimer); this._quickTimer = null; }
     if (this._observer) { this._observer.disconnect(); this._observer = null; }
     if (this._sizer) { this._sizer.disconnect(); this._sizer = null; }
     window.removeEventListener("resize", this._relayout);
@@ -22281,6 +22533,8 @@ class SpectraPanel extends HTMLElement {
     this._needs.classList.toggle("gone",
       [...this._needsBox.children].every(hidden) && !inSide.length);
     this._rail.classList.toggle("gone", [...this._rail.children].every(hidden));
+    /* On a phone the rail is at the bottom, so the quick action sits above it. */
+    this.style.setProperty("--pn-rail-h", `${this._rail.offsetHeight}px`);
 
     /* The sections view's arithmetic: as many minimum-width columns as fit,
        never more than max_columns, never more than the visible sections can
@@ -22345,6 +22599,199 @@ class SpectraPanel extends HTMLElement {
     /* The list opens just under the bar. */
     const drop = this._bar.offsetTop + this._bar.offsetHeight + 8;
     if (drop > 8) this.style.setProperty("--pn-drop", `${drop}px`);
+  }
+
+  /* ---- Quick actions ---- */
+
+  /* Which actions are in their window now. One that is open, running or
+     showing its message stays whatever the clock says: a sheet must not
+     vanish mid-step because it turned two o'clock. */
+  _quickShown() {
+    const now = new Date();
+    const live = this._quick ? this._quick.index : -1;
+    return this._quickActions
+      .map((action, index) => ({ action, index }))
+      .filter((x) => x.index === live || quickWindowOpen(x.action.show, now));
+  }
+
+  /* The corner is rebuilt only when the set of buttons changes, and
+     patched otherwise, so a button in use is never replaced under the
+     finger. */
+  _renderQuick() {
+    if (!this._quickLayer) return;
+    const shown = this._quickShown();
+    const key = shown.map((x) => x.index).join(",");
+    if (key !== this._quickKey) {
+      this._quickKey = key;
+      this._quickLayer.innerHTML = shown.map(({ action, index }) =>
+        `<button type="button" class="qa" data-qa="${index}" aria-haspopup="dialog">`
+        + iconMarkup(firstOf(action.icon, "mdi:flash"))
+        + `<span class="qalbl">${esc(firstOf(action.name, "Quick action"))}</span></button>`).join("");
+    }
+    for (const button of this._quickLayer.querySelectorAll(".qa")) {
+      const mine = Boolean(this._quick) && Number(button.dataset.qa) === this._quick.index;
+      button.classList.toggle("open", mine && this._quick.phase !== "done");
+      button.classList.toggle("done", mine && this._quick.phase === "done");
+      button.setAttribute("aria-expanded", String(mine && !this._quick.hidden));
+    }
+  }
+
+  _quickPress(index) {
+    const st = this._quick;
+    if (st && st.index === index) {
+      if (st.phase === "open") return this._quickClose();
+      if (st.hidden) { st.hidden = false; this._quickMount(); this._renderQuick(); }
+      return;
+    }
+    if (st) return;  /* one at a time: a sheet is already up for another */
+    const action = this._quickActions[index];
+    if (!action) return;
+    this._quick = { index, action, phase: "open", done: 0, hidden: false, timer: null, error: "" };
+    this._quickMount();
+    this._renderQuick();
+  }
+
+  /* Outside the sheet, or Escape, or Not yet. Before Confirm it is a no
+     and nothing runs; after it the steps carry on and only the sheet
+     hides -- the button in the corner still shows them finishing, and
+     pressing it brings the sheet back. */
+  _quickClose() {
+    const st = this._quick;
+    if (!st) return;
+    if (st.phase === "open") {
+      this._quick = null;
+      this._quickUnmount();
+    } else {
+      st.hidden = true;
+      this._quickUnmount();
+    }
+    this._renderQuick();
+  }
+
+  _quickReset() {
+    const st = this._quick;
+    if (st && st.timer) clearTimeout(st.timer);
+    this._quick = null;
+    this._quickUnmount();
+    this._renderQuick();
+  }
+
+  _quickMount() {
+    const st = this._quick;
+    if (!st || st.hidden || this._quickDim) return;
+    const dim = document.createElement("div");
+    dim.className = "qdim";
+    dim.innerHTML = quickSheetMarkup(st);
+    /* Only the dim, never the sheet -- a mis-tap inside must not count. */
+    dim.addEventListener("click", (event) => { if (event.target === dim) this._quickClose(); });
+    this._panel.appendChild(dim);
+    this._quickDim = dim;
+    this._quickWire();
+  }
+
+  _quickUnmount() {
+    if (this._quickDim) { this._quickDim.remove(); this._quickDim = null; }
+  }
+
+  _quickWire() {
+    const dim = this._quickDim;
+    if (!dim) return;
+    const yes = dim.querySelector("[data-qyes]");
+    const no = dim.querySelector("[data-qno]");
+    if (yes) yes.addEventListener("click", () => this._quickRun());
+    if (no) no.addEventListener("click", () => this._quickClose());
+  }
+
+  /* The sheet is patched, never rebuilt, while it is up: a tick that
+     re-entered the whole sheet would play its entrance on every step. */
+  _quickPatch() {
+    const st = this._quick;
+    const dim = this._quickDim;
+    if (!st || !dim) return;
+    const sheet = dim.querySelector(".qp");
+    const steps = sheet.querySelectorAll(".qstep");
+    steps.forEach((li, i) => {
+      li.classList.toggle("done", i < st.done);
+      li.classList.toggle("running", st.phase === "running" && i === st.done);
+      li.classList.toggle("failed", st.phase === "failed" && i === st.done);
+    });
+    sheet.querySelector(".qn").textContent = quickHeadNote(st);
+    sheet.querySelector(".qpsub").textContent = quickSubLine(st);
+    const tail = sheet.querySelector(".qtail");
+    if (tail.dataset.phase !== st.phase) {
+      tail.dataset.phase = st.phase;
+      tail.innerHTML = quickTailMarkup(st);
+      this._quickWire();
+    }
+  }
+
+  /* One service call per step, in writing order. The ring is shown for
+     at least 1.1s however fast the house answered, because a tick that
+     lands before the eye has found the row is a tick that was not seen;
+     and the next step starts a beat after the tick has drawn. A step
+     that fails stops the run and says which. */
+  async _quickRun() {
+    const st = this._quick;
+    if (!st || st.phase !== "open") return;
+    const steps = Array.isArray(st.action.steps) ? st.action.steps : [];
+    const wait = (ms) => new Promise((resolve) => { st.timer = setTimeout(resolve, ms); });
+    st.phase = "running";
+    this._quickPatch();
+    this._renderQuick();
+    await wait(350);
+    for (let i = 0; i < steps.length; i += 1) {
+      if (this._quick !== st) return;
+      st.done = i;
+      this._quickPatch();
+      const started = Date.now();
+      let failed = null;
+      try {
+        await this._quickCall(steps[i] && steps[i].action);
+      } catch (error) {
+        failed = error;
+      }
+      await wait(Math.max(0, 1100 - (Date.now() - started)));
+      if (this._quick !== st) return;
+      if (failed) {
+        LOGGER_WARN("spectra-panel: quick action step failed", steps[i], failed);
+        st.phase = "failed";
+        st.error = `${firstOf(steps[i] && steps[i].name, "A step")}: ${quickErrorText(failed)}`;
+        this._quickPatch();
+        this._renderQuick();
+        return;
+      }
+      st.done = i + 1;
+      this._quickPatch();
+      await wait(420);
+    }
+    if (this._quick !== st) return;
+    await wait(300);
+    st.phase = "done";
+    this._quickPatch();
+    this._renderQuick();
+    const hold = Math.max(1000, Number(st.action.hold) || 30000);
+    st.timer = setTimeout(() => this._quickFade(st), hold);
+  }
+
+  _quickCall(action) {
+    if (!action || typeof action !== "object") return Promise.reject(new Error("no action"));
+    const name = action.service || action.perform_action;
+    if (typeof name !== "string" || !name.includes(".")) return Promise.reject(new Error("no service to call"));
+    if (!this._hass || typeof this._hass.callService !== "function") return Promise.reject(new Error("not connected"));
+    const [domain, service] = name.split(".");
+    return Promise.resolve(this._hass.callService(domain, service, action.data || {}, action.target || undefined));
+  }
+
+  /* The sheet and the dim go together, and the corner forgets the run. */
+  _quickFade(st) {
+    if (this._quick !== st) return;
+    const dim = this._quickDim;
+    if (dim) {
+      dim.classList.add("out");
+      st.timer = setTimeout(() => { if (this._quick === st) this._quickReset(); }, 330);
+    } else {
+      this._quickReset();
+    }
   }
 
   /* Masonry: how many 4px rows each section needs, gap included. The
