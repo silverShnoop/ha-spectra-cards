@@ -1068,6 +1068,9 @@ ha-icon { display:inline-flex; line-height:0; }
 .voicename { flex:1 1 auto; min-width:0; font-size:14px; color:var(--sp-ink); line-height:1.3; }
 .voiceitem.dropped .voicename { color:var(--sp-ink-3); text-decoration:line-through; }
 .voicespec { color:var(--sp-ink-3); }
+/* The schedule a routine was heard with, under its name on the sheet:
+   it is half of what is being confirmed. */
+.voicewhen { display:block; font-size:12px; color:var(--sp-ink-2); margin-top:1px; }
 /* Nothing kept is a real answer to this sheet -- it is "no, none of
    that" -- so the button stays put and says so rather than vanishing
    and moving Cancel under the finger. */
@@ -14559,7 +14562,7 @@ class SpectraCard extends HTMLElement {
         return this._voiceReview(got.items, got.said).then((keep) => {
           if (!keep.length) return null;
           this._voiceSay("adding", "");
-          this._work(() => this._addItems(list, keep).then(() => {
+          this._work(() => this._addItems(list, keep, spec.action).then(() => {
             this._voiceSay("idle", keep.length === 1
               ? `${keep[0].name} added`
               : `${keep.length} added`);
@@ -14770,11 +14773,42 @@ class SpectraCard extends HTMLElement {
          called "undefined" on everybody's shopping list. */
       return rows
         .filter((row) => row && typeof row === "object" && !isBlank(row.name))
-        .map((row) => ({
-          name: String(row.name).trim(),
-          specification: isBlank(row.specification) ? "" : String(row.specification).trim(),
-        }));
+        .map((row) => {
+          const item = {
+            name: String(row.name).trim(),
+            specification: isBlank(row.specification) ? "" : String(row.specification).trim(),
+          };
+          /* A script that returns structure for a routine -- the days it
+             repeats on, its deadline, who it is for -- has those carried
+             through the sheet and handed to the action. Only the shape is
+             trusted: a list of words, a word. Anything else is dropped,
+             not guessed at, and the row is still a row. */
+          const words = (v) => (Array.isArray(v) ? v : [v])
+            .filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim());
+          if (row.days !== undefined) item.days = words(row.days).map((d) => d.toLowerCase());
+          if (typeof row.time === "string" && /^\d{1,2}:\d{2}$/.test(row.time.trim())) item.time = row.time.trim();
+          if (row.members !== undefined) item.members = words(row.members);
+          return item;
+        });
     });
+  }
+
+  /* "Daily by 19:00 · Casey": what a routine row on the sheet says under
+     its name, so the person confirming can see the schedule the model
+     heard and not only the job. */
+  static voiceSchedule(item) {
+    const parts = [];
+    const days = Array.isArray(item.days) ? item.days : [];
+    const NAMES = { mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun" };
+    const known = days.filter((d) => NAMES[d]);
+    if (known.length === 7 || days.includes("daily")) parts.push("Daily");
+    else if (known.length === 5 && !known.includes("sat") && !known.includes("sun")) parts.push("Weekdays");
+    else if (known.length === 2 && known.includes("sat") && known.includes("sun")) parts.push("Weekends");
+    else if (known.length) parts.push(known.map((d) => NAMES[d]).join(", "));
+    if (item.time) parts.push(`${parts.length ? "by" : "Today by"} ${item.time}`);
+    const who = Array.isArray(item.members) ? item.members.filter(Boolean) : [];
+    const line = parts.join(" ");
+    return who.length ? (line ? `${line} \u00b7 ${who.join(" & ")}` : who.join(" & ")) : line;
   }
 
   /* The sheet. Nothing reaches the list without passing it.
@@ -14801,6 +14835,7 @@ class SpectraCard extends HTMLElement {
       + `<span class="voicetick"><ha-icon icon="mdi:check-bold"></ha-icon></span>`
       + `<span class="voicename">${esc(item.name)}`
       + (item.specification ? `<span class="voicespec"> · ${esc(item.specification)}</span>` : "")
+      + (SpectraCard.voiceSchedule(item) ? `<span class="voicewhen">${esc(SpectraCard.voiceSchedule(item))}</span>` : "")
       + `</span></button></li>`;
     wrap.innerHTML = `<div class="confirmbox" role="alertdialog" aria-modal="true">`
       + `<div class="confirmhead">`
@@ -14877,17 +14912,31 @@ class SpectraCard extends HTMLElement {
      added and the fourth quietly missing is the worst of the available
      outcomes, because the list looks finished. The error says which one
      stopped it, so the rest can be said again. */
-  _addItems(list, items) {
+  _addItems(list, items, action) {
+    /* `voice.action` names a service that takes structure -- days, a
+       time, members -- where todo.add_item takes only a name and a
+       note. trello_todo.add_card is the one this house has; any
+       service with the same field names would do. */
+    const custom = typeof action === "string" && action.includes(".") ? action.split(".") : null;
     return items.reduce((chain, item) => chain.then(() => {
-      const data = { item: item.name };
-      if (!isBlank(item.specification)) data.description = item.specification;
-      /* notifyOnError off: this reports in the line under the list,
-         and Home Assistant's own toast on top of that is two reports
-         of one failure, one of which cannot be dismissed by the person
-         standing in front of it. */
-      return Promise.resolve(
-        this._hass.callService("todo", "add_item", data, { entity_id: list }, false),
-      ).catch((error) => {
+      let call;
+      if (custom) {
+        const data = { name: item.name };
+        if (!isBlank(item.specification)) data.description = item.specification;
+        if (Array.isArray(item.days) && item.days.length) data.days = item.days;
+        if (item.time) data.time = item.time;
+        if (Array.isArray(item.members) && item.members.length) data.members = item.members;
+        call = this._hass.callService(custom[0], custom[1], data, { entity_id: list }, false);
+      } else {
+        const data = { item: item.name };
+        if (!isBlank(item.specification)) data.description = item.specification;
+        /* notifyOnError off: this reports in the line under the list,
+           and Home Assistant's own toast on top of that is two reports
+           of one failure, one of which cannot be dismissed by the person
+           standing in front of it. */
+        call = this._hass.callService("todo", "add_item", data, { entity_id: list }, false);
+      }
+      return Promise.resolve(call).catch((error) => {
         throw voiceError(`Could not add ${item.name}.`, error && error.message);
       });
     }), Promise.resolve());

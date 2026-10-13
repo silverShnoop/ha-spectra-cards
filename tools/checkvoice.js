@@ -525,6 +525,62 @@ const js = fs.readFileSync(file);
       !q(".tdmic").classList.contains("live"), q(".tdmic").className);
     mic = () => Promise.resolve({ getTracks: () => [{ stop() { stopped += 1; } }] });
 
+    /* ---- A list of routines: the script returns structure, and the
+       card hands it to a service that takes structure. The sheet shows
+       the schedule, because it is half of what is being confirmed. */
+    await show({
+      list: "todo.chores",
+      voice: { script: "script.chore_speech_to_items", about: "the household chores",
+        pipeline: "01j4f21kr8213bjys7tpfhnkaw", action: "trello_todo.add_card" },
+    });
+    reply = {
+      items: [
+        { name: "Clean the house", days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], time: "19:00", members: [], specification: "" },
+        { name: "Bins out", days: ["mon"], time: "", members: ["Casey"], specification: "" },
+        { name: "Ring the plumber", days: [], time: "", members: [], specification: "about the tap" },
+        { name: "Odd one", days: "mon", time: "seven", members: "Morgan", specification: "" },
+      ],
+    };
+    reset();
+    await speak({ heard: "clean the house every day by seven, bins out on mondays for Casey" });
+    const whens = Array.from(root().querySelectorAll(".voicewhen")).map((n) => n.textContent);
+    check("a routine row on the sheet says its schedule",
+      whens[0] === "Daily by 19:00", whens[0]);
+    check("and who it is for",
+      whens[1] === "Mon \u00b7 Casey", whens[1]);
+    check("a one-off says nothing extra",
+      root().querySelectorAll(".voiceitem")[2].querySelector(".voicewhen") === null, "drew a schedule");
+    check("a word where a list was expected is read as one, and a time that is not HH:MM is dropped",
+      whens[2] === "Mon \u00b7 Morgan", whens[2]);
+    check("nothing has been added yet", calls.length === 0, calls.map((c) => c.service).join(","));
+    q("[data-yes]").click();
+    await settle();
+    await settle();
+    const routed = calls.filter((c) => c.service === "trello_todo.add_card");
+    check("kept rows go to the configured action, not todo.add_item",
+      routed.length === 4 && !calls.some((c) => c.service === "todo.add_item"),
+      calls.map((c) => c.service).join(","));
+    check("targeted at the list", routed[0] && routed[0].target.entity_id === "todo.chores",
+      routed[0] && JSON.stringify(routed[0].target));
+    check("with the days and the time as fields",
+      routed[0] && routed[0].data.name === "Clean the house" && routed[0].data.days.length === 7
+        && routed[0].data.time === "19:00" && routed[0].data.members === undefined,
+      routed[0] && JSON.stringify(routed[0].data));
+    check("and the members",
+      routed[1] && JSON.stringify(routed[1].data.members) === '["Casey"]' && routed[1].data.time === undefined,
+      routed[1] && JSON.stringify(routed[1].data));
+    check("a one-off keeps its note as the description and gets no schedule",
+      routed[2] && routed[2].data.description === "about the tap" && routed[2].data.days === undefined,
+      routed[2] && JSON.stringify(routed[2].data));
+    await show({});
+    reply = {
+      items: [
+        { name: "Milk", specification: "2 pints" },
+        { name: "Tenderstem", specification: "" },
+        { name: "Crumpets", specification: "for Riley" },
+      ],
+    };
+
     /* The tick has to go on working next to all of this: the mic is an
        addition to the card, not a replacement for what it did. */
     reset();

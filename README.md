@@ -1903,6 +1903,38 @@ items:
 shopping list and a list of household jobs want different things out of
 the same sentence, and the wording is the only part that differs.
 
+**A list of routines wants structure, not words.** *Clean the house every
+day by seven, and bins out on Mondays for Casey* is three facts about a
+job besides its name, and a to-do item has nowhere to put them —
+`todo.add_item` takes a name and a note. So a script for such a list
+returns them as fields, and `voice.action` names a service that takes
+fields:
+
+```yaml
+voice:
+  script: script.chore_speech_to_items
+  about: the household chores
+  action: trello_todo.add_card       # instead of todo.add_item
+```
+
+```yaml
+items:
+  - name: Clean the house
+    days: [mon, tue, wed, thu, fri, sat, sun]   # optional; weekday names
+    time: "19:00"                               # optional; HH:MM
+    members: [Casey]                            # optional; first names
+    specification: ""                           # optional; the note
+```
+
+The sheet shows the schedule under each name — *Daily by 19:00 · Casey*
+— because it is half of what is being confirmed: a model that heard
+"Tuesdays" for "Thursdays" is caught there, not next week. On **Add**
+each row goes to the action as `name`, `days`, `time`, `members` and
+`description`, targeted at `list`. Only the shape is trusted: a word
+where a list was expected is read as one, and a time that is not
+`HH:MM` is dropped rather than guessed at. Without `action` the fields
+are ignored and the list is written through `todo.add_item` as before.
+
 **Items are added one at a time, in the order they were said.**
 `todo.add_item` returns before Bring has been told, and four sent at once
 arrive at Bring in whatever order its API pleases — which leaves the list
