@@ -675,6 +675,121 @@ const js = fs.readFileSync(file);
     check("with no list to write to, a tick calls nothing",
       calls.length === 0, JSON.stringify(calls));
 
+    /* ---- Deadlines ------------------------------------------------
+       A list of routines: every row has a time, and the chip wears the
+       level a Needs you row would -- attention on the day, waiting once
+       the time has gone -- so the two cannot disagree. Opt-in, because
+       those colours promise the row exists. */
+    await show({});
+    await rest();
+    const iso = (d) => {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+    };
+    const now = new Date();
+    const inAnHour = new Date(now.getTime() + 3600000);
+    const anHourAgo = new Date(now.getTime() - 3600000);
+    const threeDays = new Date(now.getTime() + 3 * 86400000);
+    const lastWeek = new Date(now.getTime() - 6 * 86400000);
+    const ROUTINES = [
+      { uid: "r1", summary: "Feed the cat", status: "needs_action", due: iso(inAnHour) },
+      { uid: "r2", summary: "Bins out", status: "needs_action", due: iso(anHourAgo) },
+      { uid: "r3", summary: "Water the plants", status: "needs_action", due: iso(threeDays) },
+      { uid: "r4", summary: "Clean the filter", status: "needs_action", due: iso(lastWeek) },
+      { uid: "r5", summary: "Empty dishwasher", status: "completed", due: iso(anHourAgo) },
+    ];
+    await show({ list: "todo.routines", items: ROUTINES, columns: 1, deadlines: true });
+    const chipOf = (name) => {
+      const row = all(".tditem").find((x) => x.querySelector(".tdname").firstChild.textContent === name);
+      return row ? row.querySelector(".tdby") : null;
+    };
+    const hhmm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const sameDay = inAnHour.getDate() === now.getDate() && anHourAgo.getDate() === now.getDate();
+    if (sameDay) {
+      check("a deadline later today says by when, in ochre",
+        chipOf("Feed the cat") && chipOf("Feed the cat").textContent === `by ${hhmm(inAnHour)}`
+          && chipOf("Feed the cat").classList.contains("today"),
+        chipOf("Feed the cat") && chipOf("Feed the cat").outerHTML);
+      check("one that has passed says was, in orange",
+        chipOf("Bins out") && chipOf("Bins out").textContent === `was ${hhmm(anHourAgo)}`
+          && chipOf("Bins out").classList.contains("late"),
+        chipOf("Bins out") && chipOf("Bins out").outerHTML);
+      const tone = (el) => getComputedStyle(el).borderColor;
+      check("and the two are different colours",
+        tone(chipOf("Feed the cat")) !== tone(chipOf("Bins out")),
+        `${tone(chipOf("Feed the cat"))} / ${tone(chipOf("Bins out"))}`);
+    } else {
+      console.log("  (skipped the same-day chips: running within an hour of midnight)");
+    }
+    check("a deadline later in the week names the day, in no colour",
+      chipOf("Water the plants") && /^[A-Z][a-z]{2} \d\d:\d\d$/.test(chipOf("Water the plants").textContent)
+        && !chipOf("Water the plants").classList.contains("today")
+        && !chipOf("Water the plants").classList.contains("late"),
+      chipOf("Water the plants") && chipOf("Water the plants").outerHTML);
+    check("one missed last week says which day it was",
+      chipOf("Clean the filter") && /^was [A-Z][a-z]{2}$/.test(chipOf("Clean the filter").textContent)
+        && chipOf("Clean the filter").classList.contains("late"),
+      chipOf("Clean the filter") && chipOf("Clean the filter").textContent);
+    check("a ticked row has no chip: the deadline is met",
+      chipOf("Empty dishwasher") === null, "has a chip");
+    /* A ticked routine is today's done, not a row waiting to leave: it
+       sits in the Done section underneath, and comes back up tomorrow
+       when the integration rolls it over. No `done` source needed. */
+    const inDone = (name) => Array.from(root().querySelectorAll(".tddone .tdname"))
+      .some((n) => n.firstChild.textContent === name);
+    const inList = (name) => Array.from(root().querySelectorAll(".todolist:not(.tddone .todolist) .tdname"))
+      .filter((n) => !n.closest(".tddone")).some((n) => n.firstChild.textContent === name);
+    check("a ticked routine sits in Done today, under the list",
+      inDone("Empty dishwasher") && !inList("Empty dishwasher"),
+      `done:${inDone("Empty dishwasher")} list:${inList("Empty dishwasher")}`);
+    check("and the ones still to do stay in the list",
+      inList("Feed the cat") && !inDone("Feed the cat"), "misplaced");
+    check("the Done section says Done today and counts them",
+      /done today/i.test(text(".tddonehead") || "") && (text(".tddonecount") || "") === "1",
+      `${text(".tddonehead")} / ${text(".tddonecount")}`);
+    const splitBox = root().querySelector(".tddone .tdbox");
+    check("and the done row's box is ticked, to put it back with",
+      splitBox && splitBox.classList.contains("ticked"), splitBox && splitBox.className);
+    check("and no quiet due line is drawn alongside the chips",
+      all(".tddue").length === 0, all(".tddue").length);
+    check("the chip ticks by the clock, so by becomes was on time",
+      el._live === true, el._live);
+
+    /* A configured `done` still wins: a list whose finished rows come
+       from a sensor that stamps them keeps that. */
+    await show({ list: "todo.routines", items: ROUTINES, columns: 1, deadlines: true,
+      done: [{ uid: "d9", summary: "Hoover", status: "completed" }] });
+    check("a configured done source is used instead of the split",
+      inDone("Hoover") && !inDone("Empty dishwasher"),
+      `hoover:${inDone("Hoover")} dishwasher:${inDone("Empty dishwasher")}`);
+
+    /* The fetch itself. `status: all` is what puts the ticked rows in
+       front of the body at all: the default asks only for what is still
+       to do, and a ticked row simply stopped coming back. */
+    const asked = [];
+    const el2 = document.createElement("spectra-card");
+    el2.setConfig({ type: "custom:spectra-card", title: "Chores",
+      body: { type: "todo", list: "todo.chores", deadlines: true,
+        items: { todo: "todo.chores", status: "all" } } });
+    document.getElementById("a").appendChild(el2);
+    el2.hass = { states: { "todo.chores": { state: "2", attributes: {} } },
+      callService: () => Promise.resolve(),
+      callWS: (msg) => { asked.push(msg); return Promise.resolve({ response: { "todo.chores": { items: [] } } }); } };
+    await new Promise((r) => setTimeout(r, 50));
+    const fetch = asked.find((m) => m.domain === "todo" && m.service === "get_items");
+    check("status: all asks Home Assistant for ticked rows as well",
+      fetch && Array.isArray(fetch.service_data.status)
+        && fetch.service_data.status.includes("completed") && fetch.service_data.status.includes("needs_action"),
+      fetch && JSON.stringify(fetch.service_data));
+    el2.remove();
+
+    await show({ list: "todo.routines", items: ROUTINES, columns: 1 });
+    check("without deadlines the list draws as before: a line, no chip",
+      all(".tdby").length === 0 && all(".tddue").length === 4,
+      `${all(".tdby").length} chips, ${all(".tddue").length} lines`);
+    check("and does not tick",
+      el._live === false, el._live);
+
     return problems;
   });
 

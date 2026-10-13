@@ -2947,6 +2947,17 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 
 .tddue { display:block; font-size:12px; color:var(--sp-ink-2); margin-top:2px; }
 .tddue.soon { color:var(--sp-ink); font-weight:600; }
+/* The deadline chip. Neutral while there is time, then the two levels a
+   Needs you row would wear for the same fact: attention on the day,
+   waiting once the time has gone. Bordered as well as tinted, because
+   the tint alone does not survive the zebra row or a dark theme. */
+.tdby {
+  flex:none; align-self:center; font-size:12px; padding:2px 9px;
+  border-radius:9px; white-space:nowrap; border:1px solid transparent;
+  color:var(--sp-ink-2); background:var(--sp-sink);
+}
+.tdby.today { color:var(--sp-attention-on); background:var(--sp-attention-soft); border-color:var(--sp-attention); }
+.tdby.late { color:var(--sp-waiting-on); background:var(--sp-waiting-soft); border-color:var(--sp-waiting); }
 /* On a narrow card the week's buttons shed their words and share one row
    that scrolls, rather than stacking four deep under the plan. */
 .mlacts { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
@@ -5493,6 +5504,8 @@ function collectSources(spec, found) {
   if (spec.type === "floorplan") found.live = true;
   /* "Wet for 12m" counts up while nothing else on the card changes. */
   if (spec.type === "washer" && spec.wet_since !== undefined) found.live = true;
+  /* "by 19:00" becomes "was 19:00" at 19:00 with nothing else moving. */
+  if (spec.type === "todo" && spec.deadlines) found.live = true;
   if (typeof spec.entity === "string") {
     found.entities.add(spec.entity);
     return found;
@@ -5510,9 +5523,12 @@ function collectSources(spec, found) {
     return found;
   }
   if (typeof spec.todo === "string") {
+    /* `status: all` fetches both, which is what a list that keeps its
+       ticked rows on show (a day's routines) needs: a completed item
+       is still a row, not a row that has left. */
     found.todos.set(todoKey(spec), {
       entity: spec.todo,
-      status: spec.status || "needs_action",
+      status: spec.status === "all" ? ["needs_action", "completed"] : (spec.status || "needs_action"),
     });
     return found;
   }
@@ -6861,7 +6877,15 @@ const BODIES = {
      sets one, and it shipped as an empty second line under all
      thirty-one rows. */
   todo(b) {
-    const all = Array.isArray(b.items) ? b.items : [];
+    const given = Array.isArray(b.items) ? b.items : [];
+    /* On a list of routines a ticked row is today's done, not a row
+       waiting to leave: it goes to the Done section below, and comes
+       back up tomorrow unticked when the integration rolls it over. So
+       the items are split here, and `done` need not be configured --
+       though a configured `done` still wins, for a list that gets its
+       finished rows from a sensor that stamps them. */
+    const splitDone = Boolean(b.deadlines) && !Array.isArray(b.done);
+    const all = splitDone ? given.filter((i) => !(i && i.status === "completed")) : given;
     const limit = Number(b.limit) > 0 ? Number(b.limit) : all.length;
     const shown = all.slice(0, limit);
     const two = Number(b.columns) === 2;
@@ -6924,7 +6948,19 @@ const BODIES = {
          due date until prep sessions did, and an empty line under every
          row is how it shipped the first time. */
       const due = done ? null : todoDue(item.due);
-      const dueLine = due ? `<span class="tddue${due.soon ? " soon" : ""}">${esc(due.text)}</span>` : "";
+      /* Two ways to say when. The line under the name is the quiet one,
+         for a list where a date is an occasional fact. `deadlines` is
+         for a list of routines, where every row has one and it is the
+         point: a chip on the name's line, ochre on the day and orange
+         once the time has passed -- the levels a Needs you row wears,
+         so the card and the row cannot disagree. A chip in those
+         colours is a promise that the row exists (see Yellow is a
+         promise), which is why it is opt-in. */
+      const chips = Boolean(b.deadlines);
+      const dueLine = due && !chips
+        ? `<span class="tddue${due.soon ? " soon" : ""}">${esc(due.text)}</span>` : "";
+      const dueChip = due && chips
+        ? `<span class="tdby${due.late ? " late" : (due.soon ? " today" : "")}">${esc(due.chip)}</span>` : "";
       return `<div class="tditem${done ? " ticked" : ""}${open ? " open" : ""}`
         + `${endsColumn ? " colend" : ""}"`
         + ` data-key="${esc(keyPrefix + uid)}">`
@@ -6936,6 +6972,7 @@ const BODIES = {
         + `</button>`
         + `<span class="tdtext"${sub ? ` data-note="${esc(uid)}"` : ""}>`
         + `<span class="tdname">${esc(name)}${extra}${who}</span>${dueLine}${sub}</span>`
+        + dueChip
         + `</div>`;
     };
 
@@ -6962,7 +6999,8 @@ const BODIES = {
     };
 
     const cells = section(shown, "");
-    const doneItems = Array.isArray(b.done) ? b.done : [];
+    const doneItems = Array.isArray(b.done) ? b.done
+      : (splitDone ? given.filter((i) => i && i.status === "completed") : []);
     const doneCells = section(doneItems, "done:");
 
     /* An empty list used to return here and nothing else was drawn.
@@ -11285,7 +11323,19 @@ function todoDue(value) {
   const late = t < now;
   const when = (dated ? (weekdayLabel(`${text}T12:00:00`) || text) : prepWhen(t))
     .replace(/^Today/, "today").replace(/^Tomorrow/, "tomorrow");
-  return { text: `${late ? "Was due" : "Due"} ${when}`, soon };
+  /* The chip's words. On the day only the time matters -- "by 19:00",
+     "was 18:30" -- and the day word would be noise under a heading that
+     already says today. Off the day, the day is the fact: "Wed", or
+     "was Mon" for one still hanging around. */
+  const pad = (n) => String(n).padStart(2, "0");
+  const clock = dated ? "" : `${pad(t.getHours())}:${pad(t.getMinutes())}`;
+  const dayWord = dated ? (weekdayLabel(`${text}T12:00:00`) || text)
+    : t.toLocaleDateString([], { weekday: "short" });
+  let chip;
+  if (soon && prepDay(t) === prepDay(now)) chip = late ? `was ${clock || "today"}` : `by ${clock || "today"}`;
+  else if (late) chip = `was ${dayWord}`;
+  else chip = clock ? `${dayWord} ${clock}` : dayWord;
+  return { text: `${late ? "Was due" : "Due"} ${when}`, soon, late, chip };
 }
 
 /* The prep fact for a slot, as a small tag on the meal. */

@@ -1606,6 +1606,7 @@ body:
   done: {entity: sensor.phoenix_done_today, attribute: items}
   done_label: "Bought"               # optional; default "Done today"
   tick_icon: mdi:shopping            # optional; default mdi:check-bold
+  deadlines: true                    # optional; due as a levelled chip. See below
   voice:                             # optional; the mic. See below
     script: script.list_speech_to_items
     about: "a shopping list"         # optional; wording passed to the script
@@ -1723,12 +1724,66 @@ quiet morning is a reproach, not a fact anybody asked for. An empty *list*
 with a non-empty `done` still shows the day — that is the best case, not a
 reason to show nothing.
 
-**`due` is deliberately not drawn.** Neither list in this house sets one,
-and it shipped as an empty second line under all thirty-one rows. What
-belongs there instead depends on the list, which is what `detail` picks:
-Bring puts a short *specification* in `description` — 2 bottles,
-Tenderstem — which rides on the name's line; Home Tasks puts a page of
-notes there, which goes underneath.
+**`due` is only drawn where there is one.** It shipped as an empty second
+line under all thirty-one rows of a shopping list, so a row without a due
+date draws nothing for it. With one, the quiet form is a line under the
+name — *Due today 19:00*, *Was due Mon 09:00* — bold on the day. What sits
+beside the name instead is what `detail` picks: Bring puts a short
+*specification* in `description` — 2 bottles, Tenderstem — which rides on
+the name's line; Home Tasks puts a page of notes there, which goes
+underneath.
+
+#### `deadlines` — a list of routines
+
+```yaml
+body:
+  type: todo
+  list: todo.chores
+  items: {todo: todo.chores, status: all}   # ticked rows too: today's done stay on show
+  deadlines: true
+```
+
+For a list where every row has a time and the time is the point — the
+house's routines, from
+[`ha-trello-todo`](https://github.com/silverShnoop/ha-trello-todo), where a
+day-labelled card repeats and ticking it marks its due date complete. The
+due date becomes a **chip on the name's line** instead of a line under it,
+and the chip wears a level:
+
+| | Chip | Level |
+| --- | --- | --- |
+| later today | `by 19:00` | `attention` — ochre |
+| time passed today | `was 18:30` | `waiting` — orange |
+| another day | `Wed 09:00` | none |
+| missed, days ago | `was Mon` | `waiting` |
+| ticked | nothing: the deadline is met | |
+
+On the day only the time is said; under a heading that already means today
+the day word is noise. Off the day the day is the fact.
+
+**It is opt-in because of the colours.** Ochre and orange on this panel
+promise that a `Needs you` row exists for the same fact (see *Yellow is a
+promise*), so a list that turns `deadlines` on is a list whose overdue
+rows home_signals raises. The chip and the row then wear the same level,
+which is the point of taking the level from the same clock: the card and
+the row cannot disagree about which side of 19:00 it is.
+
+**A ticked routine goes to Done today.** On an ordinary list a ticked row
+is on its way out and is struck through where it stands. On a list of
+routines it is today's done: it moves to the Done section under the
+list, ticked, where it can be put back with the same box, and the
+integration brings it back up unticked at the next rollover. So the day's
+record is the section, and it empties itself overnight. `done` need not
+be configured for this; a configured `done` still wins, for a list whose
+finished rows come from a sensor that stamps them. The `items` read must
+ask for `status: all`: the default fetches only what is still to do, so a
+ticked row would simply stop coming back and leave the list, which is
+exactly what happened the first evening.
+
+**It ticks.** `by 19:00` has to become `was 19:00` at 19:00 with nothing
+else on the card moving, so a body with `deadlines` is live, the way a
+`since` is, and re-renders every thirty seconds. Without `deadlines` a
+to-do card does not pay for the timer.
 
 **A `below` note opens.** It used to be clipped to its first line, which
 threw away the part worth having: on Home Tasks the note is the *reason*
@@ -3241,6 +3296,9 @@ rows:
     sub:  {field: due}
     icon: mdi:checkbox-blank-outline
 ```
+
+`status` is `needs_action` (the default), `completed`, or `all` for both
+at once — the last for a list that keeps the day's ticked rows on show.
 
 The entity itself is watched, so when someone ticks an item off on their
 phone the count moves, the cache is dropped and the list refetches. Nothing
