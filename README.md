@@ -3195,6 +3195,75 @@ It is read from a heartbeat the bundle keeps in `localStorage` every 30
 seconds. Set `no_load_report: true` on the view to turn it off.
 `tools/checkloadreport.js` covers it.
 
+### Quick actions: a scheduled square in the corner
+
+```yaml
+views:
+  - type: custom:spectra-panel
+    quick_actions:
+      - name: Last to bed
+        icon: mdi:weather-night
+        show: {from: "19:00", until: "02:00"}   # optional: always, without it
+        done: Sweet dreams!                      # the one line, afterwards
+        note: Hallway left on.                   # optional, quieter, under it
+        steps:
+          - name: Outside lights off
+            action: {service: light.turn_off, target: {entity_id: light.outside}}
+          - name: Downstairs lights off, except the hallway
+            action: {service: light.turn_off,
+                     target: {entity_id: [light.living_room, light.kitchen, light.dining_room]}}
+```
+
+A square over the cards, bottom right, exactly its own size, that the
+content scrolls under. Pressed, a sheet opens in the middle of the screen
+with the dashboard dimmed behind it: the steps it will take, each with what
+it targets, and **Not yet** and **Confirm**. Nothing is called until
+Confirm. Then the steps run **in writing order, one at a time**: a ring
+turns in the step's box while its service is called, closes when it lands,
+the box fills moss and the tick draws itself across it, and the next step
+starts a beat later. When the last has landed the sheet says its one line
+(`done`) under the ticked steps, and thirty seconds later the sheet and the
+dim go together. `hold` sets that in milliseconds.
+
+**It is not a card and not the rail**, and it is drawn so as not to be
+mistaken for either: ink on paper where a rail button is surface with an
+edge, a square where a rail button is a wide rectangle, its name in
+sentence case under the icon rather than an uppercase label over a summary.
+It names a thing to *do*, not a state, so it never wears a level or an
+accent. Moss appears only on a tick, after the step has happened.
+
+**The sheet is the same size from Confirm to the message.** Its bottom is
+one fixed-height area that holds the buttons first, then a quiet line while
+the steps run, then the message, so nothing the eye is on moves when the
+message arrives. And it is patched, never rebuilt, while it is up: a sheet
+that re-entered on every tick would play its entrance three times in four
+seconds.
+
+**Tapping the dim dismisses it, and what that means depends on when.**
+Before Confirm it is a no, like Escape and Not yet, and nothing runs. After
+Confirm it only hides the sheet: the steps carry on, the button in the
+corner stays hollow while they run and goes moss when they are done, and
+pressing it brings the sheet back as it was.
+
+**`show` is a window on this browser's clock.** `from` and `until` are
+`HH:MM`; a window with `from` after `until` crosses midnight. Outside it the
+button is not drawn and the corner is just the corner. The clock is read
+every half minute. An action whose sheet is up stays whatever the clock
+says. Several actions in their windows at once stack upwards in the corner,
+each its own size.
+
+**A step that fails stops the run.** Its box goes red with a cross, the
+steps after it are not called, and the sheet says which step and what the
+house answered, in place of the done line. That sheet stays until it is
+dismissed, because a thing the house could not do is worth reading.
+
+On a phone the square sits above the rail and is a little smaller.
+
+`tools/checkquickactions.js` holds the panel to all of it: the window, the
+wrapped window, that nothing is called before Confirm, the order of the
+calls, the tick classes step by step, the sheet's identity and height
+across the run, the hide-and-bring-back, and the failing step.
+
 ## Rows from a collection
 
 A `list` (or any array) can be built one row per item:
