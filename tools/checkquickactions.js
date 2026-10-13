@@ -74,6 +74,7 @@ const js = fs.readFileSync(file);
     view.setConfig({
       type: "custom:spectra-panel",
       no_load_report: true,
+      quick_size: 160,
       quick_actions: [
         { name: "Last to bed", icon: "mdi:weather-night", done: "Sweet dreams!", note: "Hallway left on.",
           hold: 1500, show: { from: hhmm(-60), until: hhmm(60) },
@@ -206,7 +207,7 @@ const js = fs.readFileSync(file);
   check("only the actions in their window are drawn, a wrapped window included",
     got.shown.join("|") === "Last to bed|Always|Wrapping|Broken", got.shown);
   check("the corner sits bottom right", got.corner.right >= 0 && got.corner.right <= 24 && got.corner.bottom >= 0 && got.corner.bottom <= 24, got.corner);
-  check("the button is a square", got.square[0] === got.square[1] && got.square[0] >= 100, got.square);
+  check("the button is a square of the configured size", got.square[0] === got.square[1] && got.square[0] === 160, got.square);
   check("pressed, the sheet opens and lists the steps", got.opened && got.stepNames.join("|") === "Outside lights off|Downstairs lights off, except the hallway", got.stepNames);
   check("each step says what it targets", got.specShown.join("|") === "light.outside|light.living_room, light.kitchen", got.specShown);
   check("Not yet and Confirm are offered, and nothing has been called", got.openButtons && got.callsBeforeConfirm === 0, got);

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.168.0";
+const VERSION = "0.168.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -22126,23 +22126,26 @@ const PANEL_SHEET = `
   display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
 .quick:empty { display:none; }
 .panel.phone .quick { bottom:calc(var(--pn-rail-h, 76px) + 10px); right:12px; }
+/* Sized from one number, quick_size on the view (default 140px), so the
+   icon and the name grow with the square: it is read from across a room. */
+.quick { --qa-size:var(--pn-qa-size, 140px); }
 .qa { position:relative; display:inline-flex; flex-direction:column; align-items:center;
-  justify-content:center; gap:7px; width:112px; height:112px; padding:0 8px; margin:0;
-  box-sizing:border-box; border-radius:6px; cursor:pointer;
-  font:inherit; font-size:15px; font-weight:600; letter-spacing:.01em; line-height:1.15; text-align:center;
+  justify-content:center; gap:calc(var(--qa-size) * .05); width:var(--qa-size); height:var(--qa-size);
+  padding:0 calc(var(--qa-size) * .07); margin:0;
+  box-sizing:border-box; border-radius:8px; cursor:pointer;
+  font:inherit; font-size:calc(var(--qa-size) * .125); font-weight:600; letter-spacing:.01em; line-height:1.15; text-align:center;
   background:var(--sp-ink); color:var(--sp-paper); border:2px solid var(--sp-ink);
   /* A hard halo, not a blur: it cuts the square out of whatever card is under it. */
   box-shadow:0 0 0 3px var(--sp-paper);
   transition:background 240ms, color 240ms, border-color 240ms, transform 140ms;
   -webkit-tap-highlight-color:transparent; }
-.qa ha-icon, .qa .mdi { --mdc-icon-size:36px; width:36px; height:36px; flex:none; }
-.qa .qalbl { max-width:96px; }
+.qa ha-icon, .qa .mdi { --mdc-icon-size:calc(var(--qa-size) * .32); width:calc(var(--qa-size) * .32); height:calc(var(--qa-size) * .32); flex:none; }
+.qa .qalbl { max-width:calc(var(--qa-size) - 16px); }
 .qa:active { transform:scale(.97); }
 .qa.open { background:var(--sp-surface); color:var(--sp-ink); }
 .qa.done { background:var(--sp-a3); border-color:var(--sp-a3); color:var(--sp-surface); }
 .qa:focus-visible { outline:2px solid var(--sp-notice); outline-offset:4px; }
-.panel.phone .qa { width:92px; height:92px; font-size:13px; }
-.panel.phone .qa ha-icon, .panel.phone .qa .mdi { --mdc-icon-size:30px; width:30px; height:30px; }
+.panel.phone .quick { --qa-size:min(var(--pn-qa-size, 140px), 96px); }
 
 .qdim { position:absolute; inset:0; z-index:8; background:rgba(0,0,0,.62);
   display:flex; align-items:center; justify-content:center; padding:24px; box-sizing:border-box;
@@ -22424,6 +22427,7 @@ class SpectraPanel extends HTMLElement {
     set("--pn-needs-width", this._config.needs_width, "px");
     set("--pn-needs-max", this._config.needs_max_height, "%");
     set("--pn-min", this._config.column_min_width, "px");
+    set("--pn-qa-size", this._config.quick_size, "px");
     tabStore.setDefault(this._config.default_tab);
     this._grid.classList.toggle("masonry", Boolean(this._config.masonry));
     this._layout();
