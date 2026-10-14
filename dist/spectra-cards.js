@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.168.1";
+const VERSION = "0.168.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -22835,15 +22835,26 @@ class SpectraPanel extends HTMLElement {
     return Promise.resolve(this._hass.callService(domain, service, action.data || {}, action.target || undefined));
   }
 
-  /* The sheet and the dim go together, and the corner forgets the run. */
+  /* The sheet and the dim go together, and the corner forgets the run.
+     Then `after`, if the action has one: a last call made once the sheet
+     has gone, never listed and never ticked -- the panel putting itself
+     to bed is not a step the person took. Its failure is logged only. */
   _quickFade(st) {
     if (this._quick !== st) return;
     const dim = this._quickDim;
+    const then = () => {
+      if (this._quick !== st) return;
+      this._quickReset();
+      if (st.action.after) {
+        this._quickCall(st.action.after)
+          .catch((error) => LOGGER_WARN("spectra-panel: quick action `after` failed", st.action.after, error));
+      }
+    };
     if (dim) {
       dim.classList.add("out");
-      st.timer = setTimeout(() => { if (this._quick === st) this._quickReset(); }, 330);
+      st.timer = setTimeout(then, 330);
     } else {
-      this._quickReset();
+      then();
     }
   }
 

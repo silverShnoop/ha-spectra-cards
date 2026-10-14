@@ -3341,6 +3341,19 @@ every half minute. An action whose sheet is up stays whatever the clock
 says. Several actions in their windows at once stack upwards in the corner,
 each its own size.
 
+**`after` is a last call once the sheet has gone.** An action, in the
+same shape as a step's, made when the hold ends and the sheet and the dim
+have faded, whether the sheet was still up or had been tapped away. It is
+never listed and never ticked: the panel dimming its own screen is not a
+step the person took, and the list is a promise about what *they* asked
+for. If it fails, it is logged and nothing is shown.
+
+```yaml
+      - name: Last to bed
+        ...
+        after: {service: switch.turn_on, target: {entity_id: switch.panel_screensaver}}
+```
+
 **A step that fails stops the run.** Its box goes red with a cross, the
 steps after it are not called, and the sheet says which step and what the
 house answered, in place of the done line. That sheet stays until it is

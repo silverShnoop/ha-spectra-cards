@@ -78,6 +78,7 @@ const js = fs.readFileSync(file);
       quick_actions: [
         { name: "Last to bed", icon: "mdi:weather-night", done: "Sweet dreams!", note: "Hallway left on.",
           hold: 1500, show: { from: hhmm(-60), until: hhmm(60) },
+          after: { service: "switch.turn_on", target: { entity_id: "switch.panel_screen" } },
           steps: [
             { name: "Outside lights off", action: off("light.outside") },
             { name: "Downstairs lights off, except the hallway", action: off(["light.living_room", "light.kitchen"]) },
@@ -174,10 +175,13 @@ const js = fs.readFileSync(file);
     named("Last to bed").click();
     await sleep(60);
     out.broughtBack = Boolean(sheet()) && Boolean(root.querySelector(".qmsg")) && root.querySelectorAll(".qstep.done").length === 2;
+    out.afterNotYet = !calls.some((c) => c.startsWith("switch."));
+    out.afterListed = [...root.querySelectorAll(".qstep .qname")].some((n) => /screen/i.test(n.textContent));
 
     /* `hold` elapses: the sheet goes and the corner forgets the run. */
     await sleep(1900);
     out.wentAway = !sheet() && !named("Last to bed").classList.contains("done") && !named("Last to bed").classList.contains("open");
+    out.afterRan = calls.filter((c) => c.startsWith("switch.")).join("|");
 
     /* A failing step stops the run. */
     calls.length = 0;
@@ -231,6 +235,8 @@ const js = fs.readFileSync(file);
   check("after Confirm the dim only hides the sheet", got.hiddenAfterDone, got.hiddenAfterDone);
   check("the button brings the sheet back as it was", got.broughtBack, got.broughtBack);
   check("after `hold` the sheet goes and the corner forgets the run", got.wentAway, got.wentAway);
+  check("`after` is not a step and is not called while the sheet is up", got.afterNotYet && !got.afterListed, got);
+  check("`after` is called once, once the sheet has gone", got.afterRan === "switch.turn_on:switch.panel_screen", got.afterRan);
   check("a failing step stops the run and nothing after it is called",
     got.failed.calls.join("|") === "light.turn_off:light.ok|light.turn_off:light.broken" && got.failed.steps.join(",") === "done,failed,-", got.failed);
   check("the failure says which step and why", got.failed.message === "Could not finish" && got.failed.which === "Second: bulb unreachable", got.failed);
