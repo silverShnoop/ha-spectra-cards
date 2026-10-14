@@ -539,6 +539,7 @@ const js = fs.readFileSync(file);
         { name: "Bins out", days: ["mon"], time: "", members: ["Casey"], specification: "" },
         { name: "Ring the plumber", days: [], time: "", members: [], specification: "about the tap" },
         { name: "Odd one", days: "mon", time: "seven", members: "Morgan", specification: "" },
+        { name: "Run the dishwasher", days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], start_time: "20:00", time: "22:30", members: [], specification: "" },
       ],
     };
     reset();
@@ -552,13 +553,15 @@ const js = fs.readFileSync(file);
       root().querySelectorAll(".voiceitem")[2].querySelector(".voicewhen") === null, "drew a schedule");
     check("a word where a list was expected is read as one, and a time that is not HH:MM is dropped",
       whens[2] === "Mon \u00b7 Morgan", whens[2]);
+    check("a window says when it starts as well as its deadline",
+      whens[3] === "Daily from 20:00 by 22:30", whens[3]);
     check("nothing has been added yet", calls.length === 0, calls.map((c) => c.service).join(","));
     q("[data-yes]").click();
     await settle();
     await settle();
     const routed = calls.filter((c) => c.service === "trello_todo.add_card");
     check("kept rows go to the configured action, not todo.add_item",
-      routed.length === 4 && !calls.some((c) => c.service === "todo.add_item"),
+      routed.length === 5 && !calls.some((c) => c.service === "todo.add_item"),
       calls.map((c) => c.service).join(","));
     check("targeted at the list", routed[0] && routed[0].target.entity_id === "todo.chores",
       routed[0] && JSON.stringify(routed[0].target));
@@ -572,6 +575,10 @@ const js = fs.readFileSync(file);
     check("a one-off keeps its note as the description and gets no schedule",
       routed[2] && routed[2].data.description === "about the tap" && routed[2].data.days === undefined,
       routed[2] && JSON.stringify(routed[2].data));
+    check("the start goes to the action as start",
+      routed[4] && routed[4].data.start === "20:00" && routed[4].data.time === "22:30"
+        && routed[0].data.start === undefined,
+      routed[4] && JSON.stringify(routed[4].data));
     await show({});
     reply = {
       items: [

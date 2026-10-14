@@ -2961,6 +2961,11 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 }
 .tdby.today { color:var(--sp-attention-on); background:var(--sp-attention-soft); border-color:var(--sp-attention); }
 .tdby.late { color:var(--sp-waiting-on); background:var(--sp-waiting-soft); border-color:var(--sp-waiting); }
+/* Not asking yet: quieter than the neutral chip, because "from 20:00" is
+   a promise that nothing is wanted before then. */
+.tdby.later { background:transparent; border-color:var(--sp-edge); }
+/* What ticked a chore, under its name in Done today. */
+.tdtickby { display:block; font-size:12px; color:var(--sp-ink-2); margin-top:2px; }
 /* On a narrow card the week's buttons shed their words and share one row
    that scrolls, rather than stacking four deep under the plan. */
 .mlacts { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
@@ -6920,6 +6925,14 @@ const BODIES = {
     const drawable = (item) => Boolean(item) && typeof item === "object"
       && !isBlank(item.uid) && !isBlank(item.summary);
 
+    /* What a Trello board knows that a to-do item does not: when the
+       card starts asking, and what ticked it. `board` is the to-do
+       entity's board attribute; a list without one draws as before. */
+    const boardCards = new Map(
+      (b.board && Array.isArray(b.board.cards) ? b.board.cards : [])
+        .filter((c) => c && !isBlank(c.id)).map((c) => [String(c.id), c]),
+    );
+
     const row = (item, keyPrefix, endsColumn) => {
       const uid = String(item.uid);
       const name = String(item.summary);
@@ -6950,7 +6963,15 @@ const BODIES = {
       /* Drawn only on an item that has one: nothing in this house set a
          due date until prep sessions did, and an empty line under every
          row is how it shipped the first time. */
-      const due = done ? null : todoDue(item.due);
+      const card = boardCards.get(uid) || null;
+      /* A chore that has not started asking yet -- the dishwasher before
+         20:00 -- wears a quiet "from 20:00" in place of its deadline. An
+         ochre "by 22:30" all afternoon would promise a Needs you row
+         that is not there (Home Signals waits for the start too). */
+      const opens = !done && card ? todoOpens(card.start, item.due) : null;
+      const due = done || opens ? null : todoDue(item.due);
+      /* What ticked it, when a sensor did: "by Dishwasher 21:14". */
+      const tickedBy = done && card && card.ticked_by ? todoTickedBy(card.ticked_by) : "";
       /* Two ways to say when. The line under the name is the quiet one,
          for a list where a date is an occasional fact. `deadlines` is
          for a list of routines, where every row has one and it is the
@@ -6963,7 +6984,9 @@ const BODIES = {
       const dueLine = due && !chips
         ? `<span class="tddue${due.soon ? " soon" : ""}">${esc(due.text)}</span>` : "";
       const dueChip = due && chips
-        ? `<span class="tdby${due.late ? " late" : (due.soon ? " today" : "")}">${esc(due.chip)}</span>` : "";
+        ? `<span class="tdby${due.late ? " late" : (due.soon ? " today" : "")}">${esc(due.chip)}</span>`
+        : (opens && chips ? `<span class="tdby later">${esc(opens)}</span>` : "");
+      const byLine = tickedBy ? `<span class="tdtickby">${esc(tickedBy)}</span>` : "";
       return `<div class="tditem${done ? " ticked" : ""}${open ? " open" : ""}`
         + `${endsColumn ? " colend" : ""}"`
         + ` data-key="${esc(keyPrefix + uid)}">`
@@ -6974,7 +6997,7 @@ const BODIES = {
         + `<span class="tdmark"><ha-icon icon="${esc(tick)}"></ha-icon></span>`
         + `</button>`
         + `<span class="tdtext"${sub ? ` data-note="${esc(uid)}"` : ""}>`
-        + `<span class="tdname">${esc(name)}${extra}${who}</span>${dueLine}${sub}</span>`
+        + `<span class="tdname">${esc(name)}${extra}${who}</span>${dueLine}${byLine}${sub}</span>`
         + dueChip
         + `</div>`;
     };
@@ -11314,6 +11337,31 @@ function prepShort(text) {
   return first.length > 60 ? `${first.slice(0, 57)}…` : first;
 }
 
+/* "from 20:00", for a chore whose start is still ahead today; null once it
+   has started asking, or when it has no start (it asks from the start of
+   its day, which has already come). A start on a later day than today is
+   left to the deadline chip, which already says which day. */
+function todoOpens(start, due) {
+  if (isBlank(start)) return null;
+  const t = new Date(String(start));
+  if (isNaN(t.getTime())) return null;
+  const now = new Date();
+  if (t <= now || prepDay(t) !== prepDay(now)) return null;
+  const d = isBlank(due) ? null : new Date(String(due));
+  if (d && !isNaN(d.getTime()) && d < t) return null;
+  const pad = (n) => String(n).padStart(2, "0");
+  return `from ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+}
+
+/* "by Dishwasher 21:14": what ticked a chore, and when. */
+function todoTickedBy(by) {
+  if (!by || typeof by !== "object" || isBlank(by.by)) return "";
+  const t = isBlank(by.at) ? null : new Date(String(by.at));
+  const pad = (n) => String(n).padStart(2, "0");
+  const at = t && !isNaN(t.getTime()) ? ` ${pad(t.getHours())}:${pad(t.getMinutes())}` : "";
+  return `by ${by.by}${at}`;
+}
+
 /* "Due today 19:30", for a to-do item that has a deadline. */
 function todoDue(value) {
   if (isBlank(value)) return null;
@@ -14787,13 +14835,14 @@ class SpectraCard extends HTMLElement {
             .filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim());
           if (row.days !== undefined) item.days = words(row.days).map((d) => d.toLowerCase());
           if (typeof row.time === "string" && /^\d{1,2}:\d{2}$/.test(row.time.trim())) item.time = row.time.trim();
+          if (typeof row.start_time === "string" && /^\d{1,2}:\d{2}$/.test(row.start_time.trim())) item.start_time = row.start_time.trim();
           if (row.members !== undefined) item.members = words(row.members);
           return item;
         });
     });
   }
 
-  /* "Daily by 19:00 · Casey": what a routine row on the sheet says under
+  /* "Daily from 20:00 by 22:30 · Casey": what a routine row on the sheet says under
      its name, so the person confirming can see the schedule the model
      heard and not only the job. */
   static voiceSchedule(item) {
@@ -14805,7 +14854,9 @@ class SpectraCard extends HTMLElement {
     else if (known.length === 5 && !known.includes("sat") && !known.includes("sun")) parts.push("Weekdays");
     else if (known.length === 2 && known.includes("sat") && known.includes("sun")) parts.push("Weekends");
     else if (known.length) parts.push(known.map((d) => NAMES[d]).join(", "));
-    if (item.time) parts.push(`${parts.length ? "by" : "Today by"} ${item.time}`);
+    if (item.start_time && item.time) parts.push(`${parts.length ? "from" : "Today from"} ${item.start_time} by ${item.time}`);
+    else if (item.start_time) parts.push(`${parts.length ? "from" : "Today from"} ${item.start_time}`);
+    else if (item.time) parts.push(`${parts.length ? "by" : "Today by"} ${item.time}`);
     const who = Array.isArray(item.members) ? item.members.filter(Boolean) : [];
     const line = parts.join(" ");
     return who.length ? (line ? `${line} \u00b7 ${who.join(" & ")}` : who.join(" & ")) : line;
@@ -14925,6 +14976,7 @@ class SpectraCard extends HTMLElement {
         if (!isBlank(item.specification)) data.description = item.specification;
         if (Array.isArray(item.days) && item.days.length) data.days = item.days;
         if (item.time) data.time = item.time;
+        if (item.start_time) data.start = item.start_time;
         if (Array.isArray(item.members) && item.members.length) data.members = item.members;
         call = this._hass.callService(custom[0], custom[1], data, { entity_id: list }, false);
       } else {

@@ -1741,6 +1741,7 @@ body:
   list: todo.chores
   items: {todo: todo.chores, status: all}   # ticked rows too: today's done stay on show
   deadlines: true
+  board: {entity: todo.chores, attribute: board}   # optional: start dates, what ticked it
 ```
 
 For a list where every row has a time and the time is the point — the
@@ -1754,6 +1755,7 @@ and the chip wears a level:
 | --- | --- | --- |
 | later today | `by 19:00` | `attention` — ochre |
 | time passed today | `was 18:30` | `waiting` — orange |
+| not started yet today | `from 20:00` | none — quiet, outlined |
 | another day | `Wed 09:00` | none |
 | missed, days ago | `was Mon` | `waiting` |
 | ticked | nothing: the deadline is met | |
@@ -1779,6 +1781,14 @@ finished rows come from a sensor that stamps them. The `items` read must
 ask for `status: all`: the default fetches only what is still to do, so a
 ticked row would simply stop coming back and leave the list, which is
 exactly what happened the first evening.
+
+**`board` adds what Trello knows.** The to-do entity's `board` attribute
+carries each card's start date and, for a chore a sensor ticked, what
+ticked it. With it a chore that only asks from 20:00 -- the dishwasher --
+wears a quiet `from 20:00` until then, rather than ochre all afternoon for
+a row Home Signals has not raised; and a ticked chore in Done today says
+`by Dishwasher 21:14` under its name. Without a start a chore asks from
+the start of its day, as before.
 
 **It ticks.** `by 19:00` has to become `was 19:00` at 19:00 with nothing
 else on the card moving, so a body with `deadlines` is live, the way a
