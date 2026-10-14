@@ -85,7 +85,7 @@ const js = fs.readFileSync(file);
         if (msg.service === "save_photo") {
           return Promise.resolve({ response: { media_content_id: `media-source://x/${msg.service_data.folder}.jpg`, media_content_type: "image/jpeg" } });
         }
-        if (msg.service === "meal_recipe_from_photo") {
+        if (msg.service === "recipe_photo_to_fields") {
           return Promise.resolve({ response: { name: "Tomato tart", ingredients: ["2 tomatoes"], method: ["Bake."], dish } });
         }
         if (msg.service === "save_recipe") return Promise.resolve({ response: { slug: "tomato-tart", recipe_id: "r9", name: "Tomato tart" } });
@@ -98,7 +98,7 @@ const js = fs.readFileSync(file);
     const body = {
       type: "recipes", mealie: "e1",
       edit: { save: "home_signals.save_recipe" },
-      photo: { save: "home_signals.save_photo", script: "script.meal_recipe_from_photo" },
+      photo: { save: "home_signals.save_photo", script: "script.recipe_photo_to_fields" },
     };
     const card = document.createElement("spectra-card");
     document.getElementById("host").appendChild(card);
@@ -145,7 +145,7 @@ const js = fs.readFileSync(file);
       i.src = gridImg;
     }) : false;
     check("the grid's lines are drawn on the copy", magenta, "no line at 1/8");
-    const read = asked.filter((m) => m.service === "meal_recipe_from_photo").pop();
+    const read = asked.filter((m) => m.service === "recipe_photo_to_fields").pop();
     check("and the script gets both: the clean page to read, the gridded one to point with",
       read && read.service_data.photo === "media-source://x/cookbook.jpg" && read.service_data.grid_photo === "media-source://x/cookbook-grid.jpg",
       JSON.stringify(read && read.service_data));

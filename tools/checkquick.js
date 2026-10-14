@@ -77,7 +77,7 @@ const js = fs.readFileSync(file);
           return Promise.resolve({ response: { mealplan: d.start_date === d.end_date && d.start_date === day(0)
             ? [{ mealplan_id: 99, mealplan_date: day(0), entry_type: "dinner", title: "Takeaway" }] : plan } });
         }
-        if (msg.service === "meal_slot_ideas") {
+        if (msg.service === "meal_slot_to_ideas") {
           const shown = d.avoid || [];
           return Promise.resolve({ response: { ideas: shown.length
             ? [{ name: "Lamb tagine", recipe_id: "", reason: "Something new." }]
@@ -88,7 +88,7 @@ const js = fs.readFileSync(file);
           return Promise.resolve({ response: { recipes: { items: [{ recipe_id: "r1", name: "Chicken fajitas", slug: "chicken-fajitas" }] } } });
         }
         if (msg.service === "meal_plan_move") return Promise.resolve({ response: { moved: "Chicken fajitas", swapped: "" } });
-        if (msg.service === "meal_plan_week") {
+        if (msg.service === "meal_plan_fill") {
           return Promise.resolve({ response: { planned: [{ date: day(3), meal: "Chilli", recipe_id: "", reason: "Quick for a weeknight." }] } });
         }
         return Promise.resolve({ response: {} });
@@ -101,8 +101,8 @@ const js = fs.readFileSync(file);
       plan: { mealie: "e1", days: 4 },
       place: { script: "script.meal_plan_set" },
       move: { script: "script.meal_plan_move" },
-      ideas: { script: "script.meal_slot_ideas" },
-      week: { script: "script.meal_plan_week" },
+      ideas: { script: "script.meal_slot_to_ideas" },
+      week: { script: "script.meal_plan_fill" },
       recipes: {},
     } });
     card.hass = hass;
@@ -188,7 +188,7 @@ const js = fs.readFileSync(file);
       && text(rows[0]).includes("Recipe") && text(rows[1]).includes("Idea"), rows.map(text).join(" | "));
     sheet.querySelector("[data-again]").click();
     await settle();
-    const again = calls("meal_slot_ideas").pop();
+    const again = calls("meal_slot_to_ideas").pop();
     check("More ideas asks without the ones shown", again && (again.service_data.avoid || []).join("|") === "Mushroom risotto|Fish tacos",
       again && JSON.stringify(again.service_data));
     q(".confirmwrap [data-idea]").click();
@@ -214,7 +214,7 @@ const js = fs.readFileSync(file);
       fillTab && fillTab.getAttribute("data-plantab") + " " + text(q(".confirmwrap [data-yes]")));
     q(".confirmwrap [data-yes]").click();
     await settle();
-    check("which asks the week script", calls("meal_plan_week").length > 0, asked.map((m) => m.service).join("|"));
+    check("which asks the week script", calls("meal_plan_fill").length > 0, asked.map((m) => m.service).join("|"));
     const why = q(".confirmwrap .mlpwhy small");
     check("each suggestion says why", why && text(why) === "Quick for a weeknight.", why && text(why));
     return problems;

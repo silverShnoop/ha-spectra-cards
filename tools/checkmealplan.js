@@ -89,7 +89,7 @@ const js = fs.readFileSync(file);
           return Promise.resolve({ response: { recipe: { recipe_id: d.recipe_id, name: "Sea bass with ginger",
             ingredients: [{ display: "2 fillets" }], instructions: [{ text: "Fry it." }] } } });
         }
-        if (msg.service === "meal_plan_week") {
+        if (msg.service === "meal_plan_fill") {
           suggestN += 1;
           if (d.days === 1) {
             return Promise.resolve({ response: { planned: [{ date: d.start_date, meal: `Something else ${suggestN}`, recipe_id: "" }] } });
@@ -100,7 +100,7 @@ const js = fs.readFileSync(file);
           return Promise.resolve({ response: { planned: meals } });
         }
         if (msg.service === "meal_plan_set") return Promise.resolve({ response: { planned: "ok" } });
-        if (msg.service === "meal_recipe_from_name") {
+        if (msg.service === "recipe_name_to_fields") {
           return Promise.resolve({ response: { name: "Fish pie", total_time: "1 hour", servings: 4,
             ingredients: ["500g fish pie mix", "1kg potatoes"], method: ["Poach the fish.", "Top with mash."] } });
         }
@@ -110,11 +110,11 @@ const js = fs.readFileSync(file);
         if (msg.service === "save_photo") {
           return Promise.resolve({ response: { media_content_id: `media-source://media_source/local/home_signals/${d.folder}/x.jpg`, media_content_type: "image/jpeg" } });
         }
-        if (msg.service === "meal_recipe_from_photo") {
+        if (msg.service === "recipe_photo_to_fields") {
           return Promise.resolve({ response: { name: "Nana's scones", total_time: "30 minutes", servings: 8,
             ingredients: ["225g self-raising flour"], method: ["Rub in the butter."] } });
         }
-        if (msg.service === "meal_fridge_ideas") {
+        if (msg.service === "meal_fridge_to_ideas") {
           return Promise.resolve({ response: { seen: "eggs, spinach, feta", planned: [
             { date: day(0), entry_type: "lunch", meal: "Spinach and feta omelette", recipe_id: "" }] } });
         }
@@ -126,10 +126,10 @@ const js = fs.readFileSync(file);
     el.setConfig({ type: "custom:spectra-card", accent: 6, title: "Meals", body: {
       type: "meals", layout: "grid", days: 3, types: ["lunch", "dinner"],
       plan: { mealie: "e1", days: 3 },
-      week: { script: "script.meal_plan_week", types: ["dinner"] },
+      week: { script: "script.meal_plan_fill", types: ["dinner"] },
       place: { script: "script.meal_plan_set" },
-      write: { script: "script.meal_recipe_from_name" },
-      fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_ideas" },
+      write: { script: "script.recipe_name_to_fields" },
+      fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_to_ideas" },
       recipes: { save: "home_signals.save_recipe" },
     } });
     el.hass = hass;
@@ -149,7 +149,7 @@ const js = fs.readFileSync(file);
     top().querySelector('[data-type="lunch"]').click();
     top().querySelector("[data-yes]").click();
     await settle();
-    const sug = calls("meal_plan_week");
+    const sug = calls("meal_plan_fill");
     check("each meal is asked for as a suggestion, from today",
       sug.length === 2 && sug.every((m) => m.service_data.suggest === true && m.service_data.start_date === day(0)
         && m.service_data.days === 3), JSON.stringify(sug.map((m) => m.service_data)));
@@ -169,7 +169,7 @@ const js = fs.readFileSync(file);
       && rows()[0].classList.contains("off"), text(top().querySelector("[data-yes]")));
     rows()[2].querySelector("[data-again]").click();
     await settle();
-    const again = calls("meal_plan_week").pop();
+    const again = calls("meal_plan_fill").pop();
     check("Another asks for that one slot, avoiding what is listed",
       again.service_data.days === 1 && again.service_data.start_date === day(2)
         && again.service_data.avoid.includes("Chilli") && again.service_data.avoid.includes("Sea bass with ginger"),
@@ -222,7 +222,7 @@ const js = fs.readFileSync(file);
       text(q(".mldetail")));
     q(".mldetail [data-meal-make]").click();
     await settle();
-    const wrote = calls("meal_recipe_from_name").pop();
+    const wrote = calls("recipe_name_to_fields").pop();
     check("AI is asked to write it", wrote && wrote.service_data.title === "Fish pie"
       && wrote.service_data.entry_type === "dinner", JSON.stringify(wrote && wrote.service_data));
     check("and the form opens with the draft to check",
@@ -304,7 +304,7 @@ const js = fs.readFileSync(file);
       type: "recipes", box: { mealie: "e1", recipes: true },
       edit: { save: "home_signals.save_recipe" },
       schedule: { script: "script.meal_plan_set", types: ["breakfast", "lunch", "dinner"] },
-      photo: { save: "home_signals.save_photo", script: "script.meal_recipe_from_photo" },
+      photo: { save: "home_signals.save_photo", script: "script.recipe_photo_to_fields" },
     } });
     rc.hass = hass;
     await settle();
@@ -378,7 +378,7 @@ const js = fs.readFileSync(file);
     }
     rtop().querySelector("[data-take]").click();
     await settle();
-    const read = calls("meal_recipe_from_photo").pop();
+    const read = calls("recipe_photo_to_fields").pop();
     check("a cookbook photo is read", read && read.service_data.photo === "media-source://x/cookbook.jpg",
       JSON.stringify(read && read.service_data));
     check("into the new-recipe form", rtop() && rtop().querySelector('[data-f="name"]').value === "Nana's scones",

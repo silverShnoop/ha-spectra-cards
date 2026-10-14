@@ -101,7 +101,7 @@ const shots = process.env.SHOTS || "";
           return Promise.resolve({ response: { mealplan: plan.filter((e) => e.mealplan_date >= a && e.mealplan_date <= z) } });
         }
         if (msg.service === "get_recipes") return Promise.resolve({ response: { recipes: { items: [] } } });
-        if (msg.service === "meal_plan_week") {
+        if (msg.service === "meal_plan_fill") {
           const d = msg.service_data;
           return Promise.resolve({ response: { planned: [{ date: d.start_date, meal: `A ${d.entry_type}`, recipe_id: "" }] } });
         }
@@ -127,7 +127,7 @@ const shots = process.env.SHOTS || "";
     const home = await make("home", {
       type: "meals", layout: "grid", days: 2, types: TYPES,
       plan: { mealie: "e1", days: 2 },
-      say: { script: "script.meal_plan_say" },
+      say: { script: "script.meal_plan_set_from_speech" },
       pick: { script: "script.meal_plan_pick", types: ["lunch", "dinner"] },
       move: { script: "script.meal_plan_move" },
     });
@@ -153,7 +153,7 @@ const shots = process.env.SHOTS || "";
     const view = await make("home", {
       type: "meals", layout: "grid", days: 2, types: TYPES, readonly: true,
       plan: { mealie: "e1", days: 2 },
-      say: { script: "script.meal_plan_say" },
+      say: { script: "script.meal_plan_set_from_speech" },
     });
     check("a view-only card has the same eight cells", all(view, ".mlcell").length === 8,
       all(view, ".mlcell").length);
@@ -205,9 +205,9 @@ const shots = process.env.SHOTS || "";
     const week = await make("week", {
       type: "meals", layout: "grid", start: "monday", types: TYPES,
       plan: { mealie: "e1", days: 14, start: "monday" },
-      say: { script: "script.meal_plan_say" },
+      say: { script: "script.meal_plan_set_from_speech" },
       pick: { script: "script.meal_plan_pick", types: ["lunch", "dinner"] },
-      week: { script: "script.meal_plan_week", types: ["dinner"] },
+      week: { script: "script.meal_plan_fill", types: ["dinner"] },
       place: { script: "script.meal_plan_set" },
       shop_week: { script: "script.meal_week_to_items", list: "todo.phoenix" },
       recipes: { save: "home_signals.save_recipe" },
@@ -313,7 +313,7 @@ const shots = process.env.SHOTS || "";
     sheet().querySelector("[data-yes]").click();
     await settle();
     await settle();
-    const fills = asked.filter((m) => m.service === "meal_plan_week");
+    const fills = asked.filter((m) => m.service === "meal_plan_fill");
     check("one suggestion call per meal, lunch then dinner",
       fills.map((m) => m.service_data.entry_type).join(",") === "lunch,dinner"
       && fills.every((m) => m.service_data.suggest === true),

@@ -210,7 +210,7 @@ const js = fs.readFileSync(file);
     { const open = q(el, ".confirmwrap [data-no]"); if (open) open.click(); await frame(); }
 
     /* ---- the link import hands its reading over ---- */
-    const spec = { script: "script.meal_import_recipe", split: "script.meal_recipe_split" };
+    const spec = { script: "script.recipe_import", split: "script.recipe_split" };
     const importing = (task) => {
       const hh = hassWith(task ? [task] : [], {});
       const ws = hh.callWS;
@@ -240,7 +240,7 @@ const js = fs.readFileSync(file);
       started && started[1].action === spec.script && started[1].card === "meals"
         && started[1].then.action === spec.split && started[1].then.pass.recipe === "slug"
         && started[1].require === "slug" && /No recipe found/.test(started[1].missing)
-        && !calls.some(([n]) => n === "script.meal_import_recipe"),
+        && !calls.some(([n]) => n === "script.recipe_import"),
       JSON.stringify(calls));
     check("...and the sheet says it can be closed",
       /can be closed/.test(w.textContent) && w.querySelector("[data-no]").textContent === "Close",
@@ -312,13 +312,13 @@ const js = fs.readFileSync(file);
     calls.length = 0;
     await set(viaTask(seven));
     let seenAsked = false;
-    const answer = el._aiCall("script.meal_plan_say", { transcript: "pie" },
+    const answer = el._aiCall("script.meal_plan_set_from_speech", { transcript: "pie" },
       { title: "Plan what was said", label: "planned", require: "planned", missing: "Nothing was planned",
         seen: () => { seenAsked = true; return true; } });
     await new Promise((r) => setTimeout(r, 20));
     const begun = calls.find(([n]) => n === "home_signals.start_ai_task");
     check("an AI call starts a task with the card's own key and tab",
-      begun && begun[1].action === "script.meal_plan_say" && begun[1].card === "meals"
+      begun && begun[1].action === "script.meal_plan_set_from_speech" && begun[1].card === "meals"
         && begun[1].tab === "kitchen" && begun[1].open === false && begun[1].label === "planned"
         && begun[1].kind === "" && begun[1].require === "planned" && begun[1].missing === "Nothing was planned",
       JSON.stringify(begun));
@@ -334,7 +334,7 @@ const js = fs.readFileSync(file);
     calls.length = 0;
     await set(viaTask(seven));
     let err = null;
-    el._aiCall("script.meal_plan_say", {}, { title: "x" }).catch((e) => { err = e; });
+    el._aiCall("script.meal_plan_set_from_speech", {}, { title: "x" }).catch((e) => { err = e; });
     await new Promise((r) => setTimeout(r, 20));
     await set(viaTask(Object.assign({}, seven, { state: "failed", error: "model said nothing" })));
     await new Promise((r) => setTimeout(r, 20));
@@ -345,10 +345,10 @@ const js = fs.readFileSync(file);
     delete plain.services.home_signals;
     calls.length = 0;
     await set(plain);
-    el._aiCall("script.meal_plan_say", { transcript: "pie" }, { title: "x" });
+    el._aiCall("script.meal_plan_set_from_speech", { transcript: "pie" }, { title: "x" });
     await new Promise((r) => setTimeout(r, 20));
     check("without home_signals tasks it is the plain call",
-      calls.length === 1 && calls[0][0] === "script.meal_plan_say", JSON.stringify(calls));
+      calls.length === 1 && calls[0][0] === "script.meal_plan_set_from_speech", JSON.stringify(calls));
 
     return problems;
   });

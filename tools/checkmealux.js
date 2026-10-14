@@ -97,7 +97,7 @@ const js = fs.readFileSync(file);
             image: "x1", ingredients: [{ display: "2 fillets" }, { display: "1 lime" }],
             instructions: [{ text: "Season the fish." }, { text: "Fry it skin-side down." }] } } });
         }
-        if (msg.service === "meal_plan_say") return Promise.resolve({ response: { planned: "Fish pie" } });
+        if (msg.service === "meal_plan_set_from_speech") return Promise.resolve({ response: { planned: "Fish pie" } });
         return Promise.resolve({ response: {} });
       },
     };
@@ -113,11 +113,11 @@ const js = fs.readFileSync(file);
     const meals = {
       type: "meals", layout: "grid", start: "monday", types: ["breakfast", "dinner"], images: true,
       plan: { mealie: "e1", days: 14, start: "monday" },
-      say: { script: "script.meal_plan_say" },
+      say: { script: "script.meal_plan_set_from_speech" },
       pick: { script: "script.meal_plan_pick" },
       move: { script: "script.meal_plan_move" },
       place: { script: "script.meal_plan_set" },
-      week: { script: "script.meal_plan_week" },
+      week: { script: "script.meal_plan_fill" },
       shop_week: { script: "script.meal_week_to_items", list: "todo.shop" },
       recipes: { save: "home_signals.save_recipe" },
     };
@@ -160,7 +160,7 @@ const js = fs.readFileSync(file);
     typed.dispatchEvent(new Event("input"));
     typed.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await settle();
-    const said = asked.filter((m) => m.service === "meal_plan_say").pop();
+    const said = asked.filter((m) => m.service === "meal_plan_set_from_speech").pop();
     check("Enter plans what was typed, into that slot", !q(".confirmwrap") && said && said.service_data.transcript === "fish pie"
       && said.service_data.date === day(0) && said.service_data.entry_type === "dinner",
       said && JSON.stringify(said.service_data));

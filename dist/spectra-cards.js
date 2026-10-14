@@ -9849,7 +9849,7 @@ function recipePlanned(plan) {
   return out;
 }
 
-/* A routine rule read the way script.meal_routine_apply reads it, so the
+/* A routine rule read the way script.meal_plan_fill_from_routine reads it, so the
    preview under the box says what the script will actually do: "Friday:
    Pizza", "Sunday lunch: Roast", "Weekdays breakfast: Porridge". The meal
    is dinner unless one is named. Returns null for a line that is not a

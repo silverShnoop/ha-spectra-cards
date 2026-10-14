@@ -115,46 +115,46 @@ const js = fs.readFileSync(file);
               instructions: [{ text: "Season the fish." }, { text: "Fry it skin-side down." },
                 { text: "Squeeze over the lime." }] } } }, 120);
           }
-          if (msg.service === "meal_recipe_ask") {
+          if (msg.service === "recipe_question_to_picks") {
             return later({ response: { picks: [{ recipe_id: "r3", reason: "Not had for a while." }] } }, 150);
           }
-          if (msg.service === "meal_plan_week") {
+          if (msg.service === "meal_plan_fill") {
             return later({ response: { planned: [{ date: day(2), meal: "Chilli", recipe_id: "", reason: "Quick." }] } }, 150);
           }
-          if (msg.service === "meal_slot_ideas") {
+          if (msg.service === "meal_slot_to_ideas") {
             return later({ response: { ideas: [{ name: "Mushroom risotto", recipe_id: "r3", reason: "Not had for a while." },
               { name: "Fish tacos", recipe_id: "", reason: "Something new, quick." }] } }, 150);
           }
-          if (msg.service === "meal_plan_say") return later({ response: { planned: "Fish pie" } }, 150);
+          if (msg.service === "meal_plan_set_from_speech") return later({ response: { planned: "Fish pie" } }, 150);
           return later({ response: {} });
         },
       };
       const body = {
         type: "meals", layout: "grid", start: "monday", types: ["breakfast", "dinner"], images: true,
         plan: { mealie: "e1", days: 14, start: "monday" },
-        say: { script: "script.meal_plan_say" },
+        say: { script: "script.meal_plan_set_from_speech" },
         pick: { script: "script.meal_plan_pick" },
         move: { script: "script.meal_plan_move" },
         place: { script: "script.meal_plan_set" },
-        write: { script: "script.meal_recipe_from_name" },
-        sentence: { script: "script.meal_plan_sentence" },
-        fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_ideas" },
-        week: { script: "script.meal_plan_week" },
-        shop: { script: "script.meal_ingredients_to_items", list: "todo.shop" },
+        write: { script: "script.recipe_name_to_fields" },
+        sentence: { script: "script.meal_plan_fill_from_sentence" },
+        fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_to_ideas" },
+        week: { script: "script.meal_plan_fill" },
+        shop: { script: "script.recipe_to_items", list: "todo.shop" },
         shop_week: { script: "script.meal_week_to_items", list: "todo.shop" },
-        ask: { script: "script.meal_recipe_ask" },
-        ideas: { script: "script.meal_slot_ideas" },
+        ask: { script: "script.recipe_question_to_picks" },
+        ideas: { script: "script.meal_slot_to_ideas" },
         recipes: { save: "home_signals.save_recipe", delete: "home_signals.delete_recipe" },
       };
       const recipesConfig = { type: "custom:spectra-card", accent: 6, title: "Recipes", body: {
         type: "recipes", images: true, box: { mealie: "e1", recipes: true },
         planned: { mealie: "e1", days: 14, start: "monday" },
-        ask: { script: "script.meal_recipe_ask" },
-        import: { script: "script.meal_import_recipe", split: "script.meal_recipe_split" },
-        photo: { save: "home_signals.save_photo", script: "script.meal_recipe_from_photo" },
+        ask: { script: "script.recipe_question_to_picks" },
+        import: { script: "script.recipe_import", split: "script.recipe_split" },
+        photo: { save: "home_signals.save_photo", script: "script.recipe_photo_to_fields" },
         edit: { save: "home_signals.save_recipe", delete: "home_signals.delete_recipe" },
         schedule: { script: "script.meal_plan_set" },
-        shop: { script: "script.meal_ingredients_to_items", list: "todo.shop" },
+        shop: { script: "script.recipe_to_items", list: "todo.shop" },
       } };
       const host = document.getElementById("host");
       host.style.width = `${w - 20}px`;

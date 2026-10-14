@@ -103,10 +103,10 @@ const js = fs.readFileSync(file);
         const d = msg.service_data || {};
         if (msg.service === "get_mealplan") return Promise.resolve({ response: { mealplan: d.start_date < day(0) ? old : plan } });
         if (msg.service === "recipe_index") return Promise.resolve({ response: { recipes: INDEX, tags: [] } });
-        if (msg.service === "meal_place_several") {
+        if (msg.service === "meal_recipes_to_days") {
           return Promise.resolve({ response: { placed: [{ date: d.dates[d.dates.length - 1], recipe_id: "r4", reason: "The roast at the weekend." }] } });
         }
-        if (msg.service === "meal_plan_week") {
+        if (msg.service === "meal_plan_fill") {
           return Promise.resolve({ response: { planned: [
             { date: day(0), meal: "Soup", recipe_id: "", reason: "" },
             { date: day(3), meal: "Chilli", recipe_id: "", reason: "" }] } });
@@ -122,9 +122,9 @@ const js = fs.readFileSync(file);
       type: "meals", layout: "grid", days: 5, types: ["breakfast", "dinner"],
       plan: { mealie: "e1", days: 5 },
       place: { script: "script.meal_plan_set" },
-      week: { script: "script.meal_plan_week" },
+      week: { script: "script.meal_plan_fill" },
       shop_week: { script: "script.meal_week_to_items", list: "todo.shop" },
-      arrange: { script: "script.meal_place_several" },
+      arrange: { script: "script.meal_recipes_to_days" },
       move: { script: "script.meal_plan_move" },
       recipes: { save: "home_signals.save_recipe" },
     } });
@@ -297,7 +297,7 @@ const js = fs.readFileSync(file);
     check("the button counts them", q(".confirmwrap [data-several]").textContent === "Plan 2", q(".confirmwrap [data-several]").textContent);
     q(".confirmwrap [data-several]").click();
     await settle();
-    const arr = calls("meal_place_several").pop();
+    const arr = calls("meal_recipes_to_days").pop();
     check("they are arranged into the empty dinners", arr && arr.service_data.recipes.join(",") === "r4,r3"
       && !arr.service_data.dates.includes(day(1)), arr && JSON.stringify(arr.service_data));
     const placed = all(".confirmwrap .mlprow").map((li) => text(li.querySelector(".mlpname")) + "@" + li.querySelector("select").value);
