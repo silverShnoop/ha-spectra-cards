@@ -755,6 +755,44 @@ const js = fs.readFileSync(file);
     check("the chip ticks by the clock, so by becomes was on time",
       el._live === true, el._live);
 
+    /* A start: the dishwasher asks from 20:00, not all day. Before its
+       start the chip is a quiet "from", in no level's colour -- Home
+       Signals raises no row yet, and the chip must not promise one. */
+    const inTwo = new Date(now.getTime() + 2 * 3600000);
+    const halfAgo = new Date(now.getTime() - 1800000);
+    const WINDOW = [
+      { uid: "w1", summary: "Run the dishwasher", status: "needs_action", due: iso(inTwo) },
+      { uid: "w2", summary: "Feed the cat", status: "needs_action", due: iso(inTwo) },
+      { uid: "w3", summary: "Hoover", status: "completed", due: iso(anHourAgo) },
+    ];
+    const BOARD = { cards: [
+      { id: "w1", start: iso(inAnHour) },
+      { id: "w2", start: iso(halfAgo) },
+      { id: "w3", ticked_by: { by: "Robot vacuum", at: iso(halfAgo) } },
+    ] };
+    await show({ list: "todo.chores", items: WINDOW, columns: 1, deadlines: true, board: BOARD });
+    if (inTwo.getDate() === now.getDate() && halfAgo.getDate() === now.getDate()) {
+      const w1 = chipOf("Run the dishwasher");
+      check("before its start a chore says from when, quietly",
+        w1 && w1.textContent === `from ${hhmm(inAnHour)}` && w1.classList.contains("later")
+          && !w1.classList.contains("today") && !w1.classList.contains("late"),
+        w1 && w1.outerHTML);
+      const w2 = chipOf("Feed the cat");
+      check("once started it asks in ochre, by its deadline",
+        w2 && w2.textContent === `by ${hhmm(inTwo)}` && w2.classList.contains("today"),
+        w2 && w2.outerHTML);
+    } else {
+      console.log("  (skipped the start chips: running within two hours of midnight)");
+    }
+    const byLine = root().querySelector(".tddone .tdtickby");
+    check("a chore a sensor ticked says what ticked it, and when",
+      byLine && byLine.textContent === `by Robot vacuum ${hhmm(halfAgo)}`,
+      byLine && byLine.outerHTML);
+    await show({ list: "todo.chores", items: WINDOW, columns: 1, deadlines: true });
+    check("without a board the rows draw as before",
+      all(".tdby.later").length === 0 && !root().querySelector(".tdtickby"),
+      `${all(".tdby.later").length} later chips`);
+
     /* A configured `done` still wins: a list whose finished rows come
        from a sensor that stamps them keeps that. */
     await show({ list: "todo.routines", items: ROUTINES, columns: 1, deadlines: true,
