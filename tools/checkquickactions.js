@@ -92,6 +92,10 @@ const js = fs.readFileSync(file);
           { name: "Second", action: off("light.broken") },
           { name: "Third", action: off("light.never") },
         ] },
+        { name: "Quiet", hold: 1500, steps: [
+          { name: "Stop playing", optional: "Nothing was playing", action: off("light.broken") },
+          { name: "Lights", action: off("light.ok") },
+        ] },
       ],
     });
     view.hass = window.HASS;
@@ -108,7 +112,7 @@ const js = fs.readFileSync(file);
        rect taken mid-animation is a smaller sheet that is not smaller. */
     const height = () => (sheet() ? sheet().offsetHeight : null);
     const stepClasses = () => [...root.querySelectorAll(".qstep")].map((li) =>
-      ["running", "done", "failed"].filter((c) => li.classList.contains(c)).join("") || "-");
+      ["running", "done", "failed", "skipped"].filter((c) => li.classList.contains(c)).join("") || "-");
     const tapDim = () => dim().dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     out.shown = buttons().map((b) => b.textContent.trim());
@@ -197,9 +201,36 @@ const js = fs.readFileSync(file);
     };
     await sleep(600);
     out.failedStays = Boolean(sheet()) && calls.length === 2;
+    out.failedButtons = Boolean(root.querySelector("[data-qclose]")) && Boolean(root.querySelector("[data-qretry]"));
+    /* Try again: the list, afresh, and nothing called. */
+    root.querySelector("[data-qretry]").click();
+    await sleep(60);
+    out.retryOpens = Boolean(sheet()) && Boolean(root.querySelector("[data-qyes]")) && stepClasses().join(",") === "-,-,-" && calls.length === 2;
+    tapDim();
+    await sleep(30);
+    /* Escape on a failed sheet clears it: the button opens a fresh list. */
+    root.querySelector("[data-qyes]") ; named("Broken").click(); await sleep(60);
+    root.querySelector("[data-qyes]").click();
+    await sleep(350 + 1100 + 420 + 1100 + 250);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await sleep(30);
     out.escapeHides = !sheet();
+    named("Broken").click();
+    await sleep(60);
+    out.freshAfterEscape = Boolean(root.querySelector("[data-qyes]")) && stepClasses().join(",") === "-,-,-";
+    tapDim();
+    await sleep(30);
+    /* An optional step that cannot be done takes a dash and the run goes on. */
+    calls.length = 0;
+    named("Quiet").click();
+    await sleep(60);
+    root.querySelector("[data-qyes]").click();
+    await sleep(350 + 1100 + 420 + 1100 + 420 + 300 + 250);
+    out.quiet = {
+      calls: calls.slice(), steps: stepClasses(),
+      note: (root.querySelector(".qstep.skipped .qskip") || {}).textContent,
+      message: (root.querySelector(".qtail .qmsg .qbig") || {}).textContent,
+    };
     view.remove();
     return out;
   });
@@ -209,7 +240,7 @@ const js = fs.readFileSync(file);
     if (!ok) problems.push(label);
   };
   check("only the actions in their window are drawn, a wrapped window included",
-    got.shown.join("|") === "Last to bed|Always|Wrapping|Broken", got.shown);
+    got.shown.join("|") === "Last to bed|Always|Wrapping|Broken|Quiet", got.shown);
   check("the corner sits bottom right", got.corner.right >= 0 && got.corner.right <= 24 && got.corner.bottom >= 0 && got.corner.bottom <= 24, got.corner);
   check("the button is a square of the configured size", got.square[0] === got.square[1] && got.square[0] === 160, got.square);
   check("pressed, the sheet opens and lists the steps", got.opened && got.stepNames.join("|") === "Outside lights off|Downstairs lights off, except the hallway", got.stepNames);
@@ -240,8 +271,13 @@ const js = fs.readFileSync(file);
   check("a failing step stops the run and nothing after it is called",
     got.failed.calls.join("|") === "light.turn_off:light.ok|light.turn_off:light.broken" && got.failed.steps.join(",") === "done,failed,-", got.failed);
   check("the failure says which step and why", got.failed.message === "Could not finish" && got.failed.which === "Second: bulb unreachable", got.failed);
-  check("a failed sheet stays until dismissed", got.failedStays, got.failedStays);
-  check("Escape dismisses", got.escapeHides, got.escapeHides);
+  check("a failed sheet stays until dismissed, with Close and Try again", got.failedStays && got.failedButtons, got);
+  check("Try again opens the list afresh and calls nothing", got.retryOpens, got.retryOpens);
+  check("Escape clears a failed sheet", got.escapeHides, got.escapeHides);
+  check("after that the button opens a fresh list, not the failure", got.freshAfterEscape, got.freshAfterEscape);
+  check("an optional step that fails takes a dash and the run goes on",
+    got.quiet.steps.join(",") === "skipped,done" && got.quiet.calls.join("|") === "light.turn_off:light.broken|light.turn_off:light.ok"
+    && got.quiet.note === "Nothing was playing" && got.quiet.message === "Done", got.quiet);
 
   await browser.close();
   server.close();

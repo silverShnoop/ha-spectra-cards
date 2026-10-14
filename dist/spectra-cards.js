@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.168.2";
+const VERSION = "0.168.3";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -22250,6 +22250,15 @@ const PANEL_SHEET = `
 .qstep.failed .qtick { border-color:var(--sp-critical); background:var(--sp-critical-soft); }
 .qstep.failed .qspin { opacity:0; }
 .qstep.failed .qex { opacity:1; }
+/* An optional step that could not be done takes a dash, in ink-3: not a
+   tick, not a cross, and its note says why. */
+.qdash { stroke:var(--sp-ink-3); stroke-width:2.8; opacity:0; transition:opacity 200ms ease 200ms; }
+.qstep.skipped .qtick { border-color:var(--sp-ink-3); }
+.qstep.skipped .qspin { opacity:0; }
+.qstep.skipped .qdash { opacity:1; }
+.qskip { display:none; font-size:13px; color:var(--sp-ink-3); margin-top:3px; }
+.qstep.skipped .qskip { display:block; }
+.qmsg.failed + .qbtns { margin-top:16px; }
 @keyframes qspin { to { transform:rotate(360deg); } }
 @keyframes qpop { 0% { transform:scale(1); } 45% { transform:scale(1.18); } 100% { transform:scale(1); } }
 .qname { font-size:18px; line-height:1.3; color:var(--sp-ink-2); transition:color 240ms ease; }
@@ -22321,6 +22330,15 @@ function quickStepSpec(action) {
   return ids.join(", ");
 }
 
+/* `optional: true` on a step lets it fail without stopping the run -- a
+   stop sent to players with nothing playing is the case -- and the box
+   takes a dash rather than a tick. `optional: "Nothing was playing"`
+   says why, under the step. */
+function quickSkipNote(step) {
+  const o = step && step.optional;
+  return typeof o === "string" && !isBlank(o) ? o : "Nothing needed doing";
+}
+
 function quickHeadNote(st) {
   const n = Array.isArray(st.action.steps) ? st.action.steps.length : 0;
   if (st.phase === "done") return "Done";
@@ -22357,7 +22375,9 @@ function quickTailMarkup(st) {
   if (st.phase === "failed") {
     return `<div class="qmsg failed"><span class="qring">${iconMarkup("mdi:alert")}</span>`
       + `<div class="qbig">${esc(firstOf(st.action.failed, "Could not finish"))}</div>`
-      + `<div class="qsmall">${esc(st.error)}</div></div>`;
+      + `<div class="qsmall">${esc(st.error)}</div></div>`
+      + `<div class="qbtns"><button type="button" class="qno" data-qclose>Close</button>`
+      + `<button type="button" class="qyes" data-qretry>Try again</button></div>`;
   }
   return `<div class="qwait">One moment.</div>`;
 }
@@ -22367,15 +22387,18 @@ function quickSheetMarkup(st) {
   const steps = (Array.isArray(a.steps) ? a.steps : []).map((step, i) => {
     const spec = quickStepSpec(step && step.action);
     /* A sheet brought back mid-run, or after it, opens as it was. */
-    const cls = i < st.done ? " done"
+    const cls = (st.skipped || []).includes(i) ? " skipped"
+      : i < st.done ? " done"
       : st.phase === "running" && i === st.done ? " running"
       : st.phase === "failed" && i === st.done ? " failed" : "";
     return `<li class="qstep${cls}"><span class="qtick">`
       + `<svg class="qspin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" pathLength="1"/></svg>`
       + `<svg class="qchk" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.6l4.1 4.1L18.2 8" pathLength="1"/></svg>`
       + `<svg class="qex" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 7.5l9 9M16.5 7.5l-9 9"/></svg>`
+      + `<svg class="qdash" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12h10"/></svg>`
       + `</span><div><div class="qname">${esc(firstOf(step && step.name, "Step"))}</div>`
-      + (isBlank(spec) ? "" : `<div class="qspec">${esc(spec)}</div>`) + `</div></li>`;
+      + (isBlank(spec) ? "" : `<div class="qspec">${esc(spec)}</div>`)
+      + `<div class="qskip">${esc(quickSkipNote(step))}</div></div></li>`;
   }).join("");
   return `<div class="qp" role="dialog" aria-modal="true" aria-label="${esc(firstOf(a.name, "Quick action"))}" aria-live="polite">`
     + `<div class="qph">${iconMarkup(firstOf(a.icon, "mdi:flash"))}<span>${esc(firstOf(a.name, "Quick action"))}</span>`
@@ -22751,7 +22774,7 @@ class SpectraPanel extends HTMLElement {
     if (st) return;  /* one at a time: a sheet is already up for another */
     const action = this._quickActions[index];
     if (!action) return;
-    this._quick = { index, action, phase: "open", done: 0, hidden: false, timer: null, error: "" };
+    this._quick = { index, action, phase: "open", done: 0, skipped: [], hidden: false, timer: null, error: "" };
     this._quickMount();
     this._renderQuick();
   }
@@ -22763,7 +22786,9 @@ class SpectraPanel extends HTMLElement {
   _quickClose() {
     const st = this._quick;
     if (!st) return;
-    if (st.phase === "open") {
+    /* A failed sheet is dismissed for good: hiding it left the failure
+       behind the button, and pressing again only brought it back. */
+    if (st.phase === "open" || st.phase === "failed") {
       this._quick = null;
       this._quickUnmount();
     } else {
@@ -22803,8 +22828,13 @@ class SpectraPanel extends HTMLElement {
     if (!dim) return;
     const yes = dim.querySelector("[data-qyes]");
     const no = dim.querySelector("[data-qno]");
+    const shut = dim.querySelector("[data-qclose]");
+    const retry = dim.querySelector("[data-qretry]");
     if (yes) yes.addEventListener("click", () => this._quickRun());
     if (no) no.addEventListener("click", () => this._quickClose());
+    if (shut) shut.addEventListener("click", () => this._quickReset());
+    /* Try again opens the list afresh; nothing runs until Confirm. */
+    if (retry) retry.addEventListener("click", () => { const i = this._quick && this._quick.index; this._quickReset(); if (i !== null && i !== undefined) this._quickPress(i); });
   }
 
   /* The sheet is patched, never rebuilt, while it is up: a tick that
@@ -22816,7 +22846,9 @@ class SpectraPanel extends HTMLElement {
     const sheet = dim.querySelector(".qp");
     const steps = sheet.querySelectorAll(".qstep");
     steps.forEach((li, i) => {
-      li.classList.toggle("done", i < st.done);
+      const skipped = (st.skipped || []).includes(i);
+      li.classList.toggle("skipped", skipped);
+      li.classList.toggle("done", !skipped && i < st.done);
       li.classList.toggle("running", st.phase === "running" && i === st.done);
       li.classList.toggle("failed", st.phase === "failed" && i === st.done);
     });
@@ -22857,6 +22889,11 @@ class SpectraPanel extends HTMLElement {
       }
       await wait(Math.max(0, 1100 - (Date.now() - started)));
       if (this._quick !== st) return;
+      if (failed && steps[i] && steps[i].optional) {
+        LOGGER_WARN("spectra-panel: optional quick action step did not finish", steps[i], failed);
+        st.skipped.push(i);
+        failed = null;
+      }
       if (failed) {
         LOGGER_WARN("spectra-panel: quick action step failed", steps[i], failed);
         st.phase = "failed";

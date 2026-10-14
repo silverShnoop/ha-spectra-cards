@@ -3366,8 +3366,19 @@ for. If it fails, it is logged and nothing is shown.
 
 **A step that fails stops the run.** Its box goes red with a cross, the
 steps after it are not called, and the sheet says which step and what the
-house answered, in place of the done line. That sheet stays until it is
-dismissed, because a thing the house could not do is worth reading.
+house answered, in place of the done line, with **Close** and **Try
+again**. Try again opens the list afresh and nothing runs until Confirm.
+Tapping the dim or Escape on a failed sheet closes it for good rather than
+hiding it: an earlier build hid it, and pressing the button only brought
+the failure back.
+
+**`optional: true` on a step lets it fail without stopping the run.** The
+case it exists for: a stop sent to players with nothing playing, which
+Google Cast answers with an error. The box takes a dash in ink-3 rather
+than a tick, the run carries on, and the line under the step says why --
+`optional: "Nothing was playing"` sets the words. The services are still
+called for every target, so a player that *was* playing is stopped even
+when its neighbour had nothing to stop.
 
 On a phone the square sits above the rail.
 
