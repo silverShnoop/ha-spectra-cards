@@ -55,7 +55,10 @@ const js = fs.readFileSync(file);
     const out = {};
     const calls = [];
     window.HASS = {
-      states: {},
+      states: {
+        "media_player.loud": { entity_id: "media_player.loud", state: "playing", attributes: {} },
+        "media_player.quiet": { entity_id: "media_player.quiet", state: "off", attributes: {} },
+      },
       themes: { darkMode: true },
       callService: (domain, service, data, target) => {
         const id = target && target.entity_id;
@@ -92,6 +95,16 @@ const js = fs.readFileSync(file);
           { name: "Second", action: off("light.broken") },
           { name: "Third", action: off("light.never") },
         ] },
+        { name: "Quiet", hold: 1500, steps: [
+          { name: "Stop playing", optional: "Nothing was playing", action: off("light.broken") },
+          { name: "Lights", action: off("light.ok") },
+        ] },
+        { name: "Playing", hold: 1500, steps: [
+          { name: "Stop what's playing", when: { state: ["playing", "paused"] }, skipped: "Nothing was playing",
+            action: { service: "media_player.media_stop", target: { entity_id: ["media_player.loud", "media_player.quiet"] } } },
+          { name: "Stop the idle one", when: { state: ["playing"] }, skipped: "Nothing was playing",
+            action: { service: "media_player.media_stop", target: { entity_id: "media_player.quiet" } } },
+        ] },
       ],
     });
     view.hass = window.HASS;
@@ -108,7 +121,7 @@ const js = fs.readFileSync(file);
        rect taken mid-animation is a smaller sheet that is not smaller. */
     const height = () => (sheet() ? sheet().offsetHeight : null);
     const stepClasses = () => [...root.querySelectorAll(".qstep")].map((li) =>
-      ["running", "done", "failed"].filter((c) => li.classList.contains(c)).join("") || "-");
+      ["running", "done", "failed", "skipped"].filter((c) => li.classList.contains(c)).join("") || "-");
     const tapDim = () => dim().dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     out.shown = buttons().map((b) => b.textContent.trim());
@@ -183,23 +196,57 @@ const js = fs.readFileSync(file);
     out.wentAway = !sheet() && !named("Last to bed").classList.contains("done") && !named("Last to bed").classList.contains("open");
     out.afterRan = calls.filter((c) => c.startsWith("switch.")).join("|");
 
-    /* A failing step stops the run. */
+    /* A failing step does not stop the run. */
     calls.length = 0;
     named("Broken").click();
     await sleep(60);
     root.querySelector("[data-qyes]").click();
-    await sleep(350 + 1100 + 420 + 1100 + 250);
+    const brokenNode = sheet();
+    await sleep(350 + 3 * (1100 + 420) + 300 + 250);
     out.failed = {
       calls: calls.slice(), steps: stepClasses(),
       message: (root.querySelector(".qmsg.failed .qbig") || {}).textContent,
       which: (root.querySelector(".qmsg.failed .qsmall") || {}).textContent,
-      height: height(),
+      head: root.querySelector(".qn").textContent,
     };
     await sleep(600);
-    out.failedStays = Boolean(sheet()) && calls.length === 2;
+    out.failedStays = Boolean(sheet()) && calls.length === 3;
+    out.failedButtons = Boolean(root.querySelector("[data-qclose]")) && Boolean(root.querySelector("[data-qretry]"));
+    /* Try again: only the step that did not finish runs, on the same sheet. */
+    root.querySelector("[data-qretry]").click();
+    await sleep(450);
+    out.retryRunning = stepClasses().join(",");
+    await sleep(1100 + 420 + 300 + 250);
+    out.retry = { calls: calls.slice(), steps: stepClasses(), same: sheet() === brokenNode, again: Boolean(root.querySelector("[data-qretry]")) };
+    /* Escape on that sheet leaves it for good: the button opens a fresh list. */
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await sleep(30);
     out.escapeHides = !sheet();
+    named("Broken").click();
+    await sleep(60);
+    out.freshAfterEscape = Boolean(root.querySelector("[data-qyes]")) && stepClasses().join(",") === "-,-,-";
+    tapDim();
+    await sleep(30);
+    /* `when` narrows a step to the targets in those states, and skips it when none are. */
+    calls.length = 0;
+    named("Playing").click();
+    await sleep(60);
+    root.querySelector("[data-qyes]").click();
+    await sleep(350 + (1100 + 420) + (700 + 420) + 300 + 250);
+    out.playing = { calls: calls.slice(), steps: stepClasses(), note: (root.querySelector(".qstep.skipped .qskip") || {}).textContent,
+      message: (root.querySelector(".qtail .qmsg .qbig") || {}).textContent };
+    await sleep(1900);
+    /* An optional step that cannot be done takes a dash and the run goes on. */
+    calls.length = 0;
+    named("Quiet").click();
+    await sleep(60);
+    root.querySelector("[data-qyes]").click();
+    await sleep(350 + 1100 + 420 + 1100 + 420 + 300 + 250);
+    out.quiet = {
+      calls: calls.slice(), steps: stepClasses(),
+      note: (root.querySelector(".qstep.skipped .qskip") || {}).textContent,
+      message: (root.querySelector(".qtail .qmsg .qbig") || {}).textContent,
+    };
     view.remove();
     return out;
   });
@@ -209,7 +256,7 @@ const js = fs.readFileSync(file);
     if (!ok) problems.push(label);
   };
   check("only the actions in their window are drawn, a wrapped window included",
-    got.shown.join("|") === "Last to bed|Always|Wrapping|Broken", got.shown);
+    got.shown.join("|") === "Last to bed|Always|Wrapping|Broken|Quiet|Playing", got.shown);
   check("the corner sits bottom right", got.corner.right >= 0 && got.corner.right <= 24 && got.corner.bottom >= 0 && got.corner.bottom <= 24, got.corner);
   check("the button is a square of the configured size", got.square[0] === got.square[1] && got.square[0] === 160, got.square);
   check("pressed, the sheet opens and lists the steps", got.opened && got.stepNames.join("|") === "Outside lights off|Downstairs lights off, except the hallway", got.stepNames);
@@ -237,11 +284,21 @@ const js = fs.readFileSync(file);
   check("after `hold` the sheet goes and the corner forgets the run", got.wentAway, got.wentAway);
   check("`after` is not a step and is not called while the sheet is up", got.afterNotYet && !got.afterListed, got);
   check("`after` is called once, once the sheet has gone", got.afterRan === "switch.turn_on:switch.panel_screen", got.afterRan);
-  check("a failing step stops the run and nothing after it is called",
-    got.failed.calls.join("|") === "light.turn_off:light.ok|light.turn_off:light.broken" && got.failed.steps.join(",") === "done,failed,-", got.failed);
-  check("the failure says which step and why", got.failed.message === "Could not finish" && got.failed.which === "Second: bulb unreachable", got.failed);
-  check("a failed sheet stays until dismissed", got.failedStays, got.failedStays);
-  check("Escape dismisses", got.escapeHides, got.escapeHides);
+  check("a failing step does not stop the run: the rest is still done",
+    got.failed.calls.join("|") === "light.turn_off:light.ok|light.turn_off:light.broken|light.turn_off:light.never" && got.failed.steps.join(",") === "done,failed,done", got.failed);
+  check("the sheet says what did not finish and why", got.failed.message === "Not everything finished" && got.failed.which === "Second: bulb unreachable" && got.failed.head === "1 not done", got.failed);
+  check("that sheet stays until dismissed, with Close and Try again", got.failedStays && got.failedButtons, got);
+  check("Try again runs only the step that did not finish, on the same sheet",
+    got.retryRunning === "done,running,done" && got.retry.calls.length === 4 && got.retry.calls[3] === "light.turn_off:light.broken"
+    && got.retry.steps.join(",") === "done,failed,done" && got.retry.same && got.retry.again, got.retry);
+  check("Escape leaves that sheet for good", got.escapeHides, got.escapeHides);
+  check("after that the button opens a fresh list, not the failure", got.freshAfterEscape, got.freshAfterEscape);
+  check("`when` sends the call only to the targets in those states, and skips a step with none",
+    got.playing.calls.join("|") === "media_player.media_stop:media_player.loud" && got.playing.steps.join(",") === "done,skipped"
+    && got.playing.note === "Nothing was playing" && got.playing.message === "Done", got.playing);
+  check("an optional step that fails takes a dash and the run goes on",
+    got.quiet.steps.join(",") === "skipped,done" && got.quiet.calls.join("|") === "light.turn_off:light.broken|light.turn_off:light.ok"
+    && got.quiet.note === "Nothing was playing" && got.quiet.message === "Done", got.quiet);
 
   await browser.close();
   server.close();

@@ -3364,10 +3364,32 @@ for. If it fails, it is logged and nothing is shown.
         after: {service: switch.turn_on, target: {entity_id: switch.panel_screensaver}}
 ```
 
-**A step that fails stops the run.** Its box goes red with a cross, the
-steps after it are not called, and the sheet says which step and what the
-house answered, in place of the done line. That sheet stays until it is
-dismissed, because a thing the house could not do is worth reading.
+**A step that fails does not stop the run.** The rest is still done, its
+box goes red with a cross, and at the end the sheet says what did not
+finish and what the house answered, with **Close** and **Try again**. Try
+again runs only the steps that did not finish; the ticks stay. The house
+does what it can and reports the rest: a run that stopped at the first
+problem left a person at the panel with a list half done and no way to
+see which half, which is how an earlier build behaved. Closing that
+sheet, from the button, the dim or Escape, leaves it for good and makes
+`after` as a clean finish would.
+
+**`when: {state: [...]}` narrows a step to the targets in one of those
+states now.** Google Cast answers a stop sent to an idle player with an
+error, so "stop what's playing" has to mean exactly that:
+
+```yaml
+          - name: Stop what's playing
+            when: {state: [playing, paused, buffering]}
+            skipped: Nothing was playing
+            action: {service: media_player.media_stop, target: {entity_id: [media_player.kitchen, media_player.tv]}}
+```
+
+The call goes only to the players that are playing, and when none are the
+step is a skip, not a call: the box takes a dash in ink-3 and the line
+under the step says why (`skipped` sets the words). `optional: true` on a
+step is the blunter tool: a failure is shown as that same dash rather
+than a cross, and does not count against the run.
 
 On a phone the square sits above the rail.
 
