@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.168.3";
+const VERSION = "0.168.4";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -22330,26 +22330,57 @@ function quickStepSpec(action) {
   return ids.join(", ");
 }
 
-/* `optional: true` on a step lets it fail without stopping the run -- a
-   stop sent to players with nothing playing is the case -- and the box
-   takes a dash rather than a tick. `optional: "Nothing was playing"`
-   says why, under the step. */
+/* A step's note when it was not done: `skipped: "Nothing was playing"`
+   (or the string form of `optional`), else a plain default. */
 function quickSkipNote(step) {
   const o = step && step.optional;
+  if (step && typeof step.skipped === "string" && !isBlank(step.skipped)) return step.skipped;
   return typeof o === "string" && !isBlank(o) ? o : "Nothing needed doing";
+}
+
+/* `when: {state: [playing, paused]}` on a step narrows its targets to the
+   entities in one of those states right now. Google Cast answers a stop
+   sent to an idle player with an error, so "stop what's playing" has to
+   mean exactly that. Nothing left to target is a skip, not a call. */
+function quickStepTargets(step, hass) {
+  const action = step && step.action;
+  if (!action || typeof action !== "object") return { action };
+  const when = step.when;
+  const target = action.target;
+  if (!when || typeof when !== "object" || !target || target.entity_id === undefined) return { action };
+  const states = (Array.isArray(when.state) ? when.state : [when.state]).filter((v) => !isBlank(v)).map(String);
+  if (!states.length) return { action };
+  const all = hass && hass.states ? hass.states : {};
+  const ids = [].concat(target.entity_id).filter((id) => {
+    const state = all[String(id)];
+    return state && states.includes(String(state.state));
+  });
+  if (!ids.length) return { none: true };
+  return { action: Object.assign({}, action, { target: Object.assign({}, target, { entity_id: ids }) }) };
+}
+
+function quickStatus(st, i) {
+  return (st.status && st.status[i]) || "todo";
+}
+
+function quickCount(st, which) {
+  return (st.status || []).filter((v) => which.includes(v)).length;
 }
 
 function quickHeadNote(st) {
   const n = Array.isArray(st.action.steps) ? st.action.steps.length : 0;
   if (st.phase === "done") return "Done";
-  if (st.phase === "failed") return "Stopped";
-  if (st.phase === "running") return `${st.done} of ${n}`;
+  if (st.phase === "partial") {
+    const f = quickCount(st, ["failed"]);
+    return f === 1 ? "1 not done" : `${f} not done`;
+  }
+  if (st.phase === "running") return `${quickCount(st, ["done", "skipped", "failed"])} of ${n}`;
   return n === 1 ? "1 step" : `${n} steps`;
 }
 
 function quickSubLine(st) {
   if (st.phase === "done") return "All done.";
-  if (st.phase === "failed") return "Stopped at the step marked.";
+  if (st.phase === "partial") return "Done, apart from the steps marked.";
   if (st.phase === "running") return "Working, in order.";
   return "In this order. Nothing happens until you confirm.";
 }
@@ -22358,6 +22389,13 @@ function quickErrorText(error) {
   if (!error) return "did not finish";
   const text = error && (error.message || (typeof error === "string" ? error : ""));
   return isBlank(text) ? "did not finish" : String(text);
+}
+
+function quickFailText(st) {
+  const steps = Array.isArray(st.action.steps) ? st.action.steps : [];
+  return steps.map((step, i) => quickStatus(st, i) === "failed"
+    ? `${firstOf(step && step.name, "A step")}: ${(st.errors || {})[i] || "did not finish"}` : null)
+    .filter(Boolean).join(" · ");
 }
 
 function quickTailMarkup(st) {
@@ -22372,10 +22410,10 @@ function quickTailMarkup(st) {
       + (isBlank(st.action.note) ? "" : `<div class="qsmall">${esc(st.action.note)}</div>`)
       + `</div><div class="qdrain"><i style="--qdur:${hold}ms"></i></div>`;
   }
-  if (st.phase === "failed") {
+  if (st.phase === "partial") {
     return `<div class="qmsg failed"><span class="qring">${iconMarkup("mdi:alert")}</span>`
-      + `<div class="qbig">${esc(firstOf(st.action.failed, "Could not finish"))}</div>`
-      + `<div class="qsmall">${esc(st.error)}</div></div>`
+      + `<div class="qbig">${esc(firstOf(st.action.failed, "Not everything finished"))}</div>`
+      + `<div class="qsmall">${esc(quickFailText(st))}</div></div>`
       + `<div class="qbtns"><button type="button" class="qno" data-qclose>Close</button>`
       + `<button type="button" class="qyes" data-qretry>Try again</button></div>`;
   }
@@ -22387,10 +22425,8 @@ function quickSheetMarkup(st) {
   const steps = (Array.isArray(a.steps) ? a.steps : []).map((step, i) => {
     const spec = quickStepSpec(step && step.action);
     /* A sheet brought back mid-run, or after it, opens as it was. */
-    const cls = (st.skipped || []).includes(i) ? " skipped"
-      : i < st.done ? " done"
-      : st.phase === "running" && i === st.done ? " running"
-      : st.phase === "failed" && i === st.done ? " failed" : "";
+    const status = quickStatus(st, i);
+    const cls = status === "todo" ? "" : ` ${status}`;
     return `<li class="qstep${cls}"><span class="qtick">`
       + `<svg class="qspin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" pathLength="1"/></svg>`
       + `<svg class="qchk" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.6l4.1 4.1L18.2 8" pathLength="1"/></svg>`
@@ -22774,7 +22810,8 @@ class SpectraPanel extends HTMLElement {
     if (st) return;  /* one at a time: a sheet is already up for another */
     const action = this._quickActions[index];
     if (!action) return;
-    this._quick = { index, action, phase: "open", done: 0, skipped: [], hidden: false, timer: null, error: "" };
+    const steps = Array.isArray(action.steps) ? action.steps : [];
+    this._quick = { index, action, phase: "open", status: steps.map(() => "todo"), errors: {}, hidden: false, timer: null };
     this._quickMount();
     this._renderQuick();
   }
@@ -22782,15 +22819,16 @@ class SpectraPanel extends HTMLElement {
   /* Outside the sheet, or Escape, or Not yet. Before Confirm it is a no
      and nothing runs; after it the steps carry on and only the sheet
      hides -- the button in the corner still shows them finishing, and
-     pressing it brings the sheet back. */
+     pressing it brings the sheet back. A sheet reporting steps that did
+     not finish is left for good, the way Close leaves it. */
   _quickClose() {
     const st = this._quick;
     if (!st) return;
-    /* A failed sheet is dismissed for good: hiding it left the failure
-       behind the button, and pressing again only brought it back. */
-    if (st.phase === "open" || st.phase === "failed") {
+    if (st.phase === "open") {
       this._quick = null;
       this._quickUnmount();
+    } else if (st.phase === "partial") {
+      return this._quickLeave();
     } else {
       st.hidden = true;
       this._quickUnmount();
@@ -22804,6 +22842,18 @@ class SpectraPanel extends HTMLElement {
     this._quick = null;
     this._quickUnmount();
     this._renderQuick();
+  }
+
+  /* The way out of a sheet whose run is over: the corner forgets it and
+     `after` is made, if the action has one. */
+  _quickLeave() {
+    const st = this._quick;
+    if (!st) return;
+    this._quickReset();
+    if (st.action.after) {
+      this._quickCall(st.action.after)
+        .catch((error) => LOGGER_WARN("spectra-panel: quick action `after` failed", st.action.after, error));
+    }
   }
 
   _quickMount() {
@@ -22830,11 +22880,11 @@ class SpectraPanel extends HTMLElement {
     const no = dim.querySelector("[data-qno]");
     const shut = dim.querySelector("[data-qclose]");
     const retry = dim.querySelector("[data-qretry]");
-    if (yes) yes.addEventListener("click", () => this._quickRun());
+    if (yes) yes.addEventListener("click", () => this._quickRun(false));
     if (no) no.addEventListener("click", () => this._quickClose());
-    if (shut) shut.addEventListener("click", () => this._quickReset());
-    /* Try again opens the list afresh; nothing runs until Confirm. */
-    if (retry) retry.addEventListener("click", () => { const i = this._quick && this._quick.index; this._quickReset(); if (i !== null && i !== undefined) this._quickPress(i); });
+    if (shut) shut.addEventListener("click", () => this._quickLeave());
+    /* Try again runs only the steps that did not finish; the ticks stay. */
+    if (retry) retry.addEventListener("click", () => this._quickRun(true));
   }
 
   /* The sheet is patched, never rebuilt, while it is up: a tick that
@@ -22846,11 +22896,8 @@ class SpectraPanel extends HTMLElement {
     const sheet = dim.querySelector(".qp");
     const steps = sheet.querySelectorAll(".qstep");
     steps.forEach((li, i) => {
-      const skipped = (st.skipped || []).includes(i);
-      li.classList.toggle("skipped", skipped);
-      li.classList.toggle("done", !skipped && i < st.done);
-      li.classList.toggle("running", st.phase === "running" && i === st.done);
-      li.classList.toggle("failed", st.phase === "failed" && i === st.done);
+      const status = quickStatus(st, i);
+      for (const name of ["running", "done", "skipped", "failed"]) li.classList.toggle(name, status === name);
     });
     sheet.querySelector(".qn").textContent = quickHeadNote(st);
     sheet.querySelector(".qpsub").textContent = quickSubLine(st);
@@ -22865,54 +22912,67 @@ class SpectraPanel extends HTMLElement {
   /* One service call per step, in writing order. The ring is shown for
      at least 1.1s however fast the house answered, because a tick that
      lands before the eye has found the row is a tick that was not seen;
-     and the next step starts a beat after the tick has drawn. A step
-     that fails stops the run and says which. */
-  async _quickRun() {
+     and the next step starts a beat after the tick has drawn.
+
+     A step that fails does not stop the run: the rest is still done,
+     the box goes red, and the sheet says at the end what did not finish,
+     with Try again for exactly those steps. The house does what it can
+     and reports the rest; a run that stops at the first problem leaves a
+     person at the panel with a list half done and no way to see which
+     half. */
+  async _quickRun(retry) {
     const st = this._quick;
-    if (!st || st.phase !== "open") return;
+    if (!st) return;
+    if (retry ? st.phase !== "partial" : st.phase !== "open") return;
     const steps = Array.isArray(st.action.steps) ? st.action.steps : [];
     const wait = (ms) => new Promise((resolve) => { st.timer = setTimeout(resolve, ms); });
+    const todo = steps.map((_, i) => i).filter((i) => !retry || quickStatus(st, i) === "failed");
+    for (const i of todo) { st.status[i] = "todo"; delete st.errors[i]; }
     st.phase = "running";
     this._quickPatch();
     this._renderQuick();
     await wait(350);
-    for (let i = 0; i < steps.length; i += 1) {
+    for (const i of todo) {
       if (this._quick !== st) return;
-      st.done = i;
+      const step = steps[i];
+      st.status[i] = "running";
       this._quickPatch();
       const started = Date.now();
+      const picked = quickStepTargets(step, this._hass);
       let failed = null;
-      try {
-        await this._quickCall(steps[i] && steps[i].action);
-      } catch (error) {
-        failed = error;
+      if (!picked.none) {
+        try {
+          await this._quickCall(picked.action);
+        } catch (error) {
+          failed = error;
+        }
       }
-      await wait(Math.max(0, 1100 - (Date.now() - started)));
+      await wait(Math.max(0, (picked.none ? 700 : 1100) - (Date.now() - started)));
       if (this._quick !== st) return;
-      if (failed && steps[i] && steps[i].optional) {
-        LOGGER_WARN("spectra-panel: optional quick action step did not finish", steps[i], failed);
-        st.skipped.push(i);
-        failed = null;
+      if (picked.none) {
+        st.status[i] = "skipped";
+      } else if (failed && step && step.optional) {
+        LOGGER_WARN("spectra-panel: optional quick action step did not finish", step, failed);
+        st.status[i] = "skipped";
+      } else if (failed) {
+        LOGGER_WARN("spectra-panel: quick action step failed", step, failed);
+        st.status[i] = "failed";
+        st.errors[i] = quickErrorText(failed);
+      } else {
+        st.status[i] = "done";
       }
-      if (failed) {
-        LOGGER_WARN("spectra-panel: quick action step failed", steps[i], failed);
-        st.phase = "failed";
-        st.error = `${firstOf(steps[i] && steps[i].name, "A step")}: ${quickErrorText(failed)}`;
-        this._quickPatch();
-        this._renderQuick();
-        return;
-      }
-      st.done = i + 1;
       this._quickPatch();
       await wait(420);
     }
     if (this._quick !== st) return;
     await wait(300);
-    st.phase = "done";
+    st.phase = quickCount(st, ["failed"]) ? "partial" : "done";
     this._quickPatch();
     this._renderQuick();
-    const hold = Math.max(1000, Number(st.action.hold) || 30000);
-    st.timer = setTimeout(() => this._quickFade(st), hold);
+    if (st.phase === "done") {
+      const hold = Math.max(1000, Number(st.action.hold) || 30000);
+      st.timer = setTimeout(() => this._quickFade(st), hold);
+    }
   }
 
   _quickCall(action) {
@@ -22931,19 +22991,11 @@ class SpectraPanel extends HTMLElement {
   _quickFade(st) {
     if (this._quick !== st) return;
     const dim = this._quickDim;
-    const then = () => {
-      if (this._quick !== st) return;
-      this._quickReset();
-      if (st.action.after) {
-        this._quickCall(st.action.after)
-          .catch((error) => LOGGER_WARN("spectra-panel: quick action `after` failed", st.action.after, error));
-      }
-    };
     if (dim) {
       dim.classList.add("out");
-      st.timer = setTimeout(then, 330);
+      st.timer = setTimeout(() => { if (this._quick === st) this._quickLeave(); }, 330);
     } else {
-      then();
+      this._quickLeave();
     }
   }
 
