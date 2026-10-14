@@ -107,12 +107,12 @@ const js = fs.readFileSync(file);
         if (msg.domain === "home_signals" && msg.service === "delete_recipe") {
           return Promise.resolve({});
         }
-        if (msg.service === "meal_import_recipe") {
+        if (msg.service === "recipe_import") {
           return String(msg.service_data.url).includes("no-recipe")
             ? Promise.reject(new Error("Bad request to Mealie"))
             : Promise.resolve({ response: { recipe: "Chicken fajitas", planned: "" } });
         }
-        if (msg.service === "meal_recipe_from_speech") {
+        if (msg.service === "recipe_speech_to_fields") {
           return Promise.resolve({ response: {
             name: "Nana's curry", total_time: "1 hour", servings: 4,
             ingredients: ["2 onions", "4 chicken thighs"], method: ["Fry the onions.", "Add the chicken."],
@@ -130,7 +130,7 @@ const js = fs.readFileSync(file);
           const answer = () => ({ response: { mealplan: plan } });
           return hold ? hold.then(answer) : Promise.resolve(answer());
         }
-        if (msg.service === "meal_plan_say") {
+        if (msg.service === "meal_plan_set_from_speech") {
           return Promise.resolve({ response: { planned: "Lasagne", recipe: false } });
         }
         if (msg.service === "meal_plan_pick") {
@@ -139,7 +139,7 @@ const js = fs.readFileSync(file);
         if (msg.service === "meal_plan_move") {
           return Promise.resolve({ response: { moved: "Takeaway", swapped: "" } });
         }
-        if (msg.service === "meal_plan_week") {
+        if (msg.service === "meal_plan_fill") {
           return Promise.resolve({ response: { planned: [
             { date: "x", meal: "A" }, { date: "y", meal: "B" }, { date: "z", meal: "C" },
           ] } });
@@ -151,7 +151,7 @@ const js = fs.readFileSync(file);
             already: 1,
           } });
         }
-        if (msg.service === "meal_ingredients_to_items") {
+        if (msg.service === "recipe_to_items") {
           return Promise.resolve({ response: {
             recipe: "Sea bass with ginger",
             items: [
@@ -180,9 +180,9 @@ const js = fs.readFileSync(file);
           type: "meals",
           plan: { mealie: "entry1", days: 7 },
           days: 7,
-          say: { script: "script.meal_plan_say" },
+          say: { script: "script.meal_plan_set_from_speech" },
           place: { script: "script.meal_plan_set" },
-          shop: { script: "script.meal_ingredients_to_items", list: "todo.phoenix" },
+          shop: { script: "script.recipe_to_items", list: "todo.phoenix" },
         }, extra || {}),
       })));
       el._signature = null;
@@ -265,7 +265,7 @@ const js = fs.readFileSync(file);
     emptySheet.querySelector("[data-no]").click();
     await settle();
     check("Cancel plans nothing", !root().querySelector(".confirmwrap")
-      && !asked.some((m) => m.service === "meal_plan_say"), JSON.stringify(asked.map((m) => m.service)));
+      && !asked.some((m) => m.service === "meal_plan_set_from_speech"), JSON.stringify(asked.map((m) => m.service)));
 
     all(".mlslot")[2].click();
     await settle();
@@ -296,7 +296,7 @@ const js = fs.readFileSync(file);
     before = fetches();
     root().querySelector(".confirmwrap [data-said-mic]").click();
     await settle();
-    const said = asked.find((m) => m.service === "meal_plan_say");
+    const said = asked.find((m) => m.service === "meal_plan_set_from_speech");
     check("the mic calls the plan script", Boolean(said), JSON.stringify(asked.map((m) => m.service)));
     check("with what was said, the day and the meal",
       said && said.service_data.transcript === "lasagne please"
@@ -312,13 +312,13 @@ const js = fs.readFileSync(file);
     el._voiceSay("idle", "");
 
     el._listen = () => Promise.resolve("");
-    const saysBefore = asked.filter((m) => m.service === "meal_plan_say").length;
+    const saysBefore = asked.filter((m) => m.service === "meal_plan_set_from_speech").length;
     all(".mlslot")[1].click();
     await settle();
     root().querySelector(".confirmwrap [data-said-mic]").click();
     await settle();
     check("silence plans nothing, and the sheet stays",
-      asked.filter((m) => m.service === "meal_plan_say").length === saysBefore && Boolean(root().querySelector(".confirmwrap [data-said]")),
+      asked.filter((m) => m.service === "meal_plan_set_from_speech").length === saysBefore && Boolean(root().querySelector(".confirmwrap [data-said]")),
       JSON.stringify(asked.map((m) => m.service)));
     root().querySelector(".confirmwrap [data-no]").click();
     await settle();
@@ -331,7 +331,7 @@ const js = fs.readFileSync(file);
     await settle();
     q("[data-meal-shop]").click();
     await settle();
-    const asks = asked.find((m) => m.service === "meal_ingredients_to_items");
+    const asks = asked.find((m) => m.service === "recipe_to_items");
     check("ingredients come from the shop script",
       asks && asks.service_data.recipe === "fa4a" && asks.service_data.list === "todo.phoenix",
       asks && JSON.stringify(asks.service_data));
@@ -367,7 +367,7 @@ const js = fs.readFileSync(file);
     await show({
       pick: { script: "script.meal_plan_pick" },
       move: { script: "script.meal_plan_move" },
-      week: { script: "script.meal_plan_week" },
+      week: { script: "script.meal_plan_fill" },
       shop_week: { script: "script.meal_week_to_items", list: "todo.phoenix" },
     });
     /* A new config is not a new card: the slot opened in the last section is
@@ -491,14 +491,14 @@ const js = fs.readFileSync(file);
     check("Suggest asks first, even for one kind of meal, with no source to pick",
       chooser && chooser.querySelector("[data-request]") && !chooser.querySelector("[data-src]")
       && text(chooser.querySelector("[data-yes]")) === "Suggest meals"
-      && !asked.some((m) => m.service === "meal_plan_week"), chooser && text(chooser));
+      && !asked.some((m) => m.service === "meal_plan_fill"), chooser && text(chooser));
     chooser.querySelector("[data-request]").value = "something light";
     chooser.querySelector('[data-hint="No fish"]').click();
     check("a hint adds its words to the line", chooser.querySelector("[data-request]").value === "something light, No fish",
       chooser.querySelector("[data-request]").value);
     chooser.querySelector("[data-yes]").click();
     await settle();
-    const wk = asked.filter((m) => m.service === "meal_plan_week").pop();
+    const wk = asked.filter((m) => m.service === "meal_plan_fill").pop();
     check("Suggest meals asks for the card's days and meal",
       wk && wk.service_data.days === 7 && wk.service_data.entry_type === "dinner"
       && wk.service_data.start_date === day(0),
@@ -538,7 +538,7 @@ const js = fs.readFileSync(file);
     await show({
       recipes: {
         save: "home_signals.save_recipe", delete: "home_signals.delete_recipe",
-        dictate: "script.meal_recipe_from_speech",
+        dictate: "script.recipe_speech_to_fields",
       },
     });
     el._mealPick = null;
@@ -628,7 +628,7 @@ const js = fs.readFileSync(file);
     el._listen = () => Promise.resolve("this is nanas curry it serves four");
     top().querySelector("[data-dictate]").click();
     await settle();
-    const told = asked.filter((m) => m.service === "meal_recipe_from_speech").pop();
+    const told = asked.filter((m) => m.service === "recipe_speech_to_fields").pop();
     check("reading it out sends what was heard to the script",
       told && told.service_data.transcript === "this is nanas curry it serves four",
       told && JSON.stringify(told.service_data));
@@ -676,7 +676,7 @@ const js = fs.readFileSync(file);
         type: "recipes",
         box: { mealie: "entry1", recipes: true },
         edit: { save: "home_signals.save_recipe", delete: "home_signals.delete_recipe" },
-        import: { script: "script.meal_import_recipe" },
+        import: { script: "script.recipe_import" },
       },
     });
     rc.hass = hass;
@@ -741,7 +741,7 @@ const js = fs.readFileSync(file);
     rtop().querySelector("[data-yes]").click();
     await settle();
     check("a link that is not one is refused before anything is sent",
-      text(rtop()).includes("not a web address") && !asked.some((m) => m.service === "meal_import_recipe"),
+      text(rtop()).includes("not a web address") && !asked.some((m) => m.service === "recipe_import"),
       text(rtop()));
     rtop().querySelector("[data-f=url]").value = "https://example.com/no-recipe";
     rtop().querySelector("[data-yes]").click();
@@ -752,7 +752,7 @@ const js = fs.readFileSync(file);
     rtop().querySelector("[data-f=url]").value = "Look at this https://example.com/fajitas";
     rtop().querySelector("[data-yes]").click();
     await settle();
-    const imp = asked.filter((m) => m.service === "meal_import_recipe").pop();
+    const imp = asked.filter((m) => m.service === "recipe_import").pop();
     check("a pasted message is cut down to its link", imp && imp.service_data.url === "https://example.com/fajitas",
       JSON.stringify(imp && imp.service_data));
     check("says what was saved and rereads the box", text(rtop()).includes("Chicken fajitas is in the box")

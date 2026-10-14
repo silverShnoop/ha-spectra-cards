@@ -78,18 +78,18 @@ const js = fs.readFileSync(file);
         const d = msg.service_data || {};
         if (msg.service === "get_mealplan") return Promise.resolve({ response: { mealplan: plan } });
         if (msg.service === "get_recipes") return Promise.resolve({ response: { recipes: { items: [] } } });
-        if (msg.service === "meal_plan_say") return Promise.resolve({ response: { planned: "Fish pie" } });
-        if (msg.service === "meal_plan_week") {
+        if (msg.service === "meal_plan_set_from_speech") return Promise.resolve({ response: { planned: "Fish pie" } });
+        if (msg.service === "meal_plan_fill") {
           return Promise.resolve({ response: { planned: [
             { date: day(2), meal: "Penne arrabbiata", recipe_id: "", reason: "Something new." },
             { date: day(3), meal: "Chicken pie", recipe_id: "", reason: "" }] } });
         }
-        if (msg.service === "meal_recipe_from_name") {
+        if (msg.service === "recipe_name_to_fields") {
           return Promise.resolve({ response: { name: d.title, total_time: "30 minutes", servings: 4,
             ingredients: ["400g penne", "1 tin tomatoes"], method: ["Boil the pasta.", "Make the sauce."] } });
         }
         if (msg.service === "save_recipe") return Promise.resolve({ response: { recipe_id: "new9", slug: "penne-arrabbiata", name: d.name } });
-        if (msg.service === "meal_plan_sentence") {
+        if (msg.service === "meal_plan_fill_from_sentence") {
           return Promise.resolve({ response: { planned: [
             { date: day(2), entry_type: "dinner", meal: "Fish pie", recipe_id: "", reason: "You asked for fish." },
             { date: day(3), entry_type: "breakfast", meal: "Porridge", recipe_id: "", reason: "You asked for porridge." }] } });
@@ -97,7 +97,7 @@ const js = fs.readFileSync(file);
         if (msg.service === "save_photo") {
           return Promise.resolve({ response: { media_content_id: `media-source://x/${asked.length}.jpg`, media_content_type: "image/jpeg" } });
         }
-        if (msg.service === "meal_fridge_ideas") {
+        if (msg.service === "meal_fridge_to_ideas") {
           return Promise.resolve({ response: { seen: "eggs, spinach", planned: [
             { date: day(2), entry_type: "dinner", meal: "Spinach omelette", recipe_id: "", reason: "Uses the eggs." }] } });
         }
@@ -110,12 +110,12 @@ const js = fs.readFileSync(file);
       type: "meals", layout: "grid", days: 5, types: ["breakfast", "dinner"],
       plan: { mealie: "e1", days: 5 },
       place: { script: "script.meal_plan_set" },
-      week: { script: "script.meal_plan_week" },
-      write: { script: "script.meal_recipe_from_name" },
-      sentence: { script: "script.meal_plan_sentence" },
-      say: { script: "script.meal_plan_say" },
-      fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_ideas" },
-      recipes: { save: "home_signals.save_recipe", tag: "script.meal_recipe_tag" },
+      week: { script: "script.meal_plan_fill" },
+      write: { script: "script.recipe_name_to_fields" },
+      sentence: { script: "script.meal_plan_fill_from_sentence" },
+      say: { script: "script.meal_plan_set_from_speech" },
+      fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_to_ideas" },
+      recipes: { save: "home_signals.save_recipe", tag: "script.recipe_tag" },
     } });
     card.hass = hass;
     await settle();
@@ -142,7 +142,7 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-mix='new']").click();
     q(".confirmwrap [data-yes]").click();
     await settle();
-    const fill = calls("meal_plan_week").pop();
+    const fill = calls("meal_plan_fill").pop();
     check("Suggest passes where the suggestions come from", fill && fill.service_data.mix === "new", fill && JSON.stringify(fill.service_data));
 
     /* ---- balance ---- */
@@ -165,12 +165,12 @@ const js = fs.readFileSync(file);
     check("and can be ticked", q(".confirmwrap [data-write]").getAttribute("aria-pressed") === "true", "not ticked");
     q(".confirmwrap [data-yes]").click();
     for (let i = 0; i < 6; i += 1) await settle();
-    const written = calls("meal_recipe_from_name").map((m) => m.service_data.title);
+    const written = calls("recipe_name_to_fields").map((m) => m.service_data.title);
     check("a recipe is drafted for each idea kept", written.join(",") === "Penne arrabbiata,Chicken pie", written.join(","));
     const saved = calls("save_recipe")[0];
     check("saved with its ingredients and method", saved && saved.service_data.ingredients === "400g penne\n1 tin tomatoes"
       && saved.service_data.method.startsWith("Boil"), saved && JSON.stringify(saved.service_data));
-    check("tagged", calls("meal_recipe_tag").length === 2, calls("meal_recipe_tag").length);
+    check("tagged", calls("recipe_tag").length === 2, calls("recipe_tag").length);
     const pointed = calls("meal_plan_set").filter((m) => m.service_data.recipe_id === "new9");
     check("and the slot pointed at the new recipe", pointed.length === 2, pointed.length);
 
@@ -189,7 +189,7 @@ const js = fs.readFileSync(file);
     box.value = "fish Wednesday, porridge Thursday";
     q(".confirmwrap [data-yes]").click();
     await settle();
-    const sent = calls("meal_plan_sentence").pop();
+    const sent = calls("meal_plan_fill_from_sentence").pop();
     check("the sentence goes to the script, only to suggest", sent && sent.service_data.text === "fish Wednesday, porridge Thursday"
       && sent.service_data.suggest === true, sent && JSON.stringify(sent.service_data));
     const rows = all(".confirmwrap .mlprow .mlpname").map(text);
@@ -233,7 +233,7 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-said]").value = "fish pie";
     q(".confirmwrap [data-yes]").click();
     await settle();
-    const said = calls("meal_plan_say").pop();
+    const said = calls("meal_plan_set_from_speech").pop();
     check("what was typed goes to the say script, with the date and the meal",
       said && JSON.stringify(said.service_data) === JSON.stringify({ transcript: "fish pie", date: day(1), entry_type: "dinner" }),
       said && JSON.stringify(said.service_data));
@@ -282,7 +282,7 @@ const js = fs.readFileSync(file);
     q(".confirmwrap [data-request]").value = "use the eggs";
     q(".confirmwrap [data-yes]").click();
     await settle();
-    const fr = calls("meal_fridge_ideas").pop();
+    const fr = calls("meal_fridge_to_ideas").pop();
     check("the fridge gets every photo, the meals, the days and the wish", fr && fr.service_data.photos.length === 2
       && fr.service_data.days === 1 && fr.service_data.request === "use the eggs"
       && JSON.stringify(fr.service_data.types) === JSON.stringify(["dinner"]), fr && JSON.stringify(fr.service_data));

@@ -114,7 +114,7 @@ const js = fs.readFileSync(file);
         const d = msg.service_data || {};
         if (msg.service === "recipe_index") return Promise.resolve({ response: { recipes: INDEX, tags: [] } });
         if (msg.service === "get_mealplan") return Promise.resolve({ response: { mealplan: plan } });
-        if (msg.service === "meal_recipe_ask") {
+        if (msg.service === "recipe_question_to_picks") {
           return Promise.resolve({ response: { picks: d.question
             ? [{ recipe_id: "r3", reason: "Warming, and vegetarian." }, { recipe_id: "nope", reason: "not in the box" }]
             : [{ recipe_id: "r4", reason: "Not had yet, and it is Sunday." }] } });
@@ -137,9 +137,9 @@ const js = fs.readFileSync(file);
     document.getElementById("b").appendChild(rc);
     rc.setConfig({ type: "custom:spectra-card", accent: 6, title: "Recipes", body: {
       type: "recipes", box: { mealie: "e1", recipes: true }, planned: { mealie: "e1", days: 14 },
-      ask: { script: "script.meal_recipe_ask" },
+      ask: { script: "script.recipe_question_to_picks" },
       import: { script: "script.meal_recipe_import" },
-      edit: { save: "home_signals.save_recipe", tag: "script.meal_recipe_tag" },
+      edit: { save: "home_signals.save_recipe", tag: "script.recipe_tag" },
     } });
     rc.hass = hass;
     await settle();
@@ -235,7 +235,7 @@ const js = fs.readFileSync(file);
       askBtn && text(askBtn));
     askBtn.click();
     await settle();
-    const q = asked.filter((m) => m.service === "meal_recipe_ask").pop();
+    const q = asked.filter((m) => m.service === "recipe_question_to_picks").pop();
     check("which sends the question", q && q.service_data.question === "something warming for a cold night", JSON.stringify(q && q.service_data));
     check("and pins what it picked, with why", names()[0] === "Mushroom risotto"
       && text(rowOf("risotto").querySelector(".rpwhy")) === "Warming, and vegetarian."
@@ -348,7 +348,7 @@ const js = fs.readFileSync(file);
     sheet().querySelector('[data-f="name"]').value = "Leek soup";
     sheet().querySelector("[data-yes]").click();
     await settle();
-    const tagged = asked.filter((m) => m.service === "meal_recipe_tag").pop();
+    const tagged = asked.filter((m) => m.service === "recipe_tag").pop();
     check("a new recipe nobody tagged is tagged by AI", tagged && tagged.service_data.recipe === "new-one",
       JSON.stringify(tagged && tagged.service_data));
 
@@ -358,7 +358,7 @@ const js = fs.readFileSync(file);
     el.setConfig({ type: "custom:spectra-card", accent: 6, title: "Meals", body: {
       type: "meals", layout: "grid", days: 3, types: ["breakfast", "dinner"],
       plan: { mealie: "e1", days: 3 }, place: { script: "script.meal_plan_set" },
-      ask: { script: "script.meal_recipe_ask" }, recipes: { save: "home_signals.save_recipe" },
+      ask: { script: "script.recipe_question_to_picks" }, recipes: { save: "home_signals.save_recipe" },
     } });
     el.hass = hass;
     await settle();
@@ -370,7 +370,7 @@ const js = fs.readFileSync(file);
     check("the tray shows a planned recipe's first ingredients",
       text(E.querySelector(".mlglance")) === "500g chicken thighs · 2 peppers · 1 onion · 8 tortillas · +1",
       text(E.querySelector(".mlglance")));
-    const asksBefore = asked.filter((m) => m.service === "meal_recipe_ask").length;
+    const asksBefore = asked.filter((m) => m.service === "recipe_question_to_picks").length;
     E.querySelectorAll(".mlgridview [data-meal]").forEach((c) => {
       if (c.getAttribute("data-meal") === `${day(2)}|dinner`) c.click();
     });
@@ -387,7 +387,7 @@ const js = fs.readFileSync(file);
     check("opened for a dinner, Suits dinner is already on",
       S.querySelector('[data-rp-chip="meal:dinner"]').getAttribute("aria-pressed") === "true"
       && !snames().includes("Overnight oats") && !snames().includes("Greek salad"), snames().join("|"));
-    check("and asks no model anything just for opening it", asked.filter((m) => m.service === "meal_recipe_ask").length === asksBefore
+    check("and asks no model anything just for opening it", asked.filter((m) => m.service === "recipe_question_to_picks").length === asksBefore
       && !S.querySelector("[data-rp-note]:not([hidden])"), JSON.stringify(asked.map((m) => m.service)));
     const peek = srows().find((li) => text(li).includes("Mushroom risotto"));
     await window.holdAt(peek.querySelector("[data-recipe-open]"));

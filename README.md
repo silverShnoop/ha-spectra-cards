@@ -1623,7 +1623,7 @@ body:
 **`add` is a box to type onto the list**, for a list that is written
 rather than said. Enter or **+** calls `todo.add_item` on `list`. With
 `preview: meal_routine` each line is read back as it is typed, the way
-`script.meal_routine_apply` will read it: "Fills dinner on Friday with
+`script.meal_plan_fill_from_routine` will read it: "Fills dinner on Friday with
 Pizza, when nothing else is planned." A line the script would ignore (no
 colon, or no day) says how to write one and is not added.
 
@@ -2295,16 +2295,16 @@ body:
   plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 7}   # Mealie's config entry id
   days: 7
   types: [dinner]                                     # or [breakfast, lunch, dinner]
-  say: {script: script.meal_plan_say}
-  shop: {script: script.meal_ingredients_to_items, list: todo.phoenix}
+  say: {script: script.meal_plan_set_from_speech}
+  shop: {script: script.recipe_to_items, list: todo.phoenix}
   pick: {script: script.meal_plan_pick}
   move: {script: script.meal_plan_move}
-  week: {script: script.meal_plan_week}
+  week: {script: script.meal_plan_fill}
   shop_week: {script: script.meal_week_to_items, list: todo.phoenix}
   recipes:
     save: home_signals.save_recipe
     delete: home_signals.delete_recipe
-    dictate: script.meal_recipe_from_speech
+    dictate: script.recipe_speech_to_fields
 ```
 
 **Days run down, not across.** A calendar app lays a week out in seven
@@ -2356,7 +2356,7 @@ body:
   types: [breakfast, lunch, dinner, snack]
   plan: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}   # this week and next
   pick: {script: script.meal_plan_pick, types: [lunch, dinner]}
-  week: {script: script.meal_plan_week, types: [dinner]}
+  week: {script: script.meal_plan_fill, types: [dinner]}
   # ...and say, shop, move, shop_week and recipes as above
 ```
 
@@ -2399,10 +2399,10 @@ make one. Each needs a script that answers in a fixed shape:
 
 ```yaml
   place: {script: script.meal_plan_set}          # puts one meal in one slot
-  write: {script: script.meal_recipe_from_name}  # drafts a recipe for a name
+  write: {script: script.recipe_name_to_fields}  # drafts a recipe for a name
   fridge:
     save: home_signals.save_photo                # keeps the photo for the AI
-    script: script.meal_fridge_ideas             # suggests meals from it
+    script: script.meal_fridge_to_ideas             # suggests meals from it
 ```
 
 **One button plans; everything else is a fact or a menu.** The card's
@@ -2703,14 +2703,14 @@ body:
   edit:                                    # optional; without it the box is read-only
     save: home_signals.save_recipe
     delete: home_signals.delete_recipe
-    dictate: script.meal_recipe_from_speech
-    tag: script.meal_recipe_tag            # optional: AI tags a new recipe nobody tagged
-  ask: {script: script.meal_recipe_ask}    # optional: "Ask" the box, and suggestions for a slot
-  import: {script: script.meal_import_recipe, split: script.meal_recipe_split}   # optional: + → "From a link"; split: check its prep once
+    dictate: script.recipe_speech_to_fields
+    tag: script.recipe_tag            # optional: AI tags a new recipe nobody tagged
+  ask: {script: script.recipe_question_to_picks}    # optional: "Ask" the box, and suggestions for a slot
+  import: {script: script.recipe_import, split: script.recipe_split}   # optional: + → "From a link"; split: check its prep once
   schedule: {script: script.meal_plan_set, types: [breakfast, lunch, dinner, snack]}  # optional: "Plan"
-  arrange: {script: script.meal_place_several}                                       # optional: several recipes placed sensibly
-  shop: {script: script.meal_ingredients_to_items, list: todo.phoenix}               # optional: "Add to shopping list"
-  photo: {save: home_signals.save_photo, script: script.meal_recipe_from_photo}      # optional: + → "From a photo"
+  arrange: {script: script.meal_recipes_to_days}                                       # optional: several recipes placed sensibly
+  shop: {script: script.recipe_to_items, list: todo.phoenix}               # optional: "Add to shopping list"
+  photo: {save: home_signals.save_photo, script: script.recipe_photo_to_fields}      # optional: + → "From a photo"
   planned: {mealie: 01M3CN3XX7QGDTX6SFS8HT6829, days: 14, start: monday}             # optional: "Tue" beside a recipe
   images: true                                                                       # optional: photos. See "Recipe photos"
 ```

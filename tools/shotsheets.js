@@ -184,7 +184,7 @@ function pageSetup() {
         case "get_mealplan": return Promise.resolve({ response: { mealplan: PLAN } });
         case "recipe_index": return Promise.resolve({ response: { recipes: INDEX, tags: [...new Set(R.flatMap((r) => r.tags))] } });
         case "get_recipe": return Promise.resolve({ response: { recipe: full(String(d.recipe_id)) } });
-        case "meal_plan_week": {
+        case "meal_plan_fill": {
           const types = d.entry_type ? [d.entry_type] : ["dinner"];
           const planned = [];
           for (let k = 0; k < (d.days || 7); k += 1) {
@@ -197,7 +197,7 @@ function pageSetup() {
           }
           return Promise.resolve({ response: { planned } });
         }
-        case "meal_slot_ideas": return Promise.resolve({ response: { ideas: [
+        case "meal_slot_to_ideas": return Promise.resolve({ response: { ideas: [
           { name: "Mushroom risotto", recipe_id: id(2), reason: "Not had since August, and there are mushrooms to use." },
           { name: "Lamb tagine with apricots and a jewelled couscous", recipe_id: "", reason: "Something new, and it is slow-cooked so it waits for you." },
           { name: "Fish tacos", recipe_id: "", reason: "Quick, and fish for the week." },
@@ -217,11 +217,11 @@ function pageSetup() {
     plan: { mealie: "e1", days: 7 },
     place: { script: "script.meal_plan_set" },
     move: { script: "script.meal_plan_move" },
-    ideas: { script: "script.meal_slot_ideas" },
-    week: { script: "script.meal_plan_week" },
-    sentence: { script: "script.meal_plan_sentence" },
-    ask: { script: "script.meal_recipe_ask" },
-    fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_ideas" },
+    ideas: { script: "script.meal_slot_to_ideas" },
+    week: { script: "script.meal_plan_fill" },
+    sentence: { script: "script.meal_plan_fill_from_sentence" },
+    ask: { script: "script.recipe_question_to_picks" },
+    fridge: { save: "home_signals.save_photo", script: "script.meal_fridge_to_ideas" },
     shop: { script: "script.meal_shop", list: "todo.shopping" },
     write: { script: "script.meal_write" },
     recipes: { save: "home_signals.save_recipe", delete: "home_signals.delete_recipe" },
