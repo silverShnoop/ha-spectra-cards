@@ -11,7 +11,10 @@
  * upright.
  *
  *   NODE_PATH=$(npm root -g) node tools/shotneeds.js [path/to/spectra-cards.js] \
- *     --out DIR [--sizes 19,28,36,44] [--widths 300,1100]
+ *     --out DIR [--sizes 19,28,36,44] [--widths 300,1100] [--rows N]
+ *
+ * --rows 3 renders only the first three: both drums full and a load to
+ * hang, the ordinary afternoon that any redesign has to look right on.
  *
  * Writes DIR/needs-<width>-<light|dark>.png. The rows are made up and name
  * nobody: placeholders only, as everything in this repository must be.
@@ -27,6 +30,7 @@ let file = null;
 let out = null;
 let sizes = "19,28,36,44";
 let widths = "300,1100";
+let count = 0;
 for (let i = 0; i < args.length; i += 1) {
   const a = args[i];
   if (a === "--out") out = args[++i];
@@ -35,8 +39,10 @@ for (let i = 0; i < args.length; i += 1) {
   else if (a.startsWith("--sizes=")) sizes = a.slice(8);
   else if (a === "--widths") widths = args[++i];
   else if (a.startsWith("--widths=")) widths = a.slice(9);
+  else if (a === "--rows") count = Number(args[++i]);
+  else if (a.startsWith("--rows=")) count = Number(a.slice(7));
   else if (a === "-h" || a === "--help") {
-    console.log("usage: node tools/shotneeds.js [path/to/spectra-cards.js] --out DIR [--sizes 19,28,36,44] [--widths 300,1100]");
+    console.log("usage: node tools/shotneeds.js [path/to/spectra-cards.js] --out DIR [--sizes 19,28,36,44] [--widths 300,1100] [--rows N]");
     process.exit(0);
   } else if (!file) file = a;
   else { console.error(`unexpected argument: ${a}`); process.exit(2); }
@@ -75,20 +81,26 @@ function rows() {
   const ago = (h) => new Date(Date.now() - h * 3600000).toISOString();
   const snooze = (id) => ({ service: "home_signals.snooze", data: { item_id: id } });
   return [
+    /* The three from a real afternoon, first: both drums full and a load
+       to hang. A morning with three yellow jobs is the common case, and
+       the one a design has to survive. */
+    { id: "drum_washing_machine", title: "Washing machine needs emptying",
+      detail: "Clears when the door is opened", since: ago(1.7), since_label: "Finished",
+      icon: "mdi:washing-machine", level: "attention" },
+    { id: "hang_1", title: "Laundry needs hanging", since: ago(1.7), since_label: "Finished",
+      icon: "mdi:hanger", level: "attention", action_label: "Hung", action: snooze("hang") },
+    { id: "drum_tumble_dryer", title: "Tumble dryer needs emptying",
+      detail: "Clears when the door is opened", since: ago(2.9), since_label: "Finished",
+      icon: "mdi:tumble-dryer", level: "attention" },
     { id: "leak_washing_machine", title: "Washing machine is leaking",
       detail: "Power cut at the plug · check the floor", since: ago(0.2), since_label: "Wet",
       icon: "mdi:water-alert", level: "critical", action_label: "Snooze", action: snooze("leak") },
     { id: "unpowered_washing_machine", title: "Washing machine has no power",
       detail: "Switched off at the plug", icon: "mdi:power-plug-off", level: "waiting",
       action_label: "Snooze", action: snooze("unpowered") },
-    { id: "drum_tumble_dryer", title: "Tumble dryer needs emptying",
-      detail: "Clears when the door is opened", since: ago(2), since_label: "Finished",
-      icon: "mdi:tumble-dryer", level: "attention" },
     { id: "drum_dishwasher", title: "Dishwasher needs emptying",
       detail: "Clears when the door is opened", since: ago(9), since_label: "Finished",
       icon: "mdi:dishwasher", level: "attention" },
-    { id: "hang_2", title: "2 loads need hanging", since: ago(5), since_label: "Oldest finished",
-      icon: "mdi:hanger", level: "attention", action_label: "Hung", action: snooze("hang") },
     { id: "bins", title: "Bins out tonight", detail: "Refuse and food tomorrow",
       icon: "mdi:trash-can-outline", level: "attention" },
     { id: "offline", title: "5 devices offline, 1 partly", since: ago(30), since_label: "Quiet",
@@ -105,10 +117,12 @@ function rows() {
 }
 
 function card(size) {
-  const body = { type: "list", zebra: false, flow: true, rows: rows() };
+  const all = rows();
+  const some = count > 0 ? all.slice(0, count) : all;
+  const body = { type: "list", zebra: false, flow: true, rows: some };
   if (size !== 19) body.icon_size = size;
   return { type: "custom:spectra-card", accent: 1, icon: "mdi:hand-wave", title: "Needs you",
-    meta: `${rows().length} to do`, body };
+    meta: `${some.length} to do`, body };
 }
 
 (async () => {

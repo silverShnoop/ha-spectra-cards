@@ -394,13 +394,31 @@ A Needs-you row is a job, so its tone is a **level** and it arrives under
 are not jobs — what finished today, a bin schedule — and those are
 decorated, not levelled.
 
-**`icon_size` makes the glyph the thing you read first.** In px; the default
-is the 19px every other row on the panel uses. Needs you is read from across
-a kitchen, where the title is a grey line and the icon is what says whether a
-job is about the dryer, the bins or a leak, so it asks for `36`. Past 24 the
-text block centres on the glyph rather than hanging off its top; the cap is
-64. `tools/shotneeds.js` renders the same ten jobs at several sizes side by
-side, in both themes, for choosing one.
+**`flow: true` turns the rows into job cards.** Tiles rather than a column,
+as many abreast as fit, one on a phone. Each is two bands: the glyph beside
+the title and its detail, then a foot with the time on the left and the
+button on the right. It was one line — icon, name, time and detail run
+together, button on the right — and in the 300px column the panel gives
+Needs you that came out as four lines of the same grey with the title
+wrapped under a button. The title now gets the width and a heavier,
+larger face, because it is the one thing on the panel that says what to
+do; the time reads as small print under it rather than as part of its
+sentence. A row with no time and no button has no foot.
+
+A levelled tile wears its level **the way a card does**: the border; the
+inset ring from `waiting`; the ground only at `critical`. Every tile used
+to take the ground, which made a morning with three yellow jobs a wall of
+yellow and left a leak nothing to escalate to. The coloured glyph carries
+the hue at a distance; the weight carries the step.
+
+**`icon_size` makes the glyph the thing you read first.** In px; a tile's
+default is 32, a plain row's the 19px every other row on the panel uses.
+Needs you is read from across a kitchen, where the title is a grey line and
+the icon is what says whether a job is about the dryer, the bins or a leak,
+so it asks for `36`. Past 24 a plain row centres its text on the glyph
+rather than hanging it off the top; the cap is 64. `tools/shotneeds.js`
+renders the same jobs at several sizes side by side, in both themes, for
+choosing one, and `--rows 3` renders the ordinary afternoon alone.
 
 ```yaml
 body:
@@ -3002,9 +3020,10 @@ Colour on this rail means **status**, and nothing else:
 background, and three amber blocks across the top of the panel pulled the
 eye away from Needs you — which is where the job actually is, and the one
 thing that says what to do. So a filled button now says its state on its
-edge and a ring, one step louder than `live`, and the ground went to the
-Needs you tiles instead. The only filled button on the rail is the page
-you are on, in a neutral ground that no level ever wears.
+edge and a ring, one step louder than `live`, and the colour went to the
+Needs you tiles instead: a levelled glyph on every job, and the ground on
+a critical one. The only filled button on the rail is the page you are
+on, in a neutral ground that no level ever wears.
 
 `fill` is the loud one, and it is **earned where the reassuring state is
 itself information**. Security filled green is not decoration: "everything
