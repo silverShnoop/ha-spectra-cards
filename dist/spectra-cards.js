@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.171.0";
+const VERSION = "0.171.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6911,6 +6911,11 @@ const SKY_H = 236;
 /* The horizon. Below it is the ground band, which carries the readings. */
 const SKY_HZ = 192;
 const SKY_FPS = 30;
+/* The arc the sun and moon travel. It spans the right of the card only, from
+   just past the reading to the edge: drawn the full width, the moon rose
+   straight through the temperature and the words could not be read over it. */
+const SKY_ARC_X = 412;
+const SKY_ARC_RX = 140;
 const SKY_CLOUD = new Path2D("M6,19A5,5 0 0,1 1,14A5,5 0 0,1 6,9C7,6.65 9.3,5 12,5C15.43,5 18.24,7.66 18.5,11.03L19,11A4,4 0 0,1 23,15A4,4 0 0,1 19,19H6Z");
 
 /* What each condition brings, before the readings refine it. Cover is a
@@ -7347,7 +7352,7 @@ class SkyPainter {
 
     const arcAt = (f) => {
       const th = Math.PI * (1 - f);
-      return [288 + 250 * Math.cos(th), HZ - 128 * Math.sin(th)];
+      return [SKY_ARC_X + SKY_ARC_RX * Math.cos(th), HZ - 128 * Math.sin(th)];
     };
     /* The sun's path is the same arc lowered by its own radius at the ends,
        so that sunrise and sunset are what they are: the moment the top of
@@ -7356,7 +7361,7 @@ class SkyPainter {
     const SUN_R = 26;
     const sunAt = (f) => {
       const th = Math.PI * (1 - f);
-      return [288 + 250 * Math.cos(th), HZ + SUN_R - (128 + SUN_R) * Math.sin(th)];
+      return [SKY_ARC_X + SKY_ARC_RX * Math.cos(th), HZ + SUN_R - (128 + SUN_R) * Math.sin(th)];
     };
 
     /* Stars come out as the sky darkens, rather than all at once. */
@@ -7382,6 +7387,7 @@ class SkyPainter {
     /* The moon, on the night's arc, brightening with the dark. */
     if (!c.up && s.moon !== null && night > 0) {
       const [mx, my] = arcAt(c.f);
+      this.moonAt = [mx, my];
       const mg = ctx.createRadialGradient(mx, my, 18, mx, my, 120);
       mg.addColorStop(0, A(tk.moon, .28 * night)); mg.addColorStop(.4, A(tk.moon, .07 * night)); mg.addColorStop(1, A(tk.moon, 0));
       ctx.fillStyle = mg; ctx.fillRect(0, 0, W, HZ);
@@ -7398,6 +7404,7 @@ class SkyPainter {
        glow is left, fading with the light. */
     if (night < 1) {
       const [px, py] = sunAt(c.sun);
+      this.sunAt = [px, py];
       const dusk = 1 - night;
       const hidden = s.cover >= .8 || s.fog;
       const risen = c.up;
@@ -7422,7 +7429,7 @@ class SkyPainter {
         ctx.beginPath(); ctx.arc(px, py, SUN_R, 0, 7); ctx.fillStyle = tk.sun; ctx.fill();
         ctx.restore();
         if (risen) {
-          const vx = 288 - px, vy = 90 - py;
+          const vx = SKY_ARC_X - px, vy = 90 - py;
           for (const [k, r, a] of [[.45, 10, .10], [.75, 18, .07], [1.25, 7, .12]]) {
             ctx.beginPath(); ctx.arc(px + vx * k, py + vy * k, r, 0, 7); ctx.fillStyle = A(tk.sun, a); ctx.fill();
           }

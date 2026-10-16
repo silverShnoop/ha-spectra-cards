@@ -289,6 +289,44 @@ const BODY = {
   check("reduce motion: a still frame is painted", still.lit > 100, still.lit);
   check("reduce motion: and it does not move", still.same && still.raf === 0, `raf=${still.raf}`);
 
+  /* Neither the moon nor the sun may pass behind the reading. The arc used to
+     span the whole card, and a moon rising on the left sat under the
+     temperature. Checked at the two ends of the night and of the day. */
+  const clear = await page.evaluate((body) => {
+    const host = document.getElementById("host");
+    host.innerHTML = "";
+    host.style.width = "600px";
+    const el = document.createElement("spectra-card");
+    el.setConfig({ type: "custom:spectra-card", accent: 5, title: "Now",
+      body: { ...body, hero: "-10.5°", hero_note: "100%", moon: .2 } });
+    host.appendChild(el);
+    el.hass = { states: {} };
+    const sky = el._sky;
+    sky.stop();
+    const root = el.shadowRoot;
+    const box = root.querySelector(".skybox").getBoundingClientRect();
+    const read = root.querySelector(".skyread").getBoundingClientRect();
+    const scale = 576 / box.width;
+    const right = (read.right - box.left) * scale;
+    const realNow = Date.now;
+    const out = [];
+    /* Just after dark (moon at the start of its arc) and just after sunrise. */
+    for (const at of [Date.parse("2026-10-16T18:00:00Z"), Date.parse("2026-10-17T06:40:00Z")]) {
+      Date.now = () => at;
+      sky.scene = { ...sky.scene, times: { rising: Date.parse("2026-10-17T06:29:00Z") + (at > Date.parse("2026-10-17T00:00:00Z") ? 86400000 : 0),
+        setting: Date.parse("2026-10-17T17:02:00Z"), hint: false } };
+      sky.moonAt = null; sky.sunAt = null;
+      sky.paint(performance.now(), false);
+      const body = sky.moonAt || sky.sunAt;
+      out.push(body ? body[0] - 26 - right : null);
+    }
+    Date.now = realNow;
+    el.remove();
+    return out;
+  }, BODY);
+  check("the moon rises clear of the reading", clear[0] !== null && clear[0] > 0, `gap ${clear[0]}`);
+  check("and so does the sun", clear[1] !== null && clear[1] > 0, `gap ${clear[1]}`);
+
   /* The reading fits, at every width. */
   for (const width of WIDTHS) {
     const r = await page.evaluate(([body, width]) => {
