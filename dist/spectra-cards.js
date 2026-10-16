@@ -3975,10 +3975,19 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    smaller rather than a different one. */
 .skybox {
   position:relative; margin-top:2px; border-radius:4px; overflow:hidden;
-  aspect-ratio:576 / 210; max-width:100%; container-type:inline-size;
+  aspect-ratio:576 / 236; max-width:100%; container-type:inline-size;
 }
+/* The sky is the whole card. The border stays, because the border is where
+   a level would show; inside it, the picture runs edge to edge and the
+   title bar sits on it rather than above it. */
+.card.skycard { padding:0; overflow:hidden; }
+.card.skycard > .titlebar {
+  position:absolute; top:9px; left:10px; right:10px; z-index:1; margin:0;
+}
+.card.skycard .skybox { margin:0; border-radius:4px; }
 .skycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
-.skyread { position:absolute; left:2.4%; top:5%; pointer-events:none; }
+/* Below the title bar, which is a fixed height whatever the width. */
+.skyread { position:absolute; left:10px; top:max(34px, 14%); pointer-events:none; }
 .skyhero {
   margin:0; display:flex; align-items:baseline; gap:8px;
   font-family:var(--sp-mono); font-weight:500; line-height:.95;
@@ -3989,7 +3998,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .skyfc { margin:2px 0 0; font-size:clamp(11px, 2.25cqw, 13px); color:var(--sp-ink-2); }
 .skyfc span { font-family:var(--sp-mono); color:var(--sp-ink); }
 .skybase {
-  position:absolute; left:0; right:0; bottom:0; height:20.95%;
+  position:absolute; left:0; right:0; bottom:0; height:18.64%;
   display:flex; align-items:center; gap:clamp(10px, 3.5cqw, 22px); padding:0 2.4%;
   font-family:var(--sp-mono); font-size:clamp(11px, 2.4cqw, 14px); color:var(--sp-ink);
   white-space:nowrap; overflow:hidden; pointer-events:none;
@@ -4000,6 +4009,12 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 }
 .skyleft { margin-left:auto; color:var(--sp-ink-2); font-size:clamp(10px, 2.2cqw, 12.5px); }
 @container (max-width:440px) { .skybase i { display:none; } }
+/* At phone-in-a-column widths the title bar takes a larger share of the
+   picture, so the condition and the forecast share a line. */
+@container (max-width:340px) {
+  .skycond, .skyfc { display:inline; }
+  .skyfc { margin-left:6px; }
+}
 `;
 
 /* ------------------------------------------------------------------ *
@@ -6892,9 +6907,9 @@ const FEED_ICONS = {
  * ------------------------------------------------------------------ */
 
 const SKY_W = 576;
-const SKY_H = 210;
+const SKY_H = 236;
 /* The horizon. Below it is the ground band, which carries the readings. */
-const SKY_HZ = 166;
+const SKY_HZ = 192;
 const SKY_FPS = 30;
 const SKY_CLOUD = new Path2D("M6,19A5,5 0 0,1 1,14A5,5 0 0,1 6,9C7,6.65 9.3,5 12,5C15.43,5 18.24,7.66 18.5,11.03L19,11A4,4 0 0,1 23,15A4,4 0 0,1 19,19H6Z");
 
@@ -7230,7 +7245,7 @@ class SkyPainter {
     while (s.stars && this.stars.length < 60) {
       const x = skyRand(0, SKY_W);
       const y = skyRand(0, SKY_HZ - 25);
-      if (x < 215 && y < 110) continue;
+      if (x < 215 && y < 140) continue;
       this.stars.push({ x, y, p: skyRand(0, 6), s: skyRand(.4, 1.6), r: skyRand(.4, 1.3) });
     }
     this.boltAt = (performance.now() - this.start) / 1000 + 2;
@@ -14213,7 +14228,8 @@ class SpectraCard extends HTMLElement {
       + (tappable ? " tappable" : "")
       + (festive ? " festive" : "")
       + (lit ? " lit" : "")
-      + (swapped ? " swap" : "");
+      + (swapped ? " swap" : "")
+      + (type === "sky" ? " skycard" : "");
     /* Drawn as a sibling of the title bar and the body rather than inside
        either, because it belongs to neither: it is the column between them,
        and only a direct child of the card can span the card's rows. */

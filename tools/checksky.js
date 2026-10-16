@@ -279,13 +279,19 @@ const BODY = {
       const base = root.querySelector(".skybase");
       const spans = [...base.children].map((s) => s.getBoundingClientRect());
       const clipped = spans.some((s) => s.right > box.right + .5);
-      const overlap = read.bottom > box.top + box.height * (166 / 210);
+      const overlap = read.bottom > box.top + box.height * (192 / 236);
+      /* The sky is the whole card: the box fills it inside the border, and
+         the title bar sits over the picture rather than above it. */
+      const card = root.querySelector(".card").getBoundingClientRect();
+      const bar = root.querySelector(".titlebar").getBoundingClientRect();
+      const fills = Math.abs(card.height - box.height - 4) < 1.5 && Math.abs(card.width - box.width - 4) < 1.5;
+      const barOn = bar.top >= box.top && bar.bottom <= read.top + 1;
       el.remove();
-      return { clipped, overlap, h: Math.round(box.height), ratio: box.width / box.height };
+      return { clipped, overlap, fills, barOn, h: Math.round(box.height), ratio: box.width / box.height };
     }, [BODY, width]);
-    const ok = !r.clipped && !r.overlap && Math.abs(r.ratio - 576 / 210) < .02;
-    check(`${String(width).padStart(4)}px  the reading stays in the sky and the figures in the card`, ok,
-      `clipped=${r.clipped} overlap=${r.overlap} ratio=${r.ratio.toFixed(3)}`);
+    const ok = !r.clipped && !r.overlap && r.fills && r.barOn && Math.abs(r.ratio - 576 / 236) < .02;
+    check(`${String(width).padStart(4)}px  the sky fills the card, the title and reading sit on it`, ok,
+      `clipped=${r.clipped} overlap=${r.overlap} fills=${r.fills} barOn=${r.barOn} ratio=${r.ratio.toFixed(3)}`);
   }
 
   await browser.close();

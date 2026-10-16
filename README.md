@@ -937,7 +937,10 @@ body:
     - {label: UV, value: {entity: weather.home, attribute: uv_index, format: round, digits: 0}}
 ```
 
-The sky as it is now, moving. The reading sits on it top-left: the house's
+The sky as it is now, moving, and it is the whole card: the picture runs edge
+to edge inside the border, and the title bar sits on it rather than above it.
+The border stays, because the border is where a level would show. The reading
+sits on the sky top-left: the house's
 own thermometer as the hero, the condition in words, and the forecast's
 figure under it, because the two disagree often enough to be worth seeing
 side by side (`forecast_temperature`, labelled by `forecast_label`, "Forecast"
