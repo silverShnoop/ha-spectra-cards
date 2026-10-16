@@ -937,7 +937,10 @@ body:
     - {label: UV, value: {entity: weather.home, attribute: uv_index, format: round, digits: 0}}
 ```
 
-The sky as it is now, moving. The reading sits on it top-left: the house's
+The sky as it is now, moving, and it is the whole card: the picture runs edge
+to edge inside the border, and the title bar sits on it rather than above it.
+The border stays, because the border is where a level would show. The reading
+sits on the sky top-left: the house's
 own thermometer as the hero, the condition in words, and the forecast's
 figure under it, because the two disagree often enough to be worth seeing
 side by side (`forecast_temperature`, labelled by `forecast_label`, "Forecast"
@@ -954,7 +957,11 @@ how fast the clouds go, and the sun's times where the sun is on its arc.
 day it falls straight. Every input but `condition` is optional.
 
 **The sun is where it is; the moon is a clock.** By day the sun sits on the
-arc at the fraction of the daylight gone. After sunset the moon takes the
+arc at the fraction of the daylight gone. Day or night is read from `rising`
+and `setting` alone, whichever was more recent, and `up` is only the fallback
+for a sun with no times: for several minutes after sunset Home Assistant's
+sun still says `above_horizon` while its next setting is already tomorrow's,
+and believing both drew the sun at midday at dusk. After sunset the moon takes the
 same arc from sunset to sunrise, drawn at its real phase from `moon` (the
 `cycle` attribute of `home_signals`' `sensor.moon`: 0 new, 0.5 full). It is
 not drawn where the moon really is, which would leave it missing on most

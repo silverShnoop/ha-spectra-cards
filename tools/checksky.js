@@ -130,6 +130,19 @@ const BODY = {
   /* 17:04 to 06:30 is 806 minutes; 21:00 is 236 in. */
   check("scene: the night runs from sunset to sunrise", night && Math.abs(night.f - 236 / 806) < .005, night && night.f);
 
+  /* The minutes either side of sunset and sunrise, as Home Assistant really
+     reports them: the next time has already moved on to tomorrow, but the
+     state has not caught up. Read as the state says, 18:05 drew the sun at
+     midday. */
+  const justSet = await scene({ ...BODY, condition: "sunny", cloud_cover: 0, up: "above_horizon",
+    rising: "2026-10-17T06:29:10+00:00", setting: "2026-10-17T17:02:21+00:00" }, Date.parse("2026-10-16T17:05:00Z"));
+  check("scene: just after sunset it is night, whatever the state says", justSet && justSet.sky === "night" && justSet.f < .02,
+    justSet && `${justSet.sky} f=${justSet.f.toFixed(3)}`);
+  const justRisen = await scene({ ...BODY, condition: "sunny", cloud_cover: 0, up: "below_horizon",
+    rising: "2026-10-18T06:31:00+00:00", setting: "2026-10-17T17:02:21+00:00" }, Date.parse("2026-10-17T06:31:00Z"));
+  check("scene: just after sunrise it is day, whatever the state says", justRisen && justRisen.up && justRisen.f < .02,
+    justRisen && `up=${justRisen.up} f=${justRisen.f.toFixed(3)}`);
+
   const cloudyNight = await scene({ ...BODY, condition: "cloudy", cloud_cover: 95, ...SUN_DOWN }, Date.parse("2026-10-16T21:00:00Z"));
   check("scene: no stars through cloud", cloudyNight && cloudyNight.stars === false, cloudyNight && cloudyNight.stars);
 
@@ -266,13 +279,19 @@ const BODY = {
       const base = root.querySelector(".skybase");
       const spans = [...base.children].map((s) => s.getBoundingClientRect());
       const clipped = spans.some((s) => s.right > box.right + .5);
-      const overlap = read.bottom > box.top + box.height * (166 / 210);
+      const overlap = read.bottom > box.top + box.height * (192 / 236);
+      /* The sky is the whole card: the box fills it inside the border, and
+         the title bar sits over the picture rather than above it. */
+      const card = root.querySelector(".card").getBoundingClientRect();
+      const bar = root.querySelector(".titlebar").getBoundingClientRect();
+      const fills = Math.abs(card.height - box.height - 4) < 1.5 && Math.abs(card.width - box.width - 4) < 1.5;
+      const barOn = bar.top >= box.top && bar.bottom <= read.top + 1;
       el.remove();
-      return { clipped, overlap, h: Math.round(box.height), ratio: box.width / box.height };
+      return { clipped, overlap, fills, barOn, h: Math.round(box.height), ratio: box.width / box.height };
     }, [BODY, width]);
-    const ok = !r.clipped && !r.overlap && Math.abs(r.ratio - 576 / 210) < .02;
-    check(`${String(width).padStart(4)}px  the reading stays in the sky and the figures in the card`, ok,
-      `clipped=${r.clipped} overlap=${r.overlap} ratio=${r.ratio.toFixed(3)}`);
+    const ok = !r.clipped && !r.overlap && r.fills && r.barOn && Math.abs(r.ratio - 576 / 236) < .02;
+    check(`${String(width).padStart(4)}px  the sky fills the card, the title and reading sit on it`, ok,
+      `clipped=${r.clipped} overlap=${r.overlap} fills=${r.fills} barOn=${r.barOn} ratio=${r.ratio.toFixed(3)}`);
   }
 
   await browser.close();
