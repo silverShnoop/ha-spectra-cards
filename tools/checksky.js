@@ -111,7 +111,7 @@ const BODY = {
   /* 07:30 to 18:04 is 634 minutes; 15:24 is 474 in, so 0.748. */
   check("scene: the sun is three quarters across", day && Math.abs(day.f - .748) < .005, day && day.f);
   check("scene: from the north-west, the wind blows right", day && day.drift === 1, day && day.drift);
-  check("scene: no stars by day", day && day.stars === false, day && day.stars);
+  check("scene: no night by day, so no stars", day && day.night === 0, day && day.night);
 
   const rain = await scene({ ...BODY, condition: "rainy", cloud_cover: 20, wind_speed: 52, wind_bearing: 70 }, NOW);
   check("scene: rain under a reported 20% is still overcast", rain && rain.cover >= .8, rain && rain.cover);
@@ -136,12 +136,27 @@ const BODY = {
      midday. */
   const justSet = await scene({ ...BODY, condition: "sunny", cloud_cover: 0, up: "above_horizon",
     rising: "2026-10-17T06:29:10+00:00", setting: "2026-10-17T17:02:21+00:00" }, Date.parse("2026-10-16T17:05:00Z"));
-  check("scene: just after sunset it is night, whatever the state says", justSet && justSet.sky === "night" && justSet.f < .02,
-    justSet && `${justSet.sky} f=${justSet.f.toFixed(3)}`);
+  check("scene: just after sunset it is dusk, whatever the state says",
+    justSet && !justSet.up && justSet.night > 0 && justSet.night < .2 && justSet.sun > 1 && justSet.sky === "gold",
+    justSet && `up=${justSet.up} night=${justSet.night.toFixed(2)} sun=${justSet.sun.toFixed(3)} sky=${justSet.sky}`);
   const justRisen = await scene({ ...BODY, condition: "sunny", cloud_cover: 0, up: "below_horizon",
     rising: "2026-10-18T06:31:00+00:00", setting: "2026-10-17T17:02:21+00:00" }, Date.parse("2026-10-17T06:31:00Z"));
   check("scene: just after sunrise it is day, whatever the state says", justRisen && justRisen.up && justRisen.f < .02,
     justRisen && `up=${justRisen.up} f=${justRisen.f.toFixed(3)}`);
+
+  /* Twilight: the sun sets and keeps going, and the sky fades to night over
+     fifty minutes rather than switching. Sunset here is 17:02. */
+  const SET = { ...BODY, condition: "sunny", cloud_cover: 0, up: "below_horizon",
+    rising: "2026-10-17T06:29:10+00:00", setting: "2026-10-17T17:02:21+00:00" };
+  const half = await scene(SET, Date.parse("2026-10-16T17:27:21Z"));
+  check("twilight: half an hour after sunset the sky is half way to night",
+    half && Math.abs(half.night - .5) < .02 && half.sun > 1, half && `night=${half.night.toFixed(2)} sun=${half.sun.toFixed(3)}`);
+  const dark = await scene(SET, Date.parse("2026-10-16T17:55:00Z"));
+  check("twilight: and after fifty minutes it is night", dark && dark.night === 1 && dark.sky === "night",
+    dark && `night=${dark.night} sky=${dark.sky}`);
+  const dawn = await scene(SET, Date.parse("2026-10-17T06:04:10Z"));
+  check("twilight: dawn is the same in reverse", dawn && Math.abs(dawn.night - .5) < .02 && dawn.sun < 0,
+    dawn && `night=${dawn.night.toFixed(2)} sun=${dawn.sun.toFixed(3)}`);
 
   const cloudyNight = await scene({ ...BODY, condition: "cloudy", cloud_cover: 95, ...SUN_DOWN }, Date.parse("2026-10-16T21:00:00Z"));
   check("scene: no stars through cloud", cloudyNight && cloudyNight.stars === false, cloudyNight && cloudyNight.stars);
@@ -189,10 +204,21 @@ const BODY = {
     host.appendChild(el);
     await wait(300);
     const running = el._sky.raf !== 0;
+    /* An hour passes with nothing in the house changing: no repaint. */
+    const realNow = Date.now;
+    const at = Date.parse("2026-10-16T13:00:00Z");
+    Date.now = () => at;
+    el._sky.paint(performance.now(), false);
+    const f0 = el._sky.clock.f;
+    Date.now = () => at + 3600000;
+    el._sky.paint(performance.now() + 40, false);
+    const f1 = el._sky.clock.f;
+    Date.now = realNow;
     el.remove();
-    return { differs: a !== b, painted, moved, after: c1 !== c2, asked, running };
+    return { differs: a !== b, painted, moved, after: c1 !== c2, asked, running, drift: Math.abs(f1 - f0) };
   }, BODY);
   check("the sky is painted", live.painted > 100, live.painted);
+  check("the sun moves on its own, without a repaint", live.drift > .05, `moved ${live.drift}`);
   check("and it moves", live.differs, "two frames 400ms apart are identical");
   check("a repaint hands the painter the new canvas", live.moved, "painter still on the old canvas");
   check("and the new one keeps moving", live.after, "frozen after a repaint");

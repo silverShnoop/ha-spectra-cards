@@ -956,6 +956,14 @@ how fast the clouds go, and the sun's times where the sun is on its arc.
 "rainy" in a fifty-kilometre westerly slants hard to the east; on a still
 day it falls straight. Every input but `condition` is optional.
 
+**Dusk and dawn take their time.** At sunset the top of the sun meets the
+horizon and it keeps going, under the ground band, its glow lingering. The
+sky fades from the day's own colours to night over fifty minutes, and the
+stars and the moon come up with the dark rather than all at once; before
+sunrise the same runs backwards. The sun's place, the twilight and the
+countdown are worked out on every frame rather than at each repaint, since a
+still afternoon can go an hour without one.
+
 **The sun is where it is; the moon is a clock.** By day the sun sits on the
 arc at the fraction of the daylight gone. Day or night is read from `rising`
 and `setting` alone, whichever was more recent, and `up` is only the fallback
