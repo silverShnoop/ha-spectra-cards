@@ -394,6 +394,22 @@ A Needs-you row is a job, so its tone is a **level** and it arrives under
 are not jobs — what finished today, a bin schedule — and those are
 decorated, not levelled.
 
+**`icon_size` makes the glyph the thing you read first.** In px; the default
+is the 19px every other row on the panel uses. Needs you is read from across
+a kitchen, where the title is a grey line and the icon is what says whether a
+job is about the dryer, the bins or a leak, so it asks for `36`. Past 24 the
+text block centres on the glyph rather than hanging off its top; the cap is
+64. `tools/shotneeds.js` renders the same ten jobs at several sizes side by
+side, in both themes, for choosing one.
+
+```yaml
+body:
+  type: list
+  flow: true
+  icon_size: 36
+  rows: {entity: sensor.needs_you, attribute: items}
+```
+
 An action row:
 
 ```yaml
