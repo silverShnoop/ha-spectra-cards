@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.169.0";
+const VERSION = "0.170.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3510,16 +3510,45 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    leaving a ragged gap. */
 .flow { display:grid; gap:8px; padding:8px;
   grid-template-columns:repeat(auto-fit, minmax(258px, 1fr)); }
-.flow .row.tile { border:2px solid var(--sp-edge); border-radius:6px;
-  padding:10px 12px; min-height:0; align-items:flex-start; }
-/* An accented tile carries its accent on the edge and as its ground. It
-   used to be the edge alone, while the rail filled its buttons; the loud
-   one should be the list that says what to do, so the ground moved here. */
-.flow .row.tile.wash { background:var(--accent-soft); border-color:var(--accent); }
+/* A tile is a job card, in two bands: what, then when and the button.
+
+   It was one line -- icon, name, time and detail run together, button on
+   the right -- and in the 300px column the panel gives Needs you that
+   came out as four lines of the same grey, the title wrapped under a
+   button, and "Finished 1h 43m ago · 13:34 · Clears when the door is
+   opened" as one sentence. Read from across a kitchen it was a block.
+
+   So the title gets the width and the weight: it is the one thing on the
+   panel that says what to do. The detail sits under it in the usual
+   grey. The time goes to a foot line with the button, where it reads as
+   the row's small print rather than part of its sentence, and the button
+   stops pushing the title about. A row with no time and no button has
+   no foot. The glyph centres on the title band, not the foot. */
+.flow .row.tile { display:flex; flex-direction:column; align-items:stretch; gap:7px;
+  border:2px solid var(--sp-edge); border-radius:6px; background:var(--sp-surface);
+  padding:10px 12px; min-height:0; --row-icon:32px; }
+.tilehead { display:flex; align-items:center; gap:12px; min-width:0; }
+.tiletext { flex:1 1 auto; min-width:0; }
+.flow .tile .name { font-size:15px; line-height:1.25; font-weight:500; letter-spacing:-.005em; }
+.flow .tile .sub { margin:3px 0 0; line-height:1.35; }
+.tilefoot { display:flex; align-items:center; gap:8px; min-width:0; }
+.tilefoot .when { flex:1 1 auto; min-width:0; font-size:11px; line-height:1.3;
+  color:var(--sp-ink-3); letter-spacing:.02em; }
+.tilefoot .act { margin-left:0; }
+.tilefoot .when + .act, .tilefoot .act:first-child { margin-left:auto; }
+.tilefoot .act.alt + .act { margin-left:8px; }
+/* A levelled tile wears its level the way a card does -- the border; the
+   inset ring from waiting; the ground only at critical. Every tile used
+   to take the ground, which made a morning with three yellow jobs a wall
+   of yellow, and left nothing for a leak to escalate to. The coloured
+   glyph carries the hue at a distance; the weight carries the step. */
+.flow .row.tile.wash { background:var(--sp-surface); border-color:var(--accent); }
+.flow .row.tile.lvl-waiting, .flow .row.tile.lvl-critical { box-shadow:inset 0 0 0 1px var(--accent); }
+.flow .row.tile.lvl-critical { background:var(--accent-soft); }
 /* A list read from across a room: icon_size on the body. Past the
    reference size the glyph is taller than the name, so the text block
    centres on it rather than hanging off its top. */
-.row.bigicon, .flow .row.tile.bigicon { align-items:center; }
+.row.bigicon { align-items:center; }
 /* Rows arrive and leave; they do not blink in and out.
 
    This belongs to the LIST, not to whatever caused the change. A row that
@@ -3819,8 +3848,9 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    with Needs you, which is where a job actually is: three amber blocks
    across the top drew the eye away from the list that says what to do.
    The rail now says it on the edge -- a border and an inset ring, one step
-   louder than "live" -- and Needs you carries the ground. The only filled
-   button on the rail is the one you are on. */
+   louder than "live" -- and Needs you carries the colour: a levelled glyph
+   on every tile, and the ground on a critical one. The only filled button
+   on the rail is the one you are on. */
 .dockbtn.fill { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
 .dockbtn.fill .dockhead h4, .dockbtn.fill .docksum { color:var(--accent-on); }
 /* The rail reuses the shared press animation but feeds it the firmer value,
@@ -4339,11 +4369,18 @@ function sinceBoth(value) {
 
    The time leads: "how long" is the half you act on. A `since` that is not
    a timestamp (a list that has already worded it) is left alone. */
+/** A row's time, written the way every past time on the panel is: the
+    label, how long ago, and the clock. "" without a usable `since`. */
+function rowWhen(r) {
+  const ago = isBlank(r.since) ? null : sinceBoth(r.since);
+  if (ago === null) return "";
+  return isBlank(r.since_label) ? ago : `${r.since_label} ${ago}`;
+}
+
 function rowSub(r) {
   const sub = firstOf(r.sub, r.detail);
-  const ago = isBlank(r.since) ? null : sinceBoth(r.since);
-  if (ago === null) return sub;
-  const when = isBlank(r.since_label) ? ago : `${r.since_label} ${ago}`;
+  const when = rowWhen(r);
+  if (isBlank(when)) return sub;
   return isBlank(sub) ? when : `${when} \u00b7 ${sub}`;
 }
 
@@ -9145,6 +9182,19 @@ const BODIES = {
          can only match rows by position, and position is exactly what
          changes when one of them leaves. */
       const key = isBlank(r.id) ? "" : ` data-key="${esc(r.id)}"`;
+      if (flow) {
+        /* The job card: title and detail beside the glyph, the time and
+           the button on a foot of their own. See .tilehead in the sheet. */
+        const level = levelName(tone);
+        if (level) classes.push(`lvl-${level}`);
+        const detail = firstOf(r.sub, r.detail);
+        const when = rowWhen(r);
+        const head = `<div class="tilehead">${lead}<div class="tiletext"><p class="name">${esc(name)}</p>`
+          + (isBlank(detail) ? "" : `<p class="sub">${escLines(detail)}</p>`) + `</div></div>`;
+        const foot = isBlank(when) && !tail ? ""
+          : `<div class="tilefoot">${isBlank(when) ? "" : `<span class="when">${esc(when)}</span>`}${tail}</div>`;
+        return `<div class="${classes.join(" ")}"${key}${rowStyle}>${head}${foot}</div>`;
+      }
       return `<div class="${classes.join(" ")}"${key}${rowStyle}>${lead}${middle}${tail}</div>`;
     }).join("");
 
