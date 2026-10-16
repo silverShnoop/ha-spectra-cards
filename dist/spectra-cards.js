@@ -98,6 +98,17 @@ const TOKENS_LIGHT = `
   --sp-w1:#14504F; --sp-w2:#8CA0D0; --sp-w3:#7A4C6B; --sp-w4:#A8C57E;
   --sp-w-rest:#BFB8A6;
   --sp-sun:#B6862A;
+  /* The sky body's sky. DEPICTIONS, like --sp-sun: a clear day is blue and
+     a sunset is warm because they are. Kept pale and grey-leaning so a
+     clear sky can never pass for the notice blue, and only ever a fill
+     inside the picture -- never an edge, which is where levels live. */
+  --sp-sky-day-top:#A9C6E3; --sp-sky-day-low:#EAEFEC;
+  --sp-sky-gold-top:#AEB5D4; --sp-sky-gold-low:#F0C8A0;
+  --sp-sky-grey-top:#C2C5CA; --sp-sky-grey-low:#E6E3DB;
+  --sp-sky-storm-top:#9DA1AD; --sp-sky-storm-low:#D3D0C8;
+  --sp-sky-night-top:#AFB8CF; --sp-sky-night-low:#DCDCDD;
+  --sp-sky-cloud:#FBFAF6; --sp-sky-cloud-shade:#D5D2CA;
+  --sp-sky-moon:#F7F3E8; --sp-sky-star:#FFFFFF; --sp-sky-snow:#FFFFFF;
   /* Salt, on the softener card. A DEPICTION, like --sp-sun: salt is white in
      both themes, so these do not follow paper and ink into the dark. Three
      faces lit from one side, plus the pencil line that holds them together. */
@@ -168,6 +179,13 @@ const TOKENS_DARK = `
   --sp-w1:#8CCBCB; --sp-w2:#4C5D8A; --sp-w3:#D6A9C8; --sp-w4:#6E8F43;
   --sp-w-rest:#6A6458;
   --sp-sun:#D9A63F;
+  --sp-sky-day-top:#17304A; --sp-sky-day-low:#26302F;
+  --sp-sky-gold-top:#222A47; --sp-sky-gold-low:#5A3A2A;
+  --sp-sky-grey-top:#272A30; --sp-sky-grey-low:#2A2822;
+  --sp-sky-storm-top:#121419; --sp-sky-storm-low:#23211D;
+  --sp-sky-night-top:#0B0F1C; --sp-sky-night-low:#1E1D1A;
+  --sp-sky-cloud:#46433C; --sp-sky-cloud-shade:#2C2A25;
+  --sp-sky-moon:#E6E0D2; --sp-sky-star:#E6E0D2; --sp-sky-snow:#F0EBE0;
   --sp-salt-top:#EDE8DC; --sp-salt-front:#CFC8B7; --sp-salt-side:#ADA591;
   --sp-salt-line:#6F695C;
   --sp-ramp-0:#5A9CBF; --sp-ramp-1:#86BFAE; --sp-ramp-2:#DECB78;
@@ -3950,6 +3968,38 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    pushed right together rather than each claiming the free space. */
 .act.alt { border-color:var(--sp-edge); color:var(--sp-ink-2); }
 .act.alt + .act { margin-left:8px; }
+
+/* sky -- the weather as a moving picture. The canvas is the whole box; the
+   reading sits on it top-left and the figures along its ground band. Sized
+   off the box rather than the viewport, so a phone gets the same picture
+   smaller rather than a different one. */
+.skybox {
+  position:relative; margin-top:2px; border-radius:4px; overflow:hidden;
+  aspect-ratio:576 / 210; max-width:100%; container-type:inline-size;
+}
+.skycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.skyread { position:absolute; left:2.4%; top:5%; pointer-events:none; }
+.skyhero {
+  margin:0; display:flex; align-items:baseline; gap:8px;
+  font-family:var(--sp-mono); font-weight:500; line-height:.95;
+  font-size:clamp(30px, 9.7cqw, 56px); letter-spacing:-.03em; color:var(--sp-ink);
+}
+.skyhero .heronote { letter-spacing:0; font-size:clamp(12px, 2.6cqw, 15px); }
+.skycond { margin:4px 0 0; font-size:clamp(12px, 2.6cqw, 15px); color:var(--sp-ink); }
+.skyfc { margin:2px 0 0; font-size:clamp(11px, 2.25cqw, 13px); color:var(--sp-ink-2); }
+.skyfc span { font-family:var(--sp-mono); color:var(--sp-ink); }
+.skybase {
+  position:absolute; left:0; right:0; bottom:0; height:20.95%;
+  display:flex; align-items:center; gap:clamp(10px, 3.5cqw, 22px); padding:0 2.4%;
+  font-family:var(--sp-mono); font-size:clamp(11px, 2.4cqw, 14px); color:var(--sp-ink);
+  white-space:nowrap; overflow:hidden; pointer-events:none;
+}
+.skybase i {
+  font-style:normal; font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--sp-ink-3); margin-right:7px;
+}
+.skyleft { margin-left:auto; color:var(--sp-ink-2); font-size:clamp(10px, 2.2cqw, 12.5px); }
+@container (max-width:440px) { .skybase i { display:none; } }
 `;
 
 /* ------------------------------------------------------------------ *
@@ -6822,6 +6872,556 @@ const FEED_ICONS = {
   camera: "mdi:cctv",
 };
 
+/* ------------------------------------------------------------------ *
+ * Sky
+ *
+ * The weather as a picture of the sky, moving. Nothing here knows which
+ * weather service or which thermometer the house has: the condition is Home
+ * Assistant's own vocabulary, and everything else -- cloud cover, wind, the
+ * sun's times, the moon's phase -- arrives as a plain value from config.
+ *
+ * A picture is assembled from separate facts rather than looked up from the
+ * condition alone, because the condition is one word and the sky is not.
+ * "rainy" in a 50 km/h westerly slants hard to the east; "rainy" on a still
+ * day falls straight. The condition chooses what falls, the cover how much
+ * cloud, the wind which way and how fast, the sun's times where the sun is.
+ *
+ * Every colour is a DEPICTION, like --sp-sun: the sky is blue because it is,
+ * and none of it is a level. It fills the picture and never a border, kept
+ * pale and grey enough that a clear morning cannot be read as a notice.
+ * ------------------------------------------------------------------ */
+
+const SKY_W = 576;
+const SKY_H = 210;
+/* The horizon. Below it is the ground band, which carries the readings. */
+const SKY_HZ = 166;
+const SKY_FPS = 30;
+const SKY_CLOUD = new Path2D("M6,19A5,5 0 0,1 1,14A5,5 0 0,1 6,9C7,6.65 9.3,5 12,5C15.43,5 18.24,7.66 18.5,11.03L19,11A4,4 0 0,1 23,15A4,4 0 0,1 19,19H6Z");
+
+/* What each condition brings, before the readings refine it. Cover is a
+   floor for the wet ones: a "rainy" reported under 20% cloud is still
+   raining, and rain out of a clear sky looks like a bug. */
+const SKY_CONDITIONS = {
+  sunny:            { cover: 0 },
+  "clear-night":    { cover: 0 },
+  partlycloudy:     { cover: .35 },
+  cloudy:           { cover: 1, floor: .9 },
+  rainy:            { cover: .9, floor: .8, rain: 1 },
+  pouring:          { cover: 1, floor: .9, rain: 2, storm: true },
+  lightning:        { cover: 1, floor: .9, bolt: true, storm: true },
+  "lightning-rainy": { cover: 1, floor: .9, rain: 1.6, bolt: true, storm: true },
+  snowy:            { cover: .9, floor: .8, snow: 1 },
+  "snowy-rainy":    { cover: .9, floor: .8, snow: .6, rain: .7 },
+  hail:             { cover: 1, floor: .9, rain: 1.2 },
+  fog:              { cover: .5, fog: true },
+  windy:            { cover: .3, wind: 45 },
+  "windy-variant":  { cover: .7, wind: 45 },
+  exceptional:      { cover: .8 },
+};
+
+function skyNum(v) {
+  if (isBlank(v)) return null;
+  const n = Number(String(v).replace(/[^0-9.+-]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function skyTime(v) {
+  if (isBlank(v)) return null;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/* Where the sun (or the moon, at night) is along its arc, 0 to 1, and how
+   long until that ends. Home Assistant's sun gives only the NEXT rising and
+   setting, so the one already past is the next one less a day -- out by the
+   few minutes a day the times drift, which on a picture is nothing. */
+function skyArc(b, now) {
+  const up = b.up === true || b.up === "above_horizon" || b.up === "on";
+  const rising = skyTime(b.rising);
+  const setting = skyTime(b.setting);
+  const DAY = 86400000;
+  if (rising === null || setting === null) return { up, f: .5, left: null };
+  const from = up ? rising - DAY : setting - DAY;
+  const to = up ? setting : rising;
+  const span = to - from;
+  const f = span > 0 ? Math.min(1, Math.max(0, (now - from) / span)) : .5;
+  return { up, f, left: Math.max(0, to - now) };
+}
+
+function skyLeft(ms, up) {
+  if (ms === null) return "";
+  const m = Math.round(ms / 60000);
+  const h = Math.floor(m / 60);
+  const span = h ? `${h}h ${m % 60}m` : `${m}m`;
+  return up ? `${span} of light` : `Sunrise in ${span}`;
+}
+
+/** Everything the painter needs, from the resolved body and the clock. */
+function skyScene(b, now) {
+  const cond = String(b.condition || "").toLowerCase();
+  const base = SKY_CONDITIONS[cond] || { cover: .4 };
+  const arc = skyArc(b, now);
+  const reported = skyNum(b.cloud_cover);
+  let cover = reported === null ? base.cover : reported / 100;
+  cover = Math.min(1, Math.max(base.floor || 0, cover));
+  const wind = skyNum(b.wind_speed);
+  const bearing = skyNum(b.wind_bearing);
+  const moon = skyNum(b.moon);
+  const rain = base.rain || 0;
+  let sky;
+  if (!arc.up) sky = "night";
+  else if (base.storm) sky = "storm";
+  else if (cover >= .8 || rain || base.snow || base.fog) sky = "grey";
+  else if (arc.f < .1 || arc.f > .9) sky = "gold";
+  else sky = "day";
+  return {
+    sky, cover, rain,
+    snow: base.snow || 0,
+    bolt: Boolean(base.bolt),
+    fog: Boolean(base.fog),
+    wind: Math.max(0, wind === null ? (base.wind || 10) : wind),
+    /* Wind is reported as where it comes FROM. From anywhere west it blows
+       east, which on the card is to the right. */
+    drift: bearing === null ? 1 : (Math.sin(bearing * Math.PI / 180) > 0 ? -1 : 1),
+    up: arc.up, f: arc.f, left: arc.left, at: now,
+    moon: moon === null ? null : ((moon % 1) + 1) % 1,
+    stars: !arc.up && cover < .6,
+  };
+}
+
+/* The things in a scene that need new particles when they change. The sun's
+   place and the wind's exact speed move every render and must not restart
+   the rain. */
+function skyKey(s) {
+  return [s.sky, s.rain, s.snow, s.bolt, s.fog, Math.round(s.cover * 9), s.stars, Math.round(s.wind / 15)].join("|");
+}
+
+const SKY_TOKENS = {
+  "day-top": "--sp-sky-day-top", "day-low": "--sp-sky-day-low",
+  "gold-top": "--sp-sky-gold-top", "gold-low": "--sp-sky-gold-low",
+  "grey-top": "--sp-sky-grey-top", "grey-low": "--sp-sky-grey-low",
+  "storm-top": "--sp-sky-storm-top", "storm-low": "--sp-sky-storm-low",
+  "night-top": "--sp-sky-night-top", "night-low": "--sp-sky-night-low",
+  cloud: "--sp-sky-cloud", shade: "--sp-sky-cloud-shade",
+  moon: "--sp-sky-moon", star: "--sp-sky-star", snow: "--sp-sky-snow",
+  sun: "--sp-sun", rain: "--sp-a5", ground: "--sp-sink", edge: "--sp-edge",
+  ink3: "--sp-ink-3",
+};
+
+function skyRand(a, b) { return a + Math.random() * (b - a); }
+
+/* A colour at an alpha. Canvas normalises whatever CSS gives it, so the
+   token can be written any way a theme likes. */
+const SKY_ALPHA = new Map();
+function skyAlpha(ctx, colour, a) {
+  /* Called for every stroke of every frame, so the parse is done once per
+     colour and alpha and remembered. Alphas come rounded to two places,
+     which keeps the table to a few hundred entries at most. */
+  a = Math.round(a * 100) / 100;
+  const key = `${colour}|${a}`;
+  const hit = SKY_ALPHA.get(key);
+  if (hit) return hit;
+  if (SKY_ALPHA.size > 2000) SKY_ALPHA.clear();
+  const out = skyAlphaParse(ctx, colour, a);
+  SKY_ALPHA.set(key, out);
+  return out;
+}
+
+function skyAlphaParse(ctx, colour, a) {
+  ctx.fillStyle = "#000";
+  ctx.fillStyle = colour || "#000";
+  const c = ctx.fillStyle;
+  if (c[0] === "#") {
+    const n = parseInt(c.slice(1), 16);
+    return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const parts = c.replace(/^rgba?\(|\)$/g, "").split(",").slice(0, 3).join(",");
+  return `rgba(${parts},${a})`;
+}
+
+/* A lightning stroke: the line between two points, split again and again
+   with its middle pushed aside, branching now and then. */
+function skyBolt(x0, y0, x1, y1, disp, depth, out) {
+  if (disp < 3) { out.push([x0, y0, x1, y1, depth]); return; }
+  const mx = (x0 + x1) / 2 + skyRand(-disp, disp);
+  const my = (y0 + y1) / 2 + skyRand(-disp, disp) * .3;
+  skyBolt(x0, y0, mx, my, disp / 2, depth, out);
+  skyBolt(mx, my, x1, y1, disp / 2, depth, out);
+  /* A branch is jagged by its own length, not by how deep in the trunk it
+     forked: one forking near the end would otherwise get a displacement
+     too small to split and be drawn as a single straight line. */
+  if (depth < 2 && Math.random() < .28) {
+    const bx = mx + skyRand(-70, 70), by = my + skyRand(25, 60);
+    skyBolt(mx, my, bx, by, Math.max(disp / 2, Math.hypot(bx - mx, by - my) * .3), depth + 1, out);
+  }
+}
+
+/* The lit part of the moon, northern-hemisphere way up: a half disc on the
+   lit side closed by the terminator, an ellipse whose width is the phase. */
+function skyMoonPath(ctx, x, y, r, p) {
+  const waxing = p < .5;
+  const k = Math.abs(Math.cos(2 * Math.PI * p)) * r;
+  const crescent = p < .25 || p > .75;
+  ctx.beginPath();
+  if (waxing) {
+    ctx.arc(x, y, r, -Math.PI / 2, Math.PI / 2, false);
+    ctx.ellipse(x, y, k, r, 0, Math.PI / 2, -Math.PI / 2, crescent);
+  } else {
+    ctx.arc(x, y, r, -Math.PI / 2, Math.PI / 2, true);
+    ctx.ellipse(x, y, k, r, 0, Math.PI / 2, 3 * Math.PI / 2, !crescent);
+  }
+  ctx.closePath();
+}
+
+/* Paints one card's sky. It outlives the canvas: a repaint of the card
+   replaces the element, and the painter is handed the new one and carries
+   on, so a state change in the house does not restart the rain. */
+class SkyPainter {
+  constructor() {
+    this.scene = null;
+    this.key = "";
+    this.canvas = null;
+    this.ctx = null;
+    this.tk = {};
+    this.tkRead = -Infinity;
+    this.spritesFor = "";
+    this.raf = 0;
+    this.last = 0;
+    this.start = performance.now();
+    this.visible = true;
+    this.observer = null;
+    this.label = null;
+  }
+
+  get still() {
+    return typeof matchMedia === "function"
+      && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  attach(canvas, scene, label) {
+    this.label = label;
+    if (canvas !== this.canvas) {
+      if (this.observer) this.observer.disconnect();
+      this.canvas = canvas;
+      this.ctx = canvas.getContext("2d");
+      this.size();
+      if (typeof IntersectionObserver === "function") {
+        /* A tab that is not showing is still on the page. Painting a sky
+           nobody can see is a wall panel's battery spent on nothing. */
+        this.observer = new IntersectionObserver((entries) => {
+          this.visible = entries.some((e) => e.isIntersecting);
+          if (this.visible) this.run();
+        });
+        this.observer.observe(canvas);
+      }
+      /* A new canvas may sit under a new theme: read the colours again. */
+      this.tkRead = -Infinity;
+    }
+    this.scene = scene;
+    const key = skyKey(scene);
+    if (key !== this.key) { this.key = key; this.populate(); }
+    if (this.still) this.paint(performance.now(), true);
+    else this.run();
+  }
+
+  size() {
+    const dpr = Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+    this.canvas.width = SKY_W * dpr;
+    this.canvas.height = SKY_H * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  stop() {
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  }
+
+  detach() {
+    this.stop();
+    if (this.observer) this.observer.disconnect();
+    this.observer = null;
+    this.canvas = null;
+    this.ctx = null;
+  }
+
+  run() {
+    if (this.raf || this.still || !this.canvas) return;
+    const loop = (now) => {
+      this.raf = 0;
+      if (!this.canvas || !this.canvas.isConnected || !this.visible) return;
+      this.raf = requestAnimationFrame(loop);
+      if (now - this.last < 1000 / SKY_FPS - 2) return;
+      this.paint(now, false);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  tokens() {
+    const cs = getComputedStyle(this.canvas);
+    const tk = {};
+    for (const [k, v] of Object.entries(SKY_TOKENS)) tk[k] = cs.getPropertyValue(v).trim() || "#888";
+    this.tk = tk;
+    if (this.spritesFor !== tk.cloud + tk.shade + tk.snow) this.sprites();
+  }
+
+  sprites() {
+    const tk = this.tk;
+    this.spritesFor = tk.cloud + tk.shade + tk.snow;
+    const make = (w, h, draw) => {
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      draw(c.getContext("2d"));
+      return c;
+    };
+    /* Blurred once, here, and only drawn after. A blur filter run on every
+       frame is what would make this too heavy for a tablet. */
+    const cloud = (dark) => make(300, 140, (x) => {
+      x.filter = "blur(9px)";
+      for (let i = 0; i < 9; i++) {
+        x.fillStyle = dark && i < 5 ? tk.shade : tk.cloud;
+        x.globalAlpha = .8;
+        x.beginPath();
+        x.arc(60 + i * 22 + skyRand(-10, 10), 80 + skyRand(-22, 14) - (i > 2 && i < 7 ? 18 : 0), skyRand(26, 42), 0, 7);
+        x.fill();
+      }
+    });
+    const dot = (r, blur) => make(r * 2 + blur * 4, r * 2 + blur * 4, (x) => {
+      x.filter = `blur(${blur}px)`;
+      x.fillStyle = tk.snow;
+      x.beginPath();
+      x.arc(r + blur * 2, r + blur * 2, r, 0, 7);
+      x.fill();
+    });
+    this.cloudSprites = [cloud(false), cloud(true), cloud(false)];
+    this.flakeSprites = [dot(1.5, .5), dot(3, 1.5), dot(6, 4)];
+    if (this.clouds) this.clouds.forEach((c, i) => { c.img = this.cloudSprites[i % 3]; });
+  }
+
+  populate() {
+    const s = this.scene;
+    const n = s.cover >= .8 ? 9 : Math.round(s.cover * 8);
+    const spr = this.cloudSprites || [];
+    this.clouds = Array.from({ length: n }, (_, i) => ({
+      x0: skyRand(0, SKY_W + 300), y: skyRand(-40, s.cover >= .8 ? 30 : 50),
+      depth: [.35, .65, 1][i % 3], sc: skyRand(.8, 1.3), img: spr[i % 3],
+    })).sort((a, c) => a.depth - c.depth);
+    this.streaks = Array.from({ length: Math.round(90 * s.rain) }, () => ({
+      x: skyRand(-100, SKY_W + 100), y: skyRand(-SKY_HZ, SKY_HZ), z: skyRand(.4, 1),
+    }));
+    this.sheets = Array.from({ length: s.rain ? 5 : 0 }, (_, i) => ({ x0: i * 140 + skyRand(0, 60), w: skyRand(60, 120) }));
+    this.flakes = Array.from({ length: Math.round(110 * s.snow) }, () => ({
+      x: skyRand(0, SKY_W), y: skyRand(0, SKY_HZ), z: Math.floor(skyRand(0, 3)), ph: skyRand(0, 6),
+    }));
+    /* Kept out of the top-left corner, where the reading is. */
+    this.stars = [];
+    while (s.stars && this.stars.length < 60) {
+      const x = skyRand(0, SKY_W);
+      const y = skyRand(0, SKY_HZ - 25);
+      if (x < 215 && y < 110) continue;
+      this.stars.push({ x, y, p: skyRand(0, 6), s: skyRand(.4, 1.6), r: skyRand(.4, 1.3) });
+    }
+    this.boltAt = (performance.now() - this.start) / 1000 + 2;
+    this.flash = -9;
+    this.shoot = null;
+    this.shootAt = (performance.now() - this.start) / 1000 + 5;
+  }
+
+  paint(now, once) {
+    if (!this.ctx) return;
+    if (now - this.tkRead > 2000) { this.tkRead = now; this.tokens(); }
+    const dt = once ? .033 : Math.min(.05, (now - (this.last || now)) / 1000);
+    this.last = now;
+    /* A still frame is a moment a few seconds in, so it has rain falling
+       and clouds where they belong rather than a sky caught at its start. */
+    const t = once ? 4 : (now - this.start) / 1000;
+    const ctx = this.ctx;
+    const s = this.scene;
+    const tk = this.tk;
+    const A = (c, a) => skyAlpha(ctx, c, a);
+    const W = SKY_W, HZ = SKY_HZ;
+    ctx.clearRect(0, 0, W, SKY_H);
+
+    const g = ctx.createLinearGradient(0, 0, 0, HZ);
+    g.addColorStop(0, tk[`${s.sky}-top`]);
+    g.addColorStop(1, tk[`${s.sky}-low`]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, HZ);
+
+    const th = Math.PI * (1 - s.f);
+    const px = 288 + 250 * Math.cos(th);
+    const py = HZ - 128 * Math.sin(th);
+
+    if (s.stars) {
+      for (const o of this.stars) {
+        ctx.fillStyle = A(tk.star, .2 + .8 * Math.abs(Math.sin(t * o.s + o.p)));
+        ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, 7); ctx.fill();
+      }
+      if (!once && t > this.shootAt) { this.shoot = { at: t, x: skyRand(120, 420), y: skyRand(8, 40) }; this.shootAt = t + skyRand(8, 16); }
+      if (this.shoot && t - this.shoot.at < 1.1) {
+        const k = (t - this.shoot.at) / 1.1;
+        const x = this.shoot.x + k * 200, y = this.shoot.y + k * 60;
+        const sg = ctx.createLinearGradient(x - 90, y - 27, x, y);
+        sg.addColorStop(0, A(tk.star, 0));
+        sg.addColorStop(1, A(tk.star, Math.sin(k * Math.PI)));
+        ctx.strokeStyle = sg; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x - 90, y - 27); ctx.lineTo(x, y); ctx.stroke();
+      }
+    }
+
+    if (!s.up) {
+      if (s.moon !== null) {
+        const mg = ctx.createRadialGradient(px, py, 18, px, py, 120);
+        mg.addColorStop(0, A(tk.moon, .28)); mg.addColorStop(.4, A(tk.moon, .07)); mg.addColorStop(1, A(tk.moon, 0));
+        ctx.fillStyle = mg; ctx.fillRect(0, 0, W, HZ);
+        ctx.beginPath(); ctx.arc(px, py, 22, 0, 7); ctx.fillStyle = A(tk.moon, .1); ctx.fill();
+        if (s.moon > .01 && s.moon < .99) {
+          ctx.save(); ctx.shadowColor = tk.moon; ctx.shadowBlur = 18;
+          skyMoonPath(ctx, px, py, 22, s.moon); ctx.fillStyle = tk.moon; ctx.fill();
+          ctx.restore();
+        }
+      }
+    } else {
+      const hidden = s.cover >= .8 || s.fog;
+      if (!hidden) {
+        ctx.save(); ctx.translate(px, py); ctx.rotate(t * .03);
+        for (let i = 0; i < 14; i++) {
+          ctx.rotate(Math.PI * 2 / 14);
+          const len = 260 + 40 * Math.sin(t * .4 + i);
+          const rg = ctx.createLinearGradient(0, 0, len, 0);
+          rg.addColorStop(0, A(tk.sun, .2)); rg.addColorStop(1, A(tk.sun, 0));
+          ctx.fillStyle = rg; ctx.beginPath(); ctx.moveTo(0, 0);
+          ctx.lineTo(len, -14 - 6 * Math.sin(t * .7 + i)); ctx.lineTo(len, 14); ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+      }
+      const gl = ctx.createRadialGradient(px, py, 0, px, py, hidden ? 80 : 150);
+      gl.addColorStop(0, A(tk.sun, hidden ? .2 : .3)); gl.addColorStop(1, A(tk.sun, 0));
+      ctx.fillStyle = gl; ctx.fillRect(0, 0, W, HZ);
+      if (!hidden) {
+        ctx.save(); ctx.shadowColor = tk.sun; ctx.shadowBlur = 30;
+        ctx.beginPath(); ctx.arc(px, py, 26, 0, 7); ctx.fillStyle = tk.sun; ctx.fill();
+        ctx.restore();
+        const vx = 288 - px, vy = 90 - py;
+        for (const [k, r, a] of [[.45, 10, .10], [.75, 18, .07], [1.25, 7, .12]]) {
+          ctx.beginPath(); ctx.arc(px + vx * k, py + vy * k, r, 0, 7); ctx.fillStyle = A(tk.sun, a); ctx.fill();
+        }
+      }
+    }
+
+    const lean = s.wind * s.drift;
+    for (const [i, sh] of this.sheets.entries()) {
+      const x = ((sh.x0 + t * (12 + s.wind * .8)) % (W + 200)) - 100;
+      ctx.fillStyle = A(tk.rain, (.06 + .04 * Math.sin(t * .6 + i)) * s.rain);
+      ctx.beginPath(); ctx.moveTo(x, 30); ctx.lineTo(x + sh.w, 30);
+      ctx.lineTo(x + sh.w + lean * 1.2, HZ); ctx.lineTo(x + lean * 1.2, HZ); ctx.fill();
+    }
+
+    const storm = s.sky === "storm";
+    for (const c of this.clouds) {
+      if (!c.img) continue;
+      const x = ((c.x0 + t * (4 + s.wind * .5) * c.depth) % (W + 300)) - 300;
+      ctx.globalAlpha = (storm ? .9 : .5) + .35 * c.depth;
+      ctx.drawImage(c.img, x, c.y + (1 - c.depth) * -10, 300 * c.sc, 140 * c.sc);
+    }
+    ctx.globalAlpha = 1;
+
+    const vx = lean * 3.5;
+    ctx.lineCap = "round";
+    /* Three depths, one path each: three strokes a frame however hard it
+       rains, rather than one per drop. */
+    for (let band = 0; band < 3; band++) {
+      ctx.beginPath();
+      for (const d of this.streaks) {
+        if (Math.min(2, Math.floor((d.z - .4) / .2)) !== band) continue;
+        d.y += 700 * d.z * dt; d.x += vx * d.z * dt;
+        if (d.y > HZ + 20) { d.y = skyRand(-80, 0); d.x = skyRand(-150, W + 150); }
+        ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - vx * .07 * d.z, d.y - 34 * d.z);
+      }
+      const z = .5 + band * .2;
+      ctx.strokeStyle = A(tk.rain, .18 + .3 * z); ctx.lineWidth = .8 + z;
+      ctx.stroke();
+    }
+
+    if (this.flakes.length && this.flakeSprites) {
+      for (const f of this.flakes) {
+        f.y += [10, 22, 40][f.z] * dt;
+        f.x += (Math.sin(t * .6 + f.ph) * 8 + lean * .8) * dt * (f.z + 1) / 2;
+        if (f.y > HZ) { f.y = -10; f.x = skyRand(0, W); }
+        if (f.x > W + 10) f.x = -10; else if (f.x < -10) f.x = W + 10;
+        ctx.globalAlpha = [.6, .8, .55][f.z];
+        ctx.drawImage(this.flakeSprites[f.z], f.x, f.y);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    if (s.fog) {
+      for (let i = 0; i < 5; i++) {
+        const y = HZ - 18 - i * 22;
+        const x = Math.sin(t * (.05 + i * .02) + i) * 60 - 40;
+        const fg = ctx.createLinearGradient(0, y - 12, 0, y + 12);
+        fg.addColorStop(0, A(tk.cloud, 0)); fg.addColorStop(.5, A(tk.cloud, .45 - i * .06)); fg.addColorStop(1, A(tk.cloud, 0));
+        ctx.fillStyle = fg; ctx.fillRect(x, y - 12, W + 80, 24);
+      }
+    }
+
+    if (s.bolt) {
+      if (!once && t > this.boltAt) {
+        const segs = [];
+        const x = skyRand(220, 520);
+        skyBolt(x, 30, x + skyRand(-50, 50), HZ, 55, 0, segs);
+        /* Two paths, built once per strike: the trunk and its branches. A
+           strike is about a hundred segments, and stroking each on its own
+           with a blurred shadow cost two to four hundred milliseconds a
+           frame on a software-drawn page -- a stall you could see, at
+           exactly the moment the picture is meant to be most alive. */
+        const trunk = new Path2D();
+        const twigs = new Path2D();
+        for (const [x0, y0, x1, y1, d] of segs) {
+          const path = d ? twigs : trunk;
+          path.moveTo(x0, y0); path.lineTo(x1, y1);
+        }
+        this.bolt = { trunk, twigs }; this.flash = t; this.boltAt = t + skyRand(4, 8);
+      }
+      const e = t - this.flash;
+      if (e < 1.2) {
+        const a = Math.max(0, (Math.exp(-e * 5) + (e > .18 && e < .3 ? .5 : 0)) * .55);
+        ctx.fillStyle = A(tk.star, a); ctx.fillRect(0, 0, W, HZ);
+        if (e < .45 && this.bolt) {
+          /* The glow is a wide faint stroke under a thin bright one, which
+             reads as the same halo as a blur and costs two strokes. */
+          const k = 1 - e / .45;
+          ctx.lineCap = "round"; ctx.lineJoin = "round";
+          ctx.strokeStyle = A(tk.sun, .22 * k); ctx.lineWidth = 10; ctx.stroke(this.bolt.trunk);
+          ctx.strokeStyle = A(tk.sun, .14 * k); ctx.lineWidth = 5; ctx.stroke(this.bolt.twigs);
+          ctx.strokeStyle = A(tk.star, k); ctx.lineWidth = 2.4; ctx.stroke(this.bolt.trunk);
+          ctx.strokeStyle = A(tk.star, .6 * k); ctx.lineWidth = 1; ctx.stroke(this.bolt.twigs);
+        }
+      }
+    }
+
+    const hz = ctx.createLinearGradient(0, HZ - 40, 0, HZ);
+    hz.addColorStop(0, A(tk[`${s.sky}-low`], 0)); hz.addColorStop(1, A(tk[`${s.sky}-low`], s.fog ? .95 : .7));
+    ctx.fillStyle = hz; ctx.fillRect(0, HZ - 40, W, 40);
+
+    ctx.fillStyle = s.snow ? tk.snow : tk.ground;
+    ctx.globalAlpha = s.snow ? .85 : 1;
+    ctx.fillRect(0, HZ, W, SKY_H - HZ);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = tk.edge; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, HZ); ctx.lineTo(W, HZ); ctx.stroke();
+
+    /* The label counts down by the minute, between renders of the card. */
+    if (this.label && !once && now - (this.labelAt || 0) > 20000) {
+      this.labelAt = now;
+      if (s.left !== null) {
+        const left = Math.max(0, s.left - (Date.now() - s.at));
+        const text = skyLeft(left, s.up);
+        if (this.label.textContent !== text) this.label.textContent = text;
+      }
+    }
+  }
+}
+
 const BODIES = {
   /* What is worth reading today? */
   quote(b) {
@@ -7694,6 +8294,37 @@ const BODIES = {
       }).join("")}</div>`;
     }
     return out;
+  },
+
+  /* What is the weather doing, as a picture? See Sky above: this is only
+     the words and figures laid over it. The picture itself is painted by
+     the card after the markup lands, because a canvas has no markup. */
+  sky(b) {
+    const scene = skyScene(b, Date.now());
+    const read = [];
+    if (!isBlank(b.hero)) {
+      read.push(`<p class="skyhero">${esc(b.hero)}`
+        + (isBlank(b.hero_note) ? "" : `<span class="heronote">${esc(b.hero_note)}</span>`)
+        + `</p>`);
+    }
+    if (!isBlank(b.text)) read.push(`<p class="skycond">${esc(b.text)}</p>`);
+    /* Not called "forecast": an object with that key is how a card asks for
+       a forecast subscription, and the whole body would wait for one. */
+    if (!isBlank(b.forecast_temperature)) {
+      read.push(`<p class="skyfc">${esc(isBlank(b.forecast_label) ? "Forecast" : b.forecast_label)} `
+        + `<span>${esc(b.forecast_temperature)}</span></p>`);
+    }
+    const metrics = (Array.isArray(b.metrics) ? b.metrics : [])
+      .filter((m) => m && !isBlank(m.value));
+    const said = [b.text, b.hero].filter((v) => !isBlank(v)).join(", ");
+    return `<div class="skybox">`
+      + `<canvas class="skycanvas" role="img" aria-label="${esc(said || "Sky")}"></canvas>`
+      + `<div class="skyread">${read.join("")}</div>`
+      + `<div class="skybase">${metrics.map((m) => `<span>`
+        + (isBlank(m.label) ? "" : `<i>${esc(m.label)}</i>`)
+        + `${esc(m.value)}</span>`).join("")}`
+      + `<span class="skyleft">${esc(skyLeft(scene.left, scene.up))}</span></div>`
+      + `</div>`;
   },
 
   /* What is coming, and when? Grouped by day, because a flat list of
@@ -9263,6 +9894,9 @@ function bodyIsEmpty(type, b) {
       return isBlank(b.zone) && isBlank(b.value) && !b.adjust;
     case "forecast":
       return !Array.isArray(b.slots) || b.slots.length === 0;
+    /* A sky with no reading and no weather is not a picture of anything. */
+    case "sky":
+      return isBlank(b.hero) && isBlank(b.condition);
     /* A softener with no side reporting and no reading time has nothing to
        say. One side reading still draws both, so they stay the same size. */
     case "softener":
@@ -12774,6 +13408,10 @@ class SpectraCard extends HTMLElement {
     }
     this._subscribeForecasts();
     if (this._hass && this._config) this._frigateEnsure();
+    /* Back on the page: the painter was let go when the card left it. */
+    if (this._sky && this._model && this._config && this._config.body.type === "sky") {
+      this._skyAttach(this._model.body);
+    }
     if (!this._onOpenTask) {
       /* A Needs you row's Open. The first card that owns the task takes
          it, so two copies of a card on one page do not open it twice. */
@@ -12797,6 +13435,7 @@ class SpectraCard extends HTMLElement {
        of the rest below ever ran. tools/checkstrip.js now refuses a class
        with any method defined twice. */
     releaseDrawer(this);
+    if (this._sky) this._sky.detach();
     if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     /* A camera stream left running off-screen is a camera left streaming
        -- but a card is also taken off the page for an instant when the
@@ -13596,6 +14235,19 @@ class SpectraCard extends HTMLElement {
        and every press would fire twice. Invisible until a keyed body
        also had per-row controls, which is what the to-do list is. */
     if (this._paint(card)) this._bind(model);
+    if (type === "sky") this._skyAttach(model.body);
+  }
+
+  /* The sky body's painter: one per card, kept across repaints so a light
+     switching somewhere in the house does not restart the rain. */
+  _skyAttach(b) {
+    const canvas = this._holder.querySelector(".skycanvas");
+    if (!canvas) {
+      if (this._sky) this._sky.stop();
+      return;
+    }
+    if (!this._sky) this._sky = new SkyPainter();
+    this._sky.attach(canvas, skyScene(b || {}, Date.now()), this._holder.querySelector(".skyleft"));
   }
 
   /* Replaces what is on screen, then tells the new bar where the old one had

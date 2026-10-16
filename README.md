@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -914,6 +914,71 @@ from three metres tells you nothing but its endpoints.
 `every` thins the hours: six legible columns beat eighteen unreadable ones.
 Rain only gets a line where there is some, because a row of zeroes is noise
 pretending to be information.
+
+### `sky` — what is the weather doing, as a picture?
+
+```yaml
+body:
+  type: sky
+  hero: {entity: sensor.outdoor_temperature, suffix: "°"}
+  hero_note: {entity: sensor.outdoor_humidity, format: round, digits: 0, suffix: "%"}
+  text: {entity: weather.home, format: weather_text}
+  forecast_temperature: {entity: weather.home, attribute: temperature, suffix: "°"}
+  condition: {entity: weather.home}
+  cloud_cover: {entity: weather.home, attribute: cloud_coverage}
+  wind_speed: {entity: weather.home, attribute: wind_speed}
+  wind_bearing: {entity: weather.home, attribute: wind_bearing}
+  up: {entity: sun.sun}
+  rising: {entity: sun.sun, attribute: next_rising}
+  setting: {entity: sun.sun, attribute: next_setting}
+  moon: {entity: sensor.moon, attribute: cycle}
+  metrics:
+    - {label: Wind, value: {entity: weather.home, attribute: wind_speed, format: round, digits: 0}}
+    - {label: UV, value: {entity: weather.home, attribute: uv_index, format: round, digits: 0}}
+```
+
+The sky as it is now, moving. The reading sits on it top-left: the house's
+own thermometer as the hero, the condition in words, and the forecast's
+figure under it, because the two disagree often enough to be worth seeing
+side by side (`forecast_temperature`, labelled by `forecast_label`, "Forecast"
+unless told otherwise). It is not called `forecast`, because an object with
+that key is how a card asks for a forecast subscription. The figures run along the ground band, with the light left in
+the day, or the time to sunrise, at the end.
+
+**The picture is assembled, not looked up.** Home Assistant reports one
+condition at a time, and one word is not a sky. So the condition decides
+what falls (rain, snow, lightning, fog), `cloud_cover` how much cloud,
+`wind_speed` and `wind_bearing` how hard the rain slants and which way and
+how fast the clouds go, and the sun's times where the sun is on its arc.
+"rainy" in a fifty-kilometre westerly slants hard to the east; on a still
+day it falls straight. Every input but `condition` is optional.
+
+**The sun is where it is; the moon is a clock.** By day the sun sits on the
+arc at the fraction of the daylight gone. After sunset the moon takes the
+same arc from sunset to sunrise, drawn at its real phase from `moon` (the
+`cycle` attribute of `home_signals`' `sensor.moon`: 0 new, 0.5 full). It is
+not drawn where the moon really is, which would leave it missing on most
+evenings and up in the daytime on the rest. With no `moon` there is no moon,
+only stars.
+
+**The sky is a depiction, not a palette.** Clear is blue, the hour around
+sunrise and sunset is warm, overcast is grey, a storm is darker, night is
+near black. These are their own `--sp-sky-*` tokens, kept pale enough that a
+clear morning cannot be mistaken for a notice, and they only ever fill the
+picture — never an edge, which is where a level lives.
+
+**It moves all the time, slowly.** Clouds drift at three depths, sunlight
+turns in rays, rain falls in sheets, snow drifts out of focus, lightning
+lights the whole sky, stars twinkle and now and then one shoots. It paints
+at 30 frames a second and **stops** when the card is off screen — another
+tab, a hidden view — so a wall panel spends nothing on a sky nobody can see.
+A device set to reduce motion gets one still frame. Rain is three strokes a frame
+however hard it falls, and a strike two paths drawn twice, a faint wide glow
+under a thin bright core; a blurred shadow per segment cost a frame ten times
+its budget. A repaint of the card
+(any entity it reads changing) hands the same painter the new canvas, so the
+house changing does not restart the rain. `tools/checksky.js` holds all of
+that.
 
 ### `agenda` — what is coming, and when?
 
