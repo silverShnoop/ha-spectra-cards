@@ -964,6 +964,10 @@ sunrise the same runs backwards. The sun's place, the twilight and the
 countdown are worked out on every frame rather than at each repaint, since a
 still afternoon can go an hour without one.
 
+**The arc keeps to the right.** The sun and the moon travel an arc over the
+right of the card, from just past the reading to the edge, so neither ever
+passes behind the words.
+
 **The sun is where it is; the moon is a clock.** By day the sun sits on the
 arc at the fraction of the daylight gone. Day or night is read from `rising`
 and `setting` alone, whichever was more recent, and `up` is only the fallback
