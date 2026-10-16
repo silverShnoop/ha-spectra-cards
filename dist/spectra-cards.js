@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.170.0";
+const VERSION = "0.170.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6933,15 +6933,28 @@ function skyTime(v) {
 
 /* Where the sun (or the moon, at night) is along its arc, 0 to 1, and how
    long until that ends. Home Assistant's sun gives only the NEXT rising and
-   setting, so the one already past is the next one less a day -- out by the
-   few minutes a day the times drift, which on a picture is nothing. */
+   setting, so the ones already past are the next ones less a day -- out by
+   the few minutes a day the times drift, which on a picture is nothing.
+
+   Day or night is decided by those times alone: whichever of the last
+   sunrise and the last sunset is more recent. NOT by the sun's state. At
+   sunset Home Assistant moves next_setting to tomorrow the moment the time
+   passes, but the state stays above_horizon for several minutes more, until
+   the sun is below the horizon by refraction's half a degree. Read
+   together, the two said "day, ending tomorrow evening", and the sun was
+   drawn at midday just after it had set. The state is only the fallback
+   for a sun that reports no times. */
 function skyArc(b, now) {
-  const up = b.up === true || b.up === "above_horizon" || b.up === "on";
   const rising = skyTime(b.rising);
   const setting = skyTime(b.setting);
   const DAY = 86400000;
-  if (rising === null || setting === null) return { up, f: .5, left: null };
-  const from = up ? rising - DAY : setting - DAY;
+  if (rising === null || setting === null) {
+    return { up: b.up === true || b.up === "above_horizon" || b.up === "on", f: .5, left: null };
+  }
+  const lastRise = rising - DAY;
+  const lastSet = setting - DAY;
+  const up = lastRise > lastSet;
+  const from = up ? lastRise : lastSet;
   const to = up ? setting : rising;
   const span = to - from;
   const f = span > 0 ? Math.min(1, Math.max(0, (now - from) / span)) : .5;

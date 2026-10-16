@@ -130,6 +130,19 @@ const BODY = {
   /* 17:04 to 06:30 is 806 minutes; 21:00 is 236 in. */
   check("scene: the night runs from sunset to sunrise", night && Math.abs(night.f - 236 / 806) < .005, night && night.f);
 
+  /* The minutes either side of sunset and sunrise, as Home Assistant really
+     reports them: the next time has already moved on to tomorrow, but the
+     state has not caught up. Read as the state says, 18:05 drew the sun at
+     midday. */
+  const justSet = await scene({ ...BODY, condition: "sunny", cloud_cover: 0, up: "above_horizon",
+    rising: "2026-10-17T06:29:10+00:00", setting: "2026-10-17T17:02:21+00:00" }, Date.parse("2026-10-16T17:05:00Z"));
+  check("scene: just after sunset it is night, whatever the state says", justSet && justSet.sky === "night" && justSet.f < .02,
+    justSet && `${justSet.sky} f=${justSet.f.toFixed(3)}`);
+  const justRisen = await scene({ ...BODY, condition: "sunny", cloud_cover: 0, up: "below_horizon",
+    rising: "2026-10-18T06:31:00+00:00", setting: "2026-10-17T17:02:21+00:00" }, Date.parse("2026-10-17T06:31:00Z"));
+  check("scene: just after sunrise it is day, whatever the state says", justRisen && justRisen.up && justRisen.f < .02,
+    justRisen && `up=${justRisen.up} f=${justRisen.f.toFixed(3)}`);
+
   const cloudyNight = await scene({ ...BODY, condition: "cloudy", cloud_cover: 95, ...SUN_DOWN }, Date.parse("2026-10-16T21:00:00Z"));
   check("scene: no stars through cloud", cloudyNight && cloudyNight.stars === false, cloudyNight && cloudyNight.stars);
 
