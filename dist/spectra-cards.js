@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.168.4";
+const VERSION = "0.169.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -525,7 +525,11 @@ ha-icon { display:inline-flex; line-height:0; }
 .titlebar .wicon { width:16px; height:16px; }
 .bigicon.wicon { width:44px; height:44px; }
 .slot .wicon { width:28px; height:28px; margin:3px auto 1px; }
-.rowicon { width:19px; height:19px; }
+/* A row's leading icon is sized by the row, so a list can ask for a
+   bigger one in one place and both kinds of glyph -- ha-icon and our own
+   art -- answer it. */
+.rowicon { width:var(--row-icon, 19px); height:var(--row-icon, 19px); flex:none; }
+.row > ha-icon { --mdc-icon-size:var(--row-icon, 19px); flex:none; }
 
 /* primitives */
 .hero {
@@ -3512,6 +3516,10 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    used to be the edge alone, while the rail filled its buttons; the loud
    one should be the list that says what to do, so the ground moved here. */
 .flow .row.tile.wash { background:var(--accent-soft); border-color:var(--accent); }
+/* A list read from across a room: icon_size on the body. Past the
+   reference size the glyph is taller than the name, so the text block
+   centres on it rather than hanging off its top. */
+.row.bigicon, .flow .row.tile.bigicon { align-items:center; }
 /* Rows arrive and leave; they do not blink in and out.
 
    This belongs to the LIST, not to whatever caused the change. A row that
@@ -9061,6 +9069,15 @@ const BODIES = {
     /* Zebra is a reading aid for a column of rows. Tiles already have edges,
        and striping them alternately looks like a fault. */
     const zebra = !flow && b.zebra !== false;
+    /* `icon_size`, in px. The default is the reference size every other
+       row on the panel uses; Needs you, which is read from across a
+       kitchen, asks for more so the glyph says what a job is about
+       before the title can be read. Capped where it would dwarf the
+       text it leads. */
+    const askedSize = Number(b.icon_size);
+    const iconSize = Number.isFinite(askedSize) && askedSize > 0
+      ? Math.min(64, Math.round(askedSize)) : 0;
+    const bigIcon = iconSize > 24;
 
     const body = rows.map((source, index) => {
       const r = source || {};
@@ -9089,14 +9106,18 @@ const BODIES = {
       if (washed) classes.push("wash");
       else if (zebra && index % 2 === 0) classes.push("zebra");
       if (hasAction) classes.push("hasact");
-      const rowStyle = washed ? ` style="${toneStyle(tone)}"` : "";
+      if (bigIcon) classes.push("bigicon");
+      const styles = [];
+      if (washed) styles.push(toneStyle(tone));
+      if (iconSize) styles.push(`--row-icon:${iconSize}px`);
+      const rowStyle = styles.length ? ` style="${styles.join(";")}"` : "";
 
       let lead = "";
       const iconColour = toneBase(tone);
       if (!isBlank(r.icon)) {
         lead = String(r.icon).startsWith("spectra:")
           ? iconMarkup(r.icon, "rowicon")
-          : `<ha-icon icon="${esc(r.icon)}" style="--mdc-icon-size:19px;${iconColour ? `color:${iconColour}` : ""}"></ha-icon>`;
+          : `<ha-icon icon="${esc(r.icon)}"${iconColour ? ` style="color:${iconColour}"` : ""}></ha-icon>`;
       } else if (!isBlank(r.dot)) {
         /* A light's dot is the bulb's own colour, not an accent. */
         const colour = cssColor(r.dot) || iconColour;
