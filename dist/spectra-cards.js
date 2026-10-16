@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.170.1";
+const VERSION = "0.171.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6959,21 +6959,57 @@ function skyTime(v) {
    together, the two said "day, ending tomorrow evening", and the sun was
    drawn at midday just after it had set. The state is only the fallback
    for a sun that reports no times. */
-function skyArc(b, now) {
+/* How long the sky takes to go from sunset to night, and back before dawn.
+   Roughly civil twilight and the first half of nautical in these latitudes:
+   long enough to watch happen, short enough that night is night by tea. */
+const SKY_TWILIGHT = 50 * 60000;
+
+function skyTimes(b) {
   const rising = skyTime(b.rising);
   const setting = skyTime(b.setting);
+  return {
+    rising, setting,
+    hint: b.up === true || b.up === "above_horizon" || b.up === "on",
+  };
+}
+
+/* Where everything is at one instant. Run on every frame, not once per
+   render: the card repaints only when a reading it shows changes, and on a
+   still afternoon that can be an hour, which left the sun parked wherever
+   the last repaint put it.
+
+   - up, f: day or night, and how far through it (0 to 1). The sun travels
+     the arc by day; the moon travels it by night, as a clock.
+   - sun: the sun's own place on the day's arc, which keeps going past 0 and
+     1 -- below the horizon -- so it sets rather than vanishing.
+   - night: 0 by day, 1 in full night, and in between for the twilight after
+     sunset and before sunrise. The sky, the stars and the moon follow it. */
+function skyClock(t, now) {
   const DAY = 86400000;
-  if (rising === null || setting === null) {
-    return { up: b.up === true || b.up === "above_horizon" || b.up === "on", f: .5, left: null };
+  if (!t || t.rising === null || t.setting === null) {
+    const up = t ? t.hint : true;
+    return { up, f: .5, sun: .5, night: up ? 0 : 1, left: null };
   }
-  const lastRise = rising - DAY;
-  const lastSet = setting - DAY;
+  const lastRise = t.rising - DAY;
+  const lastSet = t.setting - DAY;
   const up = lastRise > lastSet;
   const from = up ? lastRise : lastSet;
-  const to = up ? setting : rising;
+  const to = up ? t.setting : t.rising;
   const span = to - from;
   const f = span > 0 ? Math.min(1, Math.max(0, (now - from) / span)) : .5;
-  return { up, f, left: Math.max(0, to - now) };
+  let sun = f;
+  let night = 0;
+  if (!up) {
+    const since = now - lastSet;
+    const until = t.rising - now;
+    night = Math.max(0, Math.min(1, since / SKY_TWILIGHT, until / SKY_TWILIGHT));
+    /* Carried on along the arc at the pace of the day it just finished, or
+       of the day it is about to start. */
+    sun = since <= until
+      ? 1 + since / Math.max(1, lastSet - lastRise)
+      : -until / Math.max(1, t.setting - t.rising);
+  }
+  return { up, f, sun, night, left: Math.max(0, to - now) };
 }
 
 function skyLeft(ms, up) {
@@ -6988,7 +7024,8 @@ function skyLeft(ms, up) {
 function skyScene(b, now) {
   const cond = String(b.condition || "").toLowerCase();
   const base = SKY_CONDITIONS[cond] || { cover: .4 };
-  const arc = skyArc(b, now);
+  const times = skyTimes(b);
+  const arc = skyClock(times, now);
   const reported = skyNum(b.cloud_cover);
   let cover = reported === null ? base.cover : reported / 100;
   cover = Math.min(1, Math.max(base.floor || 0, cover));
@@ -6996,12 +7033,15 @@ function skyScene(b, now) {
   const bearing = skyNum(b.wind_bearing);
   const moon = skyNum(b.moon);
   const rain = base.rain || 0;
-  let sky;
-  if (!arc.up) sky = "night";
-  else if (base.storm) sky = "storm";
-  else if (cover >= .8 || rain || base.snow || base.fog) sky = "grey";
-  else if (arc.f < .1 || arc.f > .9) sky = "gold";
-  else sky = "day";
+  /* The day's own sky, which twilight then fades into night. A clear sky
+     near either end of the day is warm, and stays warm through the dusk
+     after it; an overcast one just darkens. */
+  let base2;
+  if (base.storm) base2 = "storm";
+  else if (cover >= .8 || rain || base.snow || base.fog) base2 = "grey";
+  else if (!arc.up || arc.f < .1 || arc.f > .9) base2 = "gold";
+  else base2 = "day";
+  const sky = arc.night >= 1 ? "night" : base2;
   return {
     sky, cover, rain,
     snow: base.snow || 0,
@@ -7011,9 +7051,10 @@ function skyScene(b, now) {
     /* Wind is reported as where it comes FROM. From anywhere west it blows
        east, which on the card is to the right. */
     drift: bearing === null ? 1 : (Math.sin(bearing * Math.PI / 180) > 0 ? -1 : 1),
-    up: arc.up, f: arc.f, left: arc.left, at: now,
+    up: arc.up, f: arc.f, sun: arc.sun, night: arc.night, left: arc.left,
+    at: now, times, day: base2,
     moon: moon === null ? null : ((moon % 1) + 1) % 1,
-    stars: !arc.up && cover < .6,
+    stars: cover < .6,
   };
 }
 
@@ -7021,7 +7062,7 @@ function skyScene(b, now) {
    place and the wind's exact speed move every render and must not restart
    the rain. */
 function skyKey(s) {
-  return [s.sky, s.rain, s.snow, s.bolt, s.fog, Math.round(s.cover * 9), s.stars, Math.round(s.wind / 15)].join("|");
+  return [s.day, s.rain, s.snow, s.bolt, s.fog, Math.round(s.cover * 9), s.stars, Math.round(s.wind / 15)].join("|");
 }
 
 const SKY_TOKENS = {
@@ -7065,6 +7106,27 @@ function skyAlphaParse(ctx, colour, a) {
   }
   const parts = c.replace(/^rgba?\(|\)$/g, "").split(",").slice(0, 3).join(",");
   return `rgba(${parts},${a})`;
+}
+
+/* Two colours mixed, for the sky fading between day and night. Parsed through
+   the canvas like skyAlpha, and remembered for the same reason. */
+const SKY_RGB = new Map();
+function skyRgb(ctx, colour) {
+  const hit = SKY_RGB.get(colour);
+  if (hit) return hit;
+  const m = skyAlphaParse(ctx, colour, 1).match(/[\d.]+/g) || [0, 0, 0];
+  const out = m.slice(0, 3).map(Number);
+  if (SKY_RGB.size > 200) SKY_RGB.clear();
+  SKY_RGB.set(colour, out);
+  return out;
+}
+
+function skyMix(ctx, a, b, k) {
+  if (k <= 0) return a;
+  if (k >= 1) return b;
+  const x = skyRgb(ctx, a);
+  const y = skyRgb(ctx, b);
+  return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * k)).join(",")})`;
 }
 
 /* A lightning stroke: the line between two points, split again and again
@@ -7269,48 +7331,77 @@ class SkyPainter {
     const W = SKY_W, HZ = SKY_HZ;
     ctx.clearRect(0, 0, W, SKY_H);
 
+    /* Where the sun, the moon and the twilight are, this frame. A still
+       frame is the moment the scene was made. */
+    const c = skyClock(s.times, once ? s.at : Date.now());
+    this.clock = c;
+    const night = c.night;
+    const top = skyMix(ctx, tk[`${s.day}-top`], tk["night-top"], night);
+    const low = skyMix(ctx, tk[`${s.day}-low`], tk["night-low"], night);
+    this.low = low;
     const g = ctx.createLinearGradient(0, 0, 0, HZ);
-    g.addColorStop(0, tk[`${s.sky}-top`]);
-    g.addColorStop(1, tk[`${s.sky}-low`]);
+    g.addColorStop(0, top);
+    g.addColorStop(1, low);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, HZ);
 
-    const th = Math.PI * (1 - s.f);
-    const px = 288 + 250 * Math.cos(th);
-    const py = HZ - 128 * Math.sin(th);
+    const arcAt = (f) => {
+      const th = Math.PI * (1 - f);
+      return [288 + 250 * Math.cos(th), HZ - 128 * Math.sin(th)];
+    };
+    /* The sun's path is the same arc lowered by its own radius at the ends,
+       so that sunrise and sunset are what they are: the moment the top of
+       the disc meets the horizon. Centred on the arc, half the sun was still
+       showing at sunset and took twenty-five minutes to go. */
+    const SUN_R = 26;
+    const sunAt = (f) => {
+      const th = Math.PI * (1 - f);
+      return [288 + 250 * Math.cos(th), HZ + SUN_R - (128 + SUN_R) * Math.sin(th)];
+    };
 
-    if (s.stars) {
+    /* Stars come out as the sky darkens, rather than all at once. */
+    if (s.stars && night > 0) {
       for (const o of this.stars) {
-        ctx.fillStyle = A(tk.star, .2 + .8 * Math.abs(Math.sin(t * o.s + o.p)));
+        ctx.fillStyle = A(tk.star, (.2 + .8 * Math.abs(Math.sin(t * o.s + o.p))) * night);
         ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, 7); ctx.fill();
       }
-      if (!once && t > this.shootAt) { this.shoot = { at: t, x: skyRand(120, 420), y: skyRand(8, 40) }; this.shootAt = t + skyRand(8, 16); }
-      if (this.shoot && t - this.shoot.at < 1.1) {
-        const k = (t - this.shoot.at) / 1.1;
-        const x = this.shoot.x + k * 200, y = this.shoot.y + k * 60;
-        const sg = ctx.createLinearGradient(x - 90, y - 27, x, y);
-        sg.addColorStop(0, A(tk.star, 0));
-        sg.addColorStop(1, A(tk.star, Math.sin(k * Math.PI)));
-        ctx.strokeStyle = sg; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(x - 90, y - 27); ctx.lineTo(x, y); ctx.stroke();
+      if (night >= 1) {
+        if (!once && t > this.shootAt) { this.shoot = { at: t, x: skyRand(120, 420), y: skyRand(8, 40) }; this.shootAt = t + skyRand(8, 16); }
+        if (this.shoot && t - this.shoot.at < 1.1) {
+          const k = (t - this.shoot.at) / 1.1;
+          const x = this.shoot.x + k * 200, y = this.shoot.y + k * 60;
+          const sg = ctx.createLinearGradient(x - 90, y - 27, x, y);
+          sg.addColorStop(0, A(tk.star, 0));
+          sg.addColorStop(1, A(tk.star, Math.sin(k * Math.PI)));
+          ctx.strokeStyle = sg; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(x - 90, y - 27); ctx.lineTo(x, y); ctx.stroke();
+        }
       }
     }
 
-    if (!s.up) {
-      if (s.moon !== null) {
-        const mg = ctx.createRadialGradient(px, py, 18, px, py, 120);
-        mg.addColorStop(0, A(tk.moon, .28)); mg.addColorStop(.4, A(tk.moon, .07)); mg.addColorStop(1, A(tk.moon, 0));
-        ctx.fillStyle = mg; ctx.fillRect(0, 0, W, HZ);
-        ctx.beginPath(); ctx.arc(px, py, 22, 0, 7); ctx.fillStyle = A(tk.moon, .1); ctx.fill();
-        if (s.moon > .01 && s.moon < .99) {
-          ctx.save(); ctx.shadowColor = tk.moon; ctx.shadowBlur = 18;
-          skyMoonPath(ctx, px, py, 22, s.moon); ctx.fillStyle = tk.moon; ctx.fill();
-          ctx.restore();
-        }
+    /* The moon, on the night's arc, brightening with the dark. */
+    if (!c.up && s.moon !== null && night > 0) {
+      const [mx, my] = arcAt(c.f);
+      const mg = ctx.createRadialGradient(mx, my, 18, mx, my, 120);
+      mg.addColorStop(0, A(tk.moon, .28 * night)); mg.addColorStop(.4, A(tk.moon, .07 * night)); mg.addColorStop(1, A(tk.moon, 0));
+      ctx.fillStyle = mg; ctx.fillRect(0, 0, W, HZ);
+      ctx.beginPath(); ctx.arc(mx, my, 22, 0, 7); ctx.fillStyle = A(tk.moon, .1 * night); ctx.fill();
+      if (s.moon > .01 && s.moon < .99) {
+        ctx.save(); ctx.globalAlpha = night; ctx.shadowColor = tk.moon; ctx.shadowBlur = 18;
+        skyMoonPath(ctx, mx, my, 22, s.moon); ctx.fillStyle = tk.moon; ctx.fill();
+        ctx.restore();
       }
-    } else {
+    }
+
+    /* The sun, until twilight is over. Past either end of the arc it is
+       below the horizon, so the ground covers it as it goes and only its
+       glow is left, fading with the light. */
+    if (night < 1) {
+      const [px, py] = sunAt(c.sun);
+      const dusk = 1 - night;
       const hidden = s.cover >= .8 || s.fog;
-      if (!hidden) {
+      const risen = c.up;
+      if (!hidden && risen) {
         ctx.save(); ctx.translate(px, py); ctx.rotate(t * .03);
         for (let i = 0; i < 14; i++) {
           ctx.rotate(Math.PI * 2 / 14);
@@ -7322,16 +7413,19 @@ class SkyPainter {
         }
         ctx.restore();
       }
-      const gl = ctx.createRadialGradient(px, py, 0, px, py, hidden ? 80 : 150);
-      gl.addColorStop(0, A(tk.sun, hidden ? .2 : .3)); gl.addColorStop(1, A(tk.sun, 0));
+      const reach = hidden ? 80 : (risen ? 150 : 190);
+      const gl = ctx.createRadialGradient(px, py, 0, px, py, reach);
+      gl.addColorStop(0, A(tk.sun, (hidden ? .2 : .3) * dusk)); gl.addColorStop(1, A(tk.sun, 0));
       ctx.fillStyle = gl; ctx.fillRect(0, 0, W, HZ);
       if (!hidden) {
         ctx.save(); ctx.shadowColor = tk.sun; ctx.shadowBlur = 30;
-        ctx.beginPath(); ctx.arc(px, py, 26, 0, 7); ctx.fillStyle = tk.sun; ctx.fill();
+        ctx.beginPath(); ctx.arc(px, py, SUN_R, 0, 7); ctx.fillStyle = tk.sun; ctx.fill();
         ctx.restore();
-        const vx = 288 - px, vy = 90 - py;
-        for (const [k, r, a] of [[.45, 10, .10], [.75, 18, .07], [1.25, 7, .12]]) {
-          ctx.beginPath(); ctx.arc(px + vx * k, py + vy * k, r, 0, 7); ctx.fillStyle = A(tk.sun, a); ctx.fill();
+        if (risen) {
+          const vx = 288 - px, vy = 90 - py;
+          for (const [k, r, a] of [[.45, 10, .10], [.75, 18, .07], [1.25, 7, .12]]) {
+            ctx.beginPath(); ctx.arc(px + vx * k, py + vy * k, r, 0, 7); ctx.fillStyle = A(tk.sun, a); ctx.fill();
+          }
         }
       }
     }
@@ -7344,7 +7438,7 @@ class SkyPainter {
       ctx.lineTo(x + sh.w + lean * 1.2, HZ); ctx.lineTo(x + lean * 1.2, HZ); ctx.fill();
     }
 
-    const storm = s.sky === "storm";
+    const storm = s.day === "storm";
     for (const c of this.clouds) {
       if (!c.img) continue;
       const x = ((c.x0 + t * (4 + s.wind * .5) * c.depth) % (W + 300)) - 300;
@@ -7428,7 +7522,7 @@ class SkyPainter {
     }
 
     const hz = ctx.createLinearGradient(0, HZ - 40, 0, HZ);
-    hz.addColorStop(0, A(tk[`${s.sky}-low`], 0)); hz.addColorStop(1, A(tk[`${s.sky}-low`], s.fog ? .95 : .7));
+    hz.addColorStop(0, A(this.low, 0)); hz.addColorStop(1, A(this.low, s.fog ? .95 : .7));
     ctx.fillStyle = hz; ctx.fillRect(0, HZ - 40, W, 40);
 
     ctx.fillStyle = s.snow ? tk.snow : tk.ground;
@@ -7441,9 +7535,8 @@ class SkyPainter {
     /* The label counts down by the minute, between renders of the card. */
     if (this.label && !once && now - (this.labelAt || 0) > 20000) {
       this.labelAt = now;
-      if (s.left !== null) {
-        const left = Math.max(0, s.left - (Date.now() - s.at));
-        const text = skyLeft(left, s.up);
+      if (c.left !== null) {
+        const text = skyLeft(c.left, c.up);
         if (this.label.textContent !== text) this.label.textContent = text;
       }
     }
