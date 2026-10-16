@@ -6975,7 +6975,22 @@ function skyRand(a, b) { return a + Math.random() * (b - a); }
 
 /* A colour at an alpha. Canvas normalises whatever CSS gives it, so the
    token can be written any way a theme likes. */
+const SKY_ALPHA = new Map();
 function skyAlpha(ctx, colour, a) {
+  /* Called for every stroke of every frame, so the parse is done once per
+     colour and alpha and remembered. Alphas come rounded to two places,
+     which keeps the table to a few hundred entries at most. */
+  a = Math.round(a * 100) / 100;
+  const key = `${colour}|${a}`;
+  const hit = SKY_ALPHA.get(key);
+  if (hit) return hit;
+  if (SKY_ALPHA.size > 2000) SKY_ALPHA.clear();
+  const out = skyAlphaParse(ctx, colour, a);
+  SKY_ALPHA.set(key, out);
+  return out;
+}
+
+function skyAlphaParse(ctx, colour, a) {
   ctx.fillStyle = "#000";
   ctx.fillStyle = colour || "#000";
   const c = ctx.fillStyle;
@@ -6995,8 +7010,12 @@ function skyBolt(x0, y0, x1, y1, disp, depth, out) {
   const my = (y0 + y1) / 2 + skyRand(-disp, disp) * .3;
   skyBolt(x0, y0, mx, my, disp / 2, depth, out);
   skyBolt(mx, my, x1, y1, disp / 2, depth, out);
+  /* A branch is jagged by its own length, not by how deep in the trunk it
+     forked: one forking near the end would otherwise get a displacement
+     too small to split and be drawn as a single straight line. */
   if (depth < 2 && Math.random() < .28) {
-    skyBolt(mx, my, mx + skyRand(-70, 70), my + skyRand(25, 60), disp / 2, depth + 1, out);
+    const bx = mx + skyRand(-70, 70), by = my + skyRand(25, 60);
+    skyBolt(mx, my, bx, by, Math.max(disp / 2, Math.hypot(bx - mx, by - my) * .3), depth + 1, out);
   }
 }
 
@@ -7271,11 +7290,19 @@ class SkyPainter {
 
     const vx = lean * 3.5;
     ctx.lineCap = "round";
-    for (const d of this.streaks) {
-      d.y += 700 * d.z * dt; d.x += vx * d.z * dt;
-      if (d.y > HZ + 20) { d.y = skyRand(-80, 0); d.x = skyRand(-150, W + 150); }
-      ctx.strokeStyle = A(tk.rain, .18 + .3 * d.z); ctx.lineWidth = .8 + d.z;
-      ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - vx * .07 * d.z, d.y - 34 * d.z); ctx.stroke();
+    /* Three depths, one path each: three strokes a frame however hard it
+       rains, rather than one per drop. */
+    for (let band = 0; band < 3; band++) {
+      ctx.beginPath();
+      for (const d of this.streaks) {
+        if (Math.min(2, Math.floor((d.z - .4) / .2)) !== band) continue;
+        d.y += 700 * d.z * dt; d.x += vx * d.z * dt;
+        if (d.y > HZ + 20) { d.y = skyRand(-80, 0); d.x = skyRand(-150, W + 150); }
+        ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - vx * .07 * d.z, d.y - 34 * d.z);
+      }
+      const z = .5 + band * .2;
+      ctx.strokeStyle = A(tk.rain, .18 + .3 * z); ctx.lineWidth = .8 + z;
+      ctx.stroke();
     }
 
     if (this.flakes.length && this.flakeSprites) {
@@ -7305,20 +7332,32 @@ class SkyPainter {
         const segs = [];
         const x = skyRand(220, 520);
         skyBolt(x, 30, x + skyRand(-50, 50), HZ, 55, 0, segs);
-        this.bolt = segs; this.flash = t; this.boltAt = t + skyRand(4, 8);
+        /* Two paths, built once per strike: the trunk and its branches. A
+           strike is about a hundred segments, and stroking each on its own
+           with a blurred shadow cost two to four hundred milliseconds a
+           frame on a software-drawn page -- a stall you could see, at
+           exactly the moment the picture is meant to be most alive. */
+        const trunk = new Path2D();
+        const twigs = new Path2D();
+        for (const [x0, y0, x1, y1, d] of segs) {
+          const path = d ? twigs : trunk;
+          path.moveTo(x0, y0); path.lineTo(x1, y1);
+        }
+        this.bolt = { trunk, twigs }; this.flash = t; this.boltAt = t + skyRand(4, 8);
       }
       const e = t - this.flash;
       if (e < 1.2) {
         const a = Math.max(0, (Math.exp(-e * 5) + (e > .18 && e < .3 ? .5 : 0)) * .55);
         ctx.fillStyle = A(tk.star, a); ctx.fillRect(0, 0, W, HZ);
         if (e < .45 && this.bolt) {
-          ctx.save(); ctx.globalCompositeOperation = "lighter";
-          ctx.shadowColor = tk.sun; ctx.shadowBlur = 24;
-          for (const [x0, y0, x1, y1, d] of this.bolt) {
-            ctx.strokeStyle = A(tk.star, (1 - e / .45) * (d ? .6 : 1)); ctx.lineWidth = d ? 1 : 2.4;
-            ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-          }
-          ctx.restore();
+          /* The glow is a wide faint stroke under a thin bright one, which
+             reads as the same halo as a blur and costs two strokes. */
+          const k = 1 - e / .45;
+          ctx.lineCap = "round"; ctx.lineJoin = "round";
+          ctx.strokeStyle = A(tk.sun, .22 * k); ctx.lineWidth = 10; ctx.stroke(this.bolt.trunk);
+          ctx.strokeStyle = A(tk.sun, .14 * k); ctx.lineWidth = 5; ctx.stroke(this.bolt.twigs);
+          ctx.strokeStyle = A(tk.star, k); ctx.lineWidth = 2.4; ctx.stroke(this.bolt.trunk);
+          ctx.strokeStyle = A(tk.star, .6 * k); ctx.lineWidth = 1; ctx.stroke(this.bolt.twigs);
         }
       }
     }

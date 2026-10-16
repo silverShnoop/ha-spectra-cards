@@ -954,7 +954,10 @@ turns in rays, rain falls in sheets, snow drifts out of focus, lightning
 lights the whole sky, stars twinkle and now and then one shoots. It paints
 at 30 frames a second and **stops** when the card is off screen — another
 tab, a hidden view — so a wall panel spends nothing on a sky nobody can see.
-A device set to reduce motion gets one still frame. A repaint of the card
+A device set to reduce motion gets one still frame. Rain is three strokes a frame
+however hard it falls, and a strike two paths drawn twice, a faint wide glow
+under a thin bright core; a blurred shadow per segment cost a frame ten times
+its budget. A repaint of the card
 (any entity it reads changing) hands the same painter the new canvas, so the
 house changing does not restart the rain. `tools/checksky.js` holds all of
 that.

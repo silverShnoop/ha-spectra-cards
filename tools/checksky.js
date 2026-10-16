@@ -186,6 +186,41 @@ const BODY = {
   check("off the page, it asks for no frames", live.asked === 0, `${live.asked} frames requested`);
   check("back on the page, it runs again", live.running, "painter idle after reattaching");
 
+  /* A strike has to fit the frame budget. It did not: each of a hundred-odd
+     segments was stroked on its own under a 24px blurred shadow, and a frame
+     with lightning in it took two to four hundred milliseconds -- a visible
+     stall exactly when the picture is meant to be most alive. The median of
+     sixty strike frames must fit a 30fps frame with room to spare. */
+  const strike = await page.evaluate((body) => {
+    const host = document.getElementById("host");
+    host.innerHTML = "";
+    host.style.width = "600px";
+    const el = document.createElement("spectra-card");
+    el.setConfig({ type: "custom:spectra-card", accent: 5, title: "Now",
+      body: { ...body, condition: "lightning-rainy", wind_speed: 27 } });
+    host.appendChild(el);
+    el.hass = { states: {} };
+    const sky = el._sky;
+    sky.stop();
+    const times = [];
+    const t0 = performance.now();
+    for (let i = 0; i < 60; i++) {
+      const now = t0 + i * 33;
+      /* A fresh strike every few frames, each painted mid-flash. */
+      if (i % 6 === 0) sky.boltAt = -1;
+      const a = performance.now();
+      sky.paint(now, false);
+      sky.ctx.getImageData(0, 0, 1, 1);
+      times.push(performance.now() - a);
+      sky.flash = (now - sky.start) / 1000 - .1;
+    }
+    el.remove();
+    times.sort((x, y) => x - y);
+    return { median: times[30], struck: Boolean(sky.bolt) };
+  }, BODY);
+  check("a lightning strike fits the frame budget", strike.struck && strike.median < 33,
+    `median ${strike.median.toFixed(1)}ms, struck=${strike.struck}`);
+
   /* Reduced motion: one frame, then nothing. */
   const still = await (async () => {
     const ctx = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 900, height: 900 } });
