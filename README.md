@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `day`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `ahead`, `clock`, `control`, `day`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1002,6 +1002,46 @@ its budget. A repaint of the card
 (any entity it reads changing) hands the same painter the new canvas, so the
 house changing does not restart the rain. `tools/checksky.js` holds all of
 that.
+
+### `ahead` — now, and the hours coming towards it
+
+```yaml
+body:
+  type: ahead
+  # everything `sky` takes, for the left of the card...
+  hero: {entity: sensor.outdoor_temperature, suffix: "°"}
+  text: {entity: weather.home, format: weather_text}
+  condition: {entity: weather.home}
+  cloud_cover: {entity: weather.home, attribute: cloud_coverage}
+  rising: {entity: sun.sun, attribute: next_rising}
+  setting: {entity: sun.sun, attribute: next_setting}
+  moon: {entity: sensor.moon, attribute: cycle}
+  metrics: [...]
+  # ...and the hours ahead
+  hours: {forecast: weather.home, type: hourly}
+```
+
+The Now card and the hours after it, in one picture. The left of the card is
+the sky as it is, with the readings on it and the figures along the ground,
+as on `sky`. A thin line marks now. To its right each coming hour has its own
+sky, icon and temperature, as on `day`, and the dashed forecast line starts
+from the reading now.
+
+**Time comes to the sun, not the other way.** The sun and the moon stay on
+the now line and only rise and set. The hours ahead slide left towards it, an
+hour's width every hour, so a sunset is seen coming on the right and reaches
+the sun when it happens; after it the moon comes up on the same line.
+
+**Everything moves.** Ahead, each hour's clouds bob where they are, its rain
+falls and its stars twinkle. Over now the clouds blow left, the way time goes:
+each comes out from behind the line, crosses the readings and thins away at
+the edge, so none ever drifts into an hour it does not belong to.
+
+**Width decides the hours.** Night is half the width of day. From 640px every
+daylight hour is a block and night comes in twos, with taller icons, now
+taking the left third and about the next eighteen hours to its right; on a
+phone it is two hours by day and four by night, and now takes more of the
+width. `tools/checkahead.js` holds this.
 
 ### `day` — the whole of today, as a picture
 
