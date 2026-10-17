@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `clock`, `control`, `day`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1002,6 +1002,51 @@ its budget. A repaint of the card
 (any entity it reads changing) hands the same painter the new canvas, so the
 house changing does not restart the rain. `tools/checksky.js` holds all of
 that.
+
+### `day` — the whole of today, as a picture
+
+```yaml
+body:
+  type: day
+  temperature: sensor.outdoor_temperature   # an id: its hourly statistics are the past
+  weather: weather.home                     # an id: its history is the past sky
+  now: {entity: sensor.outdoor_temperature}
+  hours: {forecast: weather.home, type: hourly}
+  rising: {entity: sun.sun, attribute: next_rising}
+  setting: {entity: sun.sun, attribute: next_setting}
+  moon: {entity: sensor.moon, attribute: cycle}
+```
+
+Today from midnight to midnight, so now can be held against what the morning
+was and what the evening will be. It is the whole card, like `sky`: behind
+the line is each hour's own sky in the same colours, clear blue, cloud grey,
+night near black, so the weather changing through the day is the picture
+changing from left to right. The sky is a smooth function of how high the sun
+is, so dawn and dusk are a blend rather than a seam. Rain falls only in the
+hours it is forecast, stars come out only in the dark ones, clouds bob within
+their own hours, and tonight's moon sits in the evening at its real phase.
+Dry cloud is the lighter grey and rain cloud the dark, as on `sky`.
+
+**Two lines, one past, one future.** The solid line is the sensor's own
+hourly means since midnight, read from the recorder's statistics, ending at
+its reading now; the dashed line is the hourly forecast from there. The past
+is not held by any entity, which is why `temperature` and `weather` are ids
+and not values: the card reads the statistics and the weather's history
+itself, once every ten minutes, shared by every copy of the card on the page.
+What has happened is dimmed and a thin line marks now. The line wears the
+climate ramp, as every temperature does.
+
+**Night takes half the room.** A night hour is drawn half as wide as a
+daylight hour. Along the bottom the day is cut into blocks of equal width,
+each with its condition and its hours, and each block's temperature is marked
+on the line at its middle. At 640px and wider every daylight hour is a block
+and night comes in twos; narrower than that, two hours by day and four by
+night, so an icon is never too small to read across a room. The card picks
+from its own width, so moving it between one and two columns needs no
+setting. A block shows the condition most of its hours have, a tie going to
+the wetter: past blocks say what Home Assistant reported, later ones the
+forecast. `tools/checkday.js` holds that, and `tools/checkpanel.js` the
+`fill_row` that lets a two-column Today sit flush under Now and Who's home.
 
 ### `agenda` — what is coming, and when?
 
@@ -3356,6 +3401,15 @@ height and the next one fills in underneath the shortest column — which is
 what lets a tab of eleven small cards fit one screen. It is measured, and
 re-measured whenever a section changes height. It suits a tab of one-card
 sections; a span-3 group reads the same either way.
+
+**`fill_row: true` makes a section end with its neighbours.** Two cards side
+by side rarely come out the same height, and a card spanning both underneath
+then hangs off the taller one with a gap under the shorter. A section with
+`fill_row` is measured against the sections that start on the same line and
+told how much to grow, or shrink, to match the tallest as `--pn-row-grow`;
+the card decides what takes it up — on the Now card, the sky above the
+horizon. Alone on its line (a phone, a single column) it is told nothing and
+keeps its own height.
 
 **Tabs belong to the browser, not the house.** A rail button with `tab`
 switches the panel in *this* browser and calls nothing:
