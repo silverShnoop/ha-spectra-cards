@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.180.1";
+const VERSION = "0.180.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -7013,11 +7013,13 @@ const SKY_CLOUD = new Path2D("M6,19A5,5 0 0,1 1,14A5,5 0 0,1 6,9C7,6.65 9.3,5 12
 
 /* What each condition brings, before the readings refine it. Cover is a
    floor for the wet ones: a "rainy" reported under 20% cloud is still
-   raining, and rain out of a clear sky looks like a bug. */
+   raining, and rain out of a clear sky looks like a bug. "Partly cloudy"
+   gets one too: a forecast that says it over 18% cover would otherwise
+   draw the icon over an empty sky. */
 const SKY_CONDITIONS = {
   sunny:            { cover: 0 },
   "clear-night":    { cover: 0 },
-  partlycloudy:     { cover: .35 },
+  partlycloudy:     { cover: .35, floor: .3 },
   cloudy:           { cover: 1, floor: .9 },
   rainy:            { cover: .9, floor: .8, rain: 1 },
   pouring:          { cover: 1, floor: .9, rain: 2, storm: true },
@@ -8065,9 +8067,12 @@ class DayPainter {
     }
     this.clouds = [];
     const slot = w / 48;
+    let owed = .5;
     for (let px = 0; px < w; px += slot) {
       const s = this.skyAt(axis.hour(px + slot / 2, w));
-      const n = Math.round(s.cover * 1.6);
+      owed += s.cover * 1.6;
+      const n = Math.floor(owed);
+      owed -= n;
       const wet = s.rain > .1 || s.snow > .1;
       for (let i = 0; i < n; i++) {
         this.clouds.push({
@@ -8518,9 +8523,14 @@ class AheadPainter extends DayPainter {
     }
     this.clouds = [];
     const slot = L.px * .5;
+    /* The cloud count carries its remainder from slot to slot, so a thin
+       sky still gets one now and then rather than rounding to none. */
+    let owed = .5;
     for (let u = 0; u < sw; u += slot) {
       const s = this.skyAt(hourAt(u + slot / 2));
-      const n = Math.round(s.cover * 1.6);
+      owed += s.cover * 1.6;
+      const n = Math.floor(owed);
+      owed -= n;
       const wet = s.rain > .1 || s.snow > .1;
       for (let i = 0; i < n; i++) {
         this.clouds.push({ u: u + skyRand(-8, 8), y: skyRand(skyH * .02, skyH * .38), sc: skyRand(.2, .34), ph: skyRand(0, 6),
