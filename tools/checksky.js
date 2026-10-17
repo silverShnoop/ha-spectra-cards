@@ -107,7 +107,9 @@ const BODY = {
 
   const day = await scene(BODY, NOW);
   check("scene: a partly cloudy afternoon is a day sky", day && day.sky === "day", day && day.sky);
-  check("scene: reported cover wins over the condition's", day && Math.abs(day.cover - .17) < 1e-9, day && day.cover);
+  check("scene: a thin partly cloudy is held at the condition's floor", day && Math.abs(day.cover - .3) < 1e-9, day && day.cover);
+  const heavier = await scene({ ...BODY, cloud_cover: 55 }, NOW);
+  check("scene: reported cover wins over the condition's", heavier && Math.abs(heavier.cover - .55) < 1e-9, heavier && heavier.cover);
   /* 07:30 to 18:04 is 634 minutes; 15:24 is 474 in, so 0.748. */
   check("scene: the sun is three quarters across", day && Math.abs(day.f - .748) < .005, day && day.f);
   check("scene: from the north-west, the wind blows right", day && day.drift === 1, day && day.drift);
