@@ -4067,13 +4067,16 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .aheadrain { color:var(--sp-ink); }
 .aheadleft { margin:6px 0 0; font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-2); }
 .aheadbox .skybase { height:var(--ahead-band, 50px); right:auto; width:var(--ahead-now, 40%); box-sizing:border-box;
-  padding-left:calc(var(--ahead-icon, 40px) + 18px); padding-right:4px;
-  font-size:clamp(11px, 1.4cqw, 14px); gap:clamp(8px, 1.2cqw, 14px); }
+  font-size:clamp(11px, 1.4cqw, 14px); gap:clamp(8px, 1.6cqw, 18px); }
+.aheadnow { display:flex; align-items:center; gap:10px; }
+.aheadnow .aheadic { flex:none; width:clamp(36px, 6cqw, 52px); height:auto; }
+.aheadic .wc { fill:var(--sp-ink); }
+.aheadic .wa { fill:var(--sp-ink-2); }
 @container (max-width: 639px) {
   .aheadbox .skyhero { font-size:clamp(28px, 9cqw, 44px); }
   .aheadbox .skycond, .aheadbox .heronote { font-size:13px; }
   .aheadbox .skyfc { font-size:12px; }
-  .aheadbox .skybase { font-size:12px; padding-left:calc(var(--ahead-icon, 40px) + 14px); }
+  .aheadbox .skybase { font-size:12px; }
 }
 .daycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
 /* Below the title bar, which is a fixed height whatever the width. */
@@ -7153,7 +7156,7 @@ function skyScene(b, now) {
        east, which on the card is to the right. */
     drift: bearing === null ? 1 : (Math.sin(bearing * Math.PI / 180) > 0 ? -1 : 1),
     up: arc.up, f: arc.f, sun: arc.sun, night: arc.night, left: arc.left,
-    at: now, times, day: base2,
+    at: now, times, day: base2, cond,
     moon: moon === null ? null : ((moon % 1) + 1) % 1,
     stars: cover < .6,
   };
@@ -8091,11 +8094,11 @@ class DayPainter {
     }
   }
 
-  glyph(cond, x, y, size, night, bright) {
+  glyph(cond, x, y, size, night) {
     const ctx = this.ctx;
     const tk = this.tk;
     const art = dayArt();
-    const fill = { ws: tk.sun, wc: bright ? tk.ink : tk.ink2, ww: tk.rain, wa: bright ? tk.ink2 : tk.ink3 };
+    const fill = { ws: tk.sun, wc: tk.ink2, ww: tk.rain, wa: tk.ink3 };
     /* After dark a partly cloudy sky is the cloud with a small moon, and a
        clear one is the night's own picture. */
     const moonlit = night && cond === "partlycloudy";
@@ -8422,6 +8425,18 @@ function aheadMoon(m, h) {
   return -1;
 }
 
+/* Now's condition as markup, dressed for the dark as the blocks are: a
+   clear night is the moon, and a partly cloudy one the cloud with a small
+   moon behind it. */
+function aheadNowIcon(cond, night) {
+  if (!WEATHER_ART[cond]) return "";
+  const moonlit = night && cond === "partlycloudy";
+  const key = moonlit ? "cloudy" : (night && cond === "sunny" ? "clear-night" : cond);
+  return `<svg class="wicon aheadic" viewBox="0 0 24 24" aria-hidden="true">`
+    + (moonlit ? `<g transform="translate(1 -2) scale(.55)">${WEATHER_ART["clear-night"]}</g>` : "")
+    + `${WEATHER_ART[key]}</svg>`;
+}
+
 /* The time axis for a card: night at half the width, and blocks on the
    clock -- `step` hours by day, twice that by night. Night is a fixed time
    of the household's, not the sun's: by sunset the 2-hour blocks began at
@@ -8585,7 +8600,6 @@ class AheadPainter extends DayPainter {
     if (box && box.style && box.style.getPropertyValue("--ahead-now") !== `${x0}px`) {
       box.style.setProperty("--ahead-now", `${x0}px`);
       box.style.setProperty("--ahead-band", `${L.band}px`);
-      box.style.setProperty("--ahead-icon", `${L.band - 10}px`);
     }
     this.laid = { w, x0, step: L.step };
 
@@ -8803,15 +8817,6 @@ class AheadPainter extends DayPainter {
     ctx.strokeStyle = A(tk.ink, .07); ctx.lineWidth = 1;
     const pad = (k) => String(((Math.round(k) % 24) + 24) % 24).padStart(2, "0");
     const shown = [];
-    /* Now's own symbol leads the ground at the left, as big as the band
-       allows and in brighter ink, ahead of the readings it belongs with:
-       the blocks ahead slide in and fade as they reach the line, so
-       without it the hour you are in would be the dimmest thing there. */
-    {
-      const big = L.band - 10;
-      const cond = m.current && m.current.cond;
-      if (cond) this.glyph(cond, (L.icon > 24 ? 14 : 10) + big / 2, skyH + L.band / 2, big, aheadSun(m, nowH) <= 0, true);
-    }
     for (const [a, b] of blocks) {
       const mid = (a + b) / 2;
       const x = X(mid);
@@ -9931,14 +9936,20 @@ const BODIES = {
           + `${esc(b.hero_note)}</span>`)
         + `</p>`);
     }
-    if (!isBlank(b.text)) read.push(`<p class="skycond">${esc(b.text)}</p>`);
+    const says = [];
+    if (!isBlank(b.text)) says.push(`<p class="skycond">${esc(b.text)}</p>`);
     if (!isBlank(b.forecast_temperature)) {
-      read.push(`<p class="skyfc">${esc(isBlank(b.forecast_label) ? "Forecast" : b.forecast_label)} `
+      says.push(`<p class="skyfc">${esc(isBlank(b.forecast_label) ? "Forecast" : b.forecast_label)} `
         + `<span>${esc(b.forecast_temperature)}</span></p>`);
     }
     /* When it next rains, or that it will not, and how much: the line the
        Rest of today card carried in its title bar. */
-    if (!isBlank(b.rain_note)) read.push(`<p class="skyfc aheadrain">${esc(b.rain_note)}</p>`);
+    if (!isBlank(b.rain_note)) says.push(`<p class="skyfc aheadrain">${esc(b.rain_note)}</p>`);
+    /* Now's own symbol, under the reading and beside the words for it, in
+       full ink: the blocks ahead fade as they reach the line, so this is
+       where the hour you are in is shown. */
+    const icon = aheadNowIcon(scene.cond, scene.night > .5);
+    if (icon || says.length) read.push(`<div class="aheadnow">${icon}<div>${says.join("")}</div></div>`);
     const metrics = (Array.isArray(b.metrics) ? b.metrics : []).filter((m) => m && !isBlank(m.value));
     const said = [b.text, b.hero].filter((v) => !isBlank(v)).join(", ");
     return `<div class="aheadbox">`
