@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.173.0";
+const VERSION = "0.173.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -7866,6 +7866,11 @@ class DayPainter {
       this.ctx = canvas.getContext("2d");
       this.tkRead = -Infinity;
       this.built = "";
+      /* A new canvas is 300 by 150 whatever the last one was sized to, so
+         the size is forgotten with it. Kept, the next paint drew the day at
+         full size into that and showed its first few hours, magnified. */
+      this.w = 0;
+      this.h = 0;
       if (typeof IntersectionObserver === "function") {
         this.observer = new IntersectionObserver((entries) => {
           this.visible = entries.some((e) => e.isIntersecting);

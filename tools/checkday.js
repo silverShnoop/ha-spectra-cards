@@ -103,6 +103,20 @@ const js = fs.readFileSync(file);
     const pick = (el) => ({ model: el._day.model, laid: el._day.laid });
     return { calls, wide: pick(wide), narrow: pick(narrow) };
   });
+  /* A repaint of the card hands the painter a new canvas, which starts at
+     300 by 150; the painter has to size it again. */
+  const sized = await page.evaluate(async () => {
+    const { wide } = window.CARDS;
+    const before = (wide.shadowRoot || wide).querySelector(".daycanvas");
+    wide._signature = null;
+    wide.hass = Object.assign({}, wide._hass, { states: Object.assign({}, wide._hass.states, {
+      "sensor.outdoor": { state: "11.8", attributes: {} } }) });
+    await new Promise((r) => setTimeout(r, 100));
+    const c = (wide.shadowRoot || wide).querySelector(".daycanvas");
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    return { replaced: c !== before, width: c.width, want: Math.round(c.clientWidth * dpr) };
+  });
+  await page.clock.runFor(200);
   if (shot) await page.screenshot({ path: shot });
 
   const problems = [];
@@ -133,6 +147,8 @@ const js = fs.readFileSync(file);
   check("and narrow", even(res.narrow.laid), widths(res.narrow.laid));
   check("a block takes the condition most of its hours have, the wetter on a tie",
     res.narrow.laid.blocks[res.narrow.laid.blocks.length - 1].cond === "rainy", res.narrow.laid.blocks);
+
+  check("a repainted card's new canvas is sized to its box", sized.width === sized.want, sized);
 
   await browser.close();
   server.close();
