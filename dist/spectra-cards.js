@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.180.0";
+const VERSION = "0.180.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -8620,6 +8620,9 @@ class AheadPainter extends DayPainter {
     const amp = skyH - 34;
     const e = aheadSun(m, nowH);
     const cov = s.cover;
+    /* Where the sun and the moon are on the line, so the line can stop short
+       of them rather than run through. */
+    this.discs = [];
     /* Their paths ahead: where the sun will be at each hour to come, and
        the moon after it, dotted. They start on the now line, so each sits
        at the head of its own path and the path comes to meet it. */
@@ -8670,18 +8673,25 @@ class AheadPainter extends DayPainter {
         ctx.save(); ctx.shadowColor = tk.sun; ctx.shadowBlur = 24;
         ctx.fillStyle = A(tk.sun, 1 - cov * .5); ctx.beginPath(); ctx.arc(x0, sy, 14, 0, 7); ctx.fill();
         ctx.restore();
+        this.discs.push([sy, 14]);
       }
     }
     const mo = aheadMoon(m, nowH);
-    if (mo > 0 && s.night > .05 && m.moon !== null && m.moon > .01 && m.moon < .99) {
+    if (mo > 0 && s.night > .05 && m.moon !== null) {
       const my = skyH - 10 - (amp - 10) * mo;
-      const vis = s.night * (1 - cov * .7);
-      const mg = ctx.createRadialGradient(x0, my, 6, x0, my, 60);
-      mg.addColorStop(0, A(tk.moon, .25 * vis)); mg.addColorStop(1, A(tk.moon, 0));
-      ctx.fillStyle = mg; ctx.fillRect(x0 - 60, my - 60, 120, 120);
-      ctx.save(); ctx.globalAlpha = vis; ctx.shadowColor = tk.moon; ctx.shadowBlur = 14;
-      skyMoonPath(ctx, x0, my, 12, m.moon); ctx.fillStyle = tk.moon; ctx.fill();
-      ctx.restore();
+      const vis = s.night * (1 - cov * .6);
+      const mg = ctx.createRadialGradient(x0, my, 8, x0, my, 80);
+      mg.addColorStop(0, A(tk.moon, .3 * vis)); mg.addColorStop(.45, A(tk.moon, .09 * vis)); mg.addColorStop(1, A(tk.moon, 0));
+      ctx.fillStyle = mg; ctx.fillRect(x0 - 80, my - 80, 160, 160);
+      /* The whole disc, faintly, as on the Now card: a crescent drawn alone
+         is half a moon, and on the line it read as one cut in two. */
+      ctx.beginPath(); ctx.arc(x0, my, 13, 0, 7); ctx.fillStyle = A(tk.moon, .14 * vis); ctx.fill();
+      if (m.moon > .01 && m.moon < .99) {
+        ctx.save(); ctx.globalAlpha = vis; ctx.shadowColor = tk.moon; ctx.shadowBlur = 14;
+        skyMoonPath(ctx, x0, my, 13, m.moon); ctx.fillStyle = tk.moon; ctx.fill();
+        ctx.restore();
+      }
+      this.discs.push([my, 13]);
     }
 
     /* Clouds: ahead they bob in their own hours; over now they blow left,
@@ -8725,9 +8735,16 @@ class AheadPainter extends DayPainter {
     }
     ctx.stroke();
 
-    /* The now line. */
+    /* The now line, broken around the sun and the moon. */
     ctx.strokeStyle = A(tk.ink, .35); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x0, 28); ctx.lineTo(x0, skyH); ctx.stroke();
+    ctx.beginPath();
+    let from = 28;
+    for (const [y, r] of this.discs.slice().sort((p, q) => p[0] - q[0])) {
+      if (y - r - 4 > from) { ctx.moveTo(x0, from); ctx.lineTo(x0, y - r - 4); }
+      from = Math.max(from, y + r + 4);
+    }
+    if (from < skyH) { ctx.moveTo(x0, from); ctx.lineTo(x0, skyH); }
+    ctx.stroke();
 
     /* The forecast line, from the reading now, with each block's
        temperature on it. */
