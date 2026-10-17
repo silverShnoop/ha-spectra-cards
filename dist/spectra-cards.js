@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.178.0";
+const VERSION = "0.178.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4014,38 +4014,39 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    week; everything else the diary. The card gives its rows the full width. */
 .card.diarycard { padding:0; overflow:hidden; }
 .card.diarycard > .titlebar { margin:9px 10px 6px; }
-.diary { container-type:inline-size; --dy-wx:178px; --dy-cols:22px 44px 26px 22px 38px; }
+.diary { container-type:inline-size; --dy-wx:186px; --dy-cols:24px 40px 26px 22px 44px; }
 .dyhead, .dyrow { position:relative; display:grid; grid-template-columns:var(--dy-wx) minmax(0, 1fr); border-top:1px solid var(--sp-edge); }
 .dysky { position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; }
-.dywx { position:relative; display:flex; flex-direction:column; padding:9px 6px 8px 10px; min-width:0; }
-.dyfig { display:grid; grid-template-columns:var(--dy-cols); column-gap:4px; align-items:baseline; }
-.dyfig .dyic { width:22px; height:22px; align-self:center; }
+.dywx { position:relative; padding:6px 6px 6px 10px; min-width:0; }
+/* Two lines, the icon spanning both: the day and its figures, then the
+   day's words under the day -- so a row is no taller than its diary needs. */
+.dyfig { display:grid; grid-template-columns:var(--dy-cols); column-gap:4px; row-gap:1px; align-items:baseline; }
+.dyfig .dyic { width:24px; height:24px; align-self:center; grid-row:span 2; }
 .dyfig .dn { font-weight:700; font-size:13px; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.5); }
-.dyfig .dn small { display:none; font-weight:400; font-size:10px; color:var(--sp-ink-2); }
 .dyfig .n { font-family:var(--sp-mono); font-size:12.5px; text-align:right; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.5); }
 .dyfig .lo { color:var(--sp-ink-2); }
 .dyfig .rn { font-size:11px; color:var(--sp-ink); }
 .dyfig .rn small { font-size:9px; color:var(--sp-ink-3); margin-left:1px; }
 .dyfig .rn.dry { color:var(--sp-ink-3); }
 .dyfig .na { grid-column:3 / -1; font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-3); }
-.dytext { margin:auto 0 0; padding-top:5px; font-size:11.5px; color:var(--sp-ink-2); text-shadow:0 1px 3px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.dyhead .dywx, .dyhead .dyev { padding-top:5px; padding-bottom:4px; min-height:0; }
+.dytext { grid-column:2 / -1; font-size:11px; color:var(--sp-ink-2); text-shadow:0 1px 3px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dyhead .dywx, .dyhead .dyev { padding-top:4px; padding-bottom:3px; min-height:0; }
+.dyhead .dyfig { row-gap:0; }
 .dyhead .n, .dyhead .dyev { font-family:inherit; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--sp-ink-3); text-shadow:none; }
 .dyrow.today::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); z-index:1; }
-.dyev { position:relative; padding:9px 12px 9px 10px; display:flex; flex-direction:column; gap:5px; justify-content:center; min-width:0; min-height:44px; }
+.dyev { position:relative; padding:6px 12px 6px 10px; display:flex; flex-direction:column; gap:4px; justify-content:center; min-width:0; }
 .dyalls { display:flex; flex-wrap:wrap; gap:5px; }
-.dyall { font-size:12.5px; padding:2px 9px; border:1px solid var(--sp-edge); border-radius:10px; background:var(--sp-sink); line-height:1.35; }
+.dyall { font-size:12px; padding:1px 8px; border:1px solid var(--sp-edge); border-radius:10px; background:var(--sp-sink); line-height:1.35; }
 .dyall .of { font-family:var(--sp-mono); font-size:10.5px; color:var(--sp-ink-2); margin-left:6px; }
-.dylist { display:flex; flex-direction:column; gap:4px; }
+.dylist { display:flex; flex-direction:column; gap:2px; }
 .dyitem { display:grid; grid-template-columns:44px minmax(0, 1fr) auto; column-gap:8px; align-items:baseline; break-inside:avoid; }
 .dyitem .t { font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-2); }
-.dyitem .nm { font-size:13.5px; line-height:1.3; }
+.dyitem .nm { font-size:13px; line-height:1.3; }
 .dyitem .where { display:block; font-size:11.5px; color:var(--sp-ink-3); }
 .dyitem .d { font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); text-align:right; }
-.dyev .none { color:var(--sp-ink-3); font-size:12.5px; }
+.dyev .none { color:var(--sp-ink-3); font-size:12px; }
 @container (min-width: 640px) {
-  .diary { --dy-wx:196px; --dy-cols:22px 62px 26px 22px 38px; }
-  .dyfig .dn small { display:block; }
+  .diary { --dy-wx:192px; --dy-cols:24px 44px 26px 22px 46px; }
   .dylist.many { display:block; columns:2; column-gap:28px; }
   .dylist.many .dyitem { margin-bottom:4px; }
 }
@@ -9944,9 +9945,9 @@ const BODIES = {
         + `<canvas class="dysky" data-cond="${esc(cond)}" aria-hidden="true"></canvas>`
         + `<div class="dywx"><div class="dyfig">`
         + (cond ? iconMarkup(WEATHER_ICONS[cond] || "spectra:cloudy", "dyic") : "<span></span>")
-        + `<span class="dn">${esc(name)}<small>${esc(dayDateLabel(noon) || "")}</small></span>${figs}</div>`
-        + (text ? `<p class="dytext">${esc(text)}</p>` : "")
-        + `</div>`
+        + `<span class="dn">${esc(name)}</span>${figs}`
+        + (text ? `<span class="dytext">${esc(text)}</span>` : "")
+        + `</div></div>`
         + `<div class="dyev">${alls}${timed}${alls || timed ? "" : `<span class="none">Nothing on</span>`}</div>`
         + `</div>`;
     }).join("")}</div>`;

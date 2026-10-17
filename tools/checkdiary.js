@@ -82,11 +82,14 @@ const js = fs.readFileSync(file);
       hi: xs(".n:not(.lo):not(.rn)"), lo: xs(".n.lo"), rn: xs(".n.rn"),
       strip: Math.round(rows[0].querySelector(".dywx").getBoundingClientRect().width), width: Math.round(box.width),
       text: rows[1].querySelector(".dytext") ? rows[1].querySelector(".dytext").textContent : "",
-      textBelow: rows[1].querySelector(".dytext").getBoundingClientRect().top >= rows[1].querySelector(".dyfig").getBoundingClientRect().bottom - 1,
+      textBelow: rows[1].querySelector(".dytext").getBoundingClientRect().top >= rows[1].querySelector(".dn").getBoundingClientRect().bottom - 1,
       half: rows.slice(5).map((r) => [...r.querySelectorAll(".dyall")].map((a) => a.textContent).join("|")),
       cols: tue ? getComputedStyle(tue).columnCount : "",
       skies: root.querySelectorAll(".dysky").length,
       painted: !!el._diary && el._diary.rows.length,
+      quiet: Math.round(rows[0].getBoundingClientRect().height),
+      rainRight: Math.max(...rows.map((r) => r.querySelector(".n.rn")).filter(Boolean).map((n) => n.scrollWidth + n.getBoundingClientRect().left)),
+      stripRight: Math.round(rows[0].querySelector(".dywx").getBoundingClientRect().right),
     };
   }));
   if (shot) await page.screenshot({ path: shot });
@@ -104,6 +107,8 @@ const js = fs.readFileSync(file);
     check(`${at}: and the lows`, same(c.lo), c.lo);
     check(`${at}: and the rain`, same(c.rn), c.rn);
     check(`${at}: the weather stays a narrow strip`, c.strip <= 200, [c.strip, c.width]);
+    check(`${at}: a quiet day is a short row`, c.quiet <= 48, c.quiet);
+    check(`${at}: the rain stays inside the weather`, c.rainRight <= c.stripRight, [c.rainRight, c.stripRight]);
     check(`${at}: the day's words sit under its figures`, c.text === "Sunny" && c.textBelow, c.text);
     check(`${at}: a two-day event shows on both days, saying which`, c.half[0] === "Half term1 of 2" && c.half[1] === "Half term2 of 2", c.half);
     check(`${at}: every row has its sky, painted`, c.skies === 7 && c.painted === 7, [c.skies, c.painted]);
