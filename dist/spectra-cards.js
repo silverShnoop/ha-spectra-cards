@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.176.0";
+const VERSION = "0.177.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -107,6 +107,8 @@ const TOKENS_LIGHT = `
   --sp-sky-grey-top:#C2C5CA; --sp-sky-grey-low:#E6E3DB;
   --sp-sky-storm-top:#9DA1AD; --sp-sky-storm-low:#D3D0C8;
   --sp-sky-night-top:#AFB8CF; --sp-sky-night-low:#DCDCDD;
+  /* A cloudy night: no blue in it, so it reads apart from a clear one. */
+  --sp-sky-murk-top:#A3A6AC; --sp-sky-murk-low:#CBC8C1;
   --sp-sky-cloud:#FBFAF6; --sp-sky-cloud-shade:#D5D2CA;
   /* Clouds that are not raining. Lighter than the rain clouds above, so an
      overcast dry afternoon does not look like it is about to pour. */
@@ -182,11 +184,15 @@ const TOKENS_DARK = `
   --sp-w1:#8CCBCB; --sp-w2:#4C5D8A; --sp-w3:#D6A9C8; --sp-w4:#6E8F43;
   --sp-w-rest:#6A6458;
   --sp-sun:#D9A63F;
-  --sp-sky-day-top:#17304A; --sp-sky-day-low:#26302F;
+  /* Five skies that must read apart across a room: clear day blue, cloudy
+     day a grey with no blue in it, clear night navy, cloudy night charcoal,
+     and partly cloudy the blue muted towards the grey. */
+  --sp-sky-day-top:#1C4570; --sp-sky-day-low:#34505A;
   --sp-sky-gold-top:#222A47; --sp-sky-gold-low:#5A3A2A;
-  --sp-sky-grey-top:#272A30; --sp-sky-grey-low:#2A2822;
+  --sp-sky-grey-top:#3A3D42; --sp-sky-grey-low:#3B3933;
   --sp-sky-storm-top:#121419; --sp-sky-storm-low:#23211D;
-  --sp-sky-night-top:#0B0F1C; --sp-sky-night-low:#1E1D1A;
+  --sp-sky-night-top:#0A1226; --sp-sky-night-low:#161C2A;
+  --sp-sky-murk-top:#18181A; --sp-sky-murk-low:#221F1B;
   --sp-sky-cloud:#46433C; --sp-sky-cloud-shade:#2C2A25;
   --sp-sky-fair:#A29E96; --sp-sky-fair-shade:#75716A;
   --sp-sky-moon:#E6E0D2; --sp-sky-star:#E6E0D2; --sp-sky-snow:#F0EBE0;
@@ -7113,6 +7119,7 @@ const SKY_TOKENS = {
   "grey-top": "--sp-sky-grey-top", "grey-low": "--sp-sky-grey-low",
   "storm-top": "--sp-sky-storm-top", "storm-low": "--sp-sky-storm-low",
   "night-top": "--sp-sky-night-top", "night-low": "--sp-sky-night-low",
+  "murk-top": "--sp-sky-murk-top", "murk-low": "--sp-sky-murk-low",
   cloud: "--sp-sky-cloud", shade: "--sp-sky-cloud-shade",
   fair: "--sp-sky-fair", fairShade: "--sp-sky-fair-shade",
   moon: "--sp-sky-moon", star: "--sp-sky-star", snow: "--sp-sky-snow",
@@ -8310,6 +8317,23 @@ function aheadAt(m, h) {
   return hit;
 }
 
+/* Cover, rain and snow eased from hour to hour rather than stepping at each
+   hour's edge: from now's own, through each forecast hour's middle. */
+function aheadBlend(m, h) {
+  const pts = [[m.now, m.current]];
+  for (const r of m.rows) if (r.h + .5 > m.now + .25) pts.push([r.h + .5, r]);
+  if (h <= pts[0][0] || pts.length === 1) return pts[0][1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [h0, a] = pts[i];
+    const [h1, b] = pts[i + 1];
+    if (h <= h1) {
+      const k = daySmooth(0, 1, (h - h0) / Math.max(1e-6, h1 - h0));
+      return { cover: a.cover + (b.cover - a.cover) * k, rain: a.rain + (b.rain - a.rain) * k, snow: a.snow + (b.snow - a.snow) * k };
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+
 function aheadTempAt(m, h) {
   const p = m.temps;
   if (!p.length) return null;
@@ -8380,18 +8404,21 @@ class AheadPainter extends DayPainter {
     const tk = this.tk;
     const m = this.model;
     const e = aheadSun(m, h);
-    const wx = aheadAt(m, h);
+    const wx = aheadBlend(m, h);
     const lightness = daySmooth(-.85, .5, e);
-    const glow = Math.exp(-(((e + .05) / .42) ** 2));
+    const glow = Math.exp(-(((e + .05) / .42) ** 2)) * (1 - wx.cover * .7);
     let top = skyMix(ctx, tk["night-top"], tk["day-top"], lightness);
     let low = skyMix(ctx, tk["night-low"], tk["day-low"], lightness);
     top = skyMix(ctx, top, tk["gold-top"], glow * .3);
     low = skyMix(ctx, low, tk["gold-low"], glow * .7);
-    const dark = 1 - daySmooth(-.05, .5, e);
-    const gTop = skyMix(ctx, tk["grey-top"], tk["night-top"], dark * .6);
-    const gLow = skyMix(ctx, tk["grey-low"], tk["night-low"], dark * .6);
-    top = skyMix(ctx, top, gTop, wx.cover * .8);
-    low = skyMix(ctx, low, gLow, wx.cover * .8);
+    /* Cloud turns the sky towards grey by day and charcoal by night, and
+       it does so in steps you can tell apart: a few clouds barely, partly
+       cloudy about half way, overcast all but completely. */
+    const gTop = skyMix(ctx, tk["murk-top"], tk["grey-top"], lightness);
+    const gLow = skyMix(ctx, tk["murk-low"], tk["grey-low"], lightness);
+    const veil = daySmooth(.1, .9, wx.cover) * .92;
+    top = skyMix(ctx, top, gTop, veil);
+    low = skyMix(ctx, low, gLow, veil);
     return { top, low, night: 1 - daySmooth(-.7, -.05, e), e, cover: wx.cover, rain: wx.rain, snow: wx.snow };
   }
 
@@ -8502,26 +8529,27 @@ class AheadPainter extends DayPainter {
 
     ctx.clearRect(0, 0, w, h);
     /* The hours ahead, sliding left. */
-    const sx = U(nowH) * px - 40;
-    const sw = Math.min(w - x0 + 40, this.strip.width - Math.max(0, sx));
-    if (sw > 0) ctx.drawImage(this.strip, Math.max(0, sx), 0, sw, skyH, x0 - 40 + Math.max(0, -sx), 0, sw, skyH);
+    const F = Math.min(90, Math.round(x0 * .4));
+    const sx = U(nowH) * px - F;
+    const sw = Math.min(w - x0 + F, this.strip.width - Math.max(0, sx));
+    if (sw > 0) ctx.drawImage(this.strip, Math.max(0, sx), 0, sw, skyH, x0 - F + Math.max(0, -sx), 0, sw, skyH);
     /* The sky now, behind the readings, fading into the strip at the line. */
     const s = this.skyAt(nowH);
     const g = ctx.createLinearGradient(0, 0, 0, skyH);
     g.addColorStop(0, s.top); g.addColorStop(1, s.low);
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, x0 - 40, skyH);
+    ctx.fillRect(0, 0, x0 - F, skyH);
     const fade = this.fadeCanvas || (this.fadeCanvas = document.createElement("canvas"));
-    fade.width = 40; fade.height = Math.max(1, Math.round(skyH));
+    fade.width = F; fade.height = Math.max(1, Math.round(skyH));
     const fx = fade.getContext("2d");
     const fg = fx.createLinearGradient(0, 0, 0, skyH);
     fg.addColorStop(0, s.top); fg.addColorStop(1, s.low);
-    fx.fillStyle = fg; fx.fillRect(0, 0, 40, skyH);
+    fx.fillStyle = fg; fx.fillRect(0, 0, F, skyH);
     fx.globalCompositeOperation = "destination-in";
-    const fm = fx.createLinearGradient(0, 0, 40, 0);
-    fm.addColorStop(0, "#000"); fm.addColorStop(1, "rgba(0,0,0,0)");
-    fx.fillStyle = fm; fx.fillRect(0, 0, 40, skyH);
-    ctx.drawImage(fade, x0 - 40, 0);
+    const fm = fx.createLinearGradient(0, 0, F, 0);
+    fm.addColorStop(0, "#000"); fm.addColorStop(.35, "rgba(0,0,0,.85)"); fm.addColorStop(1, "rgba(0,0,0,0)");
+    fx.fillStyle = fm; fx.fillRect(0, 0, F, skyH);
+    ctx.drawImage(fade, x0 - F, 0);
 
     /* Stars: ahead in their own hours, and over now when it is dark. */
     for (const o of this.stars) {

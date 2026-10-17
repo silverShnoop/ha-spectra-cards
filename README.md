@@ -1050,6 +1050,12 @@ falls and its stars twinkle. Over now the clouds blow left, the way time goes:
 each comes out from behind the line, crosses the readings and thins away at
 the edge, so none ever drifts into an hour it does not belong to.
 
+**Five skies that read apart.** Clear day is blue, partly cloudy the blue
+muted half way to grey, cloudy a grey with no blue in it, clear night navy
+with stars, cloudy night a flat charcoal without them (`--sp-sky-murk-*`).
+The weather eases from one hour to the next rather than stepping at each
+hour's edge, and the sky now fades into the hours ahead across the line.
+
 **Night is a time of day, not of the sun.** It runs from 20:00 until 06:00
 unless `night: {from: "21:00", until: "07:00"}` says otherwise. Following
 sunset put two-hour blocks on an October evening at six, with everybody up.
