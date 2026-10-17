@@ -1017,6 +1017,14 @@ body:
   setting: {entity: sun.sun, attribute: next_setting}
   moon: {entity: sensor.moon, attribute: cycle}
   metrics: [...]
+  hero_note_label: Humidity      # says what the small figure is (on sky too)
+  # ...the rain to come, as the Rest of today card said it...
+  rain_note:
+    join:
+      - {forecast: weather.home, type: hourly, limit: 24, where: {field: precipitation, above: 0},
+         field: datetime, format: time, prefix: "Rain ", fallback: "Dry 24h"}
+      - {forecast: weather.home, type: daily, index: 0, field: precipitation, suffix: "mm today"}
+    separator: " · "
   # ...and the hours ahead
   hours: {forecast: weather.home, type: hourly}
 ```
@@ -1030,7 +1038,12 @@ from the reading now.
 **Time comes to the sun, not the other way.** The sun and the moon stay on
 the now line and only rise and set. The hours ahead slide left towards it, an
 hour's width every hour, so a sunset is seen coming on the right and reaches
-the sun when it happens; after it the moon comes up on the same line.
+the sun when it happens; after it the moon comes up on the same line. Ahead of
+the line their paths are dotted in, where each will be at every hour to come,
+so the sun sits at the head of its own path and the path slides in to meet it. Its
+rays turn slowly as on `sky`, but shine over now, the sky somebody is under,
+and thin away towards the hours ahead: strong in a clear sky, weaker under
+cloud, none in overcast.
 
 **Everything moves.** Ahead, each hour's clouds bob where they are, its rain
 falls and its stars twinkle. Over now the clouds blow left, the way time goes:

@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.174.0";
+const VERSION = "0.175.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4008,6 +4008,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .aheadbox .skyhero { font-size:clamp(34px, 5.6cqw, 60px); }
 .aheadbox .skycond, .aheadbox .heronote { font-size:clamp(12px, 1.6cqw, 15px); }
 .aheadbox .skyfc { font-size:clamp(11px, 1.4cqw, 13px); }
+.aheadrain { color:var(--sp-ink); }
 .aheadleft { margin:6px 0 0; font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-2); }
 .aheadbox .skybase { height:var(--ahead-band, 50px); right:auto; width:var(--ahead-now, 40%); box-sizing:border-box;
   font-size:clamp(11px, 1.4cqw, 14px); gap:clamp(8px, 1.6cqw, 18px); }
@@ -4026,6 +4027,10 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   font-size:clamp(30px, 9.7cqw, 56px); letter-spacing:-.03em; color:var(--sp-ink);
 }
 .skyhero .heronote { letter-spacing:0; font-size:clamp(12px, 2.6cqw, 15px); }
+/* What the small figure is, over it: a bare percentage beside a temperature
+   reads as anything. */
+.skyhero .heronote i { display:block; font-style:normal; font-family:var(--sp-font, inherit); font-size:9px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-3); margin-bottom:2px; }
 .skycond { margin:4px 0 0; font-size:clamp(12px, 2.6cqw, 15px); color:var(--sp-ink); }
 .skyfc { margin:2px 0 0; font-size:clamp(11px, 2.25cqw, 13px); color:var(--sp-ink-2); }
 .skyfc span { font-family:var(--sp-mono); color:var(--sp-ink); }
@@ -8529,12 +8534,52 @@ class AheadPainter extends DayPainter {
     const amp = skyH - 34;
     const e = aheadSun(m, nowH);
     const cov = s.cover;
+    /* Their paths ahead: where the sun will be at each hour to come, and
+       the moon after it, dotted. They start on the now line, so each sits
+       at the head of its own path and the path comes to meet it. */
+    let pathEnd = nowH;
+    while (X(pathEnd) < w + 10 && pathEnd < this.axis.H1) pathEnd += .1;
+    const trace = (alt, y, colour) => {
+      ctx.beginPath();
+      let on = false;
+      for (let hh = nowH; hh <= pathEnd; hh += .1) {
+        const v = alt(hh);
+        if (v <= 0) { on = false; continue; }
+        const x = X(hh);
+        if (on) ctx.lineTo(x, y(v)); else ctx.moveTo(x, y(v));
+        on = true;
+      }
+      ctx.setLineDash([2, 6]); ctx.strokeStyle = colour; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+    };
+    trace((hh) => aheadSun(m, hh), (v) => skyH + 14 - (amp + 14) * v, A(tk.sun, .45));
+    if (m.moon !== null) trace((hh) => aheadMoon(m, hh), (v) => skyH - 10 - (amp - 10) * v, A(tk.moon, .35));
     if (e > -1) {
       const sy = skyH + 14 - (amp + 14) * Math.max(-1, e);
       const a = (1 - cov * .6) * daySmooth(-1, -.1, e);
       const gl = ctx.createRadialGradient(x0, sy, 0, x0, sy, 110);
       gl.addColorStop(0, A(tk.sun, .32 * a)); gl.addColorStop(1, A(tk.sun, 0));
       ctx.fillStyle = gl; ctx.fillRect(x0 - 120, sy - 120, 240, 240);
+      /* Rays, as on the Now card, turning slowly -- but they shine over now,
+         the sky somebody is under, and thin away on their way into the hours
+         ahead. Strong in a clear sky, weaker under cloud, none in overcast. */
+      if (cov < .8 && e > 0) {
+        const clear = (1 - cov / .8) * daySmooth(0, .15, e);
+        ctx.save(); ctx.translate(x0, sy);
+        for (let i = 0; i < 14; i++) {
+          const th = t * .03 + i * Math.PI * 2 / 14;
+          const left = Math.max(0, Math.min(1, .35 - Math.cos(th) * 1.2));
+          if (left <= 0) continue;
+          const len = 260 + 40 * Math.sin(t * .4 + i);
+          const spread = 14 + 6 * Math.sin(t * .7 + i);
+          ctx.save(); ctx.rotate(th);
+          const rg = ctx.createLinearGradient(0, 0, len, 0);
+          rg.addColorStop(0, A(tk.sun, .2 * clear * left)); rg.addColorStop(1, A(tk.sun, 0));
+          ctx.fillStyle = rg; ctx.beginPath(); ctx.moveTo(0, 0);
+          ctx.lineTo(len, -spread); ctx.lineTo(len, 14); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+        ctx.restore();
+      }
       if (cov < .8) {
         ctx.save(); ctx.shadowColor = tk.sun; ctx.shadowBlur = 24;
         ctx.fillStyle = A(tk.sun, 1 - cov * .5); ctx.beginPath(); ctx.arc(x0, sy, 14, 0, 7); ctx.fill();
@@ -8655,7 +8700,9 @@ class AheadPainter extends DayPainter {
       const cond = [...new Set(conds)].filter((c) => c).sort((p, q) => count(q) - count(p) || rank(p) - rank(q))[0] || "";
       if (cond) this.glyph(cond, x, skyH + 6 + L.icon / 2, L.icon, aheadSun(m, mid) <= 0);
       ctx.font = `${L.icon > 24 ? 12 : 10}px ${tk.mono}`; ctx.textAlign = "center"; ctx.fillStyle = tk.ink2;
-      ctx.fillText(b - a === 1 ? pad(a) : `${pad(a)}–${pad(b)}`, x, skyH + L.band - 9);
+      /* Each block by the time it starts, written as a time: "18:00", not
+         "18" or "18–20", which read as anything but a clock. */
+      ctx.fillText(`${pad(a)}:00`, x, skyH + L.band - 9);
       shown.push({ a, b, cond });
     }
     ctx.globalAlpha = 1;
@@ -9555,7 +9602,9 @@ const BODIES = {
     const read = [];
     if (!isBlank(b.hero)) {
       read.push(`<p class="skyhero">${esc(b.hero)}`
-        + (isBlank(b.hero_note) ? "" : `<span class="heronote">${esc(b.hero_note)}</span>`)
+        + (isBlank(b.hero_note) ? "" : `<span class="heronote">`
+          + (isBlank(b.hero_note_label) ? "" : `<i>${esc(b.hero_note_label)}</i>`)
+          + `${esc(b.hero_note)}</span>`)
         + `</p>`);
     }
     if (!isBlank(b.text)) read.push(`<p class="skycond">${esc(b.text)}</p>`);
@@ -9585,7 +9634,9 @@ const BODIES = {
     const read = [];
     if (!isBlank(b.hero)) {
       read.push(`<p class="skyhero">${esc(b.hero)}`
-        + (isBlank(b.hero_note) ? "" : `<span class="heronote">${esc(b.hero_note)}</span>`)
+        + (isBlank(b.hero_note) ? "" : `<span class="heronote">`
+          + (isBlank(b.hero_note_label) ? "" : `<i>${esc(b.hero_note_label)}</i>`)
+          + `${esc(b.hero_note)}</span>`)
         + `</p>`);
     }
     if (!isBlank(b.text)) read.push(`<p class="skycond">${esc(b.text)}</p>`);
@@ -9593,6 +9644,9 @@ const BODIES = {
       read.push(`<p class="skyfc">${esc(isBlank(b.forecast_label) ? "Forecast" : b.forecast_label)} `
         + `<span>${esc(b.forecast_temperature)}</span></p>`);
     }
+    /* When it next rains, or that it will not, and how much: the line the
+       Rest of today card carried in its title bar. */
+    if (!isBlank(b.rain_note)) read.push(`<p class="skyfc aheadrain">${esc(b.rain_note)}</p>`);
     const metrics = (Array.isArray(b.metrics) ? b.metrics : []).filter((m) => m && !isBlank(m.value));
     const said = [b.text, b.hero].filter((v) => !isBlank(v)).join(", ");
     return `<div class="aheadbox">`
