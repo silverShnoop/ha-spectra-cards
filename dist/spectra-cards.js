@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.180.2";
+const VERSION = "0.180.3";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4066,13 +4066,13 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .aheadbox .skyfc { font-size:clamp(11px, 1.4cqw, 13px); }
 .aheadrain { color:var(--sp-ink); }
 .aheadleft { margin:6px 0 0; font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-2); }
-.aheadbox .skybase { height:var(--ahead-band, 50px); right:auto; width:var(--ahead-now, 40%); box-sizing:border-box;
+.aheadbox .skybase { height:var(--ahead-band, 50px); right:auto; width:calc(var(--ahead-now, 40%) - 44px); box-sizing:border-box;
   font-size:clamp(11px, 1.4cqw, 14px); gap:clamp(8px, 1.6cqw, 18px); }
 @container (max-width: 639px) {
   .aheadbox .skyhero { font-size:clamp(28px, 9cqw, 44px); }
   .aheadbox .skycond, .aheadbox .heronote { font-size:13px; }
   .aheadbox .skyfc { font-size:12px; }
-  .aheadbox .skybase { font-size:12px; }
+  .aheadbox .skybase { font-size:12px; width:calc(var(--ahead-now, 40%) - 38px); }
 }
 .daycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
 /* Below the title bar, which is a fixed height whatever the width. */
@@ -8090,11 +8090,11 @@ class DayPainter {
     }
   }
 
-  glyph(cond, x, y, size, night) {
+  glyph(cond, x, y, size, night, bright) {
     const ctx = this.ctx;
     const tk = this.tk;
     const art = dayArt();
-    const fill = { ws: tk.sun, wc: tk.ink2, ww: tk.rain, wa: tk.ink3 };
+    const fill = { ws: tk.sun, wc: bright ? tk.ink : tk.ink2, ww: tk.rain, wa: bright ? tk.ink2 : tk.ink3 };
     /* After dark a partly cloudy sky is the cloud with a small moon, and a
        clear one is the night's own picture. */
     const moonlit = night && cond === "partlycloudy";
@@ -8801,10 +8801,26 @@ class AheadPainter extends DayPainter {
     ctx.strokeStyle = A(tk.ink, .07); ctx.lineWidth = 1;
     const pad = (k) => String(((Math.round(k) % 24) + 24) % 24).padStart(2, "0");
     const shown = [];
+    /* Now's own symbol sits at full strength just left of the line, at
+       the end of the readings, a size up and in brighter ink: the blocks
+       ahead slide in and fade as they reach the line, so without it the
+       hour you are in would be the dimmest thing on the ground. */
+    const nowW = L.icon > 24 ? 44 : 38;
+    {
+      const x = x0 - nowW / 2;
+      const big = Math.round(L.icon * 1.15);
+      const cond = m.current && m.current.cond;
+      if (cond) this.glyph(cond, x, skyH + 4 + big / 2, big, aheadSun(m, nowH) <= 0, true);
+      ctx.font = `600 ${L.icon > 24 ? 12 : 10}px ${tk.mono}`; ctx.textAlign = "center"; ctx.fillStyle = tk.ink;
+      ctx.fillText("Now", x, skyH + L.band - 9);
+    }
     for (const [a, b] of blocks) {
       const mid = (a + b) / 2;
       const x = X(mid);
-      ctx.globalAlpha = daySmooth(x0 + 4, x0 + 30, x);
+      /* The block now is in is what Now shows, so it bows out early in its
+         own time; the ones ahead stay whole until they get there. */
+      const bw = X(b) - X(a);
+      ctx.globalAlpha = a <= nowH ? daySmooth(x0 + bw * .3, x0 + bw * .5, x) : 1;
       if (a > nowH) { ctx.beginPath(); ctx.moveTo(X(a), 30); ctx.lineTo(X(a), skyH); ctx.stroke(); }
       const conds = [];
       for (let hh = Math.floor(a); hh < b; hh += 1) conds.push(aheadAt(m, hh + .5).cond);
