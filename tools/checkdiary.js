@@ -87,6 +87,8 @@ const js = fs.readFileSync(file);
       cols: tue ? getComputedStyle(tue).columnCount : "",
       skies: root.querySelectorAll(".dysky").length,
       painted: !!el._diary && el._diary.rows.length,
+      iconMid: rows.slice(0, 4).map((r) => { const i = r.querySelector(".dywx > .dyic").getBoundingClientRect(); const w = r.querySelector(".dywx").getBoundingClientRect(); return Math.round(Math.abs((i.top + i.bottom) / 2 - (w.top + w.bottom) / 2)); }),
+      iconSize: Math.round(rows[0].querySelector(".dywx > .dyic").getBoundingClientRect().height),
       tiles: rows.map((r) => r.querySelector(".dytile").textContent),
       todayFilled: getComputedStyle(rows[0].querySelector(".dytile")).backgroundColor !== getComputedStyle(rows[1].querySelector(".dytile")).backgroundColor,
       tueText: (() => { const r = rows[3]; const t = r.querySelector(".dytext"); return t ? Math.round(r.getBoundingClientRect().bottom - t.getBoundingClientRect().bottom) : 99; })(),
@@ -109,13 +111,15 @@ const js = fs.readFileSync(file);
     check(`${at}: the highs line up down the week`, same(c.hi), c.hi);
     check(`${at}: and the lows`, same(c.lo), c.lo);
     check(`${at}: and the rain`, same(c.rn), c.rn);
-    check(`${at}: the weather stays a narrow strip`, c.strip <= 170, [c.strip, c.width]);
+    check(`${at}: the weather stays a narrow strip`, c.strip <= 180, [c.strip, c.width]);
     check(`${at}: a quiet day is a short row`, c.quiet <= 48, c.quiet);
     check(`${at}: the rain stays inside the weather`, c.rainRight <= c.stripRight, [c.rainRight, c.stripRight]);
     check(`${at}: the day's words sit under its figures`, c.text === "Sunny" && c.textBelow, c.text);
     check(`${at}: and at the foot of a tall row`, c.tueText <= 10, c.tueText);
     check(`${at}: each day is a tile, weekday over date`, c.tiles[0] === "Sat17" && c.tiles[6] === "Fri23", c.tiles);
     check(`${at}: today's tile is filled`, c.todayFilled, c.todayFilled);
+    check(`${at}: the icon sits in the middle of the weather, however tall the row`, c.iconMid.every((d) => d <= 2), c.iconMid);
+    check(`${at}: and is 30px`, c.iconSize === 30, c.iconSize);
     check(`${at}: a two-day event shows on both days, saying which`, c.half[0] === "Half term1 of 2" && c.half[1] === "Half term2 of 2", c.half);
     check(`${at}: every row has its sky, painted`, c.skies === 7 && c.painted === 7, [c.skies, c.painted]);
   }
