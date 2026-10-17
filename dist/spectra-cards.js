@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.175.1";
+const VERSION = "0.176.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -8284,10 +8284,18 @@ function aheadModel(b, now) {
   if (live !== null) temps.push([nowH, live]);
   for (const r of rows) if (r.temp !== null && r.h > nowH + .05) temps.push([r.h, r.temp]);
   if (!temps.length) for (const r of rows) if (r.temp !== null) temps.push([r.h, r.temp]);
-  return { mid, now: nowH, days: aheadDays(b, mid), current, rows, temps,
+  /* When the blocks go to night's width: `night: {from: "20:00", until: "06:00"}`. */
+  const clock = (v, fallback) => {
+    const hit = /^(\d{1,2}):(\d{2})/.exec(String(v === undefined || v === null ? "" : v));
+    return hit ? Math.min(24, Number(hit[1]) + Number(hit[2]) / 60) : fallback;
+  };
+  const nightCfg = b.night && typeof b.night === "object" ? b.night : {};
+  let night = { from: clock(nightCfg.from, 20), until: clock(nightCfg.until, 6) };
+  if (night.from <= night.until) night = { from: 20, until: 6 };
+  return { mid, now: nowH, days: aheadDays(b, mid), current, rows, temps, night,
     moon: skyNum(b.moon), times: skyTimes(b),
     key: [rows.map((r) => `${r.h.toFixed(2)}${r.cond}${r.cover.toFixed(2)}${r.rain}`).join(","), cond, current.cover.toFixed(2),
-      String(b.rising), String(b.setting)].join("|") };
+      String(b.rising), String(b.setting), night.from, night.until].join("|") };
 }
 
 /* The weather in an hour: now's own until the forecast's first hour starts,
@@ -8334,15 +8342,15 @@ function aheadMoon(m, h) {
   return -1;
 }
 
-/* The time axis for a card: day between the block edges nearest each
-   sunrise and sunset, night at half the width, and blocks on the clock --
-   `step` hours by day, twice that by night. */
+/* The time axis for a card: night at half the width, and blocks on the
+   clock -- `step` hours by day, twice that by night. Night is a fixed time
+   of the household's, not the sun's: by sunset the 2-hour blocks began at
+   six on an October evening that people are very much awake in. */
 function aheadAxis(m, step) {
   const nb = step * 2;
-  const days = m.days.map(([r, s]) => {
-    const o = Math.floor(r / 24) * 24;
-    return [o + Math.round((r - o) / nb) * nb, o + 24 - Math.round((o + 24 - s) / nb) * nb];
-  }).filter(([a, b]) => b > a);
+  const { from, until } = m.night;
+  const days = [];
+  for (let k = -2; k <= 4; k++) days.push([k * 24 + until, k * 24 + from]);
   const H0 = Math.floor(m.now / 24) * 24 - 24;
   const H1 = H0 + 24 * 4;
   const U = (h) => {

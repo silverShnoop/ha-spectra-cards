@@ -82,7 +82,7 @@ const js = fs.readFileSync(file);
       const L = p.layout(p.w);
       const nowH = (Date.now() - m.mid) / 3600000;
       const X = (h) => L.x0 + (p.axis.U(h) - p.axis.U(nowH)) * L.px;
-      return { x0: L.x0, px: L.px, step: L.step, blocks: p.laid.blocks.map((b) => b.b - b.a), x18: X(18), x16: X(16),
+      return { x0: L.x0, px: L.px, step: L.step, blocks: p.laid.blocks.map((b) => b.b - b.a), x18: X(18), x16: X(16), x20: X(20), x22: X(22), starts: p.laid.blocks.map((b) => b.a),
         width: (el.shadowRoot || el).querySelector(".aheadcanvas").width,
         want: Math.round((el.shadowRoot || el).querySelector(".aheadcanvas").clientWidth * Math.min(2, devicePixelRatio || 1)) };
     };
@@ -100,11 +100,13 @@ const js = fs.readFileSync(file);
     if (!ok) problems.push(name);
   };
   check("wide: every daylight hour is a block", a.wide.step === 1 && a.wide.blocks.slice(0, 5).every((n) => n === 1), a.wide);
-  check("and night comes in twos", a.wide.blocks.includes(2) && !a.wide.blocks.some((n) => n > 2), a.wide.blocks);
+  check("night comes in twos", a.wide.blocks.includes(2) && !a.wide.blocks.some((n) => n > 2), a.wide.blocks);
   check("a phone: two hours by day", a.phone.step === 2 && a.phone.blocks.slice(0, 2).every((n) => n === 2), a.phone);
   check("now takes more of a phone's width", a.phone.x0 / 360 > a.wide.x0 / 900, [a.phone.x0, a.wide.x0]);
   check("the hours slide left an hour's width in an hour", Math.abs((a.wide.x16 - b.wide.x16) - a.wide.px) < 1, [a.wide.x16, b.wide.x16, a.wide.px]);
-  check("night is half as wide as day", Math.abs((a.wide.x18 - a.wide.x16) - 2 * a.wide.px) < 1, a.wide);
+  check("the evening up to 20:00 is still day, at full width", Math.abs((a.wide.x18 - a.wide.x16) - 2 * a.wide.px) < 1, a.wide);
+  check("night, from 20:00, is half as wide", Math.abs((a.wide.x22 - a.wide.x20) - a.wide.px) < 1, a.wide);
+  check("and comes in twos from 20:00", a.wide.starts.includes(20) && a.wide.starts.includes(22) && !a.wide.starts.includes(21), a.wide.starts);
   check("the now line does not move", a.wide.x0 === b.wide.x0, [a.wide.x0, b.wide.x0]);
 
   const sized = await page.evaluate(async () => {
