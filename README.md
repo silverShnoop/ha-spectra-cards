@@ -3506,7 +3506,11 @@ error, so "stop what's playing" has to mean exactly that:
 
 The call goes only to the players that are playing, and when none are the
 step is a skip, not a call: the box takes a dash in ink-3 and the line
-under the step says why (`skipped` sets the words). `optional: true` on a
+under the step says why (`skipped` sets the words). "Playing" is asked of
+the server at that moment, not read off the page: a phone that has just
+woken shows the states it had when it slept while its socket catches up,
+and a stop sent on a stale "playing" is precisely the call Cast refuses.
+The page's copy is the fallback when the server cannot be asked. `optional: true` on a
 step is the blunter tool: a failure is shown as that same dash rather
 than a cross, and does not count against the run.
 

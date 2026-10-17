@@ -60,6 +60,14 @@ const js = fs.readFileSync(file);
         "media_player.quiet": { entity_id: "media_player.quiet", state: "off", attributes: {} },
       },
       themes: { darkMode: true },
+      /* The server's answer, which differs from the page's copy on purpose:
+         the page says loud is playing and quiet is off, the server says the
+         opposite, and the step has to believe the server. */
+      callApi: (method, path) => {
+        if (path === "states/media_player.loud") return Promise.resolve({ state: "off" });
+        if (path === "states/media_player.quiet") return Promise.resolve({ state: "playing" });
+        return Promise.reject(new Error("no such state"));
+      },
       callService: (domain, service, data, target) => {
         const id = target && target.entity_id;
         calls.push(`${domain}.${service}:${Array.isArray(id) ? id.join("+") : id}`);
@@ -102,8 +110,8 @@ const js = fs.readFileSync(file);
         { name: "Playing", hold: 1500, steps: [
           { name: "Stop what's playing", when: { state: ["playing", "paused"] }, skipped: "Nothing was playing",
             action: { service: "media_player.media_stop", target: { entity_id: ["media_player.loud", "media_player.quiet"] } } },
-          { name: "Stop the idle one", when: { state: ["playing"] }, skipped: "Nothing was playing",
-            action: { service: "media_player.media_stop", target: { entity_id: "media_player.quiet" } } },
+          { name: "Stop a paused one", when: { state: ["paused"] }, skipped: "Nothing was playing",
+            action: { service: "media_player.media_stop", target: { entity_id: ["media_player.loud", "media_player.quiet"] } } },
         ] },
       ],
     });
@@ -293,8 +301,8 @@ const js = fs.readFileSync(file);
     && got.retry.steps.join(",") === "done,failed,done" && got.retry.same && got.retry.again, got.retry);
   check("Escape leaves that sheet for good", got.escapeHides, got.escapeHides);
   check("after that the button opens a fresh list, not the failure", got.freshAfterEscape, got.freshAfterEscape);
-  check("`when` sends the call only to the targets in those states, and skips a step with none",
-    got.playing.calls.join("|") === "media_player.media_stop:media_player.loud" && got.playing.steps.join(",") === "done,skipped"
+  check("`when` asks the server, sends the call only to the targets in those states, and skips a step with none",
+    got.playing.calls.join("|") === "media_player.media_stop:media_player.quiet" && got.playing.steps.join(",") === "done,skipped"
     && got.playing.note === "Nothing was playing" && got.playing.message === "Done", got.playing);
   check("an optional step that fails takes a dash and the run goes on",
     got.quiet.steps.join(",") === "skipped,done" && got.quiet.calls.join("|") === "light.turn_off:light.broken|light.turn_off:light.ok"

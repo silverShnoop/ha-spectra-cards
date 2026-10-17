@@ -23193,20 +23193,37 @@ function quickSkipNote(step) {
 /* `when: {state: [playing, paused]}` on a step narrows its targets to the
    entities in one of those states right now. Google Cast answers a stop
    sent to an idle player with an error, so "stop what's playing" has to
-   mean exactly that. Nothing left to target is a skip, not a call. */
-function quickStepTargets(step, hass) {
+   mean exactly that. Nothing left to target is a skip, not a call.
+
+   "Right now" is asked of the server, not read off the page. A phone that
+   has just woken shows the states it had when it slept while its socket
+   catches up, and a stop sent on a stale "playing" is precisely the call
+   Cast refuses: the TV had been off for a minute, the page still said
+   playing, and the step failed. The page's copy is the fallback when the
+   server cannot be asked. */
+async function quickStepTargets(step, hass) {
   const action = step && step.action;
   if (!action || typeof action !== "object") return { action };
   const when = step.when;
   const target = action.target;
   if (!when || typeof when !== "object" || !target || target.entity_id === undefined) return { action };
-  const states = (Array.isArray(when.state) ? when.state : [when.state]).filter((v) => !isBlank(v)).map(String);
-  if (!states.length) return { action };
-  const all = hass && hass.states ? hass.states : {};
-  const ids = [].concat(target.entity_id).filter((id) => {
-    const state = all[String(id)];
-    return state && states.includes(String(state.state));
-  });
+  const wanted = (Array.isArray(when.state) ? when.state : [when.state]).filter((v) => !isBlank(v)).map(String);
+  if (!wanted.length) return { action };
+  const candidates = [].concat(target.entity_id).filter((v) => !isBlank(v)).map(String);
+  const stateOf = async (id) => {
+    if (hass && typeof hass.callApi === "function") {
+      try {
+        const live = await hass.callApi("GET", `states/${id}`);
+        if (live && live.state !== undefined && live.state !== null) return String(live.state);
+      } catch (error) {
+        LOGGER_WARN("spectra-panel: could not read a live state, using the page's copy", id, error);
+      }
+    }
+    const cached = hass && hass.states ? hass.states[id] : null;
+    return cached ? String(cached.state) : null;
+  };
+  const states = await Promise.all(candidates.map(stateOf));
+  const ids = candidates.filter((id, i) => states[i] !== null && wanted.includes(states[i]));
   if (!ids.length) return { none: true };
   return { action: Object.assign({}, action, { target: Object.assign({}, target, { entity_id: ids }) }) };
 }
@@ -23790,7 +23807,8 @@ class SpectraPanel extends HTMLElement {
       st.status[i] = "running";
       this._quickPatch();
       const started = Date.now();
-      const picked = quickStepTargets(step, this._hass);
+      const picked = await quickStepTargets(step, this._hass);
+      if (this._quick !== st) return;
       let failed = null;
       if (!picked.none) {
         try {
