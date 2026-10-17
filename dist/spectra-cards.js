@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.177.0";
+const VERSION = "0.178.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4010,6 +4010,45 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    and the figures keep to it. */
 .aheadbox { position:relative; height:264px; border-radius:4px; overflow:hidden; container-type:inline-size; }
 .aheadcanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+/* diary -- the weather a narrow strip of columns that line up down the
+   week; everything else the diary. The card gives its rows the full width. */
+.card.diarycard { padding:0; overflow:hidden; }
+.card.diarycard > .titlebar { margin:9px 10px 6px; }
+.diary { container-type:inline-size; --dy-wx:178px; --dy-cols:22px 44px 26px 22px 38px; }
+.dyhead, .dyrow { position:relative; display:grid; grid-template-columns:var(--dy-wx) minmax(0, 1fr); border-top:1px solid var(--sp-edge); }
+.dysky { position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; }
+.dywx { position:relative; display:flex; flex-direction:column; padding:9px 6px 8px 10px; min-width:0; }
+.dyfig { display:grid; grid-template-columns:var(--dy-cols); column-gap:4px; align-items:baseline; }
+.dyfig .dyic { width:22px; height:22px; align-self:center; }
+.dyfig .dn { font-weight:700; font-size:13px; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+.dyfig .dn small { display:none; font-weight:400; font-size:10px; color:var(--sp-ink-2); }
+.dyfig .n { font-family:var(--sp-mono); font-size:12.5px; text-align:right; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+.dyfig .lo { color:var(--sp-ink-2); }
+.dyfig .rn { font-size:11px; color:var(--sp-ink); }
+.dyfig .rn small { font-size:9px; color:var(--sp-ink-3); margin-left:1px; }
+.dyfig .rn.dry { color:var(--sp-ink-3); }
+.dyfig .na { grid-column:3 / -1; font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-3); }
+.dytext { margin:auto 0 0; padding-top:5px; font-size:11.5px; color:var(--sp-ink-2); text-shadow:0 1px 3px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dyhead .dywx, .dyhead .dyev { padding-top:5px; padding-bottom:4px; min-height:0; }
+.dyhead .n, .dyhead .dyev { font-family:inherit; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--sp-ink-3); text-shadow:none; }
+.dyrow.today::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); z-index:1; }
+.dyev { position:relative; padding:9px 12px 9px 10px; display:flex; flex-direction:column; gap:5px; justify-content:center; min-width:0; min-height:44px; }
+.dyalls { display:flex; flex-wrap:wrap; gap:5px; }
+.dyall { font-size:12.5px; padding:2px 9px; border:1px solid var(--sp-edge); border-radius:10px; background:var(--sp-sink); line-height:1.35; }
+.dyall .of { font-family:var(--sp-mono); font-size:10.5px; color:var(--sp-ink-2); margin-left:6px; }
+.dylist { display:flex; flex-direction:column; gap:4px; }
+.dyitem { display:grid; grid-template-columns:44px minmax(0, 1fr) auto; column-gap:8px; align-items:baseline; break-inside:avoid; }
+.dyitem .t { font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-2); }
+.dyitem .nm { font-size:13.5px; line-height:1.3; }
+.dyitem .where { display:block; font-size:11.5px; color:var(--sp-ink-3); }
+.dyitem .d { font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); text-align:right; }
+.dyev .none { color:var(--sp-ink-3); font-size:12.5px; }
+@container (min-width: 640px) {
+  .diary { --dy-wx:196px; --dy-cols:22px 62px 26px 22px 38px; }
+  .dyfig .dn small { display:block; }
+  .dylist.many { display:block; columns:2; column-gap:28px; }
+  .dylist.many .dyitem { margin-bottom:4px; }
+}
 .aheadbox .skyread { top:34px; max-width:calc(var(--ahead-now, 40%) - 14px); }
 .aheadbox .skyhero { font-size:clamp(34px, 5.6cqw, 60px); }
 .aheadbox .skycond, .aheadbox .heronote { font-size:clamp(12px, 1.6cqw, 15px); }
@@ -8756,6 +8795,174 @@ class AheadPainter extends DayPainter {
   }
 }
 
+/* ------------------------------------------------------------------
+ * diary -- the week: a row per day, its weather on the left over that
+ * day's own sky, its diary taking the rest.
+ *
+ * The weather is kept to the size the old Week card's row was -- icon,
+ * day, high, low, rain, in columns that line up down the week, and the
+ * day's words at the bottom -- and the sky fades out just past it. All the
+ * rest of the card is the diary, and a row grows to fit its day. All-day
+ * events sit at the top as pills, one spanning days saying which of how
+ * many; timed ones are listed with their time and length, the place under
+ * the title. On a wide card a busy day flows into two lists side by side.
+ * ------------------------------------------------------------------ */
+
+/* A local date's key, YYYY-MM-DD. */
+function diaryKey(t) {
+  const d = new Date(t);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/* The days the card shows, each with its forecast and its events. */
+function diaryDays(b) {
+  const n = Math.max(1, Math.min(14, Number(b.days) || 7));
+  const keys = Array.from({ length: n }, (_, i) => localDay(i));
+  const days = keys.map((key) => ({ key, wx: null, all: [], timed: [] }));
+  const at = (key) => days.find((d) => d.key === key);
+  for (const row of Array.isArray(b.weather) ? b.weather : []) {
+    const t = skyTime(row && row.datetime);
+    if (t === null) continue;
+    const day = at(diaryKey(t));
+    if (day && !day.wx) day.wx = row;
+  }
+  for (const ev of Array.isArray(b.events) ? b.events : []) {
+    if (!ev || !ev.start) continue;
+    const start = String(ev.start);
+    if (!start.includes("T")) {
+      /* An all-day event's end is the day after its last. */
+      const first = new Date(`${start.slice(0, 10)}T12:00:00`);
+      const endKey = ev.end ? String(ev.end).slice(0, 10) : null;
+      const span = [];
+      for (let d = new Date(first); span.length < 60; d.setDate(d.getDate() + 1)) {
+        const k = diaryKey(d);
+        if (span.length && (!endKey || k >= endKey)) break;
+        span.push(k);
+      }
+      span.forEach((k, i) => {
+        const day = at(k);
+        if (day) day.all.push({ summary: ev.summary, of: span.length > 1 ? `${i + 1} of ${span.length}` : "" });
+      });
+    } else {
+      const t = skyTime(start);
+      const day = t === null ? null : at(diaryKey(t));
+      if (day) day.timed.push(ev);
+    }
+  }
+  for (const d of days) d.timed.sort((x, y) => (skyTime(x.start) || 0) - (skyTime(y.start) || 0));
+  return days;
+}
+
+/* Paints every row's sky on one clock. */
+class DiaryPainter extends DayPainter {
+  attachRows(box, canvases) {
+    if (box !== this.box) {
+      this.detach();
+      this.box = box;
+      this.tkRead = -Infinity;
+      if (typeof IntersectionObserver === "function") {
+        this.observer = new IntersectionObserver((entries) => {
+          this.visible = entries.some((e) => e.isIntersecting);
+          if (this.visible) this.run();
+        });
+        this.observer.observe(box);
+      }
+    }
+    this.canvas = canvases[0] || null;
+    this.ctx = this.canvas ? this.canvas.getContext("2d") : null;
+    this.model = {};
+    const old = this.rows || [];
+    this.rows = canvases.map((cv, i) => {
+      const cond = cv.getAttribute("data-cond") || "";
+      const keep = old[i] && old[i].cond === cond ? old[i] : this.seed(cond);
+      return Object.assign(keep, { cv, cond });
+    });
+    if (this.still) this.paint(performance.now(), true);
+    else this.run();
+  }
+
+  seed(cond) {
+    const base = SKY_CONDITIONS[cond] || { cover: .4 };
+    const cover = base.cover;
+    return {
+      clouds: Array.from({ length: Math.round(cover * 5) }, (_, k) => ({ x: skyRand(-.2, .75), y: skyRand(-.25, .45), sc: skyRand(.2, .32), ph: skyRand(0, 6), d: [.4, .7, 1][k % 3] })),
+      drops: Array.from({ length: Math.round((base.rain || 0) * 40) }, () => ({ x: skyRand(0, .8), y: Math.random(), z: skyRand(.5, 1) })),
+      flakes: Array.from({ length: Math.round((base.snow || 0) * 30) }, () => ({ x: skyRand(0, .8), y: Math.random(), z: skyRand(.5, 1), ph: skyRand(0, 6) })),
+    };
+  }
+
+  paint(now, once) {
+    if (!this.ctx || !this.rows) return;
+    if (now - this.tkRead > 2000) { this.tkRead = now; this.tokens(); }
+    const tk = this.tk;
+    const dt = once ? .033 : Math.min(.05, (now - (this.last || now)) / 1000);
+    this.last = now;
+    const t = once ? 4 : (now - this.start) / 1000;
+    const dpr = Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+    for (const r of this.rows) {
+      const cv = r.cv;
+      if (!cv.isConnected) continue;
+      const w = cv.clientWidth;
+      const h = cv.clientHeight;
+      if (!w || !h) continue;
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      const x = cv.getContext("2d");
+      const A = (c, a) => skyAlpha(x, c, a);
+      x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      x.clearRect(0, 0, w, h);
+      if (!r.cond) continue;
+      const strip = cv.parentNode && cv.parentNode.querySelector(".dywx");
+      const reach = Math.min(w, (strip ? strip.offsetWidth : 180) + 44);
+      const base = SKY_CONDITIONS[r.cond] || { cover: .4 };
+      const veil = daySmooth(.1, .9, base.cover) * .92;
+      let top = skyMix(x, tk["day-top"], tk["grey-top"], veil);
+      let low = skyMix(x, tk["day-low"], tk["grey-low"], veil);
+      if (base.storm) { top = skyMix(x, top, tk["storm-top"], .7); low = skyMix(x, low, tk["storm-low"], .7); }
+      const g = x.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, top); g.addColorStop(1, low);
+      x.fillStyle = g; x.fillRect(0, 0, reach, h);
+      if (base.cover < .6) {
+        const sx = reach * .55;
+        const sg = x.createRadialGradient(sx, 4, 0, sx, 4, 80);
+        sg.addColorStop(0, A(tk.sun, .3 * (1 - base.cover))); sg.addColorStop(1, A(tk.sun, 0));
+        x.fillStyle = sg; x.fillRect(sx - 90, -80, 180, 170);
+      }
+      const set = base.rain || base.snow ? this.wet : this.fair;
+      for (const c of r.clouds) {
+        c.x -= (4 + 6 * c.d) * dt / reach;
+        if (c.x < -.4) c.x = .8;
+        x.globalAlpha = base.rain ? .75 : .55;
+        if (set) x.drawImage(set[Math.round(c.ph) % 3], c.x * reach, c.y * h + Math.sin(t * .5 + c.ph) * 2, 300 * c.sc, 140 * c.sc);
+      }
+      x.globalAlpha = 1;
+      if (r.drops.length) {
+        x.strokeStyle = A(tk.rain, .55); x.lineWidth = 1; x.beginPath();
+        for (const d of r.drops) {
+          d.y += 120 * d.z * dt / h;
+          if (d.y > 1) d.y = -.08;
+          x.moveTo(d.x * reach, d.y * h); x.lineTo(d.x * reach - 1.2, d.y * h + 6 * d.z);
+        }
+        x.stroke();
+      }
+      if (r.flakes.length) {
+        x.fillStyle = A(tk.snow, .8);
+        for (const f of r.flakes) {
+          f.y += 18 * f.z * dt / h;
+          if (f.y > 1) f.y = -.05;
+          x.beginPath(); x.arc(f.x * reach + Math.sin(t + f.ph) * 3, f.y * h, 1 + f.z, 0, 7); x.fill();
+        }
+      }
+      /* Fade the whole sky out just past the weather, into the card. */
+      x.globalCompositeOperation = "destination-in";
+      const m = x.createLinearGradient(reach * .58, 0, reach, 0);
+      m.addColorStop(0, "#000"); m.addColorStop(1, "rgba(0,0,0,0)");
+      x.fillStyle = m; x.fillRect(0, 0, w, h);
+      x.globalCompositeOperation = "source-over";
+    }
+  }
+}
+
 const BODIES = {
   /* What is worth reading today? */
   quote(b) {
@@ -9699,6 +9906,50 @@ const BODIES = {
   day(b) {
     return `<div class="daybox"><canvas class="daycanvas" role="img"`
       + ` aria-label="Today's temperature and weather, from midnight to midnight"></canvas></div>`;
+  },
+
+  /* The week, a row per day: weather on the left, the diary on the rest.
+     See diary above; the skies are painted after the markup lands. */
+  diary(b) {
+    const days = diaryDays(b);
+    const head = `<div class="dyhead"><div class="dywx"><div class="dyfig"><span></span><span></span>`
+      + `<span class="n">High</span><span class="n">Low</span><span class="n">Rain</span></div></div>`
+      + `<div class="dyev">Diary</div></div>`;
+    return `<div class="diary">${head}${days.map((day, i) => {
+      const wx = day.wx || null;
+      const cond = wx ? String(wx.condition || "") : "";
+      const hi = wx ? skyNum(wx.temperature) : null;
+      const lo = wx ? skyNum(wx.templow) : null;
+      const rain = wx ? skyNum(wx.precipitation) : null;
+      const noon = `${day.key}T12:00:00`;
+      const name = new Date(noon).toLocaleDateString([], { weekday: "short" });
+      const figs = wx
+        ? `<span class="n">${hi === null ? "" : `${Math.round(hi)}°`}</span>`
+          + `<span class="n lo">${lo === null ? "" : `${Math.round(lo)}°`}</span>`
+          + `<span class="n rn${rain === null || rain < .5 ? " dry" : ""}">${rain === null || rain < .5 ? "dry" : `${rain.toFixed(1)}<small>mm</small>`}</span>`
+        : `<span class="na">—</span>`;
+      const text = cond ? (WEATHER_TEXT[cond] || cond.charAt(0).toUpperCase() + cond.slice(1)) : "";
+      const alls = day.all.length
+        ? `<div class="dyalls">${day.all.map((a) => `<span class="dyall">${esc(a.summary)}${a.of ? `<span class="of">${esc(a.of)}</span>` : ""}</span>`).join("")}</div>`
+        : "";
+      const timed = day.timed.length
+        ? `<div class="dylist${day.timed.length > 3 ? " many" : ""}">${day.timed.map((ev) => {
+          const span = spanOf(ev.start, ev.end);
+          return `<div class="dyitem"><span class="t">${esc(shortTime(ev.start) || "")}</span>`
+            + `<span class="nm">${esc(ev.summary)}${isBlank(ev.location) ? "" : `<span class="where">${esc(ev.location)}</span>`}</span>`
+            + `<span class="d">${esc(span || "")}</span></div>`;
+        }).join("")}</div>`
+        : "";
+      return `<div class="dyrow${i === 0 ? " today" : ""}">`
+        + `<canvas class="dysky" data-cond="${esc(cond)}" aria-hidden="true"></canvas>`
+        + `<div class="dywx"><div class="dyfig">`
+        + (cond ? iconMarkup(WEATHER_ICONS[cond] || "spectra:cloudy", "dyic") : "<span></span>")
+        + `<span class="dn">${esc(name)}<small>${esc(dayDateLabel(noon) || "")}</small></span>${figs}</div>`
+        + (text ? `<p class="dytext">${esc(text)}</p>` : "")
+        + `</div>`
+        + `<div class="dyev">${alls}${timed}${alls || timed ? "" : `<span class="none">Nothing on</span>`}</div>`
+        + `</div>`;
+    }).join("")}</div>`;
   },
 
   /* What is coming, and when? Grouped by day, because a flat list of
@@ -14792,6 +15043,9 @@ class SpectraCard extends HTMLElement {
     if (this._ahead && this._model && this._config && this._config.body.type === "ahead") {
       this._aheadAttach(this._model.body);
     }
+    if (this._diary && this._model && this._config && this._config.body.type === "diary") {
+      this._diaryAttach();
+    }
     if (!this._onOpenTask) {
       /* A Needs you row's Open. The first card that owns the task takes
          it, so two copies of a card on one page do not open it twice. */
@@ -14818,6 +15072,7 @@ class SpectraCard extends HTMLElement {
     if (this._sky) this._sky.detach();
     if (this._day) this._day.detach();
     if (this._ahead) this._ahead.detach();
+    if (this._diary) { this._diary.detach(); this._diary.box = null; }
     if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     /* A camera stream left running off-screen is a camera left streaming
        -- but a card is also taken off the page for an instant when the
@@ -15583,7 +15838,8 @@ class SpectraCard extends HTMLElement {
       + (festive ? " festive" : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "")
-      + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "");
+      + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "")
+      + (type === "diary" ? " diarycard" : "");
     /* Drawn as a sibling of the title bar and the body rather than inside
        either, because it belongs to neither: it is the column between them,
        and only a direct child of the card can span the card's rows. */
@@ -15621,6 +15877,18 @@ class SpectraCard extends HTMLElement {
     if (type === "sky") this._skyAttach(model.body);
     if (type === "day") this._dayAttach(model.body);
     if (type === "ahead") this._aheadAttach(model.body);
+    if (type === "diary") this._diaryAttach();
+  }
+
+  /* The diary body's skies: one painter for all its rows. */
+  _diaryAttach() {
+    const box = this._holder.querySelector(".diary");
+    if (!box) {
+      if (this._diary) this._diary.stop();
+      return;
+    }
+    if (!this._diary) this._diary = new DiaryPainter();
+    this._diary.attachRows(box, [...box.querySelectorAll(".dysky")]);
   }
 
   /* The ahead body's painter, kept across repaints like the sky's. */

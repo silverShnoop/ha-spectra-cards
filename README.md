@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `ahead`, `clock`, `control`, `day`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `ahead`, `clock`, `control`, `day`, `diary`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -1111,6 +1111,35 @@ setting. A block shows the condition most of its hours have, a tie going to
 the wetter: past blocks say what Home Assistant reported, later ones the
 forecast. `tools/checkday.js` holds that, and `tools/checkpanel.js` the
 `fill_row` that lets a two-column Today sit flush under Now and Who's home.
+
+### `diary` — the week, a row per day
+
+```yaml
+body:
+  type: diary
+  days: 7
+  weather: {forecast: weather.home, type: daily}
+  events: {calendar: calendar.home, days: 7, limit: 60}
+```
+
+Upcoming and the week's weather as one card. Each day is a row: on the left
+its weather, over that day's own sky, and on the rest its diary.
+
+**The weather is a narrow strip.** Icon, day, high, low and rain, in columns
+that are the same in every row so each figure lines up down the week, with the
+day's words (Partly cloudy, Heavy rain) under them. It is kept to the size the
+old Week card's row was, at one column and at two; the sky fades out just past
+it, and everything else is the diary. The sky is the same depiction as `ahead`:
+clear blue, cloud grey, rain clouds dark with rain falling, snow drifting,
+clouds bobbing slowly.
+
+**The diary takes the room it needs.** A row grows to fit its day. All-day
+events sit at the top as pills, and one spanning several days shows on each
+of them saying which (`Half term 1 of 2`). Timed events are listed with their
+time and length, the place under the title. On a card 640px or wider, a day of
+more than three events flows into two lists side by side. A day with nothing on
+says so, and a day beyond the forecast shows a dash where the weather would be.
+`tools/checkdiary.js` holds this.
 
 ### `agenda` — what is coming, and when?
 
