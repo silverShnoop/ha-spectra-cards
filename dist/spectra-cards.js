@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.171.1";
+const VERSION = "0.171.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -23210,6 +23210,10 @@ async function quickStepTargets(step, hass) {
   const wanted = (Array.isArray(when.state) ? when.state : [when.state]).filter((v) => !isBlank(v)).map(String);
   if (!wanted.length) return { action };
   const candidates = [].concat(target.entity_id).filter((v) => !isBlank(v)).map(String);
+  const pageState = (id) => {
+    const cached = hass && hass.states ? hass.states[id] : null;
+    return cached ? String(cached.state) : null;
+  };
   const stateOf = async (id) => {
     if (hass && typeof hass.callApi === "function") {
       try {
@@ -23219,13 +23223,14 @@ async function quickStepTargets(step, hass) {
         LOGGER_WARN("spectra-panel: could not read a live state, using the page's copy", id, error);
       }
     }
-    const cached = hass && hass.states ? hass.states[id] : null;
-    return cached ? String(cached.state) : null;
+    return pageState(id);
   };
   const states = await Promise.all(candidates.map(stateOf));
+  /* What was seen, page and server, for the report a failed step writes. */
+  const seen = candidates.map((id, i) => `${id}=${states[i]}` + (pageState(id) !== states[i] ? ` (page: ${pageState(id)})` : ""));
   const ids = candidates.filter((id, i) => states[i] !== null && wanted.includes(states[i]));
-  if (!ids.length) return { none: true };
-  return { action: Object.assign({}, action, { target: Object.assign({}, target, { entity_id: ids }) }) };
+  if (!ids.length) return { none: true, seen };
+  return { action: Object.assign({}, action, { target: Object.assign({}, target, { entity_id: ids }) }), seen };
 }
 
 function quickStatus(st, i) {
@@ -23823,9 +23828,11 @@ class SpectraPanel extends HTMLElement {
         st.status[i] = "skipped";
       } else if (failed && step && step.optional) {
         LOGGER_WARN("spectra-panel: optional quick action step did not finish", step, failed);
+        this._quickReport(st, step, picked, failed, "skipped");
         st.status[i] = "skipped";
       } else if (failed) {
         LOGGER_WARN("spectra-panel: quick action step failed", step, failed);
+        this._quickReport(st, step, picked, failed, "failed");
         st.status[i] = "failed";
         st.errors[i] = quickErrorText(failed);
       } else {
@@ -23843,6 +23850,23 @@ class SpectraPanel extends HTMLElement {
       const hold = Math.max(1000, Number(st.action.hold) || 30000);
       st.timer = setTimeout(() => this._quickFade(st), hold);
     }
+  }
+
+  /* One line in the Home Assistant log when a step does not finish: the
+     action, the step, what the house answered, and each target's state
+     as the server gave it and, where it differed, as the page had it.
+     The answer a service call returns says only that it failed; the
+     reason is in the server's log, and this puts the two side by side
+     so a night's failure can be read the morning after. */
+  _quickReport(st, step, picked, error, outcome) {
+    if (!this._hass || typeof this._hass.callService !== "function") return;
+    const targets = picked && picked.seen && picked.seen.length
+      ? picked.seen.join(", ")
+      : quickStepSpec(step && step.action) || "-";
+    const message = `spectra panel: quick action "${firstOf(st.action.name, "?")}" step "${firstOf(step && step.name, "?")}" ${outcome}: `
+      + `${quickErrorText(error)} · targets ${targets} · user=${this._hass.user && this._hass.user.name ? this._hass.user.name : "?"}`;
+    Promise.resolve(this._hass.callService("system_log", "write", { logger: "spectra.panel", level: "warning", message }))
+      .catch(() => {});
   }
 
   _quickCall(action) {

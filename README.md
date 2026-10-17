@@ -3493,6 +3493,13 @@ see which half, which is how an earlier build behaved. Closing that
 sheet, from the button, the dim or Escape, leaves it for good and makes
 `after` as a clean finish would.
 
+A step that does not finish also writes one line to the Home Assistant
+log under `spectra.panel`: the action, the step, what the house answered,
+and each target's state as the server gave it and, where it differed, as
+the page had it. The answer a service call returns says only that it
+failed; the reason is in the server's log, and this puts the two side by
+side so a night's failure can be read the morning after.
+
 **`when: {state: [...]}` narrows a step to the targets in one of those
 states now.** Google Cast answers a stop sent to an idle player with an
 error, so "stop what's playing" has to mean exactly that:

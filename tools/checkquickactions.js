@@ -54,6 +54,7 @@ const js = fs.readFileSync(file);
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const out = {};
     const calls = [];
+    const reports = [];
     window.HASS = {
       states: {
         "media_player.loud": { entity_id: "media_player.loud", state: "playing", attributes: {} },
@@ -69,6 +70,7 @@ const js = fs.readFileSync(file);
         return Promise.reject(new Error("no such state"));
       },
       callService: (domain, service, data, target) => {
+        if (domain === "system_log") { reports.push(String(data && data.message)); return Promise.resolve(); }
         const id = target && target.entity_id;
         calls.push(`${domain}.${service}:${Array.isArray(id) ? id.join("+") : id}`);
         if (String(id) === "light.broken") return Promise.reject(new Error("bulb unreachable"));
@@ -212,6 +214,7 @@ const js = fs.readFileSync(file);
     const brokenNode = sheet();
     await sleep(350 + 3 * (1100 + 420) + 300 + 250);
     out.failed = {
+      reports: reports.slice(),
       calls: calls.slice(), steps: stepClasses(),
       message: (root.querySelector(".qmsg.failed .qbig") || {}).textContent,
       which: (root.querySelector(".qmsg.failed .qsmall") || {}).textContent,
@@ -295,6 +298,8 @@ const js = fs.readFileSync(file);
   check("a failing step does not stop the run: the rest is still done",
     got.failed.calls.join("|") === "light.turn_off:light.ok|light.turn_off:light.broken|light.turn_off:light.never" && got.failed.steps.join(",") === "done,failed,done", got.failed);
   check("the sheet says what did not finish and why", got.failed.message === "Not everything finished" && got.failed.which === "Second: bulb unreachable" && got.failed.head === "1 not done", got.failed);
+  check("a step that did not finish writes one line to the Home Assistant log, naming it and its targets",
+    got.failed.reports.length === 1 && /quick action "Broken" step "Second" failed: bulb unreachable/.test(got.failed.reports[0]) && /targets light.broken/.test(got.failed.reports[0]), got.failed.reports);
   check("that sheet stays until dismissed, with Close and Try again", got.failedStays && got.failedButtons, got);
   check("Try again runs only the step that did not finish, on the same sheet",
     got.retryRunning === "done,running,done" && got.retry.calls.length === 4 && got.retry.calls[3] === "light.turn_off:light.broken"
