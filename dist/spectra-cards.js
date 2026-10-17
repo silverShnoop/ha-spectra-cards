@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.174.0";
+const VERSION = "0.174.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -8529,6 +8529,25 @@ class AheadPainter extends DayPainter {
     const amp = skyH - 34;
     const e = aheadSun(m, nowH);
     const cov = s.cover;
+    /* Their paths ahead: where the sun will be at each hour to come, and
+       the moon after it, dotted. They start on the now line, so each sits
+       at the head of its own path and the path comes to meet it. */
+    let pathEnd = nowH;
+    while (X(pathEnd) < w + 10 && pathEnd < this.axis.H1) pathEnd += .1;
+    const trace = (alt, y, colour) => {
+      ctx.beginPath();
+      let on = false;
+      for (let hh = nowH; hh <= pathEnd; hh += .1) {
+        const v = alt(hh);
+        if (v <= 0) { on = false; continue; }
+        const x = X(hh);
+        if (on) ctx.lineTo(x, y(v)); else ctx.moveTo(x, y(v));
+        on = true;
+      }
+      ctx.setLineDash([2, 6]); ctx.strokeStyle = colour; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+    };
+    trace((hh) => aheadSun(m, hh), (v) => skyH + 14 - (amp + 14) * v, A(tk.sun, .45));
+    if (m.moon !== null) trace((hh) => aheadMoon(m, hh), (v) => skyH - 10 - (amp - 10) * v, A(tk.moon, .35));
     if (e > -1) {
       const sy = skyH + 14 - (amp + 14) * Math.max(-1, e);
       const a = (1 - cov * .6) * daySmooth(-1, -.1, e);
