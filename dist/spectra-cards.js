@@ -4066,13 +4066,14 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .aheadbox .skyfc { font-size:clamp(11px, 1.4cqw, 13px); }
 .aheadrain { color:var(--sp-ink); }
 .aheadleft { margin:6px 0 0; font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-2); }
-.aheadbox .skybase { height:var(--ahead-band, 50px); right:auto; width:calc(var(--ahead-now, 40%) - 44px); box-sizing:border-box;
-  font-size:clamp(11px, 1.4cqw, 14px); gap:clamp(8px, 1.6cqw, 18px); }
+.aheadbox .skybase { height:var(--ahead-band, 50px); right:auto; width:var(--ahead-now, 40%); box-sizing:border-box;
+  padding-left:calc(var(--ahead-icon, 40px) + 18px); padding-right:4px;
+  font-size:clamp(11px, 1.4cqw, 14px); gap:clamp(8px, 1.2cqw, 14px); }
 @container (max-width: 639px) {
   .aheadbox .skyhero { font-size:clamp(28px, 9cqw, 44px); }
   .aheadbox .skycond, .aheadbox .heronote { font-size:13px; }
   .aheadbox .skyfc { font-size:12px; }
-  .aheadbox .skybase { font-size:12px; width:calc(var(--ahead-now, 40%) - 38px); }
+  .aheadbox .skybase { font-size:12px; padding-left:calc(var(--ahead-icon, 40px) + 14px); }
 }
 .daycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
 /* Below the title bar, which is a fixed height whatever the width. */
@@ -8584,6 +8585,7 @@ class AheadPainter extends DayPainter {
     if (box && box.style && box.style.getPropertyValue("--ahead-now") !== `${x0}px`) {
       box.style.setProperty("--ahead-now", `${x0}px`);
       box.style.setProperty("--ahead-band", `${L.band}px`);
+      box.style.setProperty("--ahead-icon", `${L.band - 10}px`);
     }
     this.laid = { w, x0, step: L.step };
 
@@ -8801,18 +8803,14 @@ class AheadPainter extends DayPainter {
     ctx.strokeStyle = A(tk.ink, .07); ctx.lineWidth = 1;
     const pad = (k) => String(((Math.round(k) % 24) + 24) % 24).padStart(2, "0");
     const shown = [];
-    /* Now's own symbol sits at full strength just left of the line, at
-       the end of the readings, a size up and in brighter ink: the blocks
-       ahead slide in and fade as they reach the line, so without it the
-       hour you are in would be the dimmest thing on the ground. */
-    const nowW = L.icon > 24 ? 44 : 38;
+    /* Now's own symbol leads the ground at the left, as big as the band
+       allows and in brighter ink, ahead of the readings it belongs with:
+       the blocks ahead slide in and fade as they reach the line, so
+       without it the hour you are in would be the dimmest thing there. */
     {
-      const x = x0 - nowW / 2;
-      const big = Math.round(L.icon * 1.15);
+      const big = L.band - 10;
       const cond = m.current && m.current.cond;
-      if (cond) this.glyph(cond, x, skyH + 4 + big / 2, big, aheadSun(m, nowH) <= 0, true);
-      ctx.font = `600 ${L.icon > 24 ? 12 : 10}px ${tk.mono}`; ctx.textAlign = "center"; ctx.fillStyle = tk.ink;
-      ctx.fillText("Now", x, skyH + L.band - 9);
+      if (cond) this.glyph(cond, (L.icon > 24 ? 14 : 10) + big / 2, skyH + L.band / 2, big, aheadSun(m, nowH) <= 0, true);
     }
     for (const [a, b] of blocks) {
       const mid = (a + b) / 2;
