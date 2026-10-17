@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.175.0";
+const VERSION = "0.175.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -8700,7 +8700,9 @@ class AheadPainter extends DayPainter {
       const cond = [...new Set(conds)].filter((c) => c).sort((p, q) => count(q) - count(p) || rank(p) - rank(q))[0] || "";
       if (cond) this.glyph(cond, x, skyH + 6 + L.icon / 2, L.icon, aheadSun(m, mid) <= 0);
       ctx.font = `${L.icon > 24 ? 12 : 10}px ${tk.mono}`; ctx.textAlign = "center"; ctx.fillStyle = tk.ink2;
-      ctx.fillText(b - a === 1 ? pad(a) : `${pad(a)}–${pad(b)}`, x, skyH + L.band - 9);
+      /* Each block by the time it starts, written as a time: "18:00", not
+         "18" or "18–20", which read as anything but a clock. */
+      ctx.fillText(`${pad(a)}:00`, x, skyH + L.band - 9);
       shown.push({ a, b, cond });
     }
     ctx.globalAlpha = 1;
