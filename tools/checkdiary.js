@@ -74,19 +74,27 @@ const js = fs.readFileSync(file);
   const got = await page.evaluate(() => window.CARDS.map((el) => {
     const root = el.shadowRoot || el;
     const rows = [...root.querySelectorAll(".dyrow")];
-    const xs = (sel) => rows.map((r) => r.querySelector(sel)).filter(Boolean).map((n) => Math.round(n.getBoundingClientRect().right));
+    const xs = (sel, side = "right") => rows.map((r) => r.querySelector(sel)).filter(Boolean).map((n) => Math.round(n.getBoundingClientRect()[side]));
     const box = root.querySelector(".diary").getBoundingClientRect();
     const tue = rows[3].querySelector(".dylist");
     return {
       rows: rows.length,
-      hi: xs(".n:not(.lo):not(.rn)"), lo: xs(".n.lo"), rn: xs(".n.rn"),
+      hi: xs(".n.hi"), lo: xs(".n.lo", "left"), rn: xs(".n.rn", "left"),
+      hiSize: parseFloat(getComputedStyle(rows[0].querySelector(".n.hi")).fontSize),
+      textRight: (() => { const t = rows[1].querySelector(".dytext").getBoundingClientRect(); const w = rows[1].querySelector(".dywx").getBoundingClientRect(); return Math.round(w.right - t.right); })(),
+      edge: getComputedStyle(rows[0].querySelector(".dywx")).borderRightStyle,
       strip: Math.round(rows[0].querySelector(".dywx").getBoundingClientRect().width), width: Math.round(box.width),
       text: rows[1].querySelector(".dytext") ? rows[1].querySelector(".dytext").textContent : "",
-      textBelow: rows[1].querySelector(".dytext").getBoundingClientRect().top >= rows[1].querySelector(".dn").getBoundingClientRect().bottom - 1,
+      textBelow: rows[1].querySelector(".dytext").getBoundingClientRect().bottom >= rows[1].querySelector(".dywx").getBoundingClientRect().bottom - 10,
       half: rows.slice(5).map((r) => [...r.querySelectorAll(".dyall")].map((a) => a.textContent).join("|")),
       cols: tue ? getComputedStyle(tue).columnCount : "",
       skies: root.querySelectorAll(".dysky").length,
       painted: !!el._diary && el._diary.rows.length,
+      iconMid: rows.slice(0, 4).map((r) => { const i = r.querySelector(".dywx > .dyic").getBoundingClientRect(); const w = r.querySelector(".dywx").getBoundingClientRect(); return Math.round(Math.abs((i.top + i.bottom) / 2 - (w.top + w.bottom) / 2)); }),
+      iconSize: Math.round(rows[0].querySelector(".dywx > .dyic").getBoundingClientRect().height),
+      tiles: rows.map((r) => r.querySelector(".dytile").textContent),
+      todayFilled: getComputedStyle(rows[0].querySelector(".dytile")).backgroundColor !== getComputedStyle(rows[1].querySelector(".dytile")).backgroundColor,
+      tueText: (() => { const r = rows[3]; const t = r.querySelector(".dytext"); return t ? Math.round(r.getBoundingClientRect().bottom - t.getBoundingClientRect().bottom) : 99; })(),
       quiet: Math.round(rows[0].getBoundingClientRect().height),
       rainRight: Math.max(...rows.map((r) => r.querySelector(".n.rn")).filter(Boolean).map((n) => n.scrollWidth + n.getBoundingClientRect().left)),
       stripRight: Math.round(rows[0].querySelector(".dywx").getBoundingClientRect().right),
@@ -103,13 +111,20 @@ const js = fs.readFileSync(file);
   for (const [i, c] of got.entries()) {
     const at = i ? "wide" : "narrow";
     check(`${at}: a row for each of seven days`, c.rows === 7, c.rows);
+    check(`${at}: the high is the big figure`, c.hiSize >= 24, c.hiSize);
     check(`${at}: the highs line up down the week`, same(c.hi), c.hi);
-    check(`${at}: and the lows`, same(c.lo), c.lo);
-    check(`${at}: and the rain`, same(c.rn), c.rn);
-    check(`${at}: the weather stays a narrow strip`, c.strip <= 200, [c.strip, c.width]);
-    check(`${at}: a quiet day is a short row`, c.quiet <= 48, c.quiet);
+    check(`${at}: and the stacks of low and rain beside them`, same(c.lo) && same(c.rn), [c.lo, c.rn]);
+    check(`${at}: the day's words sit to the right`, c.textRight <= 10, c.textRight);
+    check(`${at}: the weather ends at a hard edge`, c.edge === "solid", c.edge);
+    check(`${at}: the weather stays a narrow strip`, c.strip <= 180, [c.strip, c.width]);
+    check(`${at}: a quiet day is a short row`, c.quiet <= 56, c.quiet);
     check(`${at}: the rain stays inside the weather`, c.rainRight <= c.stripRight, [c.rainRight, c.stripRight]);
     check(`${at}: the day's words sit under its figures`, c.text === "Sunny" && c.textBelow, c.text);
+    check(`${at}: and at the foot of a tall row`, c.tueText <= 10, c.tueText);
+    check(`${at}: each day is a tile, weekday over date`, c.tiles[0] === "Sat17" && c.tiles[6] === "Fri23", c.tiles);
+    check(`${at}: today's tile is filled`, c.todayFilled, c.todayFilled);
+    check(`${at}: the icon sits in the middle of the weather, however tall the row`, c.iconMid.every((d) => d <= 2), c.iconMid);
+    check(`${at}: and is 30px`, c.iconSize === 30, c.iconSize);
     check(`${at}: a two-day event shows on both days, saying which`, c.half[0] === "Half term1 of 2" && c.half[1] === "Half term2 of 2", c.half);
     check(`${at}: every row has its sky, painted`, c.skies === 7 && c.painted === 7, [c.skies, c.painted]);
   }

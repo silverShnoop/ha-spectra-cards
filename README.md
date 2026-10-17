@@ -1122,16 +1122,19 @@ body:
   events: {calendar: calendar.home, days: 7, limit: 60}
 ```
 
-Upcoming and the week's weather as one card. Each day is a row: on the left
-its weather, over that day's own sky, and on the rest its diary.
+Upcoming and the week's weather as one card. Each day is a row: a tile at the
+left edge with the weekday over the date, like a tear-off calendar, today's
+filled with the card's accent; then its weather, over that day's own sky; and
+on the rest its diary.
 
-**The weather is a narrow strip.** Icon, day, high, low and rain, in columns
-that are the same in every row so each figure lines up down the week, with the
-day's words (Partly cloudy, Heavy rain) under the day, the icon beside both. It is kept to the size the
-old Week card's row was, at one column and at two; the sky fades out just past
-it, and everything else is the diary. The sky is the same depiction as `ahead`:
-clear blue, cloud grey, rain clouds dark with rain falling, snow drifting,
-clouds bobbing slowly.
+**The weather is a narrow strip.** The icon, centred however tall the row grows;
+the high, large, the way the Now card leads with its reading, with the low and
+the rain in a little stack beside it; and the day's words (Partly cloudy, Heavy
+rain) at its foot, to the right. The high has a fixed slot, so the stacks line
+up down the week. It is kept to the size the old Week card's row was, at one
+column and at two, and ends at a hard edge so the diary's times start against a
+clean column. Behind it is the same sky as `ahead`: clear blue, cloud grey, rain
+clouds dark with rain falling, snow drifting, clouds bobbing slowly.
 
 **The diary takes the room it needs.** A row grows to fit its day. All-day
 events sit at the top as pills, and one spanning several days shows on each

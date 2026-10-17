@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.178.1";
+const VERSION = "0.180.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4014,27 +4014,36 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    week; everything else the diary. The card gives its rows the full width. */
 .card.diarycard { padding:0; overflow:hidden; }
 .card.diarycard > .titlebar { margin:9px 10px 6px; }
-.diary { container-type:inline-size; --dy-wx:186px; --dy-cols:24px 40px 26px 22px 44px; }
-.dyhead, .dyrow { position:relative; display:grid; grid-template-columns:var(--dy-wx) minmax(0, 1fr); border-top:1px solid var(--sp-edge); }
-.dysky { position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; }
-.dywx { position:relative; padding:6px 6px 6px 10px; min-width:0; }
-/* Two lines, the icon spanning both: the day and its figures, then the
-   day's words under the day -- so a row is no taller than its diary needs. */
-.dyfig { display:grid; grid-template-columns:var(--dy-cols); column-gap:4px; row-gap:1px; align-items:baseline; }
-.dyfig .dyic { width:24px; height:24px; align-self:center; grid-row:span 2; }
+.diary { container-type:inline-size; --dy-tile:46px; --dy-wx:162px; }
+.dyrow { position:relative; display:grid; grid-template-columns:var(--dy-tile) var(--dy-wx) minmax(0, 1fr); border-top:1px solid var(--sp-edge); }
+.dysky { position:absolute; top:0; bottom:0; left:var(--dy-tile); width:calc(100% - var(--dy-tile)); height:100%; display:block; pointer-events:none; }
+.dytile { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--sp-sink); border-right:1px solid var(--sp-edge); padding:5px 0; line-height:1; }
+.dytile b { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--sp-ink-2); font-weight:700; }
+.dytile span { font-size:21px; font-weight:700; margin-top:3px; color:var(--sp-ink); }
+.dyrow.today .dytile { background:var(--accent); }
+.dyrow.today .dytile b, .dyrow.today .dytile span { color:var(--accent-on, var(--sp-surface)); }
+.dywx { position:relative; display:grid; grid-template-columns:30px minmax(0, 1fr); grid-template-rows:1fr auto;
+  column-gap:7px; padding:5px 8px 4px 8px; min-width:0; border-right:1px solid var(--sp-edge); }
+/* The icon and the figures in the middle of the weather, however tall the
+   row; the day's words at its foot, to the right. The weather ends at a hard
+   edge, so the diary's times start against a clean column. */
+.dywx > .dyic { grid-column:1; grid-row:1 / span 2; align-self:center; width:30px; height:30px; }
+.dyfig { grid-column:2; align-self:center; display:grid; grid-template-columns:44px auto; grid-template-rows:auto auto;
+  column-gap:7px; align-items:center; justify-content:start; }
+/* The high large, like the Now card's reading; the low and the rain in a
+   little stack beside it. The high's slot is fixed, so the stacks line up
+   down the week. */
+.dyfig .n.hi { grid-row:1 / span 2; font-size:26px; font-weight:500; line-height:1; letter-spacing:-.02em; }
 .dyfig .dn { font-weight:700; font-size:13px; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.5); }
-.dyfig .n { font-family:var(--sp-mono); font-size:12.5px; text-align:right; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+.dyfig .n { font-family:var(--sp-mono); font-size:11.5px; line-height:1.25; text-align:left; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+.dyfig .n.hi { text-align:right; }
 .dyfig .lo { color:var(--sp-ink-2); }
-.dyfig .rn { font-size:11px; color:var(--sp-ink); }
+.dyfig .rn { color:var(--sp-ink); }
 .dyfig .rn small { font-size:9px; color:var(--sp-ink-3); margin-left:1px; }
 .dyfig .rn.dry { color:var(--sp-ink-3); }
-.dyfig .na { grid-column:3 / -1; font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-3); }
-.dytext { grid-column:2 / -1; font-size:11px; color:var(--sp-ink-2); text-shadow:0 1px 3px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.dyhead .dywx, .dyhead .dyev { padding-top:4px; padding-bottom:3px; min-height:0; }
-.dyhead .dyfig { row-gap:0; }
-.dyhead .n, .dyhead .dyev { font-family:inherit; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--sp-ink-3); text-shadow:none; }
-.dyrow.today::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); z-index:1; }
-.dyev { position:relative; padding:6px 12px 6px 10px; display:flex; flex-direction:column; gap:4px; justify-content:center; min-width:0; }
+.dyfig .na { grid-column:1 / -1; font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-3); }
+.dytext { grid-column:1 / -1; grid-row:2; align-self:end; justify-self:end; text-align:right; max-width:100%; margin:0; padding-top:1px; font-size:11px; line-height:1.2; color:var(--sp-ink-2); text-shadow:0 1px 3px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dyev { position:relative; padding:6px 12px 6px 12px; display:flex; flex-direction:column; gap:4px; justify-content:center; min-width:0; }
 .dyalls { display:flex; flex-wrap:wrap; gap:5px; }
 .dyall { font-size:12px; padding:1px 8px; border:1px solid var(--sp-edge); border-radius:10px; background:var(--sp-sink); line-height:1.35; }
 .dyall .of { font-family:var(--sp-mono); font-size:10.5px; color:var(--sp-ink-2); margin-left:6px; }
@@ -4046,7 +4055,8 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .dyitem .d { font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-3); text-align:right; }
 .dyev .none { color:var(--sp-ink-3); font-size:12px; }
 @container (min-width: 640px) {
-  .diary { --dy-wx:192px; --dy-cols:24px 44px 26px 22px 46px; }
+  .diary { --dy-tile:52px; --dy-wx:172px; }
+  .dytile span { font-size:23px; }
   .dylist.many { display:block; columns:2; column-gap:28px; }
   .dylist.many .dyitem { margin-bottom:4px; }
 }
@@ -8914,7 +8924,9 @@ class DiaryPainter extends DayPainter {
       x.clearRect(0, 0, w, h);
       if (!r.cond) continue;
       const strip = cv.parentNode && cv.parentNode.querySelector(".dywx");
-      const reach = Math.min(w, (strip ? strip.offsetWidth : 180) + 44);
+      const reach = Math.min(w, strip ? strip.offsetWidth : 170);
+      x.save();
+      x.beginPath(); x.rect(0, 0, reach, h); x.clip();
       const base = SKY_CONDITIONS[r.cond] || { cover: .4 };
       const veil = daySmooth(.1, .9, base.cover) * .92;
       let top = skyMix(x, tk["day-top"], tk["grey-top"], veil);
@@ -8932,7 +8944,7 @@ class DiaryPainter extends DayPainter {
       const set = base.rain || base.snow ? this.wet : this.fair;
       for (const c of r.clouds) {
         c.x -= (4 + 6 * c.d) * dt / reach;
-        if (c.x < -.4) c.x = .8;
+        if (c.x < -.4) c.x = 1;
         x.globalAlpha = base.rain ? .75 : .55;
         if (set) x.drawImage(set[Math.round(c.ph) % 3], c.x * reach, c.y * h + Math.sin(t * .5 + c.ph) * 2, 300 * c.sc, 140 * c.sc);
       }
@@ -8954,12 +8966,7 @@ class DiaryPainter extends DayPainter {
           x.beginPath(); x.arc(f.x * reach + Math.sin(t + f.ph) * 3, f.y * h, 1 + f.z, 0, 7); x.fill();
         }
       }
-      /* Fade the whole sky out just past the weather, into the card. */
-      x.globalCompositeOperation = "destination-in";
-      const m = x.createLinearGradient(reach * .58, 0, reach, 0);
-      m.addColorStop(0, "#000"); m.addColorStop(1, "rgba(0,0,0,0)");
-      x.fillStyle = m; x.fillRect(0, 0, w, h);
-      x.globalCompositeOperation = "source-over";
+      x.restore();
     }
   }
 }
@@ -9913,10 +9920,7 @@ const BODIES = {
      See diary above; the skies are painted after the markup lands. */
   diary(b) {
     const days = diaryDays(b);
-    const head = `<div class="dyhead"><div class="dywx"><div class="dyfig"><span></span><span></span>`
-      + `<span class="n">High</span><span class="n">Low</span><span class="n">Rain</span></div></div>`
-      + `<div class="dyev">Diary</div></div>`;
-    return `<div class="diary">${head}${days.map((day, i) => {
+    return `<div class="diary">${days.map((day, i) => {
       const wx = day.wx || null;
       const cond = wx ? String(wx.condition || "") : "";
       const hi = wx ? skyNum(wx.temperature) : null;
@@ -9925,7 +9929,7 @@ const BODIES = {
       const noon = `${day.key}T12:00:00`;
       const name = new Date(noon).toLocaleDateString([], { weekday: "short" });
       const figs = wx
-        ? `<span class="n">${hi === null ? "" : `${Math.round(hi)}°`}</span>`
+        ? `<span class="n hi">${hi === null ? "" : `${Math.round(hi)}°`}</span>`
           + `<span class="n lo">${lo === null ? "" : `${Math.round(lo)}°`}</span>`
           + `<span class="n rn${rain === null || rain < .5 ? " dry" : ""}">${rain === null || rain < .5 ? "dry" : `${rain.toFixed(1)}<small>mm</small>`}</span>`
         : `<span class="na">—</span>`;
@@ -9941,13 +9945,17 @@ const BODIES = {
             + `<span class="d">${esc(span || "")}</span></div>`;
         }).join("")}</div>`
         : "";
+      /* The day as a tile, weekday over date, like a tear-off calendar:
+         the first thing read in each row, and today's filled in. */
       return `<div class="dyrow${i === 0 ? " today" : ""}">`
+        + `<span class="dytile"><b>${esc(name)}</b><span>${new Date(noon).getDate()}</span></span>`
         + `<canvas class="dysky" data-cond="${esc(cond)}" aria-hidden="true"></canvas>`
-        + `<div class="dywx"><div class="dyfig">`
-        + (cond ? iconMarkup(WEATHER_ICONS[cond] || "spectra:cloudy", "dyic") : "<span></span>")
-        + `<span class="dn">${esc(name)}</span>${figs}`
-        + (text ? `<span class="dytext">${esc(text)}</span>` : "")
-        + `</div></div>`
+        + `<div class="dywx">`
+        + (cond ? iconMarkup(WEATHER_ICONS[cond] || "spectra:cloudy", "dyic") : `<span class="dyic"></span>`)
+        + `<div class="dyfig">${figs}</div>`
+        /* At the foot of the weather, however tall the day's diary makes the row. */
+        + (text ? `<p class="dytext">${esc(text)}</p>` : "")
+        + `</div>`
         + `<div class="dyev">${alls}${timed}${alls || timed ? "" : `<span class="none">Nothing on</span>`}</div>`
         + `</div>`;
     }).join("")}</div>`;
