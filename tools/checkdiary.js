@@ -74,12 +74,15 @@ const js = fs.readFileSync(file);
   const got = await page.evaluate(() => window.CARDS.map((el) => {
     const root = el.shadowRoot || el;
     const rows = [...root.querySelectorAll(".dyrow")];
-    const xs = (sel) => rows.map((r) => r.querySelector(sel)).filter(Boolean).map((n) => Math.round(n.getBoundingClientRect().right));
+    const xs = (sel, side = "right") => rows.map((r) => r.querySelector(sel)).filter(Boolean).map((n) => Math.round(n.getBoundingClientRect()[side]));
     const box = root.querySelector(".diary").getBoundingClientRect();
     const tue = rows[3].querySelector(".dylist");
     return {
       rows: rows.length,
-      hi: xs(".n:not(.lo):not(.rn)"), lo: xs(".n.lo"), rn: xs(".n.rn"),
+      hi: xs(".n.hi"), lo: xs(".n.lo", "left"), rn: xs(".n.rn", "left"),
+      hiSize: parseFloat(getComputedStyle(rows[0].querySelector(".n.hi")).fontSize),
+      textRight: (() => { const t = rows[1].querySelector(".dytext").getBoundingClientRect(); const w = rows[1].querySelector(".dywx").getBoundingClientRect(); return Math.round(w.right - t.right); })(),
+      edge: getComputedStyle(rows[0].querySelector(".dywx")).borderRightStyle,
       strip: Math.round(rows[0].querySelector(".dywx").getBoundingClientRect().width), width: Math.round(box.width),
       text: rows[1].querySelector(".dytext") ? rows[1].querySelector(".dytext").textContent : "",
       textBelow: rows[1].querySelector(".dytext").getBoundingClientRect().bottom >= rows[1].querySelector(".dywx").getBoundingClientRect().bottom - 10,
@@ -108,11 +111,13 @@ const js = fs.readFileSync(file);
   for (const [i, c] of got.entries()) {
     const at = i ? "wide" : "narrow";
     check(`${at}: a row for each of seven days`, c.rows === 7, c.rows);
+    check(`${at}: the high is the big figure`, c.hiSize >= 24, c.hiSize);
     check(`${at}: the highs line up down the week`, same(c.hi), c.hi);
-    check(`${at}: and the lows`, same(c.lo), c.lo);
-    check(`${at}: and the rain`, same(c.rn), c.rn);
+    check(`${at}: and the stacks of low and rain beside them`, same(c.lo) && same(c.rn), [c.lo, c.rn]);
+    check(`${at}: the day's words sit to the right`, c.textRight <= 10, c.textRight);
+    check(`${at}: the weather ends at a hard edge`, c.edge === "solid", c.edge);
     check(`${at}: the weather stays a narrow strip`, c.strip <= 180, [c.strip, c.width]);
-    check(`${at}: a quiet day is a short row`, c.quiet <= 48, c.quiet);
+    check(`${at}: a quiet day is a short row`, c.quiet <= 56, c.quiet);
     check(`${at}: the rain stays inside the weather`, c.rainRight <= c.stripRight, [c.rainRight, c.stripRight]);
     check(`${at}: the day's words sit under its figures`, c.text === "Sunny" && c.textBelow, c.text);
     check(`${at}: and at the foot of a tall row`, c.tueText <= 10, c.tueText);
