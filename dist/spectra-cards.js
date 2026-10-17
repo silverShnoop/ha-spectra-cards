@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.174.1";
+const VERSION = "0.174.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -8554,6 +8554,27 @@ class AheadPainter extends DayPainter {
       const gl = ctx.createRadialGradient(x0, sy, 0, x0, sy, 110);
       gl.addColorStop(0, A(tk.sun, .32 * a)); gl.addColorStop(1, A(tk.sun, 0));
       ctx.fillStyle = gl; ctx.fillRect(x0 - 120, sy - 120, 240, 240);
+      /* Rays, as on the Now card, turning slowly -- but they shine over now,
+         the sky somebody is under, and thin away on their way into the hours
+         ahead. Strong in a clear sky, weaker under cloud, none in overcast. */
+      if (cov < .8 && e > 0) {
+        const clear = (1 - cov / .8) * daySmooth(0, .15, e);
+        ctx.save(); ctx.translate(x0, sy);
+        for (let i = 0; i < 14; i++) {
+          const th = t * .03 + i * Math.PI * 2 / 14;
+          const left = Math.max(0, Math.min(1, .35 - Math.cos(th) * 1.2));
+          if (left <= 0) continue;
+          const len = 260 + 40 * Math.sin(t * .4 + i);
+          const spread = 14 + 6 * Math.sin(t * .7 + i);
+          ctx.save(); ctx.rotate(th);
+          const rg = ctx.createLinearGradient(0, 0, len, 0);
+          rg.addColorStop(0, A(tk.sun, .2 * clear * left)); rg.addColorStop(1, A(tk.sun, 0));
+          ctx.fillStyle = rg; ctx.beginPath(); ctx.moveTo(0, 0);
+          ctx.lineTo(len, -spread); ctx.lineTo(len, 14); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+        ctx.restore();
+      }
       if (cov < .8) {
         ctx.save(); ctx.shadowColor = tk.sun; ctx.shadowBlur = 24;
         ctx.fillStyle = A(tk.sun, 1 - cov * .5); ctx.beginPath(); ctx.arc(x0, sy, 14, 0, 7); ctx.fill();

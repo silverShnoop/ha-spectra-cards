@@ -1032,7 +1032,10 @@ the now line and only rise and set. The hours ahead slide left towards it, an
 hour's width every hour, so a sunset is seen coming on the right and reaches
 the sun when it happens; after it the moon comes up on the same line. Ahead of
 the line their paths are dotted in, where each will be at every hour to come,
-so the sun sits at the head of its own path and the path slides in to meet it.
+so the sun sits at the head of its own path and the path slides in to meet it. Its
+rays turn slowly as on `sky`, but shine over now, the sky somebody is under,
+and thin away towards the hours ahead: strong in a clear sky, weaker under
+cloud, none in overcast.
 
 **Everything moves.** Ahead, each hour's clouds bob where they are, its rain
 falls and its stars twinkle. Over now the clouds blow left, the way time goes:
