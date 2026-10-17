@@ -332,6 +332,57 @@ customElements.define("fake-section", FakeSection);
     await page.close();
   }
 
+  /* fill_row: the Now card grows to end with Who's home beside it, so the
+     span-2 card under both sits flush; on a phone nothing is told to grow. */
+  for (const [width, cols] of [[1280, 3], [390, 1]]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    page.on("pageerror", (e) => problems.push(`fill_row: PAGEERROR ${e.message}`));
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.waitForFunction(() => !!customElements.get("spectra-panel"));
+    const got = await page.evaluate(async () => {
+      window.HASS = { states: {}, themes: { darkMode: true }, callService: () => Promise.resolve() };
+      const list = (title, rows) => ({ type: "custom:spectra-card", title, accent: 4,
+        body: { type: "list", rows: Array.from({ length: rows }, (_, i) => ({ name: `${title} ${i + 1}`, value: "x" })) } });
+      const sky = { type: "custom:spectra-card", title: "Now", accent: 5, body: { type: "sky", hero: "12°", condition: "sunny" } };
+      const plan = [
+        { column: 1, column_span: 2, cards: [list("Clock", 1)] },
+        { column: 1, fill_row: true, cards: [sky] },
+        { column: 2, cards: [list("Who", 6)] },
+        { column: 1, column_span: 2, cards: [list("Today", 2)] },
+      ];
+      const sections = plan.map((c) => {
+        const s = document.createElement("fake-section");
+        s.config = Object.assign({ type: "grid" }, c);
+        return s;
+      });
+      const view = document.createElement("spectra-panel");
+      view.setConfig({ type: "custom:spectra-panel", masonry: true, max_columns: 3, column_min_width: 280 });
+      document.getElementById("a").appendChild(view);
+      view.sections = sections;
+      await new Promise((r) => setTimeout(r, 600));
+      const box = (i) => sections[i].parentElement.getBoundingClientRect();
+      const sky0 = sections[1].querySelector("spectra-card");
+      const canvas = (sky0.shadowRoot || sky0).querySelector(".skycanvas");
+      return { now: box(1), who: box(2), today: box(3),
+        grow: sections[1].parentElement.style.getPropertyValue("--pn-row-grow"),
+        canvas: canvas ? [canvas.width, canvas.height, canvas.clientHeight] : null };
+    });
+    const check = (label, ok, detail) => {
+      console.log(`${ok ? "ok  " : "FAIL"} fill_row @${width}: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`fill_row @${width}: ${label}`);
+    };
+    if (cols > 1) {
+      check("Now ends where Who's home ends", Math.abs(got.now.bottom - got.who.bottom) <= 1, got);
+      check("it grew to get there", parseFloat(got.grow) > 0, got.grow);
+      check("the sky is redrawn at the new height, not stretched",
+        got.canvas && Math.abs(got.canvas[1] / got.canvas[0] - got.canvas[2] / got.now.width) < .02, got.canvas);
+      check("the span-2 card sits flush under both", got.today.top - got.who.bottom <= 24, got);
+    } else {
+      check("alone on its line it is told nothing", got.grow === "", got.grow);
+    }
+    await page.close();
+  }
+
   /* Tabs belong to the browser. The rail's `tab` buttons switch which
      sections this browser shows and touch nothing in the house, so a phone
      changing tab cannot change the wall panel's. Two contexts are two

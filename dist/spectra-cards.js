@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.172.0";
+const VERSION = "0.173.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3981,6 +3981,12 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   position:relative; margin-top:2px; border-radius:4px; overflow:hidden;
   aspect-ratio:576 / 236; max-width:100%; container-type:inline-size;
 }
+/* On a panel a section with "fill_row" is told how much taller (or shorter)
+   to be to match the sections beside it, as --pn-row-grow. The picture's
+   own height is the canvas aspect of the card's width; the sky above the
+   horizon takes up the difference, so the ground band never moves. */
+.card.skycard { container-type:inline-size; }
+.card.skycard .skybox { aspect-ratio:auto; height:calc(100cqw * 236 / 576 + var(--pn-row-grow, 0px)); }
 /* The sky is the whole card. The border stays, because the border is where
    a level would show; inside it, the picture runs edge to edge and the
    title bar sits on it rather than above it. */
@@ -3990,6 +3996,10 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 }
 .card.skycard .skybox { margin:0; border-radius:4px; }
 .skycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+/* day -- the same picture-is-the-card treatment as the sky, at a fixed
+   height so the temperatures and icons read the same at any width. */
+.daybox { position:relative; height:248px; border-radius:4px; overflow:hidden; }
+.daycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
 /* Below the title bar, which is a fixed height whatever the width. */
 .skyread { position:absolute; left:10px; top:max(34px, 14%); pointer-events:none; }
 .skyhero {
@@ -4002,7 +4012,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .skyfc { margin:2px 0 0; font-size:clamp(11px, 2.25cqw, 13px); color:var(--sp-ink-2); }
 .skyfc span { font-family:var(--sp-mono); color:var(--sp-ink); }
 .skybase {
-  position:absolute; left:0; right:0; bottom:0; height:18.64%;
+  position:absolute; left:0; right:0; bottom:0; height:calc(100cqw * 44 / 576);
   display:flex; align-items:center; gap:clamp(10px, 3.5cqw, 22px); padding:0 2.4%;
   font-family:var(--sp-mono); font-size:clamp(11px, 2.4cqw, 14px); color:var(--sp-ink);
   white-space:nowrap; overflow:hidden; pointer-events:none;
@@ -7173,6 +7183,24 @@ function skyMoonPath(ctx, x, y, r, p) {
   ctx.closePath();
 }
 
+/* One cloud, 300 by 140, blurred once here and only drawn after. A blur
+   filter run on every frame is what would make this too heavy for a tablet.
+   `dark` puts the shade underneath, which is what makes a cloud heavy. */
+function skyCloudSprite(dark, top, under) {
+  const c = document.createElement("canvas");
+  c.width = 300; c.height = 140;
+  const x = c.getContext("2d");
+  x.filter = "blur(9px)";
+  for (let i = 0; i < 9; i++) {
+    x.fillStyle = dark && i < 5 ? under : top;
+    x.globalAlpha = .8;
+    x.beginPath();
+    x.arc(60 + i * 22 + skyRand(-10, 10), 80 + skyRand(-22, 14) - (i > 2 && i < 7 ? 18 : 0), skyRand(26, 42), 0, 7);
+    x.fill();
+  }
+  return c;
+}
+
 /* Paints one card's sky. It outlives the canvas: a repaint of the card
    replaces the element, and the painter is handed the new one and carries
    on, so a state change in the house does not restart the rain. */
@@ -7190,6 +7218,8 @@ class SkyPainter {
     this.start = performance.now();
     this.visible = true;
     this.observer = null;
+    this.sizer = null;
+    this.lift = 0;
     this.label = null;
   }
 
@@ -7202,9 +7232,20 @@ class SkyPainter {
     this.label = label;
     if (canvas !== this.canvas) {
       if (this.observer) this.observer.disconnect();
+      if (this.sizer) this.sizer.disconnect();
       this.canvas = canvas;
       this.ctx = canvas.getContext("2d");
       this.size();
+      if (typeof ResizeObserver === "function") {
+        /* The box can change height without the card repainting: the panel
+           matching it to its row. A resized canvas is blank until painted. */
+        this.sizer = new ResizeObserver(() => {
+          if (!this.canvas || !this.scene) return;
+          if (this.size()) this.populate();
+          this.paint(performance.now(), this.still);
+        });
+        this.sizer.observe(canvas);
+      }
       if (typeof IntersectionObserver === "function") {
         /* A tab that is not showing is still on the page. Painting a sky
            nobody can see is a wall panel's battery spent on nothing. */
@@ -7224,11 +7265,21 @@ class SkyPainter {
     else this.run();
   }
 
+  /* The scene is drawn 576 wide and the canvas is as tall as its box at
+     that scale. A box taller than the usual 236 gets more sky above the
+     scene (lift > 0); a shorter one loses some off the top. Nothing below
+     the horizon moves, because the readings sit on the ground band. */
   size() {
     const dpr = Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    const tall = w > 0 && h > 0 ? Math.round(SKY_W * h / w) : SKY_H;
+    const lift = Math.max(-60, tall - SKY_H);
+    const changed = lift !== this.lift;
+    this.lift = lift;
     this.canvas.width = SKY_W * dpr;
-    this.canvas.height = SKY_H * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.canvas.height = (SKY_H + lift) * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
+    return changed;
   }
 
   stop() {
@@ -7239,7 +7290,9 @@ class SkyPainter {
   detach() {
     this.stop();
     if (this.observer) this.observer.disconnect();
+    if (this.sizer) this.sizer.disconnect();
     this.observer = null;
+    this.sizer = null;
     this.canvas = null;
     this.ctx = null;
   }
@@ -7273,18 +7326,7 @@ class SkyPainter {
       draw(c.getContext("2d"));
       return c;
     };
-    /* Blurred once, here, and only drawn after. A blur filter run on every
-       frame is what would make this too heavy for a tablet. */
-    const cloud = (dark, top, under) => make(300, 140, (x) => {
-      x.filter = "blur(9px)";
-      for (let i = 0; i < 9; i++) {
-        x.fillStyle = dark && i < 5 ? under : top;
-        x.globalAlpha = .8;
-        x.beginPath();
-        x.arc(60 + i * 22 + skyRand(-10, 10), 80 + skyRand(-22, 14) - (i > 2 && i < 7 ? 18 : 0), skyRand(26, 42), 0, 7);
-        x.fill();
-      }
-    });
+    const cloud = skyCloudSprite;
     const dot = (r, blur) => make(r * 2 + blur * 4, r * 2 + blur * 4, (x) => {
       x.filter = `blur(${blur}px)`;
       x.fillStyle = tk.snow;
@@ -7327,7 +7369,7 @@ class SkyPainter {
     this.stars = [];
     while (s.stars && this.stars.length < 60) {
       const x = skyRand(0, SKY_W);
-      const y = skyRand(0, SKY_HZ - 25);
+      const y = skyRand(-Math.max(0, this.lift), SKY_HZ - 25);
       if (x < 215 && y < 140) continue;
       this.stars.push({ x, y, p: skyRand(0, 6), s: skyRand(.4, 1.6), r: skyRand(.4, 1.3) });
     }
@@ -7350,7 +7392,9 @@ class SkyPainter {
     const tk = this.tk;
     const A = (c, a) => skyAlpha(ctx, c, a);
     const W = SKY_W, HZ = SKY_HZ;
-    ctx.clearRect(0, 0, W, SKY_H);
+    /* The top of the canvas, which is above 0 when the box is taller. */
+    const T = -Math.max(0, this.lift);
+    ctx.clearRect(0, T, W, SKY_H - T);
 
     /* Where the sun, the moon and the twilight are, this frame. A still
        frame is the moment the scene was made. */
@@ -7360,11 +7404,11 @@ class SkyPainter {
     const top = skyMix(ctx, tk[`${s.day}-top`], tk["night-top"], night);
     const low = skyMix(ctx, tk[`${s.day}-low`], tk["night-low"], night);
     this.low = low;
-    const g = ctx.createLinearGradient(0, 0, 0, HZ);
+    const g = ctx.createLinearGradient(0, T, 0, HZ);
     g.addColorStop(0, top);
     g.addColorStop(1, low);
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, HZ);
+    ctx.fillRect(0, T, W, HZ - T);
 
     const arcAt = (f) => {
       const th = Math.PI * (1 - f);
@@ -7406,7 +7450,7 @@ class SkyPainter {
       this.moonAt = [mx, my];
       const mg = ctx.createRadialGradient(mx, my, 18, mx, my, 120);
       mg.addColorStop(0, A(tk.moon, .28 * night)); mg.addColorStop(.4, A(tk.moon, .07 * night)); mg.addColorStop(1, A(tk.moon, 0));
-      ctx.fillStyle = mg; ctx.fillRect(0, 0, W, HZ);
+      ctx.fillStyle = mg; ctx.fillRect(0, T, W, HZ - T);
       ctx.beginPath(); ctx.arc(mx, my, 22, 0, 7); ctx.fillStyle = A(tk.moon, .1 * night); ctx.fill();
       if (s.moon > .01 && s.moon < .99) {
         ctx.save(); ctx.globalAlpha = night; ctx.shadowColor = tk.moon; ctx.shadowBlur = 18;
@@ -7439,7 +7483,7 @@ class SkyPainter {
       const reach = hidden ? 80 : (risen ? 150 : 190);
       const gl = ctx.createRadialGradient(px, py, 0, px, py, reach);
       gl.addColorStop(0, A(tk.sun, (hidden ? .2 : .3) * dusk)); gl.addColorStop(1, A(tk.sun, 0));
-      ctx.fillStyle = gl; ctx.fillRect(0, 0, W, HZ);
+      ctx.fillStyle = gl; ctx.fillRect(0, T, W, HZ - T);
       if (!hidden) {
         ctx.save(); ctx.shadowColor = tk.sun; ctx.shadowBlur = 30;
         ctx.beginPath(); ctx.arc(px, py, SUN_R, 0, 7); ctx.fillStyle = tk.sun; ctx.fill();
@@ -7530,7 +7574,7 @@ class SkyPainter {
       const e = t - this.flash;
       if (e < 1.2) {
         const a = Math.max(0, (Math.exp(-e * 5) + (e > .18 && e < .3 ? .5 : 0)) * .55);
-        ctx.fillStyle = A(tk.star, a); ctx.fillRect(0, 0, W, HZ);
+        ctx.fillStyle = A(tk.star, a); ctx.fillRect(0, T, W, HZ - T);
         if (e < .45 && this.bolt) {
           /* The glow is a wide faint stroke under a thin bright one, which
              reads as the same halo as a blur and costs two strokes. */
@@ -7565,6 +7609,584 @@ class SkyPainter {
     }
   }
 }
+
+/* ------------------------------------------------------------------
+ * day -- the whole of today, midnight to midnight, as one picture.
+ *
+ * The sky behind it is each hour's own sky, in the Now card's colours, so
+ * the weather changing through the day is the picture changing from left
+ * to right. The solid line is what the garden sensor recorded; the dashed
+ * line is the forecast from now on. Everything before now is dimmed.
+ *
+ * Night is drawn at half the width of day: the hours somebody is awake for
+ * get the room. Along the bottom the day is cut into blocks of equal width,
+ * each with its condition and the temperature at its middle -- an hour each
+ * by day and two by night on a wide card, two and four on a narrow one, so
+ * an icon never gets too small to read across a kitchen.
+ *
+ * The past is not in any entity: the card reads it itself, the sensor's
+ * hourly statistics for the line and the weather's history for the sky.
+ * ------------------------------------------------------------------ */
+const DAY_MS = 86400000;
+const DAY_BAND = 50;
+/* A night hour's width against a day hour's. */
+const DAY_NIGHT = .5;
+/* From this width every daylight hour has a block of its own. */
+const DAY_WIDE = 640;
+/* A block of hours shows the condition most of its hours have; on a tie,
+   the one further up this list, because rain is the thing you plan for. */
+const DAY_WETTER = ["lightning-rainy", "pouring", "lightning", "hail", "snowy-rainy", "snowy", "rainy",
+  "fog", "cloudy", "windy-variant", "exceptional", "partlycloudy", "windy", "sunny", "clear-night"];
+
+function dayMidnight(now) {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/* Today's sunrise and sunset, in hours since midnight. The sun entity only
+   has the next ones, so one already past is the next less a day. */
+function dayTimes(b, mid) {
+  const hour = (v, fallback) => {
+    let t = skyTime(v);
+    if (t === null) return fallback;
+    while (t >= mid + DAY_MS) t -= DAY_MS;
+    while (t < mid) t += DAY_MS;
+    return (t - mid) / 3600000;
+  };
+  const rise = hour(b.rising, 7);
+  const set = hour(b.setting, 19);
+  return set > rise ? { rise, set } : { rise: 7, set: 19 };
+}
+
+/* Everything the picture needs, from the body, what was fetched and the
+   clock: the line before and after now, and each hour's sky. */
+function dayModel(b, got, now) {
+  const mid = dayMidnight(now);
+  const at = (t) => (t - mid) / 3600000;
+  const nowH = at(now);
+  const { rise, set } = dayTimes(b, mid);
+  const live = skyNum(b.now);
+
+  const past = [];
+  for (const r of (got && got.stats) || []) {
+    const t = typeof r.start === "number" ? r.start : skyTime(r.start);
+    const v = Number(r.mean);
+    if (t === null || !Number.isFinite(v)) continue;
+    const h = at(t) + .5;
+    if (h >= 0 && h < nowH - .1) past.push([h, v]);
+  }
+  if (live !== null) past.push([nowH, live]);
+
+  const rows = (Array.isArray(b.hours) ? b.hours : [])
+    .map((r) => ({ h: at(skyTime(r && r.datetime) || NaN), r }))
+    .filter((x) => Number.isFinite(x.h))
+    .sort((x, y) => x.h - y.h);
+  const future = live !== null ? [[nowH, live]] : [];
+  for (const { h, r } of rows) {
+    const v = Number(r.temperature);
+    if (!Number.isFinite(v) || h <= nowH) continue;
+    future.push([h, v]);
+    if (h >= 24) break;
+  }
+
+  const hist = ((got && got.hist) || [])
+    .map((e) => ({ t: Number(e.lu || e.lc || 0) * 1000, s: e.s, a: e.a || {} }))
+    .filter((e) => e.t > 0)
+    .sort((x, y) => x.t - y.t);
+  const histAt = (t) => {
+    let hit = null;
+    for (const e of hist) { if (e.t <= t) hit = e; else break; }
+    return hit || hist[0] || null;
+  };
+  const rowAt = (h) => {
+    let hit = null;
+    for (const x of rows) { if (x.h <= h + 1e-6) hit = x; else break; }
+    return hit || rows[0] || null;
+  };
+  const usable = (c) => !isBlank(c) && c !== "unavailable" && c !== "unknown";
+  const hours = [];
+  for (let i = 0; i < 24; i++) {
+    const h = i + .5;
+    let cond = null;
+    let cover = null;
+    let wet = 0;
+    if (h < nowH) {
+      const e = histAt(mid + h * 3600000);
+      if (e && usable(e.s)) { cond = e.s; cover = skyNum(e.a.cloud_coverage); }
+    }
+    if (!cond) {
+      const x = rowAt(i);
+      if (x && usable(x.r.condition)) {
+        cond = x.r.condition;
+        cover = skyNum(x.r.cloud_coverage);
+        wet = skyNum(x.r.precipitation) || 0;
+      }
+    }
+    const base = SKY_CONDITIONS[cond] || { cover: .4 };
+    const c = Math.min(1, Math.max(base.floor || 0, cover === null ? base.cover : cover / 100));
+    hours.push({ cond: cond || "", cover: c, rain: base.rain || (wet > .2 ? .6 : 0), snow: base.snow || 0 });
+  }
+  return { mid, now: nowH, rise, set, moon: skyNum(b.moon), past, future, hours };
+}
+
+/* The time axis for one width: where day starts and ends on the block
+   grid, how wide an hour is, and the blocks. Day runs between the block
+   edges nearest sunrise and sunset so every block is whole; the sky still
+   fades on the real times. */
+function dayAxis(m, step) {
+  const nb = step * 2;
+  let ds = Math.round(m.rise / nb) * nb;
+  let de = 24 - Math.round((24 - m.set) / nb) * nb;
+  if (de <= ds) { ds = 6; de = 18; }
+  const units = (h) => DAY_NIGHT * Math.min(h, ds) + Math.max(0, Math.min(h, de) - ds) + DAY_NIGHT * Math.max(0, h - de);
+  const total = units(24);
+  const u1 = DAY_NIGHT * ds;
+  const u2 = u1 + (de - ds);
+  const blocks = [];
+  for (const [a, b, size] of [[0, ds, nb], [ds, de, step], [de, 24, nb]]) {
+    for (let h = a; h < b; h += size) blocks.push([h, Math.min(b, h + size)]);
+  }
+  return {
+    blocks,
+    x: (h, w) => units(Math.max(0, Math.min(24, h))) / total * w,
+    hour: (x, w) => {
+      const u = x / w * total;
+      return u < u1 ? u / DAY_NIGHT : u < u2 ? ds + (u - u1) : de + (u - u2) / DAY_NIGHT;
+    },
+  };
+}
+
+/* The temperature at an hour, off the measured line before now and the
+   forecast after it. */
+function dayTempAt(m, h) {
+  const pts = h <= m.now && m.past.length ? m.past : (m.future.length ? m.future : m.past);
+  if (!pts.length) return null;
+  if (h <= pts[0][0]) return pts[0][1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (h <= pts[i + 1][0]) {
+      const k = (h - pts[i][0]) / Math.max(1e-6, pts[i + 1][0] - pts[i][0]);
+      return pts[i][1] + (pts[i + 1][1] - pts[i][1]) * k;
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+
+/* An hour's cover, rain and snow, eased between the hours either side. */
+function dayWeatherAt(m, h) {
+  const p = Math.max(0, Math.min(23, h - .5));
+  const i = Math.floor(p);
+  const j = Math.min(23, i + 1);
+  const k = p - i;
+  const a = m.hours[i];
+  const c = m.hours[j];
+  return {
+    cover: a.cover + (c.cover - a.cover) * k,
+    rain: a.rain + (c.rain - a.rain) * k,
+    snow: a.snow + (c.snow - a.snow) * k,
+  };
+}
+
+/* How high the sun is, as one continuous number: 0 to 1 through the day,
+   falling to -1 over the 1.6 hours either side of it. Every colour of the
+   sky is a smooth function of this, so dawn and dusk are a blend and never
+   a seam. */
+function daySun(m, h) {
+  if (h > m.rise && h < m.set) return Math.sin(Math.PI * (h - m.rise) / (m.set - m.rise));
+  const off = h <= m.rise ? m.rise - h : h - m.set;
+  return -Math.min(1, off / 1.6);
+}
+
+function daySmooth(a, b, v) {
+  const k = Math.max(0, Math.min(1, (v - a) / (b - a)));
+  return k * k * (3 - 2 * k);
+}
+
+/* Each block's condition and temperature. */
+function dayBlocks(m, axis) {
+  return axis.blocks.map(([a, b]) => {
+    const conds = [];
+    for (let h = a; h < b; h += 1) conds.push(m.hours[h].cond);
+    const n = (c) => conds.filter((x) => x === c).length;
+    const rank = (c) => { const i = DAY_WETTER.indexOf(c); return i < 0 ? 99 : i; };
+    const cond = [...new Set(conds)].sort((x, y) => n(y) - n(x) || rank(x) - rank(y))[0] || "";
+    return { a, b, cond, v: dayTempAt(m, (a + b) / 2) };
+  });
+}
+
+/* The cards' own weather art, as paths a canvas can fill. */
+let DAY_ART = null;
+function dayArt() {
+  if (DAY_ART) return DAY_ART;
+  DAY_ART = {};
+  for (const [k, svg] of Object.entries(WEATHER_ART)) {
+    const parts = [];
+    const re = /<path d="([^"]+)" class="(\w+)"\/>/g;
+    let hit;
+    while ((hit = re.exec(svg))) parts.push([new Path2D(hit[1]), hit[2]]);
+    DAY_ART[k] = parts;
+  }
+  return DAY_ART;
+}
+
+const DAY_TOKENS = Object.assign({}, SKY_TOKENS, {
+  ink: "--sp-ink", ink2: "--sp-ink-2", sink: "--sp-sink", surface: "--sp-surface", mono: "--sp-mono",
+  r0: "--sp-ramp-0", r1: "--sp-ramp-1", r2: "--sp-ramp-2", r3: "--sp-ramp-3", r4: "--sp-ramp-4", r5: "--sp-ramp-5",
+});
+
+/* Paints one card's day. Like the sky's painter it outlives the canvas, and
+   it lays itself out for whatever width it is given. */
+class DayPainter {
+  constructor() {
+    this.canvas = null;
+    this.ctx = null;
+    this.model = null;
+    this.tk = {};
+    this.tkRead = -Infinity;
+    this.raf = 0;
+    this.last = 0;
+    this.start = performance.now();
+    this.visible = true;
+    this.observer = null;
+    this.sizer = null;
+    this.w = 0;
+    this.h = 0;
+    this.built = "";
+  }
+
+  get still() {
+    return typeof matchMedia === "function"
+      && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  attach(canvas, model) {
+    if (canvas !== this.canvas) {
+      this.detach();
+      this.canvas = canvas;
+      this.ctx = canvas.getContext("2d");
+      this.tkRead = -Infinity;
+      this.built = "";
+      if (typeof IntersectionObserver === "function") {
+        this.observer = new IntersectionObserver((entries) => {
+          this.visible = entries.some((e) => e.isIntersecting);
+          if (this.visible) this.run();
+        });
+        this.observer.observe(canvas);
+      }
+      if (typeof ResizeObserver === "function") {
+        this.sizer = new ResizeObserver(() => { if (this.model) this.paint(performance.now(), this.still); });
+        this.sizer.observe(canvas);
+      }
+    }
+    this.model = model;
+    if (this.still) this.paint(performance.now(), true);
+    else this.run();
+  }
+
+  stop() {
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  }
+
+  detach() {
+    this.stop();
+    if (this.observer) this.observer.disconnect();
+    if (this.sizer) this.sizer.disconnect();
+    this.observer = null;
+    this.sizer = null;
+    this.canvas = null;
+    this.ctx = null;
+  }
+
+  run() {
+    if (this.raf || this.still || !this.canvas) return;
+    const loop = (now) => {
+      this.raf = 0;
+      if (!this.canvas || !this.canvas.isConnected || !this.visible) return;
+      this.raf = requestAnimationFrame(loop);
+      if (now - this.last < 1000 / SKY_FPS - 2) return;
+      this.paint(now, false);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  tokens() {
+    const cs = getComputedStyle(this.canvas);
+    const tk = {};
+    for (const [k, v] of Object.entries(DAY_TOKENS)) tk[k] = cs.getPropertyValue(v).trim() || (k === "mono" ? "monospace" : "#888");
+    tk.font = cs.fontFamily || "sans-serif";
+    const key = Object.values(tk).join("|");
+    if (key !== this.tkKey) {
+      this.tkKey = key;
+      this.built = "";
+      this.wet = [skyCloudSprite(false, tk.cloud, tk.shade), skyCloudSprite(true, tk.cloud, tk.shade), skyCloudSprite(false, tk.cloud, tk.shade)];
+      this.fair = [skyCloudSprite(false, tk.fair, tk.fairShade), skyCloudSprite(true, tk.fair, tk.fairShade), skyCloudSprite(false, tk.fair, tk.fairShade)];
+    }
+    this.tk = tk;
+  }
+
+  /* The sky's colour at an hour: night to day by how high the sun is, gold
+     where it meets the horizon, and grey by the cloud. */
+  skyAt(h) {
+    const ctx = this.ctx;
+    const tk = this.tk;
+    const m = this.model;
+    const e = daySun(m, h);
+    const wx = dayWeatherAt(m, h);
+    const lightness = daySmooth(-.85, .5, e);
+    const glow = Math.exp(-(((e + .05) / .42) ** 2));
+    let top = skyMix(ctx, tk["night-top"], tk["day-top"], lightness);
+    let low = skyMix(ctx, tk["night-low"], tk["day-low"], lightness);
+    top = skyMix(ctx, top, tk["gold-top"], glow * .45);
+    low = skyMix(ctx, low, tk["gold-low"], glow * .8);
+    const dark = 1 - daySmooth(-.05, .5, e);
+    const gTop = skyMix(ctx, tk["grey-top"], tk["night-top"], dark * .6);
+    const gLow = skyMix(ctx, tk["grey-low"], tk["night-low"], dark * .6);
+    top = skyMix(ctx, top, gTop, wx.cover * .8);
+    low = skyMix(ctx, low, gLow, wx.cover * .8);
+    return { top, low, night: 1 - daySmooth(-.7, -.05, e), ...wx };
+  }
+
+  /* Everything that only changes with the size, the colours or the hours:
+     the sky, column by column, and where the clouds, stars and rain are. */
+  build(w, skyH, axis) {
+    const m = this.model;
+    const key = [w, skyH, this.tkKey, m.rise.toFixed(2), m.set.toFixed(2),
+      m.hours.map((x) => `${x.cond}${x.cover.toFixed(2)}${x.rain}`).join(",")].join("|");
+    if (key === this.built) return;
+    this.built = key;
+    const dpr = Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+    const bg = document.createElement("canvas");
+    bg.width = Math.round(w * dpr); bg.height = Math.round(skyH * dpr);
+    const x = bg.getContext("2d");
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cols = Math.ceil(w);
+    for (let px = 0; px < cols; px += 1) {
+      const s = this.skyAt(axis.hour(px + .5, w));
+      const g = x.createLinearGradient(0, 0, 0, skyH);
+      g.addColorStop(0, s.top); g.addColorStop(1, s.low);
+      x.fillStyle = g;
+      x.fillRect(px, 0, 1.5, skyH);
+    }
+    this.bg = bg;
+    /* Spread over the width, not the hours, so the narrower night is not
+       more crowded than the day. */
+    this.stars = [];
+    for (let i = 0; i < Math.round(w / 7); i++) {
+      const px = skyRand(0, w);
+      const s = this.skyAt(axis.hour(px, w));
+      if (s.night < .05 || s.cover > .7) continue;
+      this.stars.push({ x: px, y: skyRand(4, skyH * .7), r: skyRand(.4, 1.2), p: skyRand(0, 6), s: skyRand(.5, 1.7), k: s.night * (1 - s.cover) });
+    }
+    this.clouds = [];
+    const slot = w / 48;
+    for (let px = 0; px < w; px += slot) {
+      const s = this.skyAt(axis.hour(px + slot / 2, w));
+      const n = Math.round(s.cover * 1.6);
+      const wet = s.rain > .1 || s.snow > .1;
+      for (let i = 0; i < n; i++) {
+        this.clouds.push({
+          x: px + skyRand(-8, 8), y: skyRand(skyH * .02, skyH * .38), sc: skyRand(.2, .34), ph: skyRand(0, 6),
+          img: (wet ? this.wet : this.fair)[i % 3], a: wet ? .35 + .55 * s.cover : .3 + .45 * s.cover,
+        });
+      }
+    }
+    this.drops = [];
+    for (let i = 0; i < Math.round(w / 2.4); i++) {
+      const px = skyRand(0, w);
+      const s = this.skyAt(axis.hour(px, w));
+      if (s.rain <= 0 || Math.random() > s.rain / 2) continue;
+      this.drops.push({ x: px, y: skyRand(0, skyH), z: skyRand(.5, 1) });
+    }
+  }
+
+  glyph(cond, x, y, size, night) {
+    const ctx = this.ctx;
+    const tk = this.tk;
+    const art = dayArt();
+    const fill = { ws: tk.sun, wc: tk.ink2, ww: tk.rain, wa: tk.ink3 };
+    /* After dark a partly cloudy sky is the cloud with a small moon, and a
+       clear one is the night's own picture. */
+    const moonlit = night && cond === "partlycloudy";
+    const key = moonlit ? "cloudy" : (night && cond === "sunny" ? "clear-night" : cond);
+    const parts = art[key] || art.cloudy || [];
+    ctx.save();
+    ctx.translate(x - size / 2, y - size / 2);
+    ctx.scale(size / 24, size / 24);
+    if (moonlit && art["clear-night"]) {
+      ctx.save(); ctx.translate(1, -2); ctx.scale(.55, .55);
+      for (const [p, c] of art["clear-night"]) { ctx.fillStyle = fill[c] || tk.ink2; ctx.fill(p); }
+      ctx.restore();
+    }
+    for (const [p, c] of parts) { ctx.fillStyle = fill[c] || tk.ink2; ctx.fill(p); }
+    ctx.restore();
+  }
+
+  paint(now, once) {
+    const canvas = this.canvas;
+    const m = this.model;
+    if (!this.ctx || !m) return;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (!w || !h) return;
+    const dpr = Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+    if (w !== this.w || h !== this.h) {
+      this.w = w; this.h = h;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      this.built = "";
+    }
+    const ctx = this.ctx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (now - this.tkRead > 2000) { this.tkRead = now; this.tokens(); }
+    const tk = this.tk;
+    const A = (c, a) => skyAlpha(ctx, c, a);
+    const dt = once ? .033 : Math.min(.05, (now - (this.last || now)) / 1000);
+    this.last = now;
+    const t = once ? 4 : (now - this.start) / 1000;
+    const step = w >= DAY_WIDE ? 1 : 2;
+    const axis = dayAxis(m, step);
+    const X = (hh) => axis.x(hh, w);
+    const skyH = h - DAY_BAND;
+    this.build(w, skyH, axis);
+    const nowH = Math.min(24, (Date.now() - m.mid) / 3600000);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(this.bg, 0, 0, w, skyH);
+    for (const o of this.stars) {
+      ctx.fillStyle = A(tk.star, (.2 + .8 * Math.abs(Math.sin(t * o.s + o.p))) * o.k);
+      ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, 7); ctx.fill();
+    }
+
+    /* The sun's path through the daylight, and the sun where it is now. */
+    const horizon = skyH * .8;
+    const amp = horizon * .78;
+    const sunXY = (hh) => [X(hh), horizon - amp * Math.sin(Math.PI * (hh - m.rise) / (m.set - m.rise))];
+    ctx.setLineDash([2, 5]); ctx.strokeStyle = A(tk.sun, .3); ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let hh = m.rise; hh <= m.set + 1e-6; hh += .1) {
+      const [a, b] = sunXY(Math.min(hh, m.set));
+      if (hh === m.rise) ctx.moveTo(a, b); else ctx.lineTo(a, b);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (nowH > m.rise && nowH < m.set) {
+      const [sx, sy] = sunXY(nowH);
+      const cov = dayWeatherAt(m, nowH).cover;
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 70 + 6 * Math.sin(t * .8));
+      g.addColorStop(0, A(tk.sun, .35 * (1 - cov * .6))); g.addColorStop(1, A(tk.sun, 0));
+      ctx.fillStyle = g; ctx.fillRect(sx - 80, sy - 80, 160, 160);
+      ctx.fillStyle = A(tk.sun, 1 - cov * .7); ctx.beginPath(); ctx.arc(sx, sy, 10, 0, 7); ctx.fill();
+    }
+    /* Tonight's moon, in the evening. */
+    if (m.moon !== null) {
+      const mh = Math.min(23.2, m.set + 3.2);
+      const s = this.skyAt(mh);
+      const vis = s.night * (1 - s.cover * .8);
+      if (vis > .05 && m.moon > .01 && m.moon < .99) {
+        const mx = X(mh), my = skyH * .26;
+        const g = ctx.createRadialGradient(mx, my, 4, mx, my, 40);
+        g.addColorStop(0, A(tk.moon, .22 * vis)); g.addColorStop(1, A(tk.moon, 0));
+        ctx.fillStyle = g; ctx.fillRect(mx - 40, my - 40, 80, 80);
+        ctx.globalAlpha = vis; skyMoonPath(ctx, mx, my, 8, m.moon); ctx.fillStyle = tk.moon; ctx.fill(); ctx.globalAlpha = 1;
+      }
+    }
+    /* Clouds bob in their own hours rather than drifting into other ones. */
+    for (const c of this.clouds) {
+      if (!c.img) continue;
+      ctx.globalAlpha = c.a;
+      ctx.drawImage(c.img, c.x - 150 * c.sc + Math.sin(t * .3 + c.ph) * 6, c.y + Math.sin(t * .5 + c.ph) * 2, 300 * c.sc, 140 * c.sc);
+    }
+    ctx.globalAlpha = 1;
+    if (this.drops.length) {
+      ctx.strokeStyle = A(tk.rain, .55); ctx.lineWidth = 1; ctx.beginPath();
+      for (const d of this.drops) {
+        d.y += 160 * d.z * dt;
+        if (d.y > skyH) d.y = -6;
+        ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - 1.5, d.y + 7 * d.z);
+      }
+      ctx.stroke();
+    }
+    /* What has happened is dimmed. */
+    ctx.fillStyle = A(tk.sink, .38);
+    ctx.fillRect(0, 0, X(nowH), skyH);
+
+    const blocks = dayBlocks(m, axis);
+    this.laid = { w, blocks: blocks.map((bl) => ({ a: bl.a, b: bl.b, cond: bl.cond, x0: X(bl.a), x1: X(bl.b) })) };
+    ctx.strokeStyle = A(tk.ink, .07); ctx.lineWidth = 1;
+    for (const bl of blocks.slice(1)) { ctx.beginPath(); ctx.moveTo(X(bl.a), 30); ctx.lineTo(X(bl.a), skyH); ctx.stroke(); }
+
+    /* The line: measured, then forecast, coloured by the climate ramp. */
+    const all = [...m.past, ...m.future].map((p) => p[1]);
+    if (all.length) {
+      const lo = Math.floor(Math.min(...all)) - 1;
+      const hi = Math.ceil(Math.max(...all)) + 1;
+      const Y = (v) => 46 + (1 - (v - lo) / (hi - lo)) * (skyH - 80);
+      const pts = (list) => list.map(([hh, v]) => [X(hh), Y(v)]);
+      const curve = (p) => {
+        ctx.beginPath();
+        ctx.moveTo(p[0][0], p[0][1]);
+        for (let i = 0; i < p.length - 1; i++) {
+          const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+          ctx.bezierCurveTo(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+            p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1]);
+        }
+      };
+      const past = pts(m.past);
+      const fut = pts(m.future);
+      const ramp = ctx.createLinearGradient(0, Y(RAMP_STOPS[0]), 0, Y(RAMP_STOPS[RAMP_STOPS.length - 1]));
+      RAMP_STOPS.forEach((v, i) => ramp.addColorStop(i / (RAMP_STOPS.length - 1), tk[`r${i}`]));
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, w, skyH); ctx.clip();
+      ctx.strokeStyle = A("#000", .35); ctx.lineWidth = 6;
+      if (past.length > 1) { curve(past); ctx.stroke(); }
+      if (fut.length > 1) { curve(fut); ctx.stroke(); }
+      ctx.strokeStyle = ramp;
+      if (past.length > 1) { ctx.lineWidth = 3; curve(past); ctx.stroke(); }
+      if (fut.length > 1) { ctx.setLineDash([5, 5]); ctx.lineWidth = 2.2; curve(fut); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.restore();
+      /* Now: a line through the sky and the reading on it. */
+      if (m.past.length) {
+        const x = X(m.now), y = Y(m.past[m.past.length - 1][1]);
+        ctx.strokeStyle = A(tk.ink, .55); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, 30); ctx.lineTo(x, skyH); ctx.stroke();
+        ctx.fillStyle = A(tk.ink, .25); ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
+        ctx.fillStyle = tk.ink; ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill();
+      }
+      /* Each block's temperature, on the line at its middle. */
+      ctx.font = `500 12px ${tk.mono}`; ctx.textAlign = "center";
+      for (const bl of blocks) {
+        if (bl.v === null) continue;
+        const x = X((bl.a + bl.b) / 2), y = Y(bl.v);
+        ctx.fillStyle = tk.ink; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fill();
+        ctx.strokeStyle = A("#000", .6); ctx.lineWidth = 3;
+        ctx.strokeText(`${Math.round(bl.v)}°`, x, y - 9);
+        ctx.fillText(`${Math.round(bl.v)}°`, x, y - 9);
+      }
+    }
+
+    /* The band: each block's condition and its hours, the one now lifted. */
+    ctx.fillStyle = tk.sink; ctx.fillRect(0, skyH, w, DAY_BAND);
+    ctx.fillStyle = tk.edge; ctx.fillRect(0, skyH, w, 1);
+    for (const bl of blocks) {
+      const midH = (bl.a + bl.b) / 2;
+      const x = X(midH);
+      const isNow = nowH >= bl.a && nowH < bl.b;
+      const gone = bl.b <= nowH;
+      if (isNow) { ctx.fillStyle = A(tk.ink, .08); ctx.fillRect(X(bl.a) + 1, skyH + 1, X(bl.b) - X(bl.a) - 2, DAY_BAND - 1); }
+      ctx.globalAlpha = gone ? .6 : 1;
+      if (bl.cond) this.glyph(bl.cond, x, skyH + 18, 22, midH < m.rise || midH > m.set);
+      const pad = (n) => String(n % 24).padStart(2, "0");
+      ctx.font = `10px ${tk.mono}`; ctx.textAlign = "center";
+      ctx.fillStyle = isNow ? tk.ink : tk.ink2;
+      ctx.fillText(isNow ? "now" : (bl.b - bl.a === 1 ? pad(bl.a) : `${pad(bl.a)}–${pad(bl.b)}`), x, skyH + 43);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+/* What the day card read for itself, shared by every copy of it on the
+   page and kept for ten minutes: the past does not change quickly. */
+const DAY_PAST = new Map();
 
 const BODIES = {
   /* What is worth reading today? */
@@ -8469,6 +9091,13 @@ const BODIES = {
         + `${esc(m.value)}</span>`).join("")}`
       + `<span class="skyleft">${esc(skyLeft(scene.left, scene.up))}</span></div>`
       + `</div>`;
+  },
+
+  /* The whole of today as one picture. See day above: the markup is only
+     the box, and the card paints into it after the markup lands. */
+  day(b) {
+    return `<div class="daybox"><canvas class="daycanvas" role="img"`
+      + ` aria-label="Today's temperature and weather, from midnight to midnight"></canvas></div>`;
   },
 
   /* What is coming, and when? Grouped by day, because a flat list of
@@ -13556,6 +14185,9 @@ class SpectraCard extends HTMLElement {
     if (this._sky && this._model && this._config && this._config.body.type === "sky") {
       this._skyAttach(this._model.body);
     }
+    if (this._day && this._model && this._config && this._config.body.type === "day") {
+      this._dayAttach(this._model.body);
+    }
     if (!this._onOpenTask) {
       /* A Needs you row's Open. The first card that owns the task takes
          it, so two copies of a card on one page do not open it twice. */
@@ -13580,6 +14212,7 @@ class SpectraCard extends HTMLElement {
        with any method defined twice. */
     releaseDrawer(this);
     if (this._sky) this._sky.detach();
+    if (this._day) this._day.detach();
     if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     /* A camera stream left running off-screen is a camera left streaming
        -- but a card is also taken off the page for an instant when the
@@ -14345,7 +14978,7 @@ class SpectraCard extends HTMLElement {
       + (festive ? " festive" : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "")
-      + (type === "sky" ? " skycard" : "");
+      + (type === "sky" || type === "day" ? " skycard" : "");
     /* Drawn as a sibling of the title bar and the body rather than inside
        either, because it belongs to neither: it is the column between them,
        and only a direct child of the card can span the card's rows. */
@@ -14381,6 +15014,60 @@ class SpectraCard extends HTMLElement {
        also had per-row controls, which is what the to-do list is. */
     if (this._paint(card)) this._bind(model);
     if (type === "sky") this._skyAttach(model.body);
+    if (type === "day") this._dayAttach(model.body);
+  }
+
+  /* The day body's painter, and the past it needs: the temperature
+     sensor's hourly means since midnight, and the weather's history for
+     what the sky did. Read here rather than configured, because no entity
+     holds either. */
+  _dayAttach(b) {
+    const canvas = this._holder.querySelector(".daycanvas");
+    if (!canvas) {
+      if (this._day) this._day.stop();
+      return;
+    }
+    if (!this._day) this._day = new DayPainter();
+    const body = b || {};
+    const now = Date.now();
+    const mid = dayMidnight(now);
+    const key = `${body.temperature}|${body.weather}|${mid}`;
+    let hit = DAY_PAST.get(key);
+    if ((!hit || now - hit.at > 600000) && this._hass && typeof this._hass.callWS === "function") {
+      const from = new Date(mid).toISOString();
+      const to = new Date(now).toISOString();
+      const ask = (msg) => Promise.resolve(this._hass.callWS(msg)).catch(() => null);
+      const promise = Promise.all([
+        isBlank(body.temperature) ? null : ask({
+          type: "recorder/statistics_during_period", start_time: from, end_time: to,
+          statistic_ids: [String(body.temperature)], period: "hour", types: ["mean"],
+        }),
+        isBlank(body.weather) ? null : ask({
+          type: "history/history_during_period", start_time: from, end_time: to,
+          entity_ids: [String(body.weather)], minimal_response: false, no_attributes: false,
+          significant_changes_only: false,
+        }),
+      ]).then(([stats, hist]) => ({
+        stats: (stats && stats[String(body.temperature)]) || [],
+        hist: (hist && hist[String(body.weather)]) || [],
+      }));
+      const entry = { at: now, data: hit ? hit.data : null, promise };
+      promise.then((data) => { entry.data = data; });
+      hit = entry;
+      DAY_PAST.set(key, hit);
+      for (const k of DAY_PAST.keys()) if (!k.endsWith(`|${mid}`)) DAY_PAST.delete(k);
+    }
+    /* Every copy of the card waiting on the same read repaints when it lands. */
+    if (hit && this._dayWaits !== hit.promise) {
+      this._dayWaits = hit.promise;
+      hit.promise.then((data) => {
+        if (this._day && this._model && this._config && this._config.body.type === "day") {
+          const live = this._holder.querySelector(".daycanvas");
+          if (live) this._day.attach(live, dayModel(this._model.body || {}, data, Date.now()));
+        }
+      });
+    }
+    this._day.attach(canvas, dayModel(body, hit ? hit.data : null, now));
   }
 
   /* The sky body's painter: one per card, kept across repaints so a light
@@ -23909,10 +24596,39 @@ class SpectraPanel extends HTMLElement {
     }
   }
 
+  /* `fill_row: true` on a section: be as tall as the tallest section that
+     starts on the same line, so two cards side by side end together and
+     whatever spans both beneath them sits flush. The section is told how
+     much to grow as --pn-row-grow, and the card decides what grows -- the
+     sky, on the Now card. Its own height is measured less what it was
+     already told, so the answer does not feed back into itself. Alone on
+     its line (a phone, one column) it is told nothing. */
+  _fillRows() {
+    const fills = this._wrappers.filter((w) => w.section.config && w.section.config.fill_row);
+    for (const w of fills) {
+      const was = parseFloat(w.wrap.style.getPropertyValue("--pn-row-grow")) || 0;
+      const h = w.wrap.offsetHeight;
+      let tallest = 0;
+      if (h > 0) {
+        const top = w.wrap.offsetTop;
+        for (const o of this._wrappers) {
+          if (fills.includes(o)) continue;
+          const oh = o.wrap.offsetHeight;
+          if (oh > 0 && Math.abs(o.wrap.offsetTop - top) < 2) tallest = Math.max(tallest, oh);
+        }
+      }
+      const grow = tallest ? Math.round(tallest - (h - was)) : 0;
+      if (grow === was) continue;
+      if (grow) w.wrap.style.setProperty("--pn-row-grow", `${grow}px`);
+      else w.wrap.style.removeProperty("--pn-row-grow");
+    }
+  }
+
   /* Masonry: how many 4px rows each section needs, gap included. The
      section is aligned to the start of its area, so its height is its own
      and never the span's -- measuring it cannot feed back into itself. */
   _spanRows() {
+    this._fillRows();
     if (!this._config.masonry) return;
     const gap = parseFloat(getComputedStyle(this).getPropertyValue("--pn-row-gap")) || 20;
     for (const w of this._wrappers) {
