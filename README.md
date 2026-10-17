@@ -1017,6 +1017,14 @@ body:
   setting: {entity: sun.sun, attribute: next_setting}
   moon: {entity: sensor.moon, attribute: cycle}
   metrics: [...]
+  hero_note_label: Humidity      # says what the small figure is (on sky too)
+  # ...the rain to come, as the Rest of today card said it...
+  rain_note:
+    join:
+      - {forecast: weather.home, type: hourly, limit: 24, where: {field: precipitation, above: 0},
+         field: datetime, format: time, prefix: "Rain ", fallback: "Dry 24h"}
+      - {forecast: weather.home, type: daily, index: 0, field: precipitation, suffix: "mm today"}
+    separator: " · "
   # ...and the hours ahead
   hours: {forecast: weather.home, type: hourly}
 ```

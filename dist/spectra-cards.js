@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.174.2";
+const VERSION = "0.175.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4008,6 +4008,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .aheadbox .skyhero { font-size:clamp(34px, 5.6cqw, 60px); }
 .aheadbox .skycond, .aheadbox .heronote { font-size:clamp(12px, 1.6cqw, 15px); }
 .aheadbox .skyfc { font-size:clamp(11px, 1.4cqw, 13px); }
+.aheadrain { color:var(--sp-ink); }
 .aheadleft { margin:6px 0 0; font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink-2); }
 .aheadbox .skybase { height:var(--ahead-band, 50px); right:auto; width:var(--ahead-now, 40%); box-sizing:border-box;
   font-size:clamp(11px, 1.4cqw, 14px); gap:clamp(8px, 1.6cqw, 18px); }
@@ -4026,6 +4027,10 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   font-size:clamp(30px, 9.7cqw, 56px); letter-spacing:-.03em; color:var(--sp-ink);
 }
 .skyhero .heronote { letter-spacing:0; font-size:clamp(12px, 2.6cqw, 15px); }
+/* What the small figure is, over it: a bare percentage beside a temperature
+   reads as anything. */
+.skyhero .heronote i { display:block; font-style:normal; font-family:var(--sp-font, inherit); font-size:9px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--sp-ink-3); margin-bottom:2px; }
 .skycond { margin:4px 0 0; font-size:clamp(12px, 2.6cqw, 15px); color:var(--sp-ink); }
 .skyfc { margin:2px 0 0; font-size:clamp(11px, 2.25cqw, 13px); color:var(--sp-ink-2); }
 .skyfc span { font-family:var(--sp-mono); color:var(--sp-ink); }
@@ -9595,7 +9600,9 @@ const BODIES = {
     const read = [];
     if (!isBlank(b.hero)) {
       read.push(`<p class="skyhero">${esc(b.hero)}`
-        + (isBlank(b.hero_note) ? "" : `<span class="heronote">${esc(b.hero_note)}</span>`)
+        + (isBlank(b.hero_note) ? "" : `<span class="heronote">`
+          + (isBlank(b.hero_note_label) ? "" : `<i>${esc(b.hero_note_label)}</i>`)
+          + `${esc(b.hero_note)}</span>`)
         + `</p>`);
     }
     if (!isBlank(b.text)) read.push(`<p class="skycond">${esc(b.text)}</p>`);
@@ -9625,7 +9632,9 @@ const BODIES = {
     const read = [];
     if (!isBlank(b.hero)) {
       read.push(`<p class="skyhero">${esc(b.hero)}`
-        + (isBlank(b.hero_note) ? "" : `<span class="heronote">${esc(b.hero_note)}</span>`)
+        + (isBlank(b.hero_note) ? "" : `<span class="heronote">`
+          + (isBlank(b.hero_note_label) ? "" : `<i>${esc(b.hero_note_label)}</i>`)
+          + `${esc(b.hero_note)}</span>`)
         + `</p>`);
     }
     if (!isBlank(b.text)) read.push(`<p class="skycond">${esc(b.text)}</p>`);
@@ -9633,6 +9642,9 @@ const BODIES = {
       read.push(`<p class="skyfc">${esc(isBlank(b.forecast_label) ? "Forecast" : b.forecast_label)} `
         + `<span>${esc(b.forecast_temperature)}</span></p>`);
     }
+    /* When it next rains, or that it will not, and how much: the line the
+       Rest of today card carried in its title bar. */
+    if (!isBlank(b.rain_note)) read.push(`<p class="skyfc aheadrain">${esc(b.rain_note)}</p>`);
     const metrics = (Array.isArray(b.metrics) ? b.metrics : []).filter((m) => m && !isBlank(m.value));
     const said = [b.text, b.hero].filter((v) => !isBlank(v)).join(", ");
     return `<div class="aheadbox">`
