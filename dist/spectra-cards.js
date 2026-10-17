@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.171.2";
+const VERSION = "0.172.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -108,6 +108,9 @@ const TOKENS_LIGHT = `
   --sp-sky-storm-top:#9DA1AD; --sp-sky-storm-low:#D3D0C8;
   --sp-sky-night-top:#AFB8CF; --sp-sky-night-low:#DCDCDD;
   --sp-sky-cloud:#FBFAF6; --sp-sky-cloud-shade:#D5D2CA;
+  /* Clouds that are not raining. Lighter than the rain clouds above, so an
+     overcast dry afternoon does not look like it is about to pour. */
+  --sp-sky-fair:#FFFFFF; --sp-sky-fair-shade:#E4E1DA;
   --sp-sky-moon:#F7F3E8; --sp-sky-star:#FFFFFF; --sp-sky-snow:#FFFFFF;
   /* Salt, on the softener card. A DEPICTION, like --sp-sun: salt is white in
      both themes, so these do not follow paper and ink into the dark. Three
@@ -185,6 +188,7 @@ const TOKENS_DARK = `
   --sp-sky-storm-top:#121419; --sp-sky-storm-low:#23211D;
   --sp-sky-night-top:#0B0F1C; --sp-sky-night-low:#1E1D1A;
   --sp-sky-cloud:#46433C; --sp-sky-cloud-shade:#2C2A25;
+  --sp-sky-fair:#A29E96; --sp-sky-fair-shade:#75716A;
   --sp-sky-moon:#E6E0D2; --sp-sky-star:#E6E0D2; --sp-sky-snow:#F0EBE0;
   --sp-salt-top:#EDE8DC; --sp-salt-front:#CFC8B7; --sp-salt-side:#ADA591;
   --sp-salt-line:#6F695C;
@@ -7077,6 +7081,7 @@ const SKY_TOKENS = {
   "storm-top": "--sp-sky-storm-top", "storm-low": "--sp-sky-storm-low",
   "night-top": "--sp-sky-night-top", "night-low": "--sp-sky-night-low",
   cloud: "--sp-sky-cloud", shade: "--sp-sky-cloud-shade",
+  fair: "--sp-sky-fair", fairShade: "--sp-sky-fair-shade",
   moon: "--sp-sky-moon", star: "--sp-sky-star", snow: "--sp-sky-snow",
   sun: "--sp-sun", rain: "--sp-a5", ground: "--sp-sink", edge: "--sp-edge",
   ink3: "--sp-ink-3",
@@ -7256,12 +7261,12 @@ class SkyPainter {
     const tk = {};
     for (const [k, v] of Object.entries(SKY_TOKENS)) tk[k] = cs.getPropertyValue(v).trim() || "#888";
     this.tk = tk;
-    if (this.spritesFor !== tk.cloud + tk.shade + tk.snow) this.sprites();
+    if (this.spritesFor !== tk.cloud + tk.shade + tk.fair + tk.fairShade + tk.snow) this.sprites();
   }
 
   sprites() {
     const tk = this.tk;
-    this.spritesFor = tk.cloud + tk.shade + tk.snow;
+    this.spritesFor = tk.cloud + tk.shade + tk.fair + tk.fairShade + tk.snow;
     const make = (w, h, draw) => {
       const c = document.createElement("canvas");
       c.width = w; c.height = h;
@@ -7270,10 +7275,10 @@ class SkyPainter {
     };
     /* Blurred once, here, and only drawn after. A blur filter run on every
        frame is what would make this too heavy for a tablet. */
-    const cloud = (dark) => make(300, 140, (x) => {
+    const cloud = (dark, top, under) => make(300, 140, (x) => {
       x.filter = "blur(9px)";
       for (let i = 0; i < 9; i++) {
-        x.fillStyle = dark && i < 5 ? tk.shade : tk.cloud;
+        x.fillStyle = dark && i < 5 ? under : top;
         x.globalAlpha = .8;
         x.beginPath();
         x.arc(60 + i * 22 + skyRand(-10, 10), 80 + skyRand(-22, 14) - (i > 2 && i < 7 ? 18 : 0), skyRand(26, 42), 0, 7);
@@ -7287,15 +7292,26 @@ class SkyPainter {
       x.arc(r + blur * 2, r + blur * 2, r, 0, 7);
       x.fill();
     });
-    this.cloudSprites = [cloud(false), cloud(true), cloud(false)];
+    /* Two sets: rain clouds, dark, and the lighter grey of cloud that is only
+       cloud. Which a sky uses is decided by whether anything is falling. */
+    this.cloudSprites = [cloud(false, tk.cloud, tk.shade), cloud(true, tk.cloud, tk.shade), cloud(false, tk.cloud, tk.shade)];
+    this.fairSprites = [cloud(false, tk.fair, tk.fairShade), cloud(true, tk.fair, tk.fairShade), cloud(false, tk.fair, tk.fairShade)];
     this.flakeSprites = [dot(1.5, .5), dot(3, 1.5), dot(6, 4)];
-    if (this.clouds) this.clouds.forEach((c, i) => { c.img = this.cloudSprites[i % 3]; });
+    if (this.clouds) this.clouds.forEach((c, i) => { c.img = this.cloudSet()[i % 3]; });
+  }
+
+  /* Rain, snow and storm clouds are dark; anything else is fair-weather grey. */
+  cloudSet() {
+    const s = this.scene;
+    const wet = Boolean(s && (s.rain || s.snow || s.bolt));
+    this.wet = wet;
+    return wet ? this.cloudSprites : this.fairSprites;
   }
 
   populate() {
     const s = this.scene;
     const n = s.cover >= .8 ? 9 : Math.round(s.cover * 8);
-    const spr = this.cloudSprites || [];
+    const spr = this.cloudSet() || [];
     this.clouds = Array.from({ length: n }, (_, i) => ({
       x0: skyRand(0, SKY_W + 300), y: skyRand(-40, s.cover >= .8 ? 30 : 50),
       depth: [.35, .65, 1][i % 3], sc: skyRand(.8, 1.3), img: spr[i % 3],

@@ -980,6 +980,10 @@ not drawn where the moon really is, which would leave it missing on most
 evenings and up in the daytime on the rest. With no `moon` there is no moon,
 only stars.
 
+**Rain clouds are dark; other clouds are not.** Cloud that is only cloud is a
+lighter grey (`--sp-sky-fair`), so an overcast dry afternoon does not read as
+rain on the way. Rain, snow and storm clouds keep the dark grey.
+
 **The sky is a depiction, not a palette.** Clear is blue, the hour around
 sunrise and sunset is warm, overcast is grey, a storm is darker, night is
 near black. These are their own `--sp-sky-*` tokens, kept pale enough that a

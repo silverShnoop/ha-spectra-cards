@@ -260,6 +260,28 @@ const BODY = {
   check("a lightning strike fits the frame budget", strike.struck && strike.median < 33,
     `median ${strike.median.toFixed(1)}ms, struck=${strike.struck}`);
 
+  /* Cloud that is only cloud is the lighter grey; rain clouds are dark. */
+  const greys = await page.evaluate((body) => {
+    const out = {};
+    for (const condition of ["cloudy", "rainy"]) {
+      const host = document.getElementById("host");
+      host.innerHTML = "";
+      host.style.width = "600px";
+      const el = document.createElement("spectra-card");
+      el.setConfig({ type: "custom:spectra-card", accent: 5, title: "Now", body: { ...body, condition, cloud_cover: 100 } });
+      host.appendChild(el);
+      el.hass = { states: {} };
+      const sky = el._sky;
+      sky.stop();
+      sky.paint(performance.now(), false);
+      out[condition] = { wet: sky.wet, fair: sky.clouds.length > 0 && sky.clouds.every((c) => sky.fairSprites.includes(c.img)) };
+      el.remove();
+    }
+    return out;
+  }, BODY);
+  check("dry cloud is drawn in the lighter grey", greys.cloudy.fair && !greys.cloudy.wet, JSON.stringify(greys.cloudy));
+  check("rain cloud stays dark", !greys.rainy.fair && greys.rainy.wet, JSON.stringify(greys.rainy));
+
   /* Reduced motion: one frame, then nothing. */
   const still = await (async () => {
     const ctx = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 900, height: 900 } });
