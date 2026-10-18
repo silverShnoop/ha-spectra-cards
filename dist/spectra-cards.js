@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.183.0";
+const VERSION = "0.183.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3870,9 +3870,13 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    card's; the tabs inside it are a step tighter, so the two curves nest. */
 .dock { display:flex; flex-wrap:wrap; gap:4px; padding:4px;
   background:var(--sp-sink); border:2px solid var(--sp-edge); border-radius:6px; }
+/* Each tab is a tile of its own, half way between the track and a card,
+   with an edge, so the tabs read as buttons against the track; the
+   selected one goes the rest of the way to a card's surface. */
 .dockbtn {
   flex:1 1 var(--sp-dock-basis, 130px); min-width:0; position:relative;
-  background:transparent; border:2px solid transparent;
+  background:color-mix(in srgb, var(--sp-surface) 55%, var(--sp-sink));
+  border:2px solid var(--sp-edge);
   border-radius:4px; padding:9px 10px; cursor:pointer;
 }
 /* A domain with something live takes its accent on the edge. The summary
@@ -3887,7 +3891,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    shadow under it, an ink edge, and the label in full ink at heavier weight.
    None of them reads as a colour, so all three survive a button that is also
    filled red, and all three survive being looked at in the dark. */
-.dockbtn.selected { border-color:var(--sp-ink-3); }
+.dockbtn.selected { border-color:var(--sp-ink-2); }
 /* Raised out of the track: the surface a card has, and a shadow under it. */
 .dockbtn.selected { background:var(--sp-surface); box-shadow:0 2px 0 rgba(0, 0, 0, .28); }
 .dockbtn.selected:not(.fill) .dockhead h4 { color:var(--sp-ink); }
@@ -25811,6 +25815,10 @@ const loadReport = {
       const secs = (ms) => `${Math.max(0, Math.round(ms / 1000))}s`;
       const parts = [
         `load=${nav.type || "unknown"}`,
+        /* Which code this load is running: a panel that went on drawing
+           last week's cards after an install was a cache, and this is how
+           to tell from the log rather than by eye. */
+        `version=${VERSION}`,
         `discarded=${document.wasDiscarded ? "yes" : "no"}`,
         `from=${from}`,
       ];
