@@ -4060,7 +4060,21 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    ahead. The painter says where now ends, as --ahead-now, and the readings
    and the figures keep to it. */
 .aheadbox { position:relative; height:calc(264px + max(0px, var(--pn-row-grow, 0px))); border-radius:4px; overflow:hidden; container-type:inline-size; }
-.aheadcanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.aheadcanvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:pan-y; }
+/* Looking ahead: the way back at the top right, counting down as a ring,
+   and the day and hour at the line. Only while the hours are pulled. */
+.aheadback { position:absolute; top:7px; right:8px; z-index:3; display:flex; align-items:center; gap:7px;
+  padding:4px 10px 4px 7px; border:1px solid var(--sp-edge); border-radius:6px; cursor:pointer;
+  background:color-mix(in srgb, var(--sp-paper) 80%, transparent); color:var(--sp-ink);
+  font:inherit; font-family:var(--sp-mono); font-size:11px; }
+.aheadback[hidden], .aheadwhen[hidden] { display:none; }
+.card.looking > .titlebar .meta { visibility:hidden; }
+.aheadback svg { width:15px; height:15px; flex:none; }
+.aheadback .track { stroke:var(--sp-ink-3); opacity:.4; }
+.aheadback .ring { stroke:var(--sp-ink); }
+.aheadwhen { position:absolute; top:34px; left:calc(var(--ahead-now, 40%) + 8px); z-index:3; pointer-events:none;
+  padding:2px 7px; border-radius:4px; background:color-mix(in srgb, var(--sp-paper) 72%, transparent);
+  font-family:var(--sp-mono); font-size:11px; color:var(--sp-ink); }
 /* diary -- the weather a narrow strip of columns that line up down the
    week; everything else the diary. The card gives its rows the full width. */
 .card.diarycard { padding:0; overflow:hidden; }
@@ -8524,6 +8538,77 @@ function aheadAxis(m, step) {
 }
 
 class AheadPainter extends DayPainter {
+  /* Looking ahead: a finger (or a wheel) drags the hours past the now line,
+     they glide to a stop, and after `returnAfter` ms untouched they ease
+     back, so the panel always reads from the present when nobody is at it.
+     Now itself never moves. `sc` is how far the hours are pulled, in px. */
+  bindScroll(canvas) {
+    if (this.boundTo === canvas) return;
+    this.boundTo = canvas;
+    this.sc = this.sc || 0;
+    this.vel = 0;
+    const local = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return (e.clientX - r.left) * (canvas.clientWidth / (r.width || 1));
+    };
+    const scale = () => canvas.clientWidth / (canvas.getBoundingClientRect().width || 1);
+    let drag = null;
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!this.laid || local(e) < this.laid.x0) return;
+      drag = { x: e.clientX, t: performance.now() };
+      this.vel = 0; this.home = null; this.touched = performance.now();
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const now = performance.now();
+      const dx = (e.clientX - drag.x) * scale();
+      const max = this.maxSc || 0;
+      const give = this.sc < 0 || this.sc > max ? .5 : 1;
+      this.sc -= dx * give;
+      this.vel = -dx / Math.max(1, now - drag.t) * 16;
+      drag = { x: e.clientX, t: now };
+      this.touched = now;
+    });
+    const up = () => { if (drag) { drag = null; this.touched = performance.now(); } };
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
+    canvas.addEventListener("wheel", (e) => {
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : (e.shiftKey ? e.deltaY : 0);
+      if (!d) return;
+      e.preventDefault();
+      this.sc = Math.max(0, Math.min(this.maxSc || 0, this.sc + d));
+      this.vel = 0; this.home = null; this.touched = performance.now();
+    }, { passive: false });
+    this.dragging = () => Boolean(drag);
+  }
+
+  /* One step of the scroll's motion, once a frame. */
+  stepScroll(now) {
+    const max = this.maxSc || 0;
+    if (this.dragging && this.dragging()) { this.stepAt = now; return; }
+    if (this.home) {
+      const k = Math.min(1, (now - this.home.at) / this.home.ms);
+      this.sc = this.home.from + (this.home.to - this.home.from) * (1 - Math.pow(1 - k, 3));
+      if (k >= 1) this.home = null;
+      return;
+    }
+    /* The glide is measured in time, not frames, so a slow panel drawing
+       fewer of them glides as far and as long as a fast one. */
+    const f = Math.min(4, Math.max(0, (now - (this.stepAt || now)) / 16.7));
+    this.stepAt = now;
+    if (Math.abs(this.vel) > .05) { this.sc += this.vel * f; this.vel *= Math.pow(.94, f); this.touched = now; }
+    if (this.sc < 0) this.sc += (0 - this.sc) * .2;
+    else if (this.sc > max) this.sc += (max - this.sc) * .2;
+    if (Math.abs(this.sc) < .5 && this.sc < 1) this.sc = Math.max(0, this.sc);
+    if (this.sc > 1 && now - (this.touched || 0) > this.returnAfter) this.goHome(now);
+  }
+
+  goHome(now) {
+    this.vel = 0;
+    this.home = { from: this.sc, to: 0, at: now || performance.now(), ms: 900 };
+  }
+
   /* The sky's colour at an hour, as on the Today card. */
   skyAt(h) {
     const ctx = this.ctx;
@@ -8649,8 +8734,23 @@ class AheadPainter extends DayPainter {
     this.build(w, skyH, L);
     const U = this.axis.U;
     const nowH = (Date.now() - m.mid) / 3600000;
-    const X = (hh) => x0 + (U(hh) - U(nowH)) * px;
-    const off = U(nowH) * px - x0;
+    if (!once) this.bindScroll(canvas);
+    /* As far as the hourly forecast goes, less what already shows. */
+    const lastH = m.rows && m.rows.length ? m.rows[m.rows.length - 1].h + 1 : nowH;
+    this.maxSc = Math.max(0, (U(Math.min(lastH, this.axis.H1)) - U(nowH)) * px - (w - x0) + 12);
+    this.returnAfter = this.returnAfter || 30000;
+    if (!once) this.stepScroll(performance.now());
+    const sc = once ? 0 : (this.sc || 0);
+    const X = (hh) => x0 + (U(hh) - U(nowH)) * px - sc;
+    const off = U(nowH) * px - x0 + sc;
+    /* The hour at the line: now, or as far ahead as the hours are pulled. */
+    let leadH = nowH;
+    if (sc > 0) {
+      let lo = nowH;
+      let hi = this.axis.H1;
+      for (let i = 0; i < 30; i++) { const mm = (lo + hi) / 2; if (X(mm) < x0) lo = mm; else hi = mm; }
+      leadH = lo;
+    }
     const box = canvas.parentNode;
     if (box && box.style && box.style.getPropertyValue("--ahead-now") !== `${x0}px`) {
       box.style.setProperty("--ahead-now", `${x0}px`);
@@ -8661,7 +8761,7 @@ class AheadPainter extends DayPainter {
     ctx.clearRect(0, 0, w, h);
     /* The hours ahead, sliding left. */
     const F = Math.min(90, Math.round(x0 * .4));
-    const sx = U(nowH) * px - F;
+    const sx = U(nowH) * px + sc - F;
     const sw = Math.min(w - x0 + F, this.strip.width - Math.max(0, sx));
     if (sw > 0) ctx.drawImage(this.strip, Math.max(0, sx), 0, sw, skyH, x0 - F + Math.max(0, -sx), 0, sw, skyH);
     /* The sky now, behind the readings, fading into the strip at the line. */
@@ -8707,12 +8807,12 @@ class AheadPainter extends DayPainter {
     /* Their paths ahead: where the sun will be at each hour to come, and
        the moon after it, dotted. They start on the now line, so each sits
        at the head of its own path and the path comes to meet it. */
-    let pathEnd = nowH;
+    let pathEnd = leadH;
     while (X(pathEnd) < w + 10 && pathEnd < this.axis.H1) pathEnd += .1;
     const trace = (alt, y, colour) => {
       ctx.beginPath();
       let on = false;
-      for (let hh = nowH; hh <= pathEnd; hh += .1) {
+      for (let hh = leadH; hh <= pathEnd; hh += .1) {
         const v = alt(hh);
         if (v <= 0) { on = false; continue; }
         const x = X(hh);
@@ -8829,28 +8929,30 @@ class AheadPainter extends DayPainter {
 
     /* The forecast line, from the reading now, with each block's
        temperature on it. */
-    let end = nowH;
+    let end = leadH;
     while (X(end) < w + 20 && end < this.axis.H1) end += .25;
     const vals = [];
     for (let hh = nowH; hh <= end; hh += .25) { const v = aheadTempAt(m, hh); if (v !== null) vals.push(v); }
-    const blocks = this.axis.blocks.filter(([a, b]) => b > nowH && X(Math.max(a, nowH)) < w);
+    const blocks = this.axis.blocks.filter(([a, b]) => b > leadH && X(Math.max(a, leadH)) < w);
     if (vals.length) {
       const lo = Math.floor(Math.min(...vals)) - 1;
       const hi = Math.ceil(Math.max(...vals)) + 1;
       const top = Math.max(56, skyH * .5);
       const Y = (v) => top + (1 - (v - lo) / (hi - lo)) * (skyH - top - 24);
       const pts = [];
-      for (let hh = nowH; hh <= end; hh += .25) { const v = aheadTempAt(m, hh); if (v !== null) pts.push([X(hh), Y(v)]); }
+      for (let hh = leadH; hh <= end; hh += .25) { const v = aheadTempAt(m, hh); if (v !== null) pts.push([X(hh), Y(v)]); }
       const ramp = ctx.createLinearGradient(0, Y(RAMP_STOPS[0]), 0, Y(RAMP_STOPS[RAMP_STOPS.length - 1]));
       RAMP_STOPS.forEach((v, i) => ramp.addColorStop(i / (RAMP_STOPS.length - 1), tk[`r${i}`]));
       const path = () => { ctx.beginPath(); pts.forEach(([a, b], i) => (i ? ctx.lineTo(a, b) : ctx.moveTo(a, b))); };
       ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.strokeStyle = A("#000", .4); ctx.lineWidth = 6; path(); ctx.stroke();
-      ctx.strokeStyle = ramp; ctx.setLineDash([5, 5]); ctx.lineDashOffset = (U(nowH) * px) % 10;
+      ctx.strokeStyle = ramp; ctx.setLineDash([5, 5]); ctx.lineDashOffset = (U(nowH) * px + sc) % 10;
       ctx.lineWidth = 2.2; path(); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
-      const ny = Y(aheadTempAt(m, nowH));
+      const ny = Y(aheadTempAt(m, leadH));
+      ctx.globalAlpha = sc > 1 ? .45 : 1;
       ctx.fillStyle = A(tk.ink, .25); ctx.beginPath(); ctx.arc(x0, ny, 9, 0, 7); ctx.fill();
       ctx.fillStyle = tk.ink; ctx.beginPath(); ctx.arc(x0, ny, 4.5, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
       ctx.font = `500 ${L.icon > 24 ? 14 : 12}px ${tk.mono}`; ctx.textAlign = "center";
       for (const [a, b] of blocks) {
         const x = X((a + b) / 2);
@@ -8878,8 +8980,15 @@ class AheadPainter extends DayPainter {
       /* The block now is in is what Now shows, so it bows out early in its
          own time; the ones ahead stay whole until they get there. */
       const bw = X(b) - X(a);
-      ctx.globalAlpha = a <= nowH ? daySmooth(x0 + bw * .3, x0 + bw * .5, x) : 1;
-      if (a > nowH) { ctx.beginPath(); ctx.moveTo(X(a), 30); ctx.lineTo(X(a), skyH); ctx.stroke(); }
+      ctx.globalAlpha = a <= leadH ? daySmooth(x0 + bw * .3, x0 + bw * .5, x) : 1;
+      if (a > leadH) { ctx.beginPath(); ctx.moveTo(X(a), 30); ctx.lineTo(X(a), skyH); ctx.stroke(); }
+      /* Midnight: the day's name at the head of its first block, so 06:00
+         tomorrow is never read as this morning. */
+      if (a > leadH && a % 24 === 0) {
+        ctx.save(); ctx.globalAlpha = 1; ctx.font = `600 10px ${tk.mono}`; ctx.textAlign = "left"; ctx.fillStyle = tk.ink;
+        ctx.fillText(new Date(m.mid + a * 3600000).toLocaleDateString([], { weekday: "short" }).toUpperCase(), X(a) + 5, 62);
+        ctx.restore();
+      }
       const conds = [];
       for (let hh = Math.floor(a); hh < b; hh += 1) conds.push(aheadAt(m, hh + .5).cond);
       const count = (c) => conds.filter((z) => z === c).length;
@@ -8894,6 +9003,35 @@ class AheadPainter extends DayPainter {
     }
     ctx.globalAlpha = 1;
     this.laid.blocks = shown;
+    this.laid.sc = sc;
+    this.laid.leadH = leadH;
+    this.laid.maxSc = this.maxSc;
+
+    /* The way back, and where the line has got to, only while looking ahead. */
+    if (!once && box) {
+      const back = box.querySelector(".aheadback");
+      const tag = box.querySelector(".aheadwhen");
+      const away = sc > 1;
+      const card = box.closest && box.closest(".card");
+      if (card && card.classList.contains("looking") !== away) card.classList.toggle("looking", away);
+      if (back) {
+        if (back.hidden === away) back.hidden = !away;
+        if (!back.bound) { back.bound = true; back.addEventListener("click", (e) => { e.stopPropagation(); this.goHome(); }); }
+        if (away) {
+          const left = Math.min(this.returnAfter, Math.max(0, this.returnAfter - (performance.now() - (this.touched || 0))));
+          const ring = back.querySelector(".ring");
+          if (ring) ring.style.strokeDashoffset = String(50.27 * (1 - left / this.returnAfter));
+        }
+      }
+      if (tag) {
+        if (tag.hidden === away) tag.hidden = !away;
+        if (away) {
+          const at = new Date(m.mid + leadH * 3600000);
+          const text = `${at.toLocaleDateString([], { weekday: "short" })} ${String(at.getHours()).padStart(2, "0")}:${String(Math.floor(at.getMinutes() / 15) * 15).padStart(2, "0")}`;
+          if (tag.textContent !== text) tag.textContent = text;
+        }
+      }
+    }
 
     /* The light left counts down by the minute, between renders. */
     if (this.label && !once && now - (this.labelAt || 0) > 20000) {
@@ -10892,7 +11030,12 @@ const BODIES = {
     const metrics = (Array.isArray(b.metrics) ? b.metrics : []).filter((m) => m && !isBlank(m.value));
     const said = [b.text, b.hero].filter((v) => !isBlank(v)).join(", ");
     return `<div class="aheadbox">`
-      + `<canvas class="aheadcanvas" role="img" aria-label="${esc(said || "Sky")}, and the hours ahead"></canvas>`
+      + `<canvas class="aheadcanvas" role="img" aria-label="${esc(said || "Sky")}, and the hours ahead. Drag to look further ahead."></canvas>`
+      + `<button class="aheadback" type="button" hidden aria-label="Back to now">`
+      + `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke-width="2" class="track"/>`
+      + `<circle cx="10" cy="10" r="8" fill="none" stroke-width="2" class="ring" stroke-dasharray="50.27" transform="rotate(-90 10 10)"/></svg>`
+      + `<span>Back to now</span></button>`
+      + `<span class="aheadwhen" hidden></span>`
       + `<div class="skyread">${read.join("")}<p class="aheadleft skyleft">${esc(skyLeft(scene.left, scene.up))}</p></div>`
       + `<div class="skybase">${metrics.map((m) => `<span>`
         + (isBlank(m.label) ? "" : `<i>${esc(m.label)}</i>`)
@@ -16985,6 +17128,7 @@ class SpectraCard extends HTMLElement {
     }
     if (!this._ahead) this._ahead = new AheadPainter();
     this._ahead.label = this._holder.querySelector(".aheadleft");
+    this._ahead.returnAfter = Math.max(3, Number((b || {}).return_after) || 30) * 1000;
     this._ahead.attach(canvas, aheadModel(b || {}, Date.now()));
   }
 
