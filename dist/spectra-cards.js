@@ -3865,11 +3865,15 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 /* dock — the domain rail along the bottom. Not a cell: it is chrome, so it
    does not use the shell. Domain-based, never room-based; room selection
    lives inside each pop-up. */
-.dock { display:flex; flex-wrap:wrap; gap:10px; }
+/* One track holding every tab, so the rail reads as a single control from
+   across a room rather than as another row of cards. Its corners are a
+   card's; the tabs inside it are a step tighter, so the two curves nest. */
+.dock { display:flex; flex-wrap:wrap; gap:4px; padding:4px;
+  background:var(--sp-sink); border:2px solid var(--sp-edge); border-radius:6px; }
 .dockbtn {
   flex:1 1 var(--sp-dock-basis, 130px); min-width:0; position:relative;
-  background:var(--sp-surface); border:2px solid var(--sp-edge);
-  border-radius:6px; padding:9px 10px; cursor:pointer;
+  background:transparent; border:2px solid transparent;
+  border-radius:4px; padding:9px 10px; cursor:pointer;
 }
 /* A domain with something live takes its accent on the edge. The summary
    text says so too — colour never carries it alone. */
@@ -3879,12 +3883,13 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    are here" is a hue that can no longer mean "the door is open".
 
    Three neutral devices at once, because any one of them alone is weak from
-   across a room: a thick bar down the leading edge, a surface one step up
-   from its neighbours, and the label in full ink at heavier weight. None of
-   them reads as a colour, so all three survive a button that is also filled
-   red, and all three survive being looked at in the dark. */
+   across a room: the tab raised out of the track on a card's surface with a
+   shadow under it, an ink edge, and the label in full ink at heavier weight.
+   None of them reads as a colour, so all three survive a button that is also
+   filled red, and all three survive being looked at in the dark. */
 .dockbtn.selected { border-color:var(--sp-ink-3); }
-.dockbtn.selected { background:var(--sp-sink); }
+/* Raised out of the track: the surface a card has, and a shadow under it. */
+.dockbtn.selected { background:var(--sp-surface); box-shadow:0 2px 0 rgba(0, 0, 0, .28); }
 .dockbtn.selected:not(.fill) .dockhead h4 { color:var(--sp-ink); }
 .dockbtn.selected:not(.fill) .docksum { color:var(--sp-ink); }
 .dockbtn.selected .dockhead h4 { font-weight:700; }
@@ -3908,17 +3913,13 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    because here the flash lands on a lifted or filled surface rather than on a
    plain one. No new keyframes: the same motion, more of it. */
 .dockbtn { --sp-press: var(--sp-press-firm); }
-/* The bar sits along the bottom edge and a caret hangs off it, pointing at
-   the cards below. That is the one thing an edge alone cannot say: not
-   merely "this button is different" but "this button owns what is
-   underneath", which on a rail above its own content is the actual
-   question. Both in ink, so selection still spends no colour. */
-.dockbtn.selected::before {
-  content:""; position:absolute; left:0; right:0; bottom:0; height:4px;
-  border-radius:0 0 4px 4px; background:var(--sp-ink);
-}
+/* A caret hangs off the track under the selected tab, pointing at the cards
+   below. That is the one thing a raised tab alone cannot say: not merely
+   "this button is different" but "this button owns what is underneath",
+   which on a rail above its own content is the actual question. In ink, so
+   selection still spends no colour. */
 .dockbtn.selected::after {
-  content:""; position:absolute; left:50%; bottom:-7px; width:0; height:0;
+  content:""; position:absolute; left:50%; bottom:-15px; width:0; height:0;
   transform:translateX(-50%);
   border-left:7px solid transparent; border-right:7px solid transparent;
   border-top:7px solid var(--sp-ink);
@@ -3951,12 +3952,11 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   .dockhead h4, .docksum { display:none; }
 }
 /* Pinned to the bottom of the screen, the rail's content is above it, so
-   the selection bar moves to the top edge and the caret points up at the
-   cards it owns. Told by the panel through an inherited property, because
-   the rail cannot see where it has been put. */
+   the caret moves to the top edge and points up at the cards it owns.
+   Told by the panel through an inherited property, because the rail
+   cannot see where it has been put. */
 @container style(--sp-dock-edge: bottom) {
-  .dockbtn.selected::before { top:0; bottom:auto; border-radius:4px 4px 0 0; }
-  .dockbtn.selected::after { top:-7px; bottom:auto; border-top:0;
+  .dockbtn.selected::after { top:-15px; bottom:auto; border-top:0;
     border-bottom:7px solid var(--sp-ink); }
 }
 
