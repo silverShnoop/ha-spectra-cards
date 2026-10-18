@@ -120,6 +120,42 @@ const js = fs.readFileSync(file);
   const c = await read();
   check("a repainted card's new canvas is sized to its box", sized && c.wide.width === c.wide.want, c.wide);
 
+  /* Looking ahead: a drag pulls the hours past the line and the day and
+     hour there are named; now never moves; after 30 seconds untouched the
+     hours ease back. A drag that starts over now does nothing. */
+  const state = () => page.evaluate(() => {
+    const el = window.CARDS.wide;
+    const r = el.shadowRoot || el;
+    const p = el._ahead;
+    return { sc: Math.round(p.sc || 0), max: Math.round(p.maxSc || 0), x0: p.laid.x0, lead: p.laid.leadH,
+      back: !r.querySelector(".aheadback").hidden, tag: r.querySelector(".aheadwhen").textContent,
+      looking: r.querySelector(".card").classList.contains("looking") };
+  });
+  const box = await page.evaluate(() => { const r = window.CARDS.wide.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width }; });
+  const drag = async (from, by) => {
+    await page.mouse.move(from, box.y + 120); await page.mouse.down();
+    for (let i = 1; i <= 10; i++) { await page.mouse.move(from - (by * i) / 10, box.y + 120); await page.clock.runFor(16); }
+    await page.mouse.up();
+  };
+  const before = await state();
+  await drag(box.x + 120, 300);
+  await page.clock.runFor(300);
+  const overNow = await state();
+  await drag(box.x + box.w * .9, 400);
+  await page.clock.runFor(2500);
+  const ahead = await state();
+  await page.clock.runFor(29000);
+  const waited = await state();
+  await page.clock.runFor(2500);
+  const back = await state();
+  check("at rest the hours start at now", before.sc === 0 && !before.back, before);
+  check("a drag over now leaves the hours alone", overNow.sc === 0, overNow);
+  check("a drag over the hours pulls them ahead", ahead.sc > 200 && ahead.sc <= ahead.max + 1, ahead);
+  check("and now stays where it is", ahead.x0 === before.x0, [before.x0, ahead.x0]);
+  check("the way back shows, and the hour at the line is named", ahead.back && ahead.looking && /\d\d:\d\d/.test(ahead.tag), ahead);
+  check("it holds while the 30 seconds run", waited.sc > 0, waited);
+  check("then eases back to now by itself", back.sc === 0 && !back.back && !back.looking, back);
+
   await browser.close();
   server.close();
   console.log(problems.length ? `FAILED (${problems.length})` : "OK (ahead: the sun keeps to the now line, the hours come to it)");

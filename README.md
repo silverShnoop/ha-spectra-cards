@@ -1079,6 +1079,7 @@ body:
     separator: " · "
   # ...and the hours ahead
   hours: {forecast: weather.home, type: hourly}
+  return_after: 30               # seconds untouched before a look ahead eases back
 ```
 
 The Now card and the hours after it, in one picture. The left of the card is
@@ -1096,6 +1097,15 @@ so the sun sits at the head of its own path and the path slides in to meet it. I
 rays turn slowly as on `sky`, but shine over now, the sky somebody is under,
 and thin away towards the hours ahead: strong in a clear sky, weaker under
 cloud, none in overcast.
+
+**A finger can look further ahead.** Drag the hours (or scroll them with a
+wheel) and they slide on past the line, as far as the hourly forecast goes,
+with a little give at each end; let go and they glide to a stop. Now does not
+move. While the hours are pulled, a tag at the line names the day and hour
+there, each midnight carries the next day's name, and a "Back to now" pill
+at the top counts down as a ring. After `return_after` seconds untouched (30)
+they ease back by themselves, so a wall panel always reads from the present
+when nobody is at it. Any touch on the hours restarts the count.
 
 **Everything moves.** Ahead, each hour's clouds bob where they are, its rain
 falls and its stars twinkle. Over now the clouds blow left, the way time goes:
