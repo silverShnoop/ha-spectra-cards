@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.181.0";
+const VERSION = "0.181.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3608,15 +3608,24 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    keys gets the departure, the arrival and the close-up for free. The
    to-do list was the second one to want it and had none of it: a ticked
    item simply vanished and everything below it jumped up a line. */
-.leaving { animation: sp-leave 420ms cubic-bezier(.4,0,.7,.3) forwards;
+/* Neither end scales any more. A scaled row is a row changing size, and
+   next to rows that were sliding into place it read as the whole list
+   resizing. Size is the card's job now: it grows and shrinks its own
+   height (motionFrom), so the space opens or closes for real and the
+   cards below follow it instead of being overlapped by a row sliding past
+   the card's edge.
+
+   Arriving waits for the space to start opening before it fades up into
+   it; leaving fades out where it is and only then gives its space back. */
+.leaving { animation: sp-leave 200ms cubic-bezier(.4,0,1,1) forwards;
   pointer-events:none; }
 @keyframes sp-leave {
   from { opacity:1; transform:none; }
-  to   { opacity:0; transform:scale(.93); }
+  to   { opacity:0; transform:translateY(-4px); }
 }
-.entering { animation: sp-enter 260ms cubic-bezier(.2,.7,.4,1) both; }
+.entering { animation: sp-enter 240ms cubic-bezier(.2,0,0,1) 120ms both; }
 @keyframes sp-enter {
-  from { opacity:0; transform:scale(.95); }
+  from { opacity:0; transform:translateY(6px); }
   to   { opacity:1; transform:none; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -11702,14 +11711,15 @@ const DIM_GIVE_UP_MS = 12000;
    the optimistic contract exists to prevent. */
 const ADJUST_GIVE_UP_MS = 45000;
 
-const LEAVE_MS = 420;
+const LEAVE_MS = 200;
 /* Matches the sp-press keyframes. A flash outliving its own animation
    would be carried onto a node that then never clears it. */
 const PRESS_MS = 260;
 /* Everything a finger can reach. One list, so a flash carried across a
    re-render lands on the same control it left. */
 const PRESSABLE = 'button, [role="button"], [data-estop], .act, .iconbtn';
-const SETTLE_MS = 380;
+const SETTLE_MS = 280;
+const SETTLE_EASE = "cubic-bezier(.2,0,0,1)";
 
 /* ---- moving the bar ----
  * The bar is rebuilt on every render, and a node built fresh arrives already
@@ -11741,17 +11751,18 @@ function stillWanted() {
 /* Animates one property from a value the element no longer has. Silent about
    a browser that cannot: the card is correct without any of this, and a
    missing animation is not worth an exception on a wall panel. */
-function moveFrom(element, property, from, to, ms) {
-  if (!element || from === null || to === null || from === to) return;
-  if (typeof element.animate !== "function") return;
+function moveFrom(element, property, from, to, ms, easing) {
+  if (!element || from === null || to === null || from === to) return null;
+  if (typeof element.animate !== "function") return null;
   const a = {};
   const b = {};
   a[property] = from;
   b[property] = to;
   try {
-    element.animate([a, b], { duration: ms || MOVE_MS, easing: MOVE_EASE });
+    return element.animate([a, b], { duration: ms || MOVE_MS, easing: easing || MOVE_EASE });
   } catch (err) {
     /* An unanimatable property is not a reason to stop rendering. */
+    return null;
   }
 }
 
@@ -11815,8 +11826,16 @@ function motionSnapshot(root) {
   const keyed = root.querySelectorAll("[data-key]");
   for (let i = 0; i < keyed.length; i += 1) {
     const box = keyed[i].getBoundingClientRect();
-    shot.rows.set(keyed[i].getAttribute("data-key"), { x: box.left, y: box.top });
+    shot.rows.set(keyed[i].getAttribute("data-key"),
+      { x: box.left, y: box.top, w: box.width, h: box.height });
   }
+
+  /* How tall the card is right now -- mid-animation if one is running, so
+     a second change carries on from where the first had got to. Only
+     taken for a card with keyed rows: those are the cards whose height a
+     row arriving or leaving changes. */
+  const card = keyed.length ? root.querySelector(":scope > .card") : null;
+  shot.cardHeight = card ? card.getBoundingClientRect().height : null;
 
   /* The drawer's two bars dull when the room goes off. Their CSS says
      260ms, but a re-render hands them over as brand new elements already
@@ -11865,6 +11884,30 @@ function motionFrom(root, shot) {
   if (!shot || !stillWanted()) return;
 
   if (shot.rows && shot.rows.size) {
+    /* The card first. A row arriving or leaving changes how tall the card
+       is, and the rows below it were animated back from where they had
+       been while the card itself jumped to its new height in one frame:
+       on the way down the rows slid over the card's bottom edge and into
+       the card beneath, on the way up they slid into a box already too
+       small. So the card's height eases between the two as well, clipped
+       while it does, and because it is real height the cards below it on
+       the dashboard move with it rather than jumping.
+
+       Border-box for the length of the move, because the measurement is
+       the border box and the card's own height is not. */
+    const card = root.querySelector(":scope > .card");
+    if (card && shot.cardHeight !== null) {
+      const now = card.getBoundingClientRect().height;
+      if (Math.abs(now - shot.cardHeight) >= 1) {
+        card.style.boxSizing = "border-box";
+        card.style.overflow = "clip";
+        const anim = moveFrom(card, "height", `${shot.cardHeight}px`, `${now}px`,
+          SETTLE_MS, SETTLE_EASE);
+        const done = () => { card.style.boxSizing = ""; card.style.overflow = ""; };
+        if (anim) { anim.onfinish = done; anim.oncancel = done; } else done();
+      }
+    }
+
     const keyed = root.querySelectorAll("[data-key]");
     for (let i = 0; i < keyed.length; i += 1) {
       const was = shot.rows.get(keyed[i].getAttribute("data-key"));
@@ -11872,10 +11915,21 @@ function motionFrom(root, shot) {
       const box = keyed[i].getBoundingClientRect();
       const dx = was.x - box.left;
       const dy = was.y - box.top;
+      /* A row whose size changed -- the flowing grid re-dealt its columns
+         when the count changed -- cannot be moved there honestly: scaling
+         it back would stretch its text. It settles in place with a short
+         fade instead, which reads as the list re-laying itself out rather
+         than every tile growing and shrinking. */
+      const resized = Math.abs(was.w - box.width) >= 1 || Math.abs(was.h - box.height) >= 1;
+      if (resized) {
+        moveFrom(keyed[i], "opacity", "0.35", "1", SETTLE_MS, SETTLE_EASE);
+        continue;
+      }
       /* A row that has not moved is not animated: a transform of zero still
          promotes a layer and still costs a frame, for nothing to see. */
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-      moveFrom(keyed[i], "transform", `translate(${dx}px, ${dy}px)`, "none", SETTLE_MS);
+      moveFrom(keyed[i], "transform", `translate(${dx}px, ${dy}px)`, "none",
+        SETTLE_MS, SETTLE_EASE);
     }
   }
 
