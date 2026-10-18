@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.183.3";
+const VERSION = "0.184.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -481,6 +481,30 @@ ha-icon { display:inline-flex; line-height:0; }
   .clockdate { font-size:clamp(14px, 2.5cqi, 22px); }
 }
 .clocknote { margin:10px 0 0; font-size:12px; color:var(--sp-ink-2); }
+/* The next appointment, under the date and aligned with it. One line: the
+   name is what you read, the time is what you check. */
+.clocknext {
+  margin:6px 0 0; font-size:13px; color:var(--sp-ink); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+.clocknextk { color:var(--accent); font-weight:500; }
+.clocknextw { color:var(--sp-ink-2); }
+@supports (font-size:1cqi) {
+  .clocknext { font-size:clamp(13px, 2.2cqi, 19px); }
+}
+/* season -- the time of year behind the clock. The canvas fills the card
+   inside its border; the title bar and the clock sit over it. The date
+   gets a halo in the card's own surface colour so a branch or a bird
+   behind it never costs a word. */
+.card.seasoncard { overflow:hidden; }
+.seasoncanvas {
+  position:absolute; inset:0; width:100%; height:100%; display:block;
+  pointer-events:none; z-index:0; border-radius:4px;
+}
+.card.seasoncard > .titlebar, .card.seasoncard .clock { position:relative; z-index:1; }
+.card.seasoncard .clockwhen > *, .card.seasoncard .clocktime {
+  text-shadow:0 0 10px var(--sp-surface), 0 0 3px var(--sp-surface);
+}
 
 /* The day's shape, which is the one thing a digital clock cannot say: how
    much daylight is left. A track of the whole 24 hours, the lit part filled,
@@ -9048,6 +9072,879 @@ class DiaryPainter extends DayPainter {
   }
 }
 
+/* season -- the Today card, dressed for the time of year.
+
+   Behind the clock: one tree that follows the calendar, a background that
+   sets the season's mood, and one animal on top. Nothing here is weather.
+   The Now card already paints the sky, and a second sky beside it would be
+   two cards saying the same thing in two styles.
+
+   The tree is the constant. Bare from December, budding from mid-March,
+   in full leaf by late May, turning from September, shedding through
+   October and November until it is bare again. Each leaf has its own day
+   to open, turn and fall, so the tree changes by the day rather than
+   jumping by the season.
+
+   The background is the season's: frost in winter, pollen in spring,
+   sunbeams in summer, a dewy web in September and falling leaves through
+   autumn. The animal is picked from the season's pool once a day, from the
+   date alone, so every copy of the card shows the same one and it holds
+   still all day. */
+const SEASON_DAY = { bud: 73, full: 146, greenDeep: 175, turn: 250, shedA: 274, shedB: 334 };
+const SEASON_AUTUMN = ["#e0a33c", "#d9772f", "#c2552a", "#e8b54a", "#a7452a", "#cf8a36", "#b8662b"];
+const SEASON_GREENS = ["#5c7d42", "#6b8c47", "#4f6e3b", "#77954e"];
+const SEASON_FRESH = "#b4cf74";
+/* A wash, not a fill: the card keeps its own surface in either palette and
+   the season only leans on it. */
+const SEASON_WASH = { spring: "#b7d08f", summer: "#e9c869", autumn: "#e39350", winter: "#9fc4e2" };
+const SEASON_POOLS = {
+  winter: ["robin", "bluetit", "starling"],
+  march: ["arriving", "butterfly", "bluetit"],
+  spring: ["bee", "butterfly", "bluetit"],
+  summer: ["butterfly", "dragonfly", "swift", "bee"],
+  sept: ["leaving", "dragonfly", "butterfly"],
+  autumn: ["robin", "bluetit", "starling"],
+};
+
+function seasonRng(seed) {
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const seasonClamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+function seasonSmooth(a, b, x) {
+  const t = seasonClamp((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+}
+/* Day of the year from the local date, 0 on 1 January. A leap year's
+   extra day is folded into the last one rather than shifting the year. */
+function seasonDoy(date) {
+  const start = new Date(date.getFullYear(), 0, 1);
+  const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.min(364, Math.round((today - start) / 86400000));
+}
+/* How many of the leaves are out, and how many have fallen. */
+const seasonGrown = (d) => seasonSmooth(SEASON_DAY.bud, SEASON_DAY.full, d);
+function seasonShed(d) {
+  if (d < SEASON_DAY.shedA) return 0;
+  if (d > SEASON_DAY.shedB) return 1;
+  return Math.pow((d - SEASON_DAY.shedA) / (SEASON_DAY.shedB - SEASON_DAY.shedA), 1.35);
+}
+function seasonOf(d) {
+  if (d < 59 || d >= 334) return "winter";
+  if (d < 151) return "spring";
+  if (d < 243) return "summer";
+  return "autumn";
+}
+function seasonPeriod(d) {
+  if (seasonOf(d) === "winter") return "winter";
+  if (d < 95) return "march";
+  if (d < 151) return "spring";
+  if (d < 243) return "summer";
+  if (d < SEASON_DAY.shedA - 4) return "sept";
+  return "autumn";
+}
+/* What is behind the animal, and the animal. */
+function seasonLayers(year, d) {
+  let back;
+  if (seasonOf(d) === "winter") back = "frost";
+  else if (d >= SEASON_DAY.shedA - 4 && d < SEASON_DAY.shedB) back = "leaf";
+  else if (d < 151) back = "pollen";
+  else if (d < 243) back = "beam";
+  else back = "web";
+  const pool = SEASON_POOLS[seasonPeriod(d)];
+  const animal = pool[Math.floor(seasonRng(year * 1000 + d)() * pool.length)];
+  return [back, animal];
+}
+const seasonHex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const seasonLerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+function seasonLeafColour(leaf, d) {
+  let c = seasonLerp(seasonHex(SEASON_FRESH), seasonHex(leaf.green),
+    seasonSmooth(SEASON_DAY.full - 30, SEASON_DAY.greenDeep, d));
+  /* Each leaf turns on its own day, early September to mid October. */
+  const turn = SEASON_DAY.turn + leaf.w * 38;
+  c = seasonLerp(c, seasonHex(leaf.autumn), seasonSmooth(turn, turn + 26, d));
+  return `rgb(${c.map(Math.round).join(",")})`;
+}
+
+/* The same tree every time, from a fixed seed, sized to the card. It stands
+   behind the gap between the time and the date. */
+function seasonTree(w, h) {
+  const r = seasonRng(7);
+  const segs = [];
+  const leaves = [];
+  const sz = h / 142;
+  const bx = w * 0.705;
+  const by = h + 2;
+  const leaf = (x, y) => leaves.push({
+    x: x + (r() - .5) * 9 * sz, y: y + (r() - .5) * 8 * sz,
+    rx: (2.3 + r() * 1.5) * sz, ry: (1.2 + r() * .7) * sz, a: r() * Math.PI,
+    u: r(), v: r(), w: r(), alpha: .65 + r() * .3,
+    green: SEASON_GREENS[(r() * 4) | 0], autumn: SEASON_AUTUMN[(r() * SEASON_AUTUMN.length) | 0],
+  });
+  const branch = (x, y, a, len, wd, d) => {
+    const x2 = x + Math.cos(a) * len;
+    const y2 = y + Math.sin(a) * len;
+    segs.push({ x, y, x2, y2, wd, d });
+    if (d <= 1) {
+      const n = d === 0 ? 4 : 2;
+      for (let i = 0; i < n; i++) {
+        const f = d === 0 ? 1 : r();
+        leaf(x + (x2 - x) * f, y + (y2 - y) * f);
+      }
+    }
+    if (d === 0) return;
+    const n = d > 4 && r() < .3 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const spread = (n === 3 ? (i - 1) * .5 : (i ? 1 : -1) * (.3 + r() * .28)) + (r() - .5) * .12;
+      branch(x2, y2, a + spread, len * (.69 + r() * .09), wd * .68, d - 1);
+    }
+  };
+  branch(bx, by, -Math.PI / 2 + (r() - .5) * .05, h * .27, Math.max(3, h * .045), 7);
+  /* The outer, higher leaves tend to go first. */
+  for (const l of leaves) l.v = seasonClamp(l.v * .75 + (1 - (by - l.y) / h) * .1 + Math.abs(l.x - bx) / h * .15);
+  return { segs, leaves };
+}
+
+const SEASON_TOKENS = { ink: "--sp-ink", surface: "--sp-surface" };
+
+/* Paints one card's season. It outlives the canvas: the card repaints its
+   markup every minute for the clock, and an animal that jumped back to its
+   start each time would read as a glitch. */
+class SeasonPainter {
+  constructor() {
+    this.canvas = null;
+    this.ctx = null;
+    this.raf = 0;
+    this.last = 0;
+    this.visible = true;
+    this.observer = null;
+    this.sizer = null;
+    this.w = 0;
+    this.h = 0;
+    this.dpr = 1;
+    this.day = -1;
+    this.key = "";
+    this.layer = null;
+    this.tree = null;
+    this.groups = {};
+    this.tk = { ink: [236, 230, 220], light: false };
+    this.now = null;
+    this.tkRead = -Infinity;
+  }
+
+  get still() {
+    return typeof matchMedia === "function"
+      && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  /* `now` is for tests and previews; on a wall it is the wall's clock. */
+  attach(canvas, now) {
+    this.now = now ? new Date(now) : null;
+    if (canvas !== this.canvas) {
+      this.detach();
+      this.canvas = canvas;
+      this.ctx = canvas.getContext("2d");
+      this.layer = null;
+      this.tkRead = -Infinity;
+      if (typeof IntersectionObserver === "function") {
+        this.observer = new IntersectionObserver((entries) => {
+          this.visible = entries.some((e) => e.isIntersecting);
+          if (this.visible) this.run();
+        });
+        this.observer.observe(canvas);
+      }
+      if (typeof ResizeObserver === "function") {
+        this.sizer = new ResizeObserver(() => this.paint(performance.now(), this.still));
+        this.sizer.observe(canvas);
+      }
+    }
+    if (this.still) this.paint(performance.now(), true);
+    else this.run();
+  }
+
+  stop() {
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  }
+
+  detach() {
+    this.stop();
+    if (this.observer) this.observer.disconnect();
+    if (this.sizer) this.sizer.disconnect();
+    this.observer = null;
+    this.sizer = null;
+    this.canvas = null;
+    this.ctx = null;
+  }
+
+  run() {
+    if (this.raf || this.still || !this.canvas) return;
+    const loop = (now) => {
+      this.raf = 0;
+      if (!this.canvas || !this.canvas.isConnected || !this.visible) return;
+      this.raf = requestAnimationFrame(loop);
+      if (now - this.last < 1000 / SKY_FPS - 2) return;
+      this.paint(now, false);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  tokens() {
+    const cs = getComputedStyle(this.canvas);
+    const read = (name, fallback) => {
+      const v = cs.getPropertyValue(name).trim();
+      const m = /^#([0-9a-f]{6})$/i.exec(v);
+      return m ? seasonHex(v) : fallback;
+    };
+    const ink = read(SEASON_TOKENS.ink, [236, 230, 220]);
+    const surface = read(SEASON_TOKENS.surface, [33, 30, 25]);
+    /* Frost and dew are white on a dark card and would vanish on a light
+       one, so they take a cold blue there instead. */
+    const light = (surface[0] * .3 + surface[1] * .59 + surface[2] * .11) > 140;
+    const key = `${ink}|${light}`;
+    if (key !== this.tkKey) {
+      this.tkKey = key;
+      this.layer = null;
+    }
+    this.tk = { ink, light };
+  }
+
+  /* Everything that only changes with the day or the size: the wash, the
+     tree, the frost. Drawn once into a layer, not every frame. */
+  build(year, d) {
+    const { w, h, dpr } = this;
+    const layer = this.layer || document.createElement("canvas");
+    layer.width = Math.round(w * dpr);
+    layer.height = Math.round(h * dpr);
+    const x = layer.getContext("2d");
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.clearRect(0, 0, w, h);
+    const wash = seasonHex(SEASON_WASH[seasonOf(d)]).join(",");
+    const g = x.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, `rgba(${wash},0)`);
+    g.addColorStop(.55, `rgba(${wash},${this.tk.light ? .1 : .06})`);
+    g.addColorStop(1, `rgba(${wash},${this.tk.light ? .2 : .14})`);
+    x.fillStyle = g;
+    x.fillRect(0, 0, w, h);
+    const [back] = seasonLayers(year, d);
+    if (back === "frost") this.frost(x);
+    this.drawTree(x, d);
+    this.layer = layer;
+  }
+
+  frost(x) {
+    const { w, h } = this;
+    const r = seasonRng(31);
+    const c0 = this.tk.light ? "90,130,170" : "210,228,248";
+    for (const c of [{ x: 0, y: h, a0: -Math.PI / 2, a1: 0 }, { x: w, y: 0, a0: Math.PI / 2, a1: Math.PI }]) {
+      const g = x.createRadialGradient(c.x, c.y, 0, c.x, c.y, h * .9);
+      g.addColorStop(0, `rgba(${c0},.16)`);
+      g.addColorStop(1, `rgba(${c0},0)`);
+      x.fillStyle = g;
+      x.fillRect(0, 0, w, h);
+      x.strokeStyle = `rgba(${c0},.26)`;
+      x.lineWidth = .8;
+      const crystal = (px, py, a, len, depth) => {
+        const x2 = px + Math.cos(a) * len;
+        const y2 = py + Math.sin(a) * len;
+        x.beginPath(); x.moveTo(px, py); x.lineTo(x2, y2); x.stroke();
+        if (depth <= 0) return;
+        for (let i = 1; i <= 3; i++) {
+          const f = i / 4;
+          const qx = px + (x2 - px) * f;
+          const qy = py + (y2 - py) * f;
+          const l = len * (.32 - f * .12);
+          crystal(qx, qy, a + 1.05, l, depth - 1);
+          crystal(qx, qy, a - 1.05, l, depth - 1);
+        }
+      };
+      for (let i = 0; i < 9; i++) {
+        const a = c.a0 + (c.a1 - c.a0) * (i + .5) / 9 + (r() - .5) * .15;
+        crystal(c.x, c.y, a, h * (.18 + r() * .26), 1);
+      }
+    }
+  }
+
+  drawTree(x, d) {
+    const tree = this.tree;
+    const g = seasonGrown(d);
+    const s = seasonShed(d);
+    const winter = seasonOf(d) === "winter";
+    x.save();
+    x.lineCap = "round";
+    x.globalAlpha = .8;
+    for (const seg of tree.segs) {
+      x.strokeStyle = winter ? "#4d4a4c" : "#4a3e34";
+      x.lineWidth = seg.wd;
+      x.beginPath(); x.moveTo(seg.x, seg.y); x.lineTo(seg.x2, seg.y2); x.stroke();
+    }
+    if (winter) {
+      x.strokeStyle = this.tk.light ? "rgba(120,150,185,.55)" : "rgba(225,236,250,.5)";
+      for (const seg of tree.segs) {
+        if (seg.d > 2) continue;
+        x.lineWidth = Math.max(.6, seg.wd * .45);
+        x.beginPath(); x.moveTo(seg.x, seg.y - .6); x.lineTo(seg.x2, seg.y2 - .6); x.stroke();
+      }
+    }
+    if (g > 0 && s < 1) {
+      for (const l of tree.leaves) {
+        if (l.u >= g || l.v < s) continue;
+        /* A new leaf is a bud that opens over a few weeks; one about to
+           drop has curled. */
+        const open = seasonClamp((g - l.u) / .22);
+        const k = .3 + .7 * open;
+        const late = d >= SEASON_DAY.shedA ? seasonClamp(1 - (l.v - s) / .08) : 0;
+        x.globalAlpha = l.alpha * (1 - .25 * late);
+        x.fillStyle = seasonLeafColour(l, d);
+        x.beginPath(); x.ellipse(l.x, l.y, l.rx * k, l.ry * k * (1 - .3 * late), l.a, 0, 7); x.fill();
+      }
+    }
+    x.restore();
+  }
+
+  liveLeaves(d) {
+    if (!this.tree) return [];
+    const g = seasonGrown(d);
+    const s = seasonShed(d);
+    return this.tree.leaves.filter((l) => l.u < g && l.v >= s);
+  }
+
+  count(kind, d) {
+    switch (kind) {
+      case "leaf": {
+        /* As many falling as the tree is losing right now: a few at the
+           start of October, most in early November, a last one or two. */
+        const rate = (seasonShed(d + 4) - seasonShed(d - 4)) / 8 * 60;
+        return Math.round(seasonClamp(rate * 7, 1, 11) * .85);
+      }
+      case "pollen": return 12;
+      case "beam": return 3;
+      case "web": return 1;
+      case "frost": return 14;
+      case "robin": return 1;
+      case "bluetit": return 2;
+      case "starling": return 42;
+      case "arriving": case "leaving": return 4;
+      case "butterfly": return 3;
+      case "bee": return 4;
+      case "dragonfly": return 3;
+      case "swift": return 3;
+      default: return 0;
+    }
+  }
+
+  make(kind, d, init, t) {
+    const { w, h } = this;
+    const r = Math.random;
+    const sz = h / 142;
+    const onTree = () => {
+      const live = this.liveLeaves(d);
+      if (live.length) {
+        const l = live[(r() * live.length) | 0];
+        return { x: l.x, y: l.y, l };
+      }
+      return { x: r() * w, y: h * (.2 + r() * .7), l: null };
+    };
+    switch (kind) {
+      case "leaf": {
+        const p = onTree();
+        return {
+          k: kind, x: p.x, y: init ? r() * h : p.y, vy: 12 + r() * 10, ph: r() * 7, f: .8 + r() * .9,
+          amp: 10 * sz, rot: r() * 7, vr: (r() - .5) * 2.2, s: (3 + r() * 2.2) * sz,
+          col: p.l ? seasonLeafColour(p.l, d) : SEASON_AUTUMN[(r() * SEASON_AUTUMN.length) | 0],
+        };
+      }
+      case "pollen":
+        return { k: kind, x: r() * w, y: init ? r() * h : h + 4, vx: (2 + r() * 5) * sz, vy: -(2 + r() * 4) * sz, ph: r() * 7, sp: 1 + r() * 2, s: (.6 + r() * .9) * sz };
+      case "beam":
+        return {
+          k: kind, x0: (r() * 1.1 - .15) * w, wd: (.07 + r() * .07) * w, ph: r() * 7, sp: .25 + r() * .3,
+          motes: Array.from({ length: 6 }, () => ({ u: r(), v: r(), ph: r() * 7, sp: .02 + r() * .03 })),
+        };
+      case "web": {
+        const R = h * .62;
+        const spokes = 11;
+        return {
+          k: kind, hx: w - h * .3, hy: h * .3,
+          A: Array.from({ length: spokes }, (_, i) => i / spokes * Math.PI * 2 + (r() - .5) * .12),
+          rings: Array.from({ length: 9 }, (_, i) => R * (.12 + i * .1)),
+          dew: Array.from({ length: 16 }, () => ({ si: (r() * spokes) | 0, ri: (r() * 9) | 0, f: r(), ph: r() * 7, sp: .6 + r() * 1.2 })),
+        };
+      }
+      case "frost": {
+        const left = r() < .5;
+        const dd = r() * h * .55;
+        const a = r() * Math.PI / 2;
+        return {
+          k: kind, x: left ? Math.cos(a) * dd : w - Math.cos(a) * dd, y: left ? h - Math.sin(a) * dd : Math.sin(a) * dd,
+          ph: r() * 7, sp: .5 + r() * 1.2, life: 3 + r() * 4, t: init ? r() * 4 : 0, s: (.8 + r() * .9) * sz,
+        };
+      }
+      case "robin":
+      case "bluetit": {
+        /* Perches along the flatter middle branches, clear of the trunk. */
+        const P = [];
+        for (const g of (this.tree ? this.tree.segs : [])) {
+          if (g.d < 1 || g.d > 3) continue;
+          const dx = g.x2 - g.x;
+          const dy = g.y2 - g.y;
+          if (Math.abs(dy) > Math.abs(dx) * .9) continue;
+          for (const f of [.45, .7]) {
+            const y = g.y + dy * f;
+            if (y > h * .25 && y < h * .8) P.push({ x: g.x + dx * f, y: y - g.wd * .5 });
+          }
+        }
+        if (!P.length) P.push({ x: w * .7, y: h * .55 });
+        const p0 = P[(r() * P.length) | 0];
+        return { k: "perch", bird: kind, P, x: p0.x, y: p0.y, sit: 1 + r() * 3, hop: null, face: r() < .5 ? 1 : -1, ph: r() * 7, s: sz * (kind === "robin" ? 1.3 : 1.1) };
+      }
+      case "starling": {
+        const p = { k: kind, a: r() * 7, r: Math.sqrt(r()), ph: r() * 7, x: 0, y: 0 };
+        const T = this.flock(p, t);
+        p.x = T.x; p.y = T.y;
+        return p;
+      }
+      case "arriving":
+      case "leaving": {
+        /* In from the left in March, away to the right... the other way in
+           September, so the two read as coming and going. */
+        const dir = kind === "arriving" ? 1 : -1;
+        return { k: "bird", dir, x: dir > 0 ? -20 - r() * w * .9 : w + 20 + r() * w * .9, y: h * (.12 + r() * .42), vx: dir * (26 + r() * 16) * sz, ph: r() * 7, fs: .8 + r() * .5, s: (4.5 + r() * 2) * sz };
+      }
+      case "butterfly":
+        return { k: kind, x: r() * w, y: h * (.25 + r() * .6), vx: (r() - .5) * 20 * sz, vy: 0, ph: r() * 7, fs: 7 + r() * 4, s: (3.2 + r() * 1.4) * sz, col: ["#f1e49a", "#f3f0e6", "#e9a65a"][(r() * 3) | 0] };
+      case "bee": {
+        const a = onTree();
+        const b = onTree();
+        return { k: kind, x: a.x, y: a.y, tx: b.x, ty: b.y, hover: r() * 1.5, ph: r() * 7, s: 1.8 * sz };
+      }
+      case "dragonfly":
+        return { k: kind, x: r() * w, y: h * (.2 + r() * .6), tx: 0, ty: 0, hover: .5 + r() * 2, ang: r() * 7, ph: r() * 7, s: sz };
+      case "swift": {
+        const dir = r() < .5 ? 1 : -1;
+        return { k: kind, dir, x: dir > 0 ? -30 - r() * w * 1.2 : w + 30 + r() * w * 1.2, base: h * (.25 + r() * .3), A: h * (.12 + r() * .14), fq: 1.1 + r() * .8, ph: r() * 7, sp: (85 + r() * 45) * sz, s: (5.5 + r() * 2) * sz, y: 0 };
+      }
+      default:
+        return null;
+    }
+  }
+
+  /* A moving, breathing cloud the starlings chase, each a beat behind. */
+  flock(p, t) {
+    const { w, h } = this;
+    const cx = w * (.55 + .3 * Math.sin(t * .11));
+    const cy = h * (.36 + .12 * Math.sin(t * .17));
+    const R1 = w * .11 * (1 + .45 * Math.sin(t * .23));
+    const R2 = h * .2 * (1 + .35 * Math.cos(t * .19));
+    return { x: cx + Math.cos(p.a + t * .5) * R1 * p.r, y: cy + Math.sin(p.a * 2 + t * .35) * R2 * p.r };
+  }
+
+  paint(now, still) {
+    const canvas = this.canvas;
+    if (!canvas || !this.ctx) return;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (!w || !h) return;
+    const dt = this.last ? Math.min(.05, (now - this.last) / 1000) : 0;
+    this.last = now;
+    const t = now / 1000;
+    const dpr = Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+    const date = this.now || new Date();
+    const d = seasonDoy(date);
+    const year = date.getFullYear();
+    if (now - this.tkRead > 2000) { this.tkRead = now; this.tokens(); }
+    const sized = w !== this.w || h !== this.h || dpr !== this.dpr;
+    if (sized) {
+      this.w = w; this.h = h; this.dpr = dpr;
+      this.tree = seasonTree(w, h);
+      this.groups = {};
+      this.key = "";
+      this.layer = null;
+    }
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    if (!this.layer || d !== this.day) {
+      this.day = d;
+      this.build(year, d);
+    }
+    const layers = seasonLayers(year, d);
+    const key = `${year}|${d}|${layers.join("|")}`;
+    if (key !== this.key) {
+      this.key = key;
+      this.groups = {};
+      for (const kind of layers) this.groups[kind] = [];
+    }
+    for (const kind of Object.keys(this.groups)) {
+      const list = this.groups[kind];
+      const n = this.count(kind, d);
+      while (list.length < n) list.push(this.make(kind, d, true, t));
+      list.length = Math.min(list.length, n);
+    }
+
+    const x = this.ctx;
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.clearRect(0, 0, w, h);
+    x.drawImage(this.layer, 0, 0, w, h);
+    const step = still ? 0 : dt;
+    /* Background first, then the animal over it. */
+    for (const kind of layers) {
+      const list = this.groups[kind] || [];
+      for (let i = 0; i < list.length; i++) {
+        const fresh = this.move(list[i], kind, step, t, d);
+        if (fresh) list[i] = fresh;
+        else this.draw(list[i], t);
+      }
+    }
+  }
+
+  /* Moves one thing on by dt. Returns a replacement when it has left. */
+  move(p, kind, dt, t, d) {
+    const { w, h } = this;
+    const sz = h / 142;
+    const r = Math.random;
+    switch (p.k) {
+      case "leaf":
+        p.y += p.vy * dt; p.x += Math.sin(t * p.f + p.ph) * p.amp * dt; p.rot += p.vr * dt;
+        return p.y > h + 10 ? this.make(kind, d, false, t) : null;
+      case "pollen":
+        p.x += (p.vx + Math.sin(t * .8 + p.ph) * 4) * dt;
+        p.y += (p.vy + Math.cos(t * .6 + p.ph) * 3) * dt;
+        if (p.y < -6 || p.x > w + 6) {
+          const q = this.make(kind, d, false, t);
+          if (r() < .5) { q.x = -4; q.y = r() * h; }
+          return q;
+        }
+        return null;
+      case "beam":
+        p.x0 += 4 * sz * dt;
+        if (p.x0 > w * 1.05) p.x0 = -p.wd - h * .6;
+        for (const m of p.motes) { m.v -= m.sp * dt; if (m.v < 0) m.v += 1; }
+        return null;
+      case "web":
+        return null;
+      case "frost":
+        p.t += dt;
+        return p.t > p.life ? this.make(kind, d, false, t) : null;
+      case "perch":
+        if (p.hop) {
+          p.hop.t += dt / p.hop.dur;
+          const k = Math.min(1, p.hop.t);
+          p.x = p.hop.x0 + (p.hop.x1 - p.hop.x0) * k;
+          p.y = p.hop.y0 + (p.hop.y1 - p.hop.y0) * k - Math.sin(Math.PI * k) * p.hop.arc;
+          if (k >= 1) { p.hop = null; p.sit = 1.5 + r() * 4; }
+        } else if (dt > 0) {
+          p.sit -= dt;
+          if (p.sit <= 0 && p.P.length > 1) {
+            let q = p.P[(r() * p.P.length) | 0];
+            for (let i = 0; i < 8 && q.x === p.x && q.y === p.y; i++) q = p.P[(r() * p.P.length) | 0];
+            const dd = Math.hypot(q.x - p.x, q.y - p.y);
+            p.face = q.x >= p.x ? 1 : -1;
+            p.hop = { x0: p.x, y0: p.y, x1: q.x, y1: q.y, t: 0, dur: .3 + dd / (170 * p.s), arc: Math.min(14 * p.s, dd * .4 + 4 * p.s) };
+          }
+        }
+        return null;
+      case "starling": {
+        const T = this.flock(p, t);
+        const k = Math.min(1, dt * (1.4 + p.ph * .12));
+        p.x += (T.x - p.x) * k; p.y += (T.y - p.y) * k;
+        return null;
+      }
+      case "bird":
+        p.x += p.vx * dt; p.y += Math.sin(t * 1.3 + p.ph) * 4 * dt;
+        return (p.dir > 0 && p.x > w + 20) || (p.dir < 0 && p.x < -20) ? this.make(kind, d, false, t) : null;
+      case "butterfly":
+        p.vx += (r() - .5) * 70 * sz * dt; p.vy += (r() - .5) * 60 * sz * dt;
+        p.vx *= .97; p.vy *= .97;
+        p.x += p.vx * dt; p.y += (p.vy + Math.sin(t * 3 + p.ph) * 10 * sz) * dt;
+        if (p.x < 0) { p.x = 0; p.vx = Math.abs(p.vx); }
+        if (p.x > w) { p.x = w; p.vx = -Math.abs(p.vx); }
+        if (p.y < h * .1) { p.y = h * .1; p.vy = Math.abs(p.vy); }
+        if (p.y > h * .95) { p.y = h * .95; p.vy = -Math.abs(p.vy); }
+        return null;
+      case "bee":
+        if (p.hover > 0) {
+          p.hover -= dt;
+          p.x += Math.sin(t * 14 + p.ph) * 6 * sz * dt;
+          p.y += Math.cos(t * 11 + p.ph) * 6 * sz * dt;
+          if (p.hover <= 0) {
+            const live = this.liveLeaves(d);
+            const l = live.length ? live[(r() * live.length) | 0] : { x: r() * w, y: h * (.2 + r() * .7) };
+            p.tx = l.x; p.ty = l.y;
+          }
+        } else if (dt > 0) {
+          const dx = p.tx - p.x;
+          const dy = p.ty - p.y;
+          const dd = Math.hypot(dx, dy) || 1;
+          const v = 48 * sz;
+          p.x += dx / dd * v * dt + Math.sin(t * 9 + p.ph) * 10 * sz * dt;
+          p.y += dy / dd * v * dt + Math.cos(t * 7 + p.ph) * 10 * sz * dt;
+          if (dd < 3 * sz) p.hover = .6 + r() * 1.6;
+        }
+        return null;
+      case "dragonfly":
+        if (p.hover > 0) {
+          p.hover -= dt;
+          p.x += Math.sin(t * 20 + p.ph) * 4 * sz * dt;
+          p.y += Math.cos(t * 17 + p.ph) * 4 * sz * dt;
+          if (p.hover <= 0) {
+            p.tx = w * (.05 + r() * .9);
+            p.ty = h * (.15 + r() * .7);
+            p.ang = Math.atan2(p.ty - p.y, p.tx - p.x);
+          }
+        } else if (dt > 0) {
+          const dx = p.tx - p.x;
+          const dy = p.ty - p.y;
+          const dd = Math.hypot(dx, dy);
+          const stepLen = Math.min(dd, 260 * sz * dt);
+          if (dd < 1) p.hover = .8 + r() * 2.2;
+          else { p.x += dx / dd * stepLen; p.y += dy / dd * stepLen; }
+        }
+        return null;
+      case "swift":
+        p.x += p.dir * p.sp * dt;
+        p.y = p.base + p.A * Math.sin(t * p.fq + p.ph);
+        return (p.dir > 0 && p.x > w + 30) || (p.dir < 0 && p.x < -30) ? this.make(kind, d, false, t) : null;
+      default:
+        return null;
+    }
+  }
+
+  draw(p, t) {
+    const x = this.ctx;
+    const h = this.h;
+    const sz = h / 142;
+    const ink = this.tk.ink.join(",");
+    switch (p.k) {
+      case "leaf":
+        x.save(); x.translate(p.x, p.y); x.rotate(p.rot); x.globalAlpha = .85; x.fillStyle = p.col;
+        x.beginPath(); x.ellipse(0, 0, p.s, p.s * .5, 0, 0, 7); x.fill();
+        x.strokeStyle = "rgba(60,35,20,.5)"; x.lineWidth = .6;
+        x.beginPath(); x.moveTo(-p.s, 0); x.lineTo(p.s * 1.3, 0); x.stroke();
+        x.restore();
+        return;
+      case "pollen": {
+        const a = .25 + .75 * Math.pow(Math.max(0, Math.sin(t * p.sp + p.ph)), 3);
+        const g = x.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.s * 4);
+        g.addColorStop(0, `rgba(240,200,90,${.5 * a})`);
+        g.addColorStop(1, "rgba(240,200,90,0)");
+        x.fillStyle = g; x.beginPath(); x.arc(p.x, p.y, p.s * 4, 0, 7); x.fill();
+        x.fillStyle = `rgba(250,226,150,${.9 * a})`; x.beginPath(); x.arc(p.x, p.y, p.s, 0, 7); x.fill();
+        return;
+      }
+      case "beam": {
+        const a = (this.tk.light ? .08 : .045) + .035 * Math.sin(t * p.sp + p.ph);
+        const sl = h * .55;
+        const g = x.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, `rgba(255,214,140,${a})`);
+        g.addColorStop(1, "rgba(255,214,140,0)");
+        x.fillStyle = g;
+        x.beginPath(); x.moveTo(p.x0, 0); x.lineTo(p.x0 + p.wd, 0); x.lineTo(p.x0 + p.wd + sl, h); x.lineTo(p.x0 + sl, h); x.closePath(); x.fill();
+        for (const m of p.motes) {
+          const ma = (.3 + .7 * Math.pow(Math.max(0, Math.sin(t * 1.5 + m.ph)), 2)) * (1 - m.v * .6);
+          x.fillStyle = `rgba(250,226,170,${.8 * ma})`;
+          x.beginPath(); x.arc(p.x0 + m.u * p.wd + sl * m.v, m.v * h, .9 * sz, 0, 7); x.fill();
+        }
+        return;
+      }
+      case "web": {
+        const c0 = this.tk.light ? "110,104,96" : "230,226,216";
+        const dew = this.tk.light ? "120,160,200" : "235,245,255";
+        const sw = Math.sin(t * .7) * .8 * sz;
+        const hx = p.hx + sw;
+        const hy = p.hy + sw * .5;
+        const pt = (si, ri, f = 0) => {
+          const a = p.A[si];
+          const b = p.A[(si + 1) % p.A.length];
+          const aa = a + (b - a + (b < a ? Math.PI * 2 : 0)) * f;
+          const rr = p.rings[ri] * (1 - .06 * Math.sin(Math.PI * f));
+          return { x: hx + Math.cos(aa) * rr, y: hy + Math.sin(aa) * rr };
+        };
+        x.save();
+        x.strokeStyle = `rgba(${c0},${this.tk.light ? .22 : .16})`;
+        x.lineWidth = .6;
+        x.beginPath();
+        const outer = p.rings[p.rings.length - 1] * 1.15;
+        for (const a of p.A) { x.moveTo(hx, hy); x.lineTo(hx + Math.cos(a) * outer, hy + Math.sin(a) * outer); }
+        for (let ri = 0; ri < p.rings.length; ri++) {
+          for (let si = 0; si < p.A.length; si++) {
+            for (let k = 0; k <= 4; k++) {
+              const q = pt(si, ri, k / 4);
+              if (si === 0 && k === 0) x.moveTo(q.x, q.y); else x.lineTo(q.x, q.y);
+            }
+          }
+        }
+        x.stroke();
+        for (const dd of p.dew) {
+          const q = pt(dd.si, dd.ri, dd.f);
+          const a = .25 + .75 * Math.pow(Math.max(0, Math.sin(t * dd.sp + dd.ph)), 4);
+          const g = x.createRadialGradient(q.x, q.y, 0, q.x, q.y, 3.5 * sz);
+          g.addColorStop(0, `rgba(${dew},${.55 * a})`);
+          g.addColorStop(1, `rgba(${dew},0)`);
+          x.fillStyle = g; x.beginPath(); x.arc(q.x, q.y, 3.5 * sz, 0, 7); x.fill();
+          x.fillStyle = `rgba(${dew},${.4 + .6 * a})`; x.beginPath(); x.arc(q.x, q.y, .8 * sz, 0, 7); x.fill();
+        }
+        x.restore();
+        return;
+      }
+      case "frost": {
+        const a = Math.sin(Math.PI * p.t / p.life) * (.5 + .5 * Math.sin(t * p.sp * 4 + p.ph));
+        x.strokeStyle = this.tk.light ? `rgba(90,130,170,${a * .9})` : `rgba(235,245,255,${a * .9})`;
+        x.lineWidth = .7;
+        x.beginPath();
+        x.moveTo(p.x - p.s * 2.2, p.y); x.lineTo(p.x + p.s * 2.2, p.y);
+        x.moveTo(p.x, p.y - p.s * 2.2); x.lineTo(p.x, p.y + p.s * 2.2);
+        x.stroke();
+        return;
+      }
+      case "perch": {
+        const s = p.s;
+        const tit = p.bird === "bluetit";
+        const C = tit
+          ? { tail: "#4a6d9c", body: "#7f9a5c", breast: "#e9cf4c", belly: "#efe08a", head: "#ecebe4" }
+          : { tail: "#5b4838", body: "#7d6753", breast: "#df6f37", belly: "rgba(236,228,214,.95)", head: "#7d6753" };
+        const bob = p.hop ? 0 : Math.pow(Math.max(0, Math.sin(t * 2.2 + p.ph)), 12) * 1.2 * s;
+        const flick = p.hop ? -.3 : Math.pow(Math.max(0, Math.sin(t * 1.7 + p.ph * 2)), 16) * .6;
+        x.save(); x.translate(p.x, p.y - bob); x.scale(p.face, 1);
+        x.save(); x.translate(-3 * s, -2 * s); x.rotate(.35 - flick); x.fillStyle = C.tail;
+        x.beginPath(); x.moveTo(0, -.8 * s); x.lineTo(-4 * s, .3 * s); x.lineTo(-3.6 * s, 1.3 * s); x.lineTo(.3 * s, .9 * s); x.fill();
+        x.restore();
+        x.fillStyle = C.body; x.beginPath(); x.ellipse(0, -3.2 * s, 4 * s, 3 * s, -.15, 0, 7); x.fill();
+        x.fillStyle = C.breast; x.beginPath(); x.ellipse(1.7 * s, -2.8 * s, 2.3 * s, 2.3 * s, 0, 0, 7); x.fill();
+        x.fillStyle = C.belly; x.beginPath(); x.ellipse(.2 * s, -1.1 * s, 2.4 * s, 1.2 * s, 0, 0, 7); x.fill();
+        x.fillStyle = C.head; x.beginPath(); x.arc(2.9 * s, -6 * s, 2.1 * s, 0, 7); x.fill();
+        if (tit) {
+          x.fillStyle = "#4f86c6"; x.beginPath(); x.arc(2.9 * s, -6 * s, 2.1 * s, Math.PI * 1.08, Math.PI * 1.92); x.fill();
+          x.strokeStyle = "#22304a"; x.lineWidth = .6 * s;
+          x.beginPath(); x.moveTo(1.4 * s, -5.7 * s); x.lineTo(4.6 * s, -6.1 * s); x.stroke();
+        } else {
+          x.fillStyle = "#df6f37"; x.beginPath(); x.arc(3.7 * s, -5.5 * s, 1.4 * s, 0, 7); x.fill();
+        }
+        x.fillStyle = "#14110e"; x.beginPath(); x.arc(3.9 * s, -6.5 * s, .45 * s, 0, 7); x.fill();
+        x.fillStyle = "#2b2420"; x.beginPath(); x.moveTo(4.8 * s, -6.2 * s); x.lineTo(6.2 * s, -5.9 * s); x.lineTo(4.8 * s, -5.5 * s); x.fill();
+        x.strokeStyle = "#3a2f27"; x.lineWidth = .6 * s;
+        x.beginPath(); x.moveTo(-.4 * s, -.3 * s); x.lineTo(-.4 * s, .3 * s); x.moveTo(.6 * s, -.3 * s); x.lineTo(.6 * s, .3 * s); x.stroke();
+        x.restore();
+        return;
+      }
+      case "starling":
+        x.fillStyle = `rgba(${ink},.6)`;
+        x.beginPath(); x.arc(p.x, p.y, 1.05 * sz, 0, 7); x.fill();
+        return;
+      case "bird": {
+        const wy = -Math.sin(t * 9 * p.fs + p.ph) * p.s * .55;
+        x.strokeStyle = `rgba(${ink},.6)`; x.lineWidth = 1.1 * sz; x.lineCap = "round";
+        x.beginPath();
+        x.moveTo(p.x - p.s, p.y + wy);
+        x.quadraticCurveTo(p.x - p.s * .4, p.y - p.s * .15 + wy * .3, p.x, p.y);
+        x.quadraticCurveTo(p.x + p.s * .4, p.y - p.s * .15 + wy * .3, p.x + p.s, p.y + wy);
+        x.stroke();
+        return;
+      }
+      case "butterfly": {
+        const f = .2 + .8 * Math.abs(Math.sin(t * p.fs + p.ph));
+        const s = p.s;
+        x.save(); x.translate(p.x, p.y); x.globalAlpha = .88; x.fillStyle = p.col;
+        for (const m of [-1, 1]) {
+          x.beginPath(); x.ellipse(m * s * .55 * f, -s * .25, s * .6 * f, s * .55, m * .3, 0, 7); x.fill();
+          x.beginPath(); x.ellipse(m * s * .4 * f, s * .35, s * .4 * f, s * .35, -m * .3, 0, 7); x.fill();
+        }
+        x.strokeStyle = "rgba(40,32,26,.8)"; x.lineWidth = .8 * sz;
+        x.beginPath(); x.moveTo(0, -s * .6); x.lineTo(0, s * .6); x.stroke();
+        x.restore();
+        return;
+      }
+      case "bee": {
+        const s = p.s;
+        x.save(); x.translate(p.x, p.y);
+        x.fillStyle = `rgba(235,240,245,${.35 + .2 * Math.sin(t * 40)})`;
+        x.beginPath();
+        x.ellipse(-s * .2, -s * 1.1, s * .9, s * .55, -.4, 0, 7);
+        x.ellipse(s * .5, -s * 1.1, s * .9, s * .55, .4, 0, 7);
+        x.fill();
+        x.fillStyle = "#e8b43a"; x.beginPath(); x.ellipse(0, 0, s * 1.5, s, 0, 0, 7); x.fill();
+        x.strokeStyle = "rgba(30,22,14,.85)"; x.lineWidth = s * .45;
+        x.beginPath(); x.moveTo(-s * .2, -s * .9); x.lineTo(-s * .2, s * .9); x.moveTo(s * .6, -s * .8); x.lineTo(s * .6, s * .8); x.stroke();
+        x.restore();
+        return;
+      }
+      case "dragonfly": {
+        const s = p.s;
+        const fl = .6 + .4 * Math.abs(Math.sin(t * 35 + p.ph));
+        x.save(); x.translate(p.x, p.y); x.rotate(p.ang);
+        x.strokeStyle = this.tk.light ? "rgba(90,120,130,.35)" : "rgba(225,242,246,.45)";
+        x.lineWidth = 2 * s; x.lineCap = "round";
+        x.beginPath();
+        x.moveTo(2 * s, -6 * s * fl); x.lineTo(2 * s, 6 * s * fl);
+        x.moveTo(-.5 * s, -5 * s * fl); x.lineTo(-.5 * s, 5 * s * fl);
+        x.stroke();
+        x.strokeStyle = "#4fa9b0"; x.lineWidth = 1.4 * s;
+        x.beginPath(); x.moveTo(4 * s, 0); x.lineTo(-9 * s, 0); x.stroke();
+        x.fillStyle = "#6fc3c9"; x.beginPath(); x.arc(4.3 * s, 0, 1.3 * s, 0, 7); x.fill();
+        x.restore();
+        return;
+      }
+      case "swift": {
+        const vy = p.A * p.fq * Math.cos(t * p.fq + p.ph);
+        const ang = Math.atan2(vy, p.sp);
+        const s = p.s;
+        const fl = Math.sin(t * 14 + p.ph) * .18;
+        x.save(); x.translate(p.x, p.y); x.scale(p.dir, 1); x.rotate(ang * p.dir);
+        x.fillStyle = `rgba(${ink},.6)`;
+        x.beginPath();
+        x.moveTo(s * .6, 0);
+        x.quadraticCurveTo(0, -s * .25, -s * 1.1, -s * (1 + fl));
+        x.quadraticCurveTo(-s * .25, -s * .2, -s * .45, 0);
+        x.quadraticCurveTo(-s * .25, s * .2, -s * 1.1, s * (1 + fl));
+        x.quadraticCurveTo(0, s * .25, s * .6, 0);
+        x.fill();
+        x.restore();
+        return;
+      }
+      default:
+    }
+  }
+}
+
+/* The next thing in the calendar that has not started: a timed event after
+   now, or an all-day one from tomorrow. What is on today already is the
+   Week card's to say. */
+function clockNext(events, now) {
+  if (!Array.isArray(events)) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  let best = null;
+  for (const e of events) {
+    if (!e || isBlank(e.summary)) continue;
+    const start = typeof e.start === "string" ? e.start : (e.start && (e.start.dateTime || e.start.date));
+    if (typeof start !== "string") continue;
+    const allDay = /^\d{4}-\d{2}-\d{2}$/.test(start);
+    const at = allDay ? new Date(`${start}T00:00:00`).getTime() : Date.parse(start);
+    if (isNaN(at)) continue;
+    if (allDay ? at <= today : at <= now.getTime()) continue;
+    if (!best || at < best.at) best = { at, allDay, summary: String(e.summary) };
+  }
+  return best;
+}
+
+/* "12:00", "Tomorrow 12:00", "Wed 09:00", "4 Nov". A day as a word while it
+   is this week, a date once it is not. */
+function clockNextWhen(next, now) {
+  const then = new Date(next.at);
+  const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(then) - day(now)) / 86400000);
+  const time = next.allDay ? "" : `${pad2(then.getHours())}:${pad2(then.getMinutes())}`;
+  let when = "";
+  if (days === 1) when = "Tomorrow";
+  else if (days > 1 && days < 7) when = DAY_NAMES[then.getDay()].slice(0, 3);
+  else if (days >= 7) when = `${then.getDate()} ${MONTH_NAMES[then.getMonth()]}`;
+  return [when, time].filter(Boolean).join(" ") || "Today";
+}
+
 const BODIES = {
   /* What is worth reading today? */
   quote(b) {
@@ -9062,13 +9959,24 @@ const BODIES = {
   /* What time is it, and what day? */
   clock(b) {
     const now = b && b.now ? new Date(b.now) : new Date();
-    let out = `<div class="clock">`
+    /* The season sits behind everything on the card, so its canvas comes
+       first and the card is told to make room for it (see seasoncard). */
+    let out = (b && b.season ? `<canvas class="seasoncanvas" aria-hidden="true"></canvas>` : "")
+      + `<div class="clock">`
       + `<p class="clocktime">${pad2(now.getHours())}:${pad2(now.getMinutes())}</p>`
       + `<div class="clockwhen">`
       + `<p class="clockday">${esc(DAY_NAMES[now.getDay()])}</p>`
       + `<p class="clockdate">`
       + esc(`${ordinal(now.getDate())} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`)
-      + `</p></div></div>`;
+      + `</p>`;
+    /* The next appointment, and only that: nothing when the calendar has
+       nothing coming, rather than a line saying so. */
+    const next = clockNext(b && b.next, now);
+    if (next) {
+      out += `<p class="clocknext"><span class="clocknextk">Next</span> `
+        + `${esc(next.summary)} <span class="clocknextw">\u00b7 ${esc(clockNextWhen(next, now))}</span></p>`;
+    }
+    out += `</div></div>`;
 
     /* minutesOfDay, not the date on the timestamp. sun.sun reports the *next*
        rising, which after dawn is tomorrow's — so its date is wrong for today
@@ -14906,6 +15814,7 @@ const VOICE_NOTE_MS = 12000;
 /* How often a meal card rereads the plan. Five minutes: a meal planned on
    a phone should reach the kitchen before anybody walks there to look. */
 const MEAL_REFRESH_MS = 5 * 60 * 1000;
+const CAL_REFRESH_MS = 15 * 60 * 1000;
 /* The recipe box as a picker reads it, per Mealie, shared by every card. */
 const RECIPE_INDEX = new Map();
 /* Whole recipes read for their prep steps, by `entry|recipe_id`. */
@@ -15063,6 +15972,7 @@ class SpectraCard extends HTMLElement {
     this._mealSources = new Map();
     this._meals = {};
     this._mealTimer = null;
+    this._calTimer = null;
     /* Which meal slot is open, "YYYY-MM-DD|dinner", at most one. */
     this._mealPick = null;
     /* The slot whose meal is being moved, waiting for where to. */
@@ -15257,6 +16167,10 @@ class SpectraCard extends HTMLElement {
     if (this._pressTimer) { clearTimeout(this._pressTimer); this._pressTimer = null; }
     if (this._keyPick) { clearTimeout(this._keyPick); this._keyPick = null; }
     if (this._mealTimer) { clearTimeout(this._mealTimer); this._mealTimer = null; }
+    if (this._calTimer) { clearTimeout(this._calTimer); this._calTimer = null; }
+    /* The season's frames stop with the card rather than running on for a
+       canvas nobody can see. */
+    if (this._season) this._season.stop();
     for (const pending of this._subscriptions.values()) {
       Promise.resolve(pending).then(
         (unsubscribe) => { if (typeof unsubscribe === "function") unsubscribe(); },
@@ -15436,6 +16350,18 @@ class SpectraCard extends HTMLElement {
       this._signature = null;
       LOGGER_WARN(`spectra-card: could not fetch events for ${source.entity}`, error);
       this._update();
+    }).then(() => {
+      /* An appointment added from a phone changes nothing this card can
+         watch until it starts, so the window is read again on a timer --
+         the same reason the meal plan is. The old events stay on screen
+         until the new ones replace them. */
+      if (this._calTimer || !this.isConnected) return;
+      this._calTimer = setTimeout(() => {
+        this._calTimer = null;
+        for (const k of this._calendarSources.keys()) this._fetched.delete(k);
+        if (!this._hass || !this.isConnected) return;
+        for (const [k, src] of this._calendarSources) this._fetchCalendar(k, src);
+      }, CAL_REFRESH_MS);
     });
   }
 
@@ -15984,6 +16910,7 @@ class SpectraCard extends HTMLElement {
       + (swapped ? " swap" : "")
       + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "")
       + (type === "diary" ? " diarycard" : "")
+      + (type === "clock" && model.body && model.body.season ? " seasoncard" : "")
       + (config.grow && !(type === "sky" || type === "day" || type === "ahead") ? " grow" : "");
     /* Drawn as a sibling of the title bar and the body rather than inside
        either, because it belongs to neither: it is the column between them,
@@ -16023,6 +16950,19 @@ class SpectraCard extends HTMLElement {
     if (type === "day") this._dayAttach(model.body);
     if (type === "ahead") this._aheadAttach(model.body);
     if (type === "diary") this._diaryAttach();
+    if (type === "clock") this._seasonAttach(model.body);
+  }
+
+  /* The clock's season: one painter per card, kept across the minute's
+     repaint so the robin does not jump back to where it started. */
+  _seasonAttach(b) {
+    const canvas = this._holder.querySelector(".seasoncanvas");
+    if (!canvas) {
+      if (this._season) this._season.stop();
+      return;
+    }
+    if (!this._season) this._season = new SeasonPainter();
+    this._season.attach(canvas, b && b.now);
   }
 
   /* The diary body's skies: one painter for all its rows. */

@@ -915,6 +915,58 @@ from three metres tells you nothing but its endpoints.
 Rain only gets a line where there is some, because a row of zeroes is noise
 pretending to be information.
 
+### `clock` — what time is it, and what time of year?
+
+```yaml
+body:
+  type: clock
+  season: true
+  next: {calendar: calendar.home, days: 14}
+```
+
+The time, the day and the date. Two options dress it up:
+
+**`next`** puts the next appointment under the date: *Next Nursery ·
+Tomorrow 12:00*. It is the first event in the window that has **not
+started yet** — a timed event after now, or an all-day one from tomorrow —
+because what is already on today is the Week card's to say. Today's are
+the clock time, this week's the day and the time, later ones the date. With
+nothing coming the line is left out rather than saying so. The calendar is
+read again every fifteen minutes, so an appointment added from a phone
+turns up without anything on the card having to change.
+
+**`season: true`** puts the time of year behind the clock, opt-in because
+it is the one cell on the panel that moves on its own. Three layers:
+
+- **A tree** that follows the calendar, the same tree every year. Bare
+  through winter, budding from mid-March, in full leaf by late May,
+  turning from September, shedding through October and November until it
+  is bare again in December. Each leaf has its own day to open, turn and
+  fall, so it changes by the day rather than jumping by the season.
+- **A background** for the season: frost in the corners from December to
+  February, pollen through spring, sunbeams through the summer, a dewy web
+  in September, and leaves falling from the tree through the autumn — as
+  many as it is losing that week.
+- **An animal on top**, one a day from the season's pool, picked from the
+  date alone so every copy of the card shows the same one and it holds
+  still all day:
+
+  | | Animals |
+  |---|---|
+  | Dec – Feb | robin, blue tits, a starling murmuration |
+  | Mar | birds arriving, butterflies, blue tits |
+  | Apr – May | bees, butterflies, blue tits |
+  | Jun – Aug | butterflies, dragonflies, swifts, bees |
+  | Sep | birds leaving, dragonflies, butterflies |
+  | Oct – Nov | robin, blue tits, a starling murmuration |
+
+Nothing here is weather: the Now card already paints the sky, and a second
+one beside it would be two cards saying the same thing. The season is a
+wash over the card's own surface, so it works in either palette; frost and
+dew turn a cold blue on a light card, where white would vanish. The date
+keeps a halo in the surface colour so a branch behind it never costs a
+word. Under reduced motion it is one still frame.
+
 ### `sky` — what is the weather doing, as a picture?
 
 ```yaml
