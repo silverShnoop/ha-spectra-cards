@@ -3528,6 +3528,12 @@ gains room at its foot. In a section of two cards, mark the one that should
 grow. Alone on its line (a phone, a single column) it is told nothing and
 keeps its own height.
 
+**`fill_bottom: true` lines up only the foot of the tab.** Put it on the last
+section of each column and the columns stack however their cards fall, but
+all end on one line: each is told to grow until its foot meets the lowest
+foot on the tab, and its `grow` card takes the room. It costs no height,
+where rows of `fill_row` cost the difference on every row.
+
 Give every section on a tab `fill_row` and the tab becomes rows: each row
 ends level, so the next starts level, and the eye has straight lines to run
 along. A `rail` body with `fill: true` spends its growth on further whole

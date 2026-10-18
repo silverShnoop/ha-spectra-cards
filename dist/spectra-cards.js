@@ -25633,7 +25633,32 @@ class SpectraPanel extends HTMLElement {
      sky, on the Now card. Its own height is measured less what it was
      already told, so the answer does not feed back into itself. Alone on
      its line (a phone, one column) it is told nothing. */
+  /* `fill_bottom: true` on the last section of a column: the columns may
+     stack however their cards fall, but they all end on one line. Each
+     such section is told to grow until its foot meets the lowest foot on
+     the tab, as --pn-row-grow, which its `grow` card takes up as a
+     fill_row section's does. Its own height is measured less what it was
+     already told, so the answer does not feed back into itself. On a
+     single column there is nothing to line up with, and it is told
+     nothing. */
+  _fillBottom() {
+    const own = (o) => o.wrap.offsetHeight - (parseFloat(o.wrap.style.getPropertyValue("--pn-row-grow")) || 0);
+    const shown = this._wrappers.filter((o) => o.wrap.offsetHeight > 0 && !(o.side && this._sideMode));
+    const fills = shown.filter((w) => w.section.config && w.section.config.fill_bottom);
+    const single = (parseFloat(this._grid && this._grid.style.getPropertyValue("--pn-cols")) || 1) < 2;
+    let lowest = 0;
+    for (const o of shown) lowest = Math.max(lowest, o.wrap.offsetTop + own(o));
+    for (const w of this._wrappers.filter((o) => o.section.config && o.section.config.fill_bottom)) {
+      const was = parseFloat(w.wrap.style.getPropertyValue("--pn-row-grow")) || 0;
+      const grow = single || !fills.includes(w) ? 0 : Math.max(0, Math.round(lowest - (w.wrap.offsetTop + own(w))));
+      if (grow === was) continue;
+      if (grow) w.wrap.style.setProperty("--pn-row-grow", `${grow}px`);
+      else w.wrap.style.removeProperty("--pn-row-grow");
+    }
+  }
+
   _fillRows() {
+    this._fillBottom();
     const fills = this._wrappers.filter((w) => w.section.config && w.section.config.fill_row);
     /* A section's own height, less what it was already told to grow. Every
        section on the line is measured this way, so a row of fill_row
