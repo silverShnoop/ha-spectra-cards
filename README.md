@@ -3271,11 +3271,16 @@ or two domains in a house pass it — security, an alarm — which is also
 roughly as many as can be loud before the rail is a fruit salad that means
 nothing.
 
+**The rail is one track.** Every button sits inside a single sunken strip
+with a card's corners, so from across a room it reads as one control
+rather than as another row of cards.
+
 **Selection is said without colour on purpose**: a hue spent on "you are
 here" is a hue that can no longer mean "the door is open". It uses three
-neutral devices at once, because any one alone is weak across a room — a
-thick bar along the bottom edge with a caret hanging off it, a surface one
-step up from its neighbours, and the label in full ink at heavier weight.
+neutral devices at once, because any one alone is weak across a room — the
+button raised out of the track on a card's surface with a shadow and an ink
+edge, a caret hanging off the track under it, and the label in full ink at
+heavier weight.
 All of them survive a button that is simultaneously filled red, and all of
 them survive being looked at in the dark.
 
@@ -3448,12 +3453,12 @@ content below the rail scrolls, inside itself. A job cannot scroll out of
 sight, and the tabs are always a thumb away.
 
 **`rail: bottom` puts the rail along the foot on every screen**, the way a
-phone always has it: the cards above, the selection bar and caret pointing
+phone always has it: the cards above, the caret pointing
 up at them. Needs you keeps its place down the side.
 
 **On a phone the rail goes to the bottom and is icons only.** At or below
 `phone_max_width` (default 600) the rail pins to the bottom edge, where a
-thumb is, and its selection bar and caret flip to point up at the cards.
+thumb is, and its caret flips to point up at the cards.
 The rail itself turns icons-only whenever it is narrower than 560px,
 wherever it is placed: eight labels cannot share a phone's width. The
 words are not lost — each button reads its label and summary to a screen
