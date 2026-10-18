@@ -24708,7 +24708,7 @@ const PANEL_SHEET = `
    content above them, the caret pointing up at what it owns. */
 .panel.railbottom .rail { order:2; padding:8px 0 calc(10px + env(safe-area-inset-bottom, 0px));
   --sp-dock-edge:bottom; }
-.panel.railbottom .scroll { order:1; }
+.panel.railbottom .scroll { order:1; padding-bottom:4px; }
 .panel.railbottom .quick { bottom:calc(var(--pn-rail-h, 76px) + 10px); }
 /* A phone: Needs you folds to one line. The bar says how many and the
    most urgent, in words, and wears the loudest level the way a card
@@ -25330,6 +25330,7 @@ class SpectraPanel extends HTMLElement {
       w.wrap.style.gridColumn = Number.isInteger(at) && at >= 1 && at + span - 1 <= cols ? `${at} / span ${span}` : "";
     }
 
+    this._fitHi = 0;
     this._spanRows();
 
     /* A different set of sections is a different tab. Start it at the top
@@ -25710,11 +25711,22 @@ class SpectraPanel extends HTMLElement {
     const drawn = g.getBoundingClientRect().height / (scale || 1);
     if (room <= 0 || drawn <= 0) return;
     const least = Number(this._config.fit_min) > 0 ? Math.min(1, Number(this._config.fit_min)) : .75;
+    /* Drawn smaller, the cards are wider and wrap less, so the height does
+       not scale with the zoom and one step rarely lands. Each overflow
+       remembers the size that was too big, and room left over steps half
+       way back towards it, so it settles instead of see-sawing. Forgotten
+       on a relayout and once an hour, so a quieter week can grow back. */
+    if (!this._fitAt || Date.now() - this._fitAt > 3600000) { this._fitAt = Date.now(); this._fitHi = 0; }
+    const hi = this._fitHi || 0;
     let z = was;
     const over = sc.scrollHeight - sc.clientHeight;
-    if (over > 0 || drawn > room + .5) z = was * (room - 3 - Math.max(0, over)) / drawn;
-    else if (was < 1 && room - drawn > 16) z = Math.min(1, was * room / drawn);
-    else return;
+    if (over > 0 || drawn > room + .5) {
+      this._fitHi = hi ? Math.min(hi, was) : was;
+      z = was * (room - 3 - Math.max(0, over)) / drawn;
+    } else if (was < 1 && room - drawn > 12) {
+      if (hi && hi - was < .006) return;
+      z = hi ? (was + hi) / 2 : Math.min(1, was * room / drawn);
+    } else return;
     z = Math.max(least, Math.min(1, Math.floor(z * 1000) / 1000));
     if (Math.abs(z - was) < .004) return;
     this._fitZoom = z;
