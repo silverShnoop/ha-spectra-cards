@@ -1122,10 +1122,11 @@ body:
   events: {calendar: calendar.home, days: 7, limit: 60}
 ```
 
-Upcoming and the week's weather as one card. Each day is a row: a tile at the
-left edge with the weekday over the date, like a tear-off calendar, today's
-filled with the card's accent; then its weather, over that day's own sky; and
-on the rest its diary.
+Upcoming and the week's weather as one card. Each day is a row: its weather,
+over that day's own sky; then a tile with the weekday over the date, like a
+tear-off calendar, today's filled with the card's accent; and on the rest its
+diary. The date sits between the two halves of the row because it belongs to
+both: it is what the weather is for and what the diary is on.
 
 **The weather is a narrow strip.** The icon, centred however tall the row grows;
 the high, large, the way the Now card leads with its reading, with the low and
@@ -3424,6 +3425,7 @@ views:
     needs_max_height: 36      # optional: upright cap on Needs you, % of height
     side_min_width: 900       # optional: narrowest width that goes sideways
     phone_max_width: 600      # optional: widest screen that gets the phone rail
+    rail: bottom              # optional: the rail along the foot on every screen
     needs_entity: sensor.needs_you  # optional: lets Needs you fold to a bar on a phone
     column_min_width: 280     # optional: narrowest column, px (default 320)
     masonry: true             # optional: pack sections with no row gaps
@@ -3444,6 +3446,10 @@ all: the panel is exactly as tall as the screen that is left under Home
 Assistant's header — measured, so kiosk mode needs no setting — and only the
 content below the rail scrolls, inside itself. A job cannot scroll out of
 sight, and the tabs are always a thumb away.
+
+**`rail: bottom` puts the rail along the foot on every screen**, the way a
+phone always has it: the cards above, the selection bar and caret pointing
+up at them. Needs you keeps its place down the side.
 
 **On a phone the rail goes to the bottom and is icons only.** At or below
 `phone_max_width` (default 600) the rail pins to the bottom edge, where a
@@ -3502,10 +3508,29 @@ sections; a span-3 group reads the same either way.
 by side rarely come out the same height, and a card spanning both underneath
 then hangs off the taller one with a gap under the shorter. A section with
 `fill_row` is measured against the sections that start on the same line and
-told how much to grow, or shrink, to match the tallest as `--pn-row-grow`;
-the card decides what takes it up — on the Now card, the sky above the
-horizon. Alone on its line (a phone, a single column) it is told nothing and
+told how much to grow to match the tallest as `--pn-row-grow`; it is never
+told to shrink. The card decides what takes it up: on a sky, `ahead` or `day`
+card the picture grows, and on any other card the one marked `grow: true`
+gains room at its foot. In a section of two cards, mark the one that should
+grow. Alone on its line (a phone, a single column) it is told nothing and
 keeps its own height.
+
+Give every section on a tab `fill_row` and the tab becomes rows: each row
+ends level, so the next starts level, and the eye has straight lines to run
+along. A `rail` body with `fill: true` spends its growth on further whole
+rows past `max` rather than empty space, which makes it the natural card to
+stand beside something tall:
+
+```yaml
+- type: grid
+  column: 3
+  fill_row: true
+  cards:
+    - type: custom:spectra-card
+      title: Activity
+      grow: true
+      body: { type: rail, max: 6, fill: true, events: { entity: sensor.activity_feed, attribute: events } }
+```
 
 **Tabs belong to the browser, not the house.** A rail button with `tab`
 switches the panel in *this* browser and calls nothing:

@@ -383,6 +383,74 @@ customElements.define("fake-section", FakeSection);
     await page.close();
   }
 
+  /* Rows of fill_row sections: every section in a row ends with the
+     tallest, by growing the card marked `grow`; a rail with `fill` spends
+     its growth on further whole rows. Nothing is ever told to shrink, which
+     is what used to let one section chase another off the bottom. */
+  {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    page.on("pageerror", (e) => problems.push(`rows: PAGEERROR ${e.message}`));
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.waitForFunction(() => !!customElements.get("spectra-panel"));
+    const got = await page.evaluate(async () => {
+      const now = Date.now();
+      const events = Array.from({ length: 20 }, (_, i) => ({ entity_id: `binary_sensor.m${i}`, area: `Room ${i + 1}`, kind: "motion",
+        at: new Date(now - (i + 1) * 60000).toISOString() }));
+      window.HASS = { states: { "sensor.feed": { entity_id: "sensor.feed", state: "x", attributes: { events } } },
+        themes: { darkMode: true }, callService: () => Promise.resolve() };
+      const list = (title, rows, grow) => Object.assign({ type: "custom:spectra-card", title, accent: 4,
+        body: { type: "list", rows: Array.from({ length: rows }, (_, i) => ({ name: `${title} ${i + 1}`, value: "x" })) } },
+        grow ? { grow: true } : {});
+      const rail = { type: "custom:spectra-card", title: "Activity", accent: 6, grow: true,
+        body: { type: "rail", max: 3, fill: true, events: { entity: "sensor.feed", attribute: "events" } } };
+      const plan = [
+        { column: 1, column_span: 2, cards: [list("Wide one", 2, true)] },
+        { column: 3, cards: [list("Tall", 6, true)] },
+        { column: 4, cards: [list("Short", 1, true)] },
+        { column: 1, column_span: 2, cards: [list("Wide two", 12, true)] },
+        { column: 3, cards: [rail] },
+        { column: 4, cards: [list("Pair a", 2), list("Pair b", 1, true)] },
+      ];
+      const sections = plan.map((c) => {
+        const s = document.createElement("fake-section");
+        s.config = Object.assign({ type: "grid", fill_row: true }, c);
+        return s;
+      });
+      const view = document.createElement("spectra-panel");
+      view.setConfig({ type: "custom:spectra-panel", masonry: true, max_columns: 4, column_min_width: 280 });
+      document.getElementById("a").appendChild(view);
+      view.sections = sections;
+      await new Promise((r) => setTimeout(r, 900));
+      const box = (i) => sections[i].parentElement.getBoundingClientRect();
+      const card = sections[4].querySelector("spectra-card");
+      const root = card.shadowRoot || card;
+      const more = root.querySelector(".railmore");
+      const cardBox = root.querySelector(".card").getBoundingClientRect();
+      const m = more && more.getBoundingClientRect();
+      const seen = more ? [...more.querySelectorAll(".event")].map((e) => e.getBoundingClientRect())
+        .filter((r) => r.left < m.right && r.top < m.bottom) : [];
+      return {
+        bottoms: [[0, 1, 2], [3, 4, 5]].map((row) => row.map((i) => Math.round(box(i).bottom))),
+        tops: [3, 4, 5].map((i) => Math.round(box(i).top)),
+        grows: sections.map((s) => s.parentElement.style.getPropertyValue("--pn-row-grow")),
+        seen: seen.length, whole: seen.every((r) => r.bottom <= m.bottom + .5),
+        inside: m ? m.bottom <= cardBox.bottom : false,
+      };
+    });
+    const check = (label, ok, detail) => {
+      console.log(`${ok ? "ok  " : "FAIL"} rows: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`rows: ${label}`);
+    };
+    const level = (row) => Math.max(...row) - Math.min(...row) <= 1;
+    check("every section in a row ends together", got.bottoms.every(level), got.bottoms);
+    check("so the next row starts level", level(got.tops), got.tops);
+    check("nothing runs away", got.grows.every((g) => !g || (parseFloat(g) >= 0 && parseFloat(g) < 500)), got.grows);
+    check("the tallest is told nothing", got.grows[1] === "" && got.grows[3] === "", got.grows);
+    check("the rail fills its room with further rows", got.seen >= 3, got.seen);
+    check("whole rows only, inside the card", got.whole && got.inside, got);
+    await page.close();
+  }
+
   /* Tabs belong to the browser. The rail's `tab` buttons switch which
      sections this browser shows and touch nothing in the house, so a phone
      changing tab cannot change the wall panel's. Two contexts are two
