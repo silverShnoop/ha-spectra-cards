@@ -93,6 +93,7 @@ const js = fs.readFileSync(file);
       iconMid: rows.slice(0, 4).map((r) => { const i = r.querySelector(".dywx > .dyic").getBoundingClientRect(); const w = r.querySelector(".dywx").getBoundingClientRect(); return Math.round(Math.abs((i.top + i.bottom) / 2 - (w.top + w.bottom) / 2)); }),
       iconSize: Math.round(rows[0].querySelector(".dywx > .dyic").getBoundingClientRect().height),
       tiles: rows.map((r) => r.querySelector(".dytile").textContent),
+      tileBetween: (() => { const w = rows[1].querySelector(".dywx").getBoundingClientRect(); const t = rows[1].querySelector(".dytile").getBoundingClientRect(); const e = rows[1].querySelector(".dyev").getBoundingClientRect(); return Math.abs(t.left - w.right) <= 1 && Math.abs(e.left - t.right) <= 1; })(),
       todayFilled: getComputedStyle(rows[0].querySelector(".dytile")).backgroundColor !== getComputedStyle(rows[1].querySelector(".dytile")).backgroundColor,
       tueText: (() => { const r = rows[3]; const t = r.querySelector(".dytext"); return t ? Math.round(r.getBoundingClientRect().bottom - t.getBoundingClientRect().bottom) : 99; })(),
       quiet: Math.round(rows[0].getBoundingClientRect().height),
@@ -122,6 +123,7 @@ const js = fs.readFileSync(file);
     check(`${at}: the day's words sit under its figures`, c.text === "Sunny" && c.textBelow, c.text);
     check(`${at}: and at the foot of a tall row`, c.tueText <= 10, c.tueText);
     check(`${at}: each day is a tile, weekday over date`, c.tiles[0] === "Sat17" && c.tiles[6] === "Fri23", c.tiles);
+    check(`${at}: the date sits between the weather and the diary`, c.tileBetween, c.tileBetween);
     check(`${at}: today's tile is filled`, c.todayFilled, c.todayFilled);
     check(`${at}: the icon sits in the middle of the weather, however tall the row`, c.iconMid.every((d) => d <= 2), c.iconMid);
     check(`${at}: and is 30px`, c.iconSize === 30, c.iconSize);
