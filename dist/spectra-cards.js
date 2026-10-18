@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.180.3";
+const VERSION = "0.181.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -291,6 +291,11 @@ ha-icon { display:inline-flex; line-height:0; }
   background:var(--sp-surface); border:2px solid var(--sp-edge);
   border-radius:6px; padding:9px 10px; position:relative;
 }
+/* "grow: true": in a fill_row section, this is the card that takes up the
+   difference, so the row ends level. Room at its foot, unless its body
+   has something to put there (the rail's further rows). */
+.card.grow { padding-bottom:calc(9px + max(0px, var(--pn-row-grow, 0px))); }
+.card.grow:has(.railmore) { padding-bottom:9px; }
 /* A card that wants attention takes the level's colour on the edge it
    already has, the same device a Needs-you row uses. The border was
    always there, so nothing moves and nothing is pushed down the card --
@@ -1814,6 +1819,15 @@ ${TOKENS_DARK}
 .railcol .line { flex:1; width:2px; background:var(--sp-edge);
   margin-top:3px; margin-bottom:-6px; }
 .event.stale .name, .event.stale ha-icon { color:var(--sp-ink-3); }
+/* "fill: true": the rows past "max", kept for a card that is told to grow
+   ("grow: true" in a fill_row section). They take exactly the room it was
+   given, whole rows only, so the rail runs to the foot of its row instead
+   of stopping short with a gap under it. */
+.railmore { overflow:hidden; height:max(0px, var(--pn-row-grow, 0px));
+  display:flex; flex-direction:column; flex-wrap:wrap; align-content:flex-start; }
+/* A row that would not fit whole wraps into a second column, which is out
+   of sight past the card's edge, rather than showing cut in half. */
+.railmore .event { width:100%; flex:none; }
 .event.stale .trail { color:var(--sp-ink-3); }
 
 /* strip */
@@ -4008,15 +4022,19 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 /* ahead -- the Now card's readings over the left of a picture of the day
    ahead. The painter says where now ends, as --ahead-now, and the readings
    and the figures keep to it. */
-.aheadbox { position:relative; height:264px; border-radius:4px; overflow:hidden; container-type:inline-size; }
+.aheadbox { position:relative; height:calc(264px + max(0px, var(--pn-row-grow, 0px))); border-radius:4px; overflow:hidden; container-type:inline-size; }
 .aheadcanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
 /* diary -- the weather a narrow strip of columns that line up down the
    week; everything else the diary. The card gives its rows the full width. */
 .card.diarycard { padding:0; overflow:hidden; }
+.card.diarycard.grow { padding-bottom:max(0px, var(--pn-row-grow, 0px)); }
 .card.diarycard > .titlebar { margin:9px 10px 6px; }
 .diary { container-type:inline-size; --dy-tile:46px; --dy-wx:162px; }
-.dyrow { position:relative; display:grid; grid-template-columns:var(--dy-tile) var(--dy-wx) minmax(0, 1fr); border-top:1px solid var(--sp-edge); }
-.dysky { position:absolute; top:0; bottom:0; left:var(--dy-tile); width:calc(100% - var(--dy-tile)); height:100%; display:block; pointer-events:none; }
+.dyrow { position:relative; display:grid; grid-template-columns:var(--dy-wx) var(--dy-tile) minmax(0, 1fr); border-top:1px solid var(--sp-edge); }
+.dysky { position:absolute; top:0; bottom:0; left:0; width:100%; height:100%; display:block; pointer-events:none; }
+.dyrow > .dywx { grid-column:1; grid-row:1; }
+.dyrow > .dytile { grid-column:2; grid-row:1; }
+.dyrow > .dyev { grid-column:3; grid-row:1; }
 .dytile { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--sp-sink); border-right:1px solid var(--sp-edge); padding:5px 0; line-height:1; }
 .dytile b { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--sp-ink-2); font-weight:700; }
 .dytile span { font-size:21px; font-weight:700; margin-top:3px; color:var(--sp-ink); }
@@ -10599,9 +10617,9 @@ const BODIES = {
     }
 
     const limit = Number(b.max) > 0 ? Number(b.max) : rows.length;
-    const shown = rows.slice(0, limit);
+    const shown = b.fill ? rows : rows.slice(0, limit);
 
-    return shown.map(({ event, count }, i) => {
+    const html = shown.map(({ event, count }, i) => {
       const ago = firstOf(event.ago, shortSince(event.at));
       /* An hour is the line between "just now" and "earlier"; past it a row
          is context rather than news, and that goes for every kind.
@@ -10630,7 +10648,9 @@ const BODIES = {
         + `<div class="eventbody"><p class="name">${esc(name)}${suffix}</p>`
         + (isBlank(ago) ? "" : `<span class="trail">${esc(ago)} ago</span>`)
         + `</div></div>`;
-    }).join("");
+    });
+    if (!b.fill || html.length <= limit) return html.join("");
+    return html.slice(0, limit).join("") + `<div class="railmore">${html.slice(limit).join("")}</div>`;
   },
 
   /* Where in the house, lately? The same feed as the rail, drawn on the
@@ -15900,7 +15920,8 @@ class SpectraCard extends HTMLElement {
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "")
       + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "")
-      + (type === "diary" ? " diarycard" : "");
+      + (type === "diary" ? " diarycard" : "")
+      + (config.grow && !(type === "sky" || type === "day" || type === "ahead") ? " grow" : "");
     /* Drawn as a sibling of the title bar and the body rather than inside
        either, because it belongs to neither: it is the column between them,
        and only a direct child of the card can span the card's rows. */
@@ -24629,6 +24650,12 @@ const PANEL_SHEET = `
   --sp-dock-edge:bottom; }
 .panel.phone .scroll { order:1; padding-bottom:12px; }
 .panel.phone .main { gap:6px; }
+/* rail: bottom -- the same on any screen: the tabs along the foot, the
+   content above them, the caret pointing up at what it owns. */
+.panel.railbottom .rail { order:2; padding:8px 0 calc(10px + env(safe-area-inset-bottom, 0px));
+  --sp-dock-edge:bottom; }
+.panel.railbottom .scroll { order:1; }
+.panel.railbottom .quick { bottom:calc(var(--pn-rail-h, 76px) + 10px); }
 /* A phone: Needs you folds to one line. The bar says how many and the
    most urgent, in words, and wears the loudest level the way a card
    does -- border, ring, ground -- so it is the same promise at a glance.
@@ -25202,6 +25229,7 @@ class SpectraPanel extends HTMLElement {
     this._panel.classList.toggle("side", side);
     const phoneMax = Number(this._config.phone_max_width) || 600;
     this._panel.classList.toggle("phone", !side && width <= phoneMax);
+    this._panel.classList.toggle("railbottom", this._config.rail === "bottom");
     this._updateBar();
 
     /* `spectra_slot: side` sections live under Needs you in a column and
@@ -25552,19 +25580,26 @@ class SpectraPanel extends HTMLElement {
      its line (a phone, one column) it is told nothing. */
   _fillRows() {
     const fills = this._wrappers.filter((w) => w.section.config && w.section.config.fill_row);
+    /* A section's own height, less what it was already told to grow. Every
+       section on the line is measured this way, so a row of fill_row
+       sections settles on its tallest rather than chasing itself. */
+    const own = (o) => o.wrap.offsetHeight - (parseFloat(o.wrap.style.getPropertyValue("--pn-row-grow")) || 0);
     for (const w of fills) {
       const was = parseFloat(w.wrap.style.getPropertyValue("--pn-row-grow")) || 0;
       const h = w.wrap.offsetHeight;
       let tallest = 0;
+      let alone = true;
       if (h > 0) {
         const top = w.wrap.offsetTop;
         for (const o of this._wrappers) {
-          if (fills.includes(o)) continue;
-          const oh = o.wrap.offsetHeight;
-          if (oh > 0 && Math.abs(o.wrap.offsetTop - top) < 2) tallest = Math.max(tallest, oh);
+          if (o === w || o.wrap.offsetHeight <= 0 || Math.abs(o.wrap.offsetTop - top) >= 2) continue;
+          alone = false;
+          tallest = Math.max(tallest, own(o));
         }
       }
-      const grow = tallest ? Math.round(tallest - (h - was)) : 0;
+      /* Only ever taller: a row ends at its tallest section, never its
+         shortest, so a section is told nothing it could not do. */
+      const grow = alone ? 0 : Math.max(0, Math.round(tallest - (h - was)));
       if (grow === was) continue;
       if (grow) w.wrap.style.setProperty("--pn-row-grow", `${grow}px`);
       else w.wrap.style.removeProperty("--pn-row-grow");
