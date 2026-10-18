@@ -1130,7 +1130,8 @@ both: it is what the weather is for and what the diary is on.
 
 **The weather is a narrow strip.** The icon, centred however tall the row grows;
 the high, large, the way the Now card leads with its reading, with the low and
-the rain in a little stack beside it; and the day's words (Partly cloudy, Heavy
+the rain in a little stack beside it (in mm, or as a chance when the forecast
+gives a day only that, as the Met Office does); and the day's words (Partly cloudy, Heavy
 rain) at its foot, to the right. The high has a fixed slot, so the stacks line
 up down the week. It is kept to the size the old Week card's row was, at one
 column and at two, and ends at a hard edge so the diary's times start against a
