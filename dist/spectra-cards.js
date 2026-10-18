@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.181.1";
+const VERSION = "0.183.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -25665,6 +25665,11 @@ class SpectraPanel extends HTMLElement {
      and never the span's -- measuring it cannot feed back into itself. */
   _spanRows() {
     this._fillRows();
+    this._spanMasonry();
+    this._fit();
+  }
+
+  _spanMasonry() {
     if (!this._config.masonry) return;
     const gap = parseFloat(getComputedStyle(this).getPropertyValue("--pn-row-gap")) || 20;
     for (const w of this._wrappers) {
@@ -25677,6 +25682,44 @@ class SpectraPanel extends HTMLElement {
         w.wrap.style.setProperty("--pn-rows", String(rows));
       }
     }
+  }
+
+  /* `fit: [Home]` (or `fit: true` for every tab): the tab is a screen, not
+     a page. When what is on it is taller than the room above the rail, the
+     grid is drawn smaller, just enough to fit and never below `fit_min`
+     (0.75), rather than scrolling a busy week's Saturday out of sight. It
+     comes back up to full size as soon as there is room again. Never on a
+     phone, which scrolls by nature. Measured in the scroller's own pixels,
+     so a zoom on the page around it cancels out. */
+  _fit() {
+    const g = this._grid;
+    const sc = this._scroll;
+    if (!g || !sc) return;
+    const fit = this._config.fit;
+    const tab = tabStore.get() || ((this._wrappers.find((w) => w.tabs) || {}).tabs || [])[0];
+    const on = fit === true || (Array.isArray(fit) && fit.map(String).includes(String(tab)));
+    const was = this._fitZoom || 1;
+    if (!on || this._panel.classList.contains("phone")) {
+      if (was !== 1) { this._fitZoom = 1; g.style.removeProperty("zoom"); }
+      return;
+    }
+    const cs = getComputedStyle(sc);
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const room = sc.clientHeight - pad;
+    const scale = sc.getBoundingClientRect().height / (sc.clientHeight || 1);
+    const drawn = g.getBoundingClientRect().height / (scale || 1);
+    if (room <= 0 || drawn <= 0) return;
+    const least = Number(this._config.fit_min) > 0 ? Math.min(1, Number(this._config.fit_min)) : .75;
+    let z = was;
+    const over = sc.scrollHeight - sc.clientHeight;
+    if (over > 0 || drawn > room + .5) z = was * (room - 3 - Math.max(0, over)) / drawn;
+    else if (was < 1 && room - drawn > 16) z = Math.min(1, was * room / drawn);
+    else return;
+    z = Math.max(least, Math.min(1, Math.floor(z * 1000) / 1000));
+    if (Math.abs(z - was) < .004) return;
+    this._fitZoom = z;
+    if (z === 1) g.style.removeProperty("zoom");
+    else g.style.zoom = String(z);
   }
 }
 
