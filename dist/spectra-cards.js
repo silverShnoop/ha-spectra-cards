@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.183.2";
+const VERSION = "0.183.3";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -10009,12 +10009,17 @@ const BODIES = {
       const hi = wx ? skyNum(wx.temperature) : null;
       const lo = wx ? skyNum(wx.templow) : null;
       const rain = wx ? skyNum(wx.precipitation) : null;
+      /* A forecast that gives a day only its chance of rain (the Met Office
+         does) says that instead: 88% is not "dry". Under one in five is. */
+      const chance = wx && rain === null ? skyNum(wx.precipitation_probability) : null;
       const noon = `${day.key}T12:00:00`;
       const name = new Date(noon).toLocaleDateString([], { weekday: "short" });
       const figs = wx
         ? `<span class="n hi">${hi === null ? "" : `${Math.round(hi)}°`}</span>`
           + `<span class="n lo">${lo === null ? "" : `${Math.round(lo)}°`}</span>`
-          + `<span class="n rn${rain === null || rain < .5 ? " dry" : ""}">${rain === null || rain < .5 ? "dry" : `${rain.toFixed(1)}<small>mm</small>`}</span>`
+          + (chance !== null
+            ? `<span class="n rn${chance < 20 ? " dry" : ""}">${chance < 20 ? "dry" : `${Math.round(chance)}<small>%</small>`}</span>`
+            : `<span class="n rn${rain === null || rain < .5 ? " dry" : ""}">${rain === null || rain < .5 ? "dry" : `${rain.toFixed(1)}<small>mm</small>`}</span>`)
         : `<span class="na">—</span>`;
       const text = cond ? (WEATHER_TEXT[cond] || cond.charAt(0).toUpperCase() + cond.slice(1)) : "";
       const alls = day.all.length
