@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.183.0";
+const VERSION = "0.183.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -25811,6 +25811,10 @@ const loadReport = {
       const secs = (ms) => `${Math.max(0, Math.round(ms / 1000))}s`;
       const parts = [
         `load=${nav.type || "unknown"}`,
+        /* Which code this load is running: a panel that went on drawing
+           last week's cards after an install was a cache, and this is how
+           to tell from the log rather than by eye. */
+        `version=${VERSION}`,
         `discarded=${document.wasDiscarded ? "yes" : "no"}`,
         `from=${from}`,
       ];
