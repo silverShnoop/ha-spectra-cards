@@ -3431,6 +3431,8 @@ views:
     side_min_width: 900       # optional: narrowest width that goes sideways
     phone_max_width: 600      # optional: widest screen that gets the phone rail
     rail: bottom              # optional: the rail along the foot on every screen
+    fit: [Home]               # optional: tabs drawn smaller rather than scrolled
+    fit_min: 0.75             # optional: the smallest they may be drawn
     needs_entity: sensor.needs_you  # optional: lets Needs you fold to a bar on a phone
     column_min_width: 280     # optional: narrowest column, px (default 320)
     masonry: true             # optional: pack sections with no row gaps
@@ -3455,6 +3457,12 @@ sight, and the tabs are always a thumb away.
 **`rail: bottom` puts the rail along the foot on every screen**, the way a
 phone always has it: the cards above, the caret pointing
 up at them. Needs you keeps its place down the side.
+
+**`fit` makes a tab a screen rather than a page.** On the tabs it names
+(`fit: true` for all of them), when the cards would run past the rail the
+grid is drawn smaller, just enough to fit and never below `fit_min` (0.75),
+so a busy week does not scroll its Saturday out of sight. It goes back to
+full size as soon as there is room again. A phone keeps scrolling.
 
 **On a phone the rail goes to the bottom and is icons only.** At or below
 `phone_max_width` (default 600) the rail pins to the bottom edge, where a
@@ -3519,6 +3527,12 @@ card the picture grows, and on any other card the one marked `grow: true`
 gains room at its foot. In a section of two cards, mark the one that should
 grow. Alone on its line (a phone, a single column) it is told nothing and
 keeps its own height.
+
+**`fill_bottom: true` lines up only the foot of the tab.** Put it on the last
+section of each column and the columns stack however their cards fall, but
+all end on one line: each is told to grow until its foot meets the lowest
+foot on the tab, and its `grow` card takes the room. It costs no height,
+where rows of `fill_row` cost the difference on every row.
 
 Give every section on a tab `fill_row` and the tab becomes rows: each row
 ends level, so the next starts level, and the eye has straight lines to run

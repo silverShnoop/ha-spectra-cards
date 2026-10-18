@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.181.1";
+const VERSION = "0.183.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -24708,7 +24708,7 @@ const PANEL_SHEET = `
    content above them, the caret pointing up at what it owns. */
 .panel.railbottom .rail { order:2; padding:8px 0 calc(10px + env(safe-area-inset-bottom, 0px));
   --sp-dock-edge:bottom; }
-.panel.railbottom .scroll { order:1; }
+.panel.railbottom .scroll { order:1; padding-bottom:4px; }
 .panel.railbottom .quick { bottom:calc(var(--pn-rail-h, 76px) + 10px); }
 /* A phone: Needs you folds to one line. The bar says how many and the
    most urgent, in words, and wears the loudest level the way a card
@@ -25330,6 +25330,7 @@ class SpectraPanel extends HTMLElement {
       w.wrap.style.gridColumn = Number.isInteger(at) && at >= 1 && at + span - 1 <= cols ? `${at} / span ${span}` : "";
     }
 
+    this._fitHi = 0;
     this._spanRows();
 
     /* A different set of sections is a different tab. Start it at the top
@@ -25632,7 +25633,32 @@ class SpectraPanel extends HTMLElement {
      sky, on the Now card. Its own height is measured less what it was
      already told, so the answer does not feed back into itself. Alone on
      its line (a phone, one column) it is told nothing. */
+  /* `fill_bottom: true` on the last section of a column: the columns may
+     stack however their cards fall, but they all end on one line. Each
+     such section is told to grow until its foot meets the lowest foot on
+     the tab, as --pn-row-grow, which its `grow` card takes up as a
+     fill_row section's does. Its own height is measured less what it was
+     already told, so the answer does not feed back into itself. On a
+     single column there is nothing to line up with, and it is told
+     nothing. */
+  _fillBottom() {
+    const own = (o) => o.wrap.offsetHeight - (parseFloat(o.wrap.style.getPropertyValue("--pn-row-grow")) || 0);
+    const shown = this._wrappers.filter((o) => o.wrap.offsetHeight > 0 && !(o.side && this._sideMode));
+    const fills = shown.filter((w) => w.section.config && w.section.config.fill_bottom);
+    const single = (parseFloat(this._grid && this._grid.style.getPropertyValue("--pn-cols")) || 1) < 2;
+    let lowest = 0;
+    for (const o of shown) lowest = Math.max(lowest, o.wrap.offsetTop + own(o));
+    for (const w of this._wrappers.filter((o) => o.section.config && o.section.config.fill_bottom)) {
+      const was = parseFloat(w.wrap.style.getPropertyValue("--pn-row-grow")) || 0;
+      const grow = single || !fills.includes(w) ? 0 : Math.max(0, Math.round(lowest - (w.wrap.offsetTop + own(w))));
+      if (grow === was) continue;
+      if (grow) w.wrap.style.setProperty("--pn-row-grow", `${grow}px`);
+      else w.wrap.style.removeProperty("--pn-row-grow");
+    }
+  }
+
   _fillRows() {
+    this._fillBottom();
     const fills = this._wrappers.filter((w) => w.section.config && w.section.config.fill_row);
     /* A section's own height, less what it was already told to grow. Every
        section on the line is measured this way, so a row of fill_row
@@ -25665,6 +25691,11 @@ class SpectraPanel extends HTMLElement {
      and never the span's -- measuring it cannot feed back into itself. */
   _spanRows() {
     this._fillRows();
+    this._spanMasonry();
+    this._fit();
+  }
+
+  _spanMasonry() {
     if (!this._config.masonry) return;
     const gap = parseFloat(getComputedStyle(this).getPropertyValue("--pn-row-gap")) || 20;
     for (const w of this._wrappers) {
@@ -25677,6 +25708,55 @@ class SpectraPanel extends HTMLElement {
         w.wrap.style.setProperty("--pn-rows", String(rows));
       }
     }
+  }
+
+  /* `fit: [Home]` (or `fit: true` for every tab): the tab is a screen, not
+     a page. When what is on it is taller than the room above the rail, the
+     grid is drawn smaller, just enough to fit and never below `fit_min`
+     (0.75), rather than scrolling a busy week's Saturday out of sight. It
+     comes back up to full size as soon as there is room again. Never on a
+     phone, which scrolls by nature. Measured in the scroller's own pixels,
+     so a zoom on the page around it cancels out. */
+  _fit() {
+    const g = this._grid;
+    const sc = this._scroll;
+    if (!g || !sc) return;
+    const fit = this._config.fit;
+    const tab = tabStore.get() || ((this._wrappers.find((w) => w.tabs) || {}).tabs || [])[0];
+    const on = fit === true || (Array.isArray(fit) && fit.map(String).includes(String(tab)));
+    const was = this._fitZoom || 1;
+    if (!on || this._panel.classList.contains("phone")) {
+      if (was !== 1) { this._fitZoom = 1; g.style.removeProperty("zoom"); }
+      return;
+    }
+    const cs = getComputedStyle(sc);
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const room = sc.clientHeight - pad;
+    const scale = sc.getBoundingClientRect().height / (sc.clientHeight || 1);
+    const drawn = g.getBoundingClientRect().height / (scale || 1);
+    if (room <= 0 || drawn <= 0) return;
+    const least = Number(this._config.fit_min) > 0 ? Math.min(1, Number(this._config.fit_min)) : .75;
+    /* Drawn smaller, the cards are wider and wrap less, so the height does
+       not scale with the zoom and one step rarely lands. Each overflow
+       remembers the size that was too big, and room left over steps half
+       way back towards it, so it settles instead of see-sawing. Forgotten
+       on a relayout and once an hour, so a quieter week can grow back. */
+    if (!this._fitAt || Date.now() - this._fitAt > 3600000) { this._fitAt = Date.now(); this._fitHi = 0; }
+    const hi = this._fitHi || 0;
+    let z = was;
+    const over = sc.scrollHeight - sc.clientHeight;
+    if (over > 0 || drawn > room + .5) {
+      this._fitHi = hi ? Math.min(hi, was) : was;
+      z = was * (room - 3 - Math.max(0, over)) / drawn;
+    } else if (was < 1 && room - drawn > 12) {
+      if (hi && hi - was < .006) return;
+      z = hi ? (was + hi) / 2 : Math.min(1, was * room / drawn);
+    } else return;
+    z = Math.max(least, Math.min(1, Math.floor(z * 1000) / 1000));
+    if (Math.abs(z - was) < .004) return;
+    this._fitZoom = z;
+    if (z === 1) g.style.removeProperty("zoom");
+    else g.style.zoom = String(z);
   }
 }
 

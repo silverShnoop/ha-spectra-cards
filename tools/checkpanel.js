@@ -451,6 +451,100 @@ customElements.define("fake-section", FakeSection);
     await page.close();
   }
 
+  /* fill_bottom: columns stack however they fall, and the last section of
+     each grows until every column ends on one line. */
+  {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 1400 } });
+    page.on("pageerror", (e) => problems.push(`bottom: PAGEERROR ${e.message}`));
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.waitForFunction(() => !!customElements.get("spectra-panel"));
+    const got = await page.evaluate(async () => {
+      window.HASS = { states: {}, themes: { darkMode: true }, callService: () => Promise.resolve() };
+      const list = (title, rows, grow) => Object.assign({ type: "custom:spectra-card", title, accent: 4,
+        body: { type: "list", rows: Array.from({ length: rows }, (_, i) => ({ name: `${title} ${i + 1}`, value: "x" })) } },
+        grow ? { grow: true } : {});
+      const plan = [
+        { column: 1, column_span: 2, cards: [list("A1", 3)] },
+        { column: 3, cards: [list("B1", 6)] },
+        { column: 4, cards: [list("C1", 1)] },
+        { column: 1, column_span: 2, fill_bottom: true, cards: [list("A2", 12, true)] },
+        { column: 3, fill_bottom: true, cards: [list("B2", 2, true)] },
+        { column: 4, fill_bottom: true, cards: [list("C2", 4, true)] },
+      ];
+      const sections = plan.map((c) => {
+        const s = document.createElement("fake-section");
+        s.config = Object.assign({ type: "grid" }, c);
+        return s;
+      });
+      const view = document.createElement("spectra-panel");
+      view.setConfig({ type: "custom:spectra-panel", masonry: true, max_columns: 4, column_min_width: 280 });
+      document.getElementById("a").appendChild(view);
+      view.sections = sections;
+      await new Promise((r) => setTimeout(r, 900));
+      const box = (i) => sections[i].parentElement.getBoundingClientRect();
+      return {
+        tops: [1, 2].map((i) => Math.round(box(i).bottom)),
+        bottoms: [3, 4, 5].map((i) => Math.round(box(i).bottom)),
+        grows: sections.map((s) => s.parentElement.style.getPropertyValue("--pn-row-grow")),
+      };
+    });
+    const check = (label, ok, detail) => {
+      console.log(`${ok ? "ok  " : "FAIL"} bottom: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`bottom: ${label}`);
+    };
+    check("every column ends on one line", Math.max(...got.bottoms) - Math.min(...got.bottoms) <= 4, got);
+    check("the rows above are left as they fall", got.tops[0] !== got.tops[1], got);
+    check("only the last of each column is told to grow", got.grows.slice(0, 3).every((g) => g === "") && got.grows[3] === "", got.grows);
+    await page.close();
+  }
+
+  /* fit: a tab that would scroll is drawn smaller until it does not, never
+     below fit_min, and comes back to full size when there is room again. */
+  {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    page.on("pageerror", (e) => problems.push(`fit: PAGEERROR ${e.message}`));
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.waitForFunction(() => !!customElements.get("spectra-panel"));
+    const got = await page.evaluate(async () => {
+      window.HASS = { states: {}, themes: { darkMode: true }, callService: () => Promise.resolve() };
+      const list = (title, rows) => ({ type: "custom:spectra-card", title, accent: 4,
+        body: { type: "list", rows: Array.from({ length: rows }, (_, i) => ({ name: `${title} ${i + 1}`, value: "x" })) } });
+      const plan = [
+        { column: 1, column_span: 2, cards: [list("Tall", 36)] },
+        { column: 3, cards: [list("Side", 4)] },
+      ];
+      const sections = plan.map((c) => {
+        const s = document.createElement("fake-section");
+        s.config = Object.assign({ type: "grid", spectra_tab: "Home" }, c);
+        return s;
+      });
+      const view = document.createElement("spectra-panel");
+      view.setConfig({ type: "custom:spectra-panel", masonry: true, max_columns: 3, column_min_width: 280, fit: ["Home"] });
+      document.getElementById("a").appendChild(view);
+      view.sections = sections;
+      await new Promise((r) => setTimeout(r, 900));
+      const root = view.shadowRoot;
+      const sc = root.querySelector(".scroll");
+      const grid = root.querySelector(".grid");
+      const tall = { over: sc.scrollHeight - sc.clientHeight, zoom: Number(grid.style.zoom || 1) };
+      sections[0].config.cards[0].body.rows.length = 3;
+      const card = sections[0].querySelector("spectra-card");
+      card.setConfig(sections[0].config.cards[0]);
+      card.hass = window.HASS;
+      await new Promise((r) => setTimeout(r, 900));
+      const short = { over: sc.scrollHeight - sc.clientHeight, zoom: Number(grid.style.zoom || 1) };
+      return { tall, short };
+    });
+    const check = (label, ok, detail) => {
+      console.log(`${ok ? "ok  " : "FAIL"} fit: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`fit: ${label}`);
+    };
+    check("a tall tab does not scroll", got.tall.over <= 0, got);
+    check("it is drawn smaller to get there, but not below 0.75", got.tall.zoom < 1 && got.tall.zoom >= .75, got);
+    check("with room again it is full size", got.short.zoom === 1 && got.short.over <= 0, got);
+    await page.close();
+  }
+
   /* Tabs belong to the browser. The rail's `tab` buttons switch which
      sections this browser shows and touch nothing in the house, so a phone
      changing tab cannot change the wall panel's. Two contexts are two
