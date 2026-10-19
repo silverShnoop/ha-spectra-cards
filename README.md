@@ -1267,7 +1267,50 @@ over a window:
 | --- | --- |
 | `calendar` | The calendar entity. Required; marks the object as a fetch. |
 | `days` | How far ahead to look. Default 7. |
+| `back` | Start this many days before today's midnight instead of now, for a body that needs what began earlier. Up to 60. |
 | `limit` | Keep the first N. |
+
+### `festival` — what are we celebrating today?
+
+One card for festivals, holidays and awareness days. It reads the calendars
+itself, so a festival the calendar gives as one day ("Durga Puja begins")
+stays up for its whole run and says how far through it is: Navaratri to
+Maha Navami, Diwali from Dhan Teras to Bhai Dooj, Durga Puja for five days,
+Onam's ten days up to its calendar day, Ganesh Chaturthi for ten. Advent runs
+1–24 December by the date, and the month-long observances (LGBT+ History
+Month, Pride Month, South Asian Heritage Month, Black History Month) come from
+the date too.
+
+```yaml
+type: custom:spectra-card
+body:
+  type: festival
+  scenes: true
+  events:
+    - {calendar: calendar.hindu_holidays, back: 35, days: 12}
+    - {calendar: calendar.united_kingdom_eng, back: 35, days: 12}
+  observance: {entity: sensor.observance_today}     # an awareness day's name, or blank
+  preview: {entity: input_text.panel_preview_holiday}  # a name to show as if today
+```
+
+On Home the card is short: the event's own animated scene, its name, the day
+of its run and two lines. Tap it and it opens full screen with the whole
+explanation, written for a child to read, and a line for each other thing on
+today that opens in turn. Bank holidays and awareness days are the plain card
+with a small motif; days of remembrance stay quiet on purpose.
+
+When two things fall on one day, one leads and the rest are "Also today":
+a festival's own day, or Advent, beats a day in the middle of a run, which
+beats a bank holiday or an awareness day, which beats a month-long
+observance; the bigger festival wins a tie. A day with nothing on renders
+nothing.
+
+The words and the scenes live in the card, in `FEST_TABLE`, one entry per
+event with its `short` line and its `full` sections. A name the table does
+not know still shows, as the plain card.
+
+Without `scenes: true` the body is the older one: `text`, `wash`, `decor`,
+`palette`, `day`, `of` and `count_art`, all given by the dashboard.
 
 ### `alert` — what is wrong right now that you must fix?
 
