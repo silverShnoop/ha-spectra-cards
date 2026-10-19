@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.192.2";
+const VERSION = "0.193.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -296,6 +296,11 @@ ha-icon { display:inline-flex; line-height:0; }
    has something to put there (the rail's further rows). */
 .card.grow { padding-bottom:calc(9px + max(0px, var(--pn-row-grow, 0px))); }
 .card.grow:has(.railmore) { padding-bottom:9px; }
+/* "fill_bottom: screen": the panel says how tall it may be, and what does
+   not fit is cut off at its foot -- whole rows only, see _cutRows. Nothing
+   in it is drawn smaller. */
+.card.grow.cut { max-height:var(--pn-max-h); overflow:hidden; }
+.card.grow.cut .cutrow { visibility:hidden; }
 /* A card that wants attention takes the level's colour on the edge it
    already has, the same device a Needs-you row uses. The border was
    always there, so nothing moves and nothing is pushed down the card --
@@ -19200,6 +19205,35 @@ class SpectraCard extends HTMLElement {
     if (type === "diary") this._diaryAttach();
     if (type === "clock") this._seasonAttach(model.body);
     if (type === "festival") this._festAttach(model.body);
+    this._cutRows();
+  }
+
+  /* `fill_bottom: screen` on the panel: told how tall it may be as
+     --pn-max-h, the card stops there. A row the foot would cut through is
+     hidden whole rather than shown in half; nothing is drawn smaller.
+     Again after every paint, since a paint draws the rows afresh. */
+  _cutRows() {
+    const box = this._cutBox();
+    if (!box) return;
+    const max = this.style.getPropertyValue("--pn-max-h");
+    box.classList.toggle("cut", Boolean(max));
+    const rows = box.querySelectorAll(".row, .dyrow, .event");
+    if (!max) {
+      rows.forEach((r) => r.classList.remove("cutrow"));
+      return;
+    }
+    /* In the page's pixels, which a zoom on the panel makes differ. */
+    const rect = box.getBoundingClientRect();
+    const scale = rect.height / (box.offsetHeight || 1);
+    const inner = box.clientTop + box.clientHeight - (parseFloat(getComputedStyle(box).paddingBottom) || 0);
+    const foot = rect.top + inner * scale;
+    rows.forEach((r) => r.classList.toggle("cutrow", r.getBoundingClientRect().bottom > foot + .5));
+  }
+
+  /* The box a `grow` card is cut off in, for the panel to measure. */
+  _cutBox() {
+    if (!this._config || !this._config.grow || !this._holder) return null;
+    return this._holder.querySelector(".card.grow");
   }
 
   /* The clock's season: one painter per card, kept across the minute's
@@ -29194,19 +29228,80 @@ class SpectraPanel extends HTMLElement {
      already told, so the answer does not feed back into itself. On a
      single column there is nothing to line up with, and it is told
      nothing. */
+  /* `fill_bottom: screen` goes further: the section ends at the foot of
+     the screen, not at the lowest section. Short, it grows to it as
+     above; tall, its `grow` card is cut off there -- whole rows only, and
+     nothing drawn smaller -- so the tab never scrolls for it. */
   _fillBottom() {
-    const own = (o) => o.wrap.offsetHeight - (parseFloat(o.wrap.style.getPropertyValue("--pn-row-grow")) || 0);
+    const grown = (o) => parseFloat(o.wrap.style.getPropertyValue("--pn-row-grow")) || 0;
+    /* What it would be with nothing grown and nothing cut off. */
+    const own = (o) => o.wrap.offsetHeight - grown(o) + (o.cutBy || 0);
     const shown = this._wrappers.filter((o) => o.wrap.offsetHeight > 0 && !(o.side && this._sideMode));
     const fills = shown.filter((w) => w.section.config && w.section.config.fill_bottom);
-    const single = (parseFloat(this._grid && this._grid.style.getPropertyValue("--pn-cols")) || 1) < 2;
+    const single = (parseFloat(this._grid && this._grid.style.getPropertyValue("--pn-cols")) || 1) < 2
+      || this._panel.classList.contains("phone");
+    for (const w of fills) w.cutBy = this._cutBy(w);
     let lowest = 0;
     for (const o of shown) lowest = Math.max(lowest, o.wrap.offsetTop + own(o));
+    const sc = this._scroll;
+    const zoom = this._fitZoom || 1;
+    const scBox = sc.getBoundingClientRect();
+    const foot = sc.clientHeight - (parseFloat(getComputedStyle(sc).paddingBottom) || 0);
     for (const w of this._wrappers.filter((o) => o.section.config && o.section.config.fill_bottom)) {
-      const was = parseFloat(w.wrap.style.getPropertyValue("--pn-row-grow")) || 0;
-      const grow = single || !fills.includes(w) ? 0 : Math.max(0, Math.round(lowest - (w.wrap.offsetTop + own(w))));
+      const was = grown(w);
+      const screen = !single && fills.includes(w) && w.section.config.fill_bottom === "screen";
+      /* Its top, and the room under it, in the scroller's own pixels. */
+      const top = screen ? (w.wrap.getBoundingClientRect().top - scBox.top) / zoom - sc.clientTop + sc.scrollTop : 0;
+      const room = screen ? Math.max(0, Math.floor(foot - top)) : 0;
+      const grow = screen ? Math.max(0, Math.round(room - own(w)))
+        : single || !fills.includes(w) ? 0 : Math.max(0, Math.round(lowest - (w.wrap.offsetTop + own(w))));
+      w.toFoot = screen;
+      this._cutAt(w, screen ? room : 0);
       if (grow === was) continue;
       if (grow) w.wrap.style.setProperty("--pn-row-grow", `${grow}px`);
       else w.wrap.style.removeProperty("--pn-row-grow");
+    }
+  }
+
+  /* The spectra cards inside a section, through hui-section's shadow
+     roots. Kept, and looked for again once one has gone. */
+  _cardsIn(w) {
+    if (w.cards && w.cards.length && w.cards.every((c) => c.isConnected)) return w.cards;
+    const found = [];
+    const walk = (root) => {
+      for (const el of root.querySelectorAll("*")) {
+        if (el.tagName === "SPECTRA-CARD") found.push(el);
+        else if (el.shadowRoot) walk(el.shadowRoot);
+      }
+    };
+    walk(w.wrap);
+    w.cards = found;
+    return found;
+  }
+
+  /* How much of a section's grow card is out of sight below its cut. */
+  _cutBy(w) {
+    let by = 0;
+    for (const card of this._cardsIn(w)) {
+      const box = card._cutBox && card._cutBox();
+      if (box) by = Math.max(by, box.scrollHeight - box.clientHeight);
+    }
+    return by;
+  }
+
+  /* Tell a section's grow card how tall it may be: the room under the
+     section, less how far down the section the card starts. 0 lifts it. */
+  _cutAt(w, room) {
+    const zoom = this._fitZoom || 1;
+    const top = w.wrap.getBoundingClientRect().top;
+    for (const card of this._cardsIn(w)) {
+      if (!card._config || !card._config.grow) continue;
+      const max = room ? Math.max(0, Math.floor(room - (card.getBoundingClientRect().top - top) / zoom)) : 0;
+      const was = card.style.getPropertyValue("--pn-max-h");
+      if (was === (max ? `${max}px` : "")) continue;
+      if (max) card.style.setProperty("--pn-max-h", `${max}px`);
+      else card.style.removeProperty("--pn-max-h");
+      if (card._cutRows) card._cutRows();
     }
   }
 
@@ -29256,7 +29351,9 @@ class SpectraPanel extends HTMLElement {
          is in zoomed pixels and the 4px rows are not, so every section
          spanned zoom-times its height and left a gap beneath it. */
       const h = w.wrap.offsetHeight;
-      const rows = h > 0 ? Math.ceil((h + gap) / 4) : 1;
+      /* One that ends at the foot of the screen ends its column too: a gap
+         under it would only be something to scroll to. */
+      const rows = h <= 0 ? 1 : w.toFoot ? Math.max(1, Math.floor(h / 4)) : Math.ceil((h + gap) / 4);
       if (w.wrap.style.getPropertyValue("--pn-rows") !== String(rows)) {
         w.wrap.style.setProperty("--pn-rows", String(rows));
       }

@@ -498,6 +498,68 @@ customElements.define("fake-section", FakeSection);
     await page.close();
   }
 
+  /* fill_bottom: screen -- the last section of each column ends at the
+     foot of the screen: a short one grows to it, a tall one is cut off
+     there, whole rows only, at full size, and the tab does not scroll. */
+  {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    page.on("pageerror", (e) => problems.push(`screen: PAGEERROR ${e.message}`));
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.waitForFunction(() => !!customElements.get("spectra-panel"));
+    const got = await page.evaluate(async () => {
+      window.HASS = { states: {}, themes: { darkMode: true }, callService: () => Promise.resolve() };
+      const list = (title, rows, grow) => Object.assign({ type: "custom:spectra-card", title, accent: 4,
+        body: { type: "list", rows: Array.from({ length: rows }, (_, i) => ({ name: `${title} ${i + 1}`, value: "x" })) } },
+        grow ? { grow: true } : {});
+      const plan = [
+        { column: 1, column_span: 2, cards: [list("A1", 3)] },
+        { column: 3, cards: [list("B1", 6)] },
+        { column: 4, cards: [list("C1", 1)] },
+        { column: 1, column_span: 2, fill_bottom: "screen", cards: [list("A2", 40, true)] },
+        { column: 3, fill_bottom: "screen", cards: [list("B2", 2, true)] },
+        { column: 4, fill_bottom: "screen", cards: [list("C2", 30, true)] },
+      ];
+      const sections = plan.map((c) => {
+        const s = document.createElement("fake-section");
+        s.config = Object.assign({ type: "grid" }, c);
+        return s;
+      });
+      const view = document.createElement("spectra-panel");
+      view.setConfig({ type: "custom:spectra-panel", masonry: true, max_columns: 4, column_min_width: 280 });
+      document.getElementById("a").appendChild(view);
+      view.sections = sections;
+      await new Promise((r) => setTimeout(r, 1200));
+      const sc = view.shadowRoot.querySelector(".scroll");
+      const foot = sc.getBoundingClientRect().top + sc.clientHeight - parseFloat(getComputedStyle(sc).paddingBottom);
+      const card = (i) => sections[i].querySelector("spectra-card");
+      const inner = (i) => (card(i).shadowRoot || card(i)).querySelector(".card");
+      const rowsOf = (i) => [...inner(i).querySelectorAll(".row")];
+      const visible = (i) => rowsOf(i).filter((r) => getComputedStyle(r).visibility !== "hidden");
+      const cardFoot = (i) => inner(i).getBoundingClientRect().bottom;
+      const rowH = (i) => rowsOf(i)[0].getBoundingClientRect().height;
+      return {
+        over: sc.scrollHeight - sc.clientHeight,
+        foot: Math.round(foot),
+        feet: [3, 4, 5].map((i) => Math.round(cardFoot(i))),
+        shown: [3, 5].map((i) => [visible(i).length, rowsOf(i).length]),
+        crossing: [3, 5].map((i) => visible(i).filter((r) => r.getBoundingClientRect().bottom > cardFoot(i) - 2).length),
+        rowH: [rowH(0), rowH(3), rowH(5)].map((h) => Math.round(h)),
+        grow: sections[4].parentElement.style.getPropertyValue("--pn-row-grow"),
+      };
+    });
+    const check = (label, ok, detail) => {
+      console.log(`${ok ? "ok  " : "FAIL"} screen: ${label}${ok ? "" : "  -> " + JSON.stringify(detail)}`);
+      if (!ok) problems.push(`screen: ${label}`);
+    };
+    check("the tab does not scroll", got.over <= 0, got);
+    check("every column ends at the foot of the screen", got.feet.every((f) => Math.abs(f - got.foot) <= 4), got);
+    check("a short one grows to it", parseFloat(got.grow) > 0, got.grow);
+    check("a tall one shows only some of its rows", got.shown.every(([v, all]) => v > 0 && v < all), got.shown);
+    check("and none of them in half", got.crossing.every((n) => n === 0), got.crossing);
+    check("at full size", got.rowH.every((h) => h === got.rowH[0]), got.rowH);
+    await page.close();
+  }
+
   /* fit: a tab that would scroll is drawn smaller until it does not, never
      below fit_min, and comes back to full size when there is room again. */
   {

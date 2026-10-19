@@ -3673,6 +3673,14 @@ all end on one line: each is told to grow until its foot meets the lowest
 foot on the tab, and its `grow` card takes the room. It costs no height,
 where rows of `fill_row` cost the difference on every row.
 
+**`fill_bottom: screen` ends them at the foot of the screen instead.** A
+short section grows to it as above. A tall one has its `grow` card cut off
+there: it shows the rows that fit whole, hides the one the foot would cut
+through, and draws nothing smaller -- so a long week, feed or list never
+makes the tab scroll. Put it on the last section of every column and the
+tab is exactly one screen. On a phone or a single column it does nothing,
+and the tab scrolls as usual.
+
 Give every section on a tab `fill_row` and the tab becomes rows: each row
 ends level, so the next starts level, and the eye has straight lines to run
 along. A `rail` body with `fill: true` spends its growth on further whole
