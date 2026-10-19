@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.191.2";
+const VERSION = "0.191.3";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3716,15 +3716,19 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   padding:5px 8px; width:fit-content; }
 .fsalso i { font-style:normal; color:rgba(255,255,255,.65); text-transform:uppercase;
   letter-spacing:.08em; font-size:10px; font-weight:600; white-space:nowrap; }
-/* Which of today's is showing. Small, at the foot, out of the words' way. */
-.fsdots { display:flex; gap:2px; margin-top:auto; padding-top:8px; }
+/* Which of today's is showing: pinned to the card's foot, at the same
+   place whichever is showing and however much it says. The words keep
+   clear of them. */
+.fsdots { position:absolute; left:8px; bottom:14px; z-index:3; display:flex; gap:2px; }
+.card.fsturns .fsin { padding-bottom:44px; }
+.card.fsturns .fsquiet { padding-bottom:36px; }
 .fsdots button { width:22px; height:22px; padding:0; border:0; background:none; cursor:pointer;
   display:grid; place-items:center; }
 .fsdots button::after { content:""; width:8px; height:8px; border-radius:50%;
   background:rgba(255,255,255,.35); transition:background .2s, transform .2s; }
 .fsdots button.on::after { background:#fff; transform:scale(1.25); }
-.fsquiet .fsdots button::after { background:var(--sp-edge); }
-.fsquiet .fsdots button.on::after { background:var(--sp-ink-2); }
+.card:not(.festscene) .fsdots button::after { background:var(--sp-edge); }
+.card:not(.festscene) .fsdots button.on::after { background:var(--sp-ink-2); }
 /* The next one slides in from the right: the scene a little behind the words. */
 .card.fsnext .fsin, .card.fsnext .fsquiet { animation:fs-in .5s cubic-bezier(.2,.7,.2,1) both; }
 .card.fsnext .fscanvas { animation:fs-in-bg .7s cubic-bezier(.2,.7,.2,1) both; }
@@ -8088,19 +8092,23 @@ function festScenesBody(b) {
   if (!pick) return "";
   const lead = pick.item;
   const entry = festEntry(lead.key);
-  const also = festAlsoLine(pick.also) + festDots(pick);
+  const also = festAlsoLine(pick.also);
+  /* The dots belong to the card, not the words: pinned to its foot at the
+     same place on a scene and on the plain card, so they never move as
+     the card changes from one of today's to the next. */
+  const dots = festDots(pick);
   const open = ` role="button" tabindex="0" aria-label="${esc(lead.key)}: open full screen" data-festopen="${esc(lead.key)}"`;
   if (entry.tier !== "festive") {
     return `<div class="fsquiet"${open}>${festMotif(entry.motif, 26)}`
       + `<div class="fsqbody"><div class="fseye">${esc(entry.eyebrow || "Today")}</div>`
       + `<h4>${esc(lead.key)}</h4>${festWhen(lead) ? `<div class="fsqwhen">${festWhen(lead)}</div>` : ""}`
-      + `${entry.short ? `<p>${esc(entry.short)}</p>` : ""}${also}</div>${festXp()}</div>`;
+      + `${entry.short ? `<p>${esc(entry.short)}</p>` : ""}${also}</div>${festXp()}</div>${dots}`;
   }
   return `<canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsscrim"></span>`
     + `<div class="fsin"${open}>${festXp()}<div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div>`
     + `<div class="fsname">${esc(lead.key)}</div>`
     + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}${festPips(lead, entry)}`
-    + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>`;
+    + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>${dots}`;
 }
 
 /* The full-screen view of one event: its scene large, then all of the
@@ -19110,6 +19118,7 @@ class SpectraCard extends HTMLElement {
       + (festive ? " festive" : "")
       + (fsGround ? " festscene" : "")
       + (fsSlide ? (fsBack ? " fsnext fsprev" : " fsnext") : "")
+      + (fsPick && fsPick.list.length > 1 && !fsPick.also.length ? " fsturns" : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "")
       + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "")

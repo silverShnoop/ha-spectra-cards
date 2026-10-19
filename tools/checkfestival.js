@@ -138,7 +138,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     window.LATE_WRAPPER = wrapper;
     window.CARDS = cards;
   }, { dates, hindu: asEvents(HINDU), uk: asEvents(UK) });
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(1500);
 
   const res = await page.evaluate(() => {
     const read = (el) => {
@@ -168,16 +168,25 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     const el = window.CARDS.turns;
     const r = el.shadowRoot || el;
     const name = () => ((r.querySelector(".fsname") || r.querySelector(".fsquiet h4") || {}).textContent || "").trim();
-    const out = { first: name(), dots: r.querySelectorAll(".fsdots button").length, timer: !!el._festTimer };
+    /* Where the dots sit on the card, after the slide has settled. */
+    const spot = async () => {
+      await new Promise((x) => setTimeout(x, 800));
+      const card = r.querySelector(".card").getBoundingClientRect();
+      const d = r.querySelector(".fsdots").getBoundingClientRect();
+      return `${Math.round(d.left - card.left)},${Math.round(card.bottom - d.bottom)},${Math.round(card.height)}`;
+    };
+    const out = { first: name(), dots: r.querySelectorAll(".fsdots button").length, timer: !!el._festTimer, spots: [await spot()] };
     el._festIdx = 1; el._signature = null; el._update();
     await new Promise((x) => setTimeout(x, 50));
     out.second = name();
     out.slid = !!r.querySelector(".card.fsnext");
     out.lit = [...r.querySelectorAll(".fsdots button")].findIndex((b) => b.classList.contains("on"));
+    out.spots.push(await spot());
     r.querySelector('.fsdots [data-festat="2"]').click();
     await new Promise((x) => setTimeout(x, 50));
     out.third = name();
     out.opened = !!r.querySelector(".fsfull");
+    out.spots.push(await spot());
     return out;
   });
 
@@ -303,6 +312,8 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("and covers a rail fixed above everything else on the page", sheet.first.overRail, sheet.first);
   check("several things on today take turns, a dot each", steps.first === "Durga Puja" && steps.dots === 3 && steps.timer, steps);
   check("the next one slides in", steps.second === "Maha Navami" && steps.slid && steps.lit === 1, steps);
+  check("the dots sit in the same place on every one, scene or plain card, and the card keeps its height",
+    new Set(steps.spots).size === 1, steps.spots);
   check("a dot goes straight to its one, without opening it", steps.third === "Black History Month" && !steps.opened, steps);
   check("a swipe left goes to the next, round to the first", swiped.left.name === "Durga Puja" && !swiped.left.back && !swiped.left.opened, swiped);
   check("taking turns, the card keeps one height", heights.length === 3 && heights.every((h) => h === heights[0]) && heights[0] > 100, heights);
