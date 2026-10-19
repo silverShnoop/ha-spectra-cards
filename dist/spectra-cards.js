@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.191.4";
+const VERSION = "0.192.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3721,7 +3721,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    clear of them. */
 .fsdots { position:absolute; left:8px; bottom:14px; z-index:3; display:flex; gap:2px; }
 .card.fsturns .fsin { padding-bottom:44px; }
-.card.fsturns .fsquiet { padding-bottom:36px; }
+.card.fsturns .fsquiet { padding-bottom:44px; }
 .fsdots button { width:22px; height:22px; padding:0; border:0; background:none; cursor:pointer;
   display:grid; place-items:center; }
 .fsdots button::after { content:""; width:8px; height:8px; border-radius:50%;
@@ -3761,16 +3761,33 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   .fsscrim { background:linear-gradient(90deg, rgba(8,5,12,.78), rgba(8,5,12,.4)); }
 }
 
-/* A bank holiday or an awareness day: the plain card, a motif, the words. */
-.fsquiet { position:relative; display:flex; gap:12px; padding-right:36px; cursor:pointer; }
+/* A bank holiday or an awareness day: the plain card, laid out as a
+   festival is, with its motif large and faint on the right in place of
+   a scene. Same padding, same lines, the same name face, so the two
+   read as one card changing as it takes turns. */
+.card.festquiet { padding:0; container-type:inline-size; }
+.fsquiet { position:relative; z-index:2; min-height:184px; box-sizing:border-box;
+  padding:12px 14px 14px; display:flex; flex-direction:column; gap:4px; cursor:pointer; }
+.fsquiet > :not(.fsxp):not(.fsqart) { max-width:66%; position:relative; }
 .fsquiet .fseye { color:var(--sp-ink-3); }
-.fsquiet h4 { margin:2px 0 0; font-size:15px; font-weight:600; color:var(--sp-ink); }
-.fsquiet p { margin:4px 0 0; font-size:13px; line-height:1.5; color:var(--sp-ink-2); }
-.fsqwhen { font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-2); margin-top:2px; }
-.fsqwhen b { font-weight:600; color:var(--sp-ink); }
+.fsquiet .fsname { color:var(--sp-ink); text-shadow:none; }
+.fsquiet .fswhen { color:var(--sp-ink-2); }
+.fsquiet .fswhen b { color:var(--sp-ink); }
+.fsquiet .fsshort { color:var(--sp-ink-2); }
 .fsquiet .fsalso { background:var(--sp-sink); border-color:var(--sp-edge); color:var(--sp-ink-2); }
 .fsquiet .fsalso i { color:var(--sp-ink-3); }
-.fsquiet .fsxp { top:0; right:0; background:var(--sp-sink); color:var(--sp-ink-2); }
+.fsquiet .fsxp { background:var(--sp-sink); color:var(--sp-ink-2); }
+.fsqart { position:absolute; right:9%; top:50%; transform:translateY(-50%); opacity:.24;
+  pointer-events:none; display:grid; place-items:center; }
+.fsqart .fsmotif { width:clamp(72px, 24cqi, 120px); height:auto; stroke-width:1.2; margin:0; }
+/* A candle stays lit and stays itself: a day of remembrance. */
+.fsqart:has(.fscandle) { opacity:.9; }
+.fsqart .fscandle { transform:scale(2.4); }
+@container (max-width: 420px) {
+  .fsquiet > :not(.fsxp):not(.fsqart) { max-width:100%; }
+  .fsquiet { padding-right:44px; }
+  .fsqart { opacity:.12; }
+}
 .fsmotif { flex:none; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round;
   stroke-linejoin:round; color:var(--accent); margin-top:2px; }
 .fscandle { flex:none; width:22px; display:flex; flex-direction:column; align-items:center; padding-top:4px; }
@@ -8098,10 +8115,13 @@ function festScenesBody(b) {
   const dots = festDots(pick);
   const open = ` role="button" tabindex="0" aria-label="${esc(lead.key)}: open full screen" data-festopen="${esc(lead.key)}"`;
   if (entry.tier !== "festive") {
-    return `<div class="fsquiet"${open}>${festMotif(entry.motif, 26)}`
-      + `<div class="fsqbody"><div class="fseye">${esc(entry.eyebrow || "Today")}</div>`
-      + `<h4>${esc(lead.key)}</h4>${festWhen(lead) ? `<div class="fsqwhen">${festWhen(lead)}</div>` : ""}`
-      + `${entry.short ? `<p>${esc(entry.short)}</p>` : ""}${also}</div>${festXp()}</div>${dots}`;
+    /* Laid out as a festival is -- eyebrow, name, when, the short line --
+       with the motif standing large and faint on the right where a
+       festival's scene would be. */
+    return `<div class="fsquiet"${open}>${festXp()}<span class="fsqart" aria-hidden="true">${festMotif(entry.motif, 96)}</span>`
+      + `<div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsname">${esc(lead.key)}</div>`
+      + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}`
+      + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>${dots}`;
   }
   return `<canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsscrim"></span>`
     + `<div class="fsin"${open}>${festXp()}<div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div>`
@@ -19115,7 +19135,7 @@ class SpectraCard extends HTMLElement {
       + (config.invert ? " invert" : "")
       + (tappable ? " tappable" : "")
       + (festive ? " festive" : "")
-      + (fsGround ? " festscene" : "")
+      + (fsGround ? " festscene" : (fsLead ? " festquiet" : ""))
       + (fsSlide ? (fsBack ? " fsnext fsprev" : " fsnext") : "")
       + (fsPick && fsPick.list.length > 1 && !fsPick.also.length ? " fsturns" : "")
       + (lit ? " lit" : "")
@@ -26578,11 +26598,11 @@ class SpectraCard extends HTMLElement {
     if (!this._festTall || this._festTall.key !== key) {
       const shell = document.createElement("div");
       shell.style.cssText = `position:absolute;left:0;top:0;width:${width}px;visibility:hidden;pointer-events:none;`;
-      const base = card.className.split(/\s+/).filter((c) => !/^(grow|fsnext|fsprev|festscene)$/.test(c)).join(" ");
+      const base = card.className.split(/\s+/).filter((c) => !/^(grow|fsnext|fsprev|festscene|festquiet)$/.test(c)).join(" ");
       const bar = this._model ? this._titlebar(this._model, this._phase) : "";
       shell.innerHTML = pick.list.map((x, i) => {
         const festive = festEntry(x.key).tier === "festive";
-        return `<div class="${base}${festive ? " festscene" : ""}" style="${card.getAttribute("style") || ""}">`
+        return `<div class="${base}${festive ? " festscene" : " festquiet"}" style="${card.getAttribute("style") || ""}">`
           + `${bar}${BODIES.festival(Object.assign({}, b, { index: i }))}</div>`;
       }).join("");
       this._holder.appendChild(shell);

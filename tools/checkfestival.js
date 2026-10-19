@@ -147,10 +147,10 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
         hidden: el.hidden || el.style.display === "none" || !r.querySelector(".card"),
         scene: !!r.querySelector(".card.festscene .fscanvas"),
         quiet: !!r.querySelector(".fsquiet"),
-        name: text(".fsname") || text(".fsquiet h4"),
-        when: text(".fswhen") || text(".fsqwhen"),
+        name: text(".fsname"),
+        when: text(".fswhen"),
         also: text(".fsalso"),
-        short: text(".fsshort") || text(".fsquiet p"),
+        short: text(".fsshort"),
         pips: r.querySelectorAll(".fspips span").length,
         lit: r.querySelectorAll(".fspips span.on").length,
         painting: !!(el._fest && el._fest.draw && el._fest.canvas && el._fest.canvas.width > 0),
@@ -166,13 +166,14 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   const steps = await page.evaluate(async () => {
     const el = window.CARDS.turns;
     const r = el.shadowRoot || el;
-    const name = () => ((r.querySelector(".fsname") || r.querySelector(".fsquiet h4") || {}).textContent || "").trim();
+    const name = () => ((r.querySelector(".fsname") || {}).textContent || "").trim();
     /* Where the dots sit on the card, after the slide has settled. */
     const spot = async () => {
       await new Promise((x) => setTimeout(x, 800));
       const card = r.querySelector(".card").getBoundingClientRect();
       const d = r.querySelector(".fsdots").getBoundingClientRect();
-      return `${Math.round(d.left - card.left)},${Math.round(card.bottom - d.bottom)},${Math.round(card.height)}`;
+      const n = r.querySelector(".fsname").getBoundingClientRect();
+      return `${Math.round(d.left - card.left)},${Math.round(card.bottom - d.bottom)},${Math.round(card.height)}|${Math.round(n.left - card.left)},${Math.round(n.top - card.top)}`;
     };
     const out = { first: name(), dots: r.querySelectorAll(".fsdots button").length, timer: !!el._festTimer, spots: [await spot()] };
     el._festIdx = 1; el._signature = null; el._update();
@@ -200,7 +201,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     return page.evaluate(() => {
       const el = window.CARDS.turns;
       const r = el.shadowRoot || el;
-      return { name: ((r.querySelector(".fsname") || r.querySelector(".fsquiet h4") || {}).textContent || "").trim(),
+      return { name: ((r.querySelector(".fsname") || {}).textContent || "").trim(),
         back: !!r.querySelector(".card.fsprev"), opened: !!r.querySelector(".fsfull") };
     });
   };
@@ -314,7 +315,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("and covers the rail", sheet.first.overRail, sheet.first);
   check("several things on today take turns, a dot each", steps.first === "Durga Puja" && steps.dots === 3 && steps.timer, steps);
   check("the next one slides in", steps.second === "Maha Navami" && steps.slid && steps.lit === 1, steps);
-  check("the dots sit in the same place on every one, scene or plain card, and the card keeps its height",
+  check("the dots and the name sit in the same place on every one, scene or plain card, and the card keeps its height",
     new Set(steps.spots).size === 1, steps.spots);
   check("a dot goes straight to its one, without opening it", steps.third === "Black History Month" && !steps.opened, steps);
   check("a swipe left goes to the next, round to the first", swiped.left.name === "Durga Puja" && !swiped.left.back && !swiped.left.opened, swiped);
