@@ -84,7 +84,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       const el = document.createElement("spectra-card");
       document.getElementById("a").appendChild(el);
       el.setConfig({ type: "custom:spectra-card", accent: 6, body: {
-        type: "festival", scenes: true, now,
+        type: "festival", scenes: true, now, rotate: false,
         events: [{ calendar: "calendar.hindu", back: 35, days: 12 }, { calendar: "calendar.uk", back: 35, days: 12 }],
         observance: { entity: "sensor.observance_today" },
         preview: { entity: "input_text.panel_preview_holiday" },
@@ -92,6 +92,32 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       el.hass = hass;
       cards[name] = el;
     }
+    /* Taking turns: the same day as a card that rotates, and one whose
+       calendars never answer. */
+    const turns = document.createElement("spectra-card");
+    document.getElementById("a").appendChild(turns);
+    turns.setConfig({ type: "custom:spectra-card", accent: 6, body: {
+      type: "festival", scenes: true, now: dates.durga1,
+      events: [{ calendar: "calendar.hindu", back: 35, days: 12 }, { calendar: "calendar.uk", back: 35, days: 12 }],
+      observance: { entity: "sensor.observance_today" },
+    } });
+    turns.hass = hass;
+    cards.turns = turns;
+    const silent = document.createElement("spectra-card");
+    document.getElementById("a").appendChild(silent);
+    silent.setConfig({ type: "custom:spectra-card", accent: 6, body: {
+      type: "festival", scenes: true, now: dates.bhm,
+      events: [{ calendar: "calendar.hindu", back: 35, days: 12 }],
+    } });
+    silent.hass = Object.assign({}, hass, { callWS: () => new Promise(() => {}) });
+    cards.silent = silent;
+    /* A rail fixed over the bottom of the screen, as high as a z-index goes,
+       the way the panel's own chrome could be. The full-screen view has to
+       cover it all the same. */
+    const rail = document.createElement("div");
+    rail.id = "rail";
+    rail.style.cssText = "position:fixed;left:0;right:0;bottom:0;height:70px;z-index:2147483647;background:#f0f";
+    document.body.appendChild(rail);
     window.CARDS = cards;
   }, { dates, hindu: asEvents(HINDU), uk: asEvents(UK) });
   await page.waitForTimeout(800);
@@ -118,6 +144,24 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     return out;
   });
 
+  /* Step the rotating card on, and press a dot. */
+  const steps = await page.evaluate(async () => {
+    const el = window.CARDS.turns;
+    const r = el.shadowRoot || el;
+    const name = () => ((r.querySelector(".fsname") || r.querySelector(".fsquiet h4") || {}).textContent || "").trim();
+    const out = { first: name(), dots: r.querySelectorAll(".fsdots button").length, timer: !!el._festTimer };
+    el._festIdx = 1; el._signature = null; el._update();
+    await new Promise((x) => setTimeout(x, 50));
+    out.second = name();
+    out.slid = !!r.querySelector(".card.fsnext");
+    out.lit = [...r.querySelectorAll(".fsdots button")].findIndex((b) => b.classList.contains("on"));
+    r.querySelector('.fsdots [data-festat="2"]').click();
+    await new Promise((x) => setTimeout(x, 50));
+    out.third = name();
+    out.opened = !!r.querySelector(".fsfull");
+    return out;
+  });
+
   /* Open the lead full screen, follow its "Also today", close it. */
   const sheet = await page.evaluate(async () => {
     const el = window.CARDS.durga1;
@@ -135,14 +179,18 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       covers: (() => { if (!wrap) return false; const box = wrap.querySelector(".fsbox").getBoundingClientRect();
         return box.left <= 0 && box.top <= 0 && box.right >= innerWidth && box.bottom >= innerHeight; })(),
     };
+    /* What is on top where the rail is: the card's view, not the rail. */
+    first.modal = !!(wrap && wrap.matches && wrap.matches(":modal"));
+    first.overRail = document.elementFromPoint(innerWidth / 2, innerHeight - 30) === el;
     const go = wrap && wrap.querySelector('[data-festgo="Maha Navami"]');
     if (go) go.click();
     await new Promise((x) => setTimeout(x, 200));
     const second = r.querySelector(".fsfull .fsbig") ? r.querySelector(".fsfull .fsbig").textContent : "";
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    await new Promise((x) => setTimeout(x, 100));
-    return { first, second, closed: !r.querySelector(".fsfull") };
+    return { first, second };
   });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  sheet.closed = await page.evaluate(() => !(window.CARDS.durga1.shadowRoot || window.CARDS.durga1).querySelector(".fsfull"));
 
   /* A wall panel never scrolls the full-screen view: every event, opened
      on a 1280x800 screen with today's others beside it, fits. */
@@ -202,6 +250,12 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("every card has its short line", ["durga1", "diwali", "advent12", "christmas", "bhm"].every((k) => r[k].short.length > 20), r);
   check("tapping opens it full screen, scene and all", sheet.first.open && sheet.first.title === "Durga Puja" && sheet.first.canvas, sheet.first);
   check("full screen means the whole screen, nothing of the dashboard round it", sheet.first.covers, sheet.first);
+  check("it opens in the browser's top layer, as a modal", sheet.first.modal, sheet.first);
+  check("and covers a rail fixed above everything else on the page", sheet.first.overRail, sheet.first);
+  check("several things on today take turns, a dot each", steps.first === "Durga Puja" && steps.dots === 3 && steps.timer, steps);
+  check("the next one slides in", steps.second === "Maha Navami" && steps.slid && steps.lit === 1, steps);
+  check("a dot goes straight to its one, without opening it", steps.third === "Black History Month" && !steps.opened, steps);
+  check("nothing shows until the calendars answer, so no flash of the month's observance", r.silent.hidden, r.silent);
   check("with the whole explanation", sheet.first.sections === 2 && sheet.first.story.includes("Asche bochor abar hobe"), sheet.first);
   check("and the others on today, which open in turn",
     sheet.first.others.includes("Maha Navami") && sheet.second === "Maha Navami", sheet);

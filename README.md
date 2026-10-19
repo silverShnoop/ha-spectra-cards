@@ -1299,7 +1299,19 @@ explanation, written for a child to read, and a line for each other thing on
 today that opens in turn. Bank holidays and awareness days are the plain card
 with a small motif; days of remembrance stay quiet on purpose.
 
-When two things fall on one day, one leads and the rest are "Also today":
+Tapped, the card opens full screen in the browser's top layer, like the
+camera's live view: nothing of the dashboard shows, not the rail, not Home
+Assistant's header. On a wall panel the words fit beside the scene without
+scrolling; the cross or Escape closes it.
+
+Two or more things on one day take turns: the card slides from one to the
+next every `every` seconds (12 by default), with a dot for each that jumps
+straight to it. Tapped, it opens whichever is showing. `rotate: false`
+keeps the lead and names the rest as "Also today" instead. Nothing shows
+until the calendars have answered, so a refresh never flashes the month's
+observance before the festival.
+
+The order they take turns in, and the lead when they do not:
 a festival's own day, or Advent, beats a day in the middle of a run, which
 beats a bank holiday or an awareness day, which beats a month-long
 observance; the bigger festival wins a tie. A day with nothing on renders
