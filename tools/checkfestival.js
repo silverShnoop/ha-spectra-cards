@@ -132,6 +132,8 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       story: wrap ? wrap.querySelector(".fsstory").textContent : "",
       others: wrap ? [...wrap.querySelectorAll("[data-festgo]")].map((b) => b.dataset.festgo) : [],
       canvas: !!(wrap && wrap.querySelector(".fsstage .fscanvas")),
+      covers: (() => { if (!wrap) return false; const box = wrap.querySelector(".fsbox").getBoundingClientRect();
+        return box.left <= 0 && box.top <= 0 && box.right >= innerWidth && box.bottom >= innerHeight; })(),
     };
     const go = wrap && wrap.querySelector('[data-festgo="Maha Navami"]');
     if (go) go.click();
@@ -199,6 +201,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("a day with nothing on renders nothing", r.nothing.hidden, r.nothing);
   check("every card has its short line", ["durga1", "diwali", "advent12", "christmas", "bhm"].every((k) => r[k].short.length > 20), r);
   check("tapping opens it full screen, scene and all", sheet.first.open && sheet.first.title === "Durga Puja" && sheet.first.canvas, sheet.first);
+  check("full screen means the whole screen, nothing of the dashboard round it", sheet.first.covers, sheet.first);
   check("with the whole explanation", sheet.first.sections === 2 && sheet.first.story.includes("Asche bochor abar hobe"), sheet.first);
   check("and the others on today, which open in turn",
     sheet.first.others.includes("Maha Navami") && sheet.second === "Maha Navami", sheet);

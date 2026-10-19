@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.185.1";
+const VERSION = "0.185.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3749,13 +3749,15 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   box-shadow:0 0 8px #F2C14E; animation:sp-flicker 2.6s ease-in-out infinite; transform-origin:50% 100%; }
 .fscandle u { width:10px; height:26px; background:var(--sp-ink-3); border-radius:2px; margin-top:2px; }
 
-/* Full screen: the scene large, then all of the words. */
+/* Full screen means the whole screen, as the camera's live view does:
+   nothing of the dashboard shows round it, at any width. The scene large,
+   then all of the words. */
 .fsfull {
   position:fixed; left:0; right:0; top:var(--sp-vvtop, 0px); height:var(--sp-vvh, 100dvh);
-  z-index:1001; background:rgba(8,5,12,.66); display:flex; justify-content:center;
+  z-index:1001; background:#000; display:flex; justify-content:center;
   animation:sheetfade .16s ease-out;
 }
-.fsbox { position:relative; width:min(1000px, 100%); height:100%; overflow:auto;
+.fsbox { position:relative; width:100%; height:100%; overflow:auto;
   background:var(--fg); color:#fff; overscroll-behavior:contain; box-sizing:border-box;
   padding-bottom:env(safe-area-inset-bottom, 0px); }
 .fsbox.quiet { background:var(--sp-surface); color:var(--sp-ink); }
@@ -3820,7 +3822,6 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   .fsgo { flex:1 1 160px; width:auto; margin:0; }
   .fsgo span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .fsbox:not(.quiet) .fsdoors { grid-template-columns:repeat(12, 1fr); max-width:min(100%, 56vh); gap:3px; }
-  .fsbox.quiet { width:min(1100px, 100%); }
   .fsbox.quiet .fsstory p { font-size:clamp(14px, 2.3vh, 17px); }
 }
 .fsdoors { display:grid; grid-template-columns:repeat(8, 1fr); gap:4px; max-width:420px;
@@ -26156,8 +26157,8 @@ class SpectraCard extends HTMLElement {
   }
 
   /* Full screen, for one event and the others on today. Opened from the
-     card, closed by the cross, Escape, or a tap outside it on a wide
-     screen. The card holds its repaints while it is up, the same as the
+     card, closed by the cross or Escape. It covers the whole screen, as
+     the camera's live view does. The card holds its repaints while it is up, the same as the
      camera's live view, so the house changing underneath does not take
      it off the screen. */
   _festSheet(name) {
@@ -26192,7 +26193,6 @@ class SpectraCard extends HTMLElement {
       const s = { wrap, painter: null };
       s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._festClose(); } };
       document.addEventListener("keydown", s.onKey, true);
-      wrap.addEventListener("click", (event) => { if (event.target === wrap) this._festClose(); });
       this._fsSheet = s;
       this._holder.appendChild(wrap);
     }
