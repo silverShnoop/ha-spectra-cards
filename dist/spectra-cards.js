@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.192.0";
+const VERSION = "0.192.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3703,19 +3703,19 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   padding:12px 14px 14px; display:flex; flex-direction:column; gap:4px; cursor:pointer; }
 .fsin > :not(.fsxp) { max-width:66%; }
 .fsin:focus-visible, .fsquiet:focus-visible { outline:2px solid #fff; outline-offset:-4px; }
-.fseye { font-size:11px; letter-spacing:.09em; text-transform:uppercase; font-weight:600;
+.fseye { font-size:12px; letter-spacing:.09em; text-transform:uppercase; font-weight:600;
   color:rgba(255,255,255,.78); }
-.fsname { font-family:"Rozha One", Georgia, "Times New Roman", serif; font-size:24px;
+.fsname { font-family:"Rozha One", Georgia, "Times New Roman", serif; font-size:30px;
   line-height:1.05; text-wrap:balance; text-shadow:0 2px 14px rgba(0,0,0,.45); margin-top:1px; }
-.fswhen { font-family:var(--sp-mono); font-size:12px; color:rgba(255,255,255,.85); }
+.fswhen { font-family:var(--sp-mono); font-size:14px; color:rgba(255,255,255,.85); }
 .fswhen b { color:#FFD166; font-weight:600; }
-.fsshort { margin:3px 0 0; font-size:13px; line-height:1.45; color:rgba(255,255,255,.92);
+.fsshort { margin:3px 0 0; font-size:16px; line-height:1.45; color:rgba(255,255,255,.92);
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.fsalso { margin-top:6px; display:flex; gap:8px; align-items:baseline; font-size:12px;
+.fsalso { margin-top:6px; display:flex; gap:8px; align-items:baseline; font-size:14px;
   background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); border-radius:4px;
   padding:5px 8px; width:fit-content; }
 .fsalso i { font-style:normal; color:rgba(255,255,255,.65); text-transform:uppercase;
-  letter-spacing:.08em; font-size:10px; font-weight:600; white-space:nowrap; }
+  letter-spacing:.08em; font-size:11px; font-weight:600; white-space:nowrap; }
 /* Which of today's is showing: pinned to the card's foot, at the same
    place whichever is showing and however much it says. The words keep
    clear of them. */
@@ -3755,6 +3755,17 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .fspips.bar { display:block; height:5px; border-radius:3px; background:rgba(255,255,255,.18);
   width:160px; overflow:hidden; }
 .fspips.bar i { display:block; height:100%; background:#FFD166; }
+/* Two columns wide on a wall panel, read from across the room: the
+   words grow with the card rather than sitting small in a big scene. */
+@container (min-width: 560px) {
+  .fsin, .fsquiet { min-height:220px; padding:16px 20px 18px; gap:6px; }
+  .fseye { font-size:13px; }
+  .fsname { font-size:40px; }
+  .fswhen { font-size:16px; }
+  .fsshort { font-size:19px; line-height:1.4; }
+  .fsalso { font-size:16px; }
+  .fsalso i { font-size:12px; }
+}
 @container (max-width: 420px) {
   .fsin > :not(.fsxp) { max-width:100%; }
   .fsin { padding-right:44px; }
