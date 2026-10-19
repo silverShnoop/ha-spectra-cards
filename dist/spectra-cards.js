@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.186.0";
+const VERSION = "0.186.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3733,6 +3733,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 @media (prefers-reduced-motion: reduce) {
   .card.fsnext .fsin, .card.fsnext .fsquiet, .card.fsnext .fscanvas { animation:none; }
 }
+.fswaiting { min-height:160px; }
 .fsxp { position:absolute; top:9px; right:9px; width:28px; height:28px; border-radius:50%;
   display:grid; place-items:center; background:rgba(0,0,0,.35); color:#fff; }
 .fsxp ha-icon, .fsxp .mdi { --mdc-icon-size:16px; width:16px; height:16px; }
@@ -7988,13 +7989,19 @@ const festXp = () => `<span class="fsxp" aria-hidden="true">${iconMarkup("mdi:ar
    every festival gets its own scene rather than a line under another's.
    `rotate: false` keeps the lead and names the rest as "Also today".
 
-   Nothing is shown until the calendars have answered. Before they do, the
-   only thing the card knows about today is what comes from the date -- a
-   month-long observance -- and drawing that for a second before the
-   festival replaced it was a flash of the wrong card on every refresh. */
+   Until the calendars have answered the card holds an empty space rather
+   than an event. Before they do, the only thing it knows about today is
+   what comes from the date -- a month-long observance -- and drawing that
+   for a second before the festival replaced it was a flash of the wrong
+   card on every refresh. It holds the space rather than hiding, because
+   a card that hides itself and then comes back is one Home Assistant's
+   own wrapper does not always show again. */
+function festWaiting(b) {
+  return !b.preview && Array.isArray(b.events) && b.events.some((l) => !Array.isArray(l));
+}
+
 function festPick(b) {
-  const waiting = !b.preview && Array.isArray(b.events) && b.events.some((l) => !Array.isArray(l));
-  if (waiting) return null;
+  if (festWaiting(b)) return null;
   const list = festActive(b, b.now);
   if (!list.length) return null;
   if (b.rotate === false || list.length < 2) return { item: list[0], also: list.slice(1), list, at: 0 };
@@ -8011,6 +8018,7 @@ function festDots(pick) {
 }
 
 function festScenesBody(b) {
+  if (festWaiting(b)) return `<div class="fswaiting" aria-busy="true"></div>`;
   const pick = festPick(b);
   if (!pick) return "";
   const lead = pick.item;
@@ -14496,7 +14504,7 @@ function bodyIsEmpty(type, b) {
       return isBlank(b.info) && !b.action;
     /* Nothing to explain and no day to count is not a celebration. */
     case "festival":
-      if (b.scenes) return !festPick(b);
+      if (b.scenes) return !festWaiting(b) && !festPick(b);
       return isBlank(b.text) && !(Number(b.of) > 0);
     /* A zone with no target to show and nothing to drive is not a control,
        and a card with nothing to say renders nothing rather than a shell. */
@@ -21108,6 +21116,10 @@ class SpectraCard extends HTMLElement {
     const parent = this.parentElement;
     if (parent && parent.localName === "hui-card") {
       parent.style.display = hide ? "none" : "";
+      /* hui-card marks itself hidden when the card inside is, and only
+         looks again when it next re-checks its conditions. A card that
+         comes back stays invisible until then, so the mark is lifted here. */
+      if (!hide && parent.hasAttribute("hidden")) parent.removeAttribute("hidden");
     }
   }
 

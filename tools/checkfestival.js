@@ -118,6 +118,24 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     rail.id = "rail";
     rail.style.cssText = "position:fixed;left:0;right:0;bottom:0;height:70px;z-index:2147483647;background:#f0f";
     document.body.appendChild(rail);
+    /* Inside Home Assistant's own wrapper, with calendars that answer
+       late, as a refresh on the panel does. The wrapper marks itself
+       hidden whenever the card is, the way hui-card does, and that is how
+       the card went missing for good after a refresh. */
+    const wrapper = document.createElement("hui-card");
+    document.getElementById("a").appendChild(wrapper);
+    const late = document.createElement("spectra-card");
+    /* Only ever marks itself hidden: like hui-card, it does not look
+       again on its own when the card comes back. */
+    new MutationObserver(() => { if (late.hidden) wrapper.setAttribute("hidden", ""); }).observe(late, { attributes: true, attributeFilter: ["hidden"] });
+    wrapper.appendChild(late);
+    late.setConfig({ type: "custom:spectra-card", accent: 6, body: {
+      type: "festival", scenes: true, now: dates.durga1,
+      events: [{ calendar: "calendar.hindu", back: 35, days: 12 }, { calendar: "calendar.uk", back: 35, days: 12 }],
+    } });
+    late.hass = Object.assign({}, hass, { callWS: (msg) => new Promise((ok) => setTimeout(() => ok(hass.callWS(msg)), 400)) });
+    cards.late = late;
+    window.LATE_WRAPPER = wrapper;
     window.CARDS = cards;
   }, { dates, hindu: asEvents(HINDU), uk: asEvents(UK) });
   await page.waitForTimeout(800);
@@ -137,6 +155,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
         pips: r.querySelectorAll(".fspips span").length,
         lit: r.querySelectorAll(".fspips span.on").length,
         painting: !!(el._fest && el._fest.draw && el._fest.canvas && el._fest.canvas.width > 0),
+        waiting: !!r.querySelector(".fswaiting"),
       };
     };
     const out = {};
@@ -255,7 +274,11 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("several things on today take turns, a dot each", steps.first === "Durga Puja" && steps.dots === 3 && steps.timer, steps);
   check("the next one slides in", steps.second === "Maha Navami" && steps.slid && steps.lit === 1, steps);
   check("a dot goes straight to its one, without opening it", steps.third === "Black History Month" && !steps.opened, steps);
-  check("nothing shows until the calendars answer, so no flash of the month's observance", r.silent.hidden, r.silent);
+  const lateWrapperHidden = await page.evaluate(() => window.LATE_WRAPPER.hasAttribute("hidden") || getComputedStyle(window.LATE_WRAPPER).display === "none");
+  check("after a refresh with slow calendars it still appears, in Home Assistant's wrapper",
+    r.late.name === "Durga Puja" && !r.late.hidden && !lateWrapperHidden, [r.late, lateWrapperHidden]);
+  check("until the calendars answer it holds an empty space: no flash of the month's observance, and never hidden",
+    !r.silent.hidden && r.silent.name === "" && r.silent.waiting, r.silent);
   check("with the whole explanation", sheet.first.sections === 2 && sheet.first.story.includes("Asche bochor abar hobe"), sheet.first);
   check("and the others on today, which open in turn",
     sheet.first.others.includes("Maha Navami") && sheet.second === "Maha Navami", sheet);
