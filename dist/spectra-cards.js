@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.188.0";
+const VERSION = "0.189.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -19189,6 +19189,7 @@ class SpectraCard extends HTMLElement {
     this._wearAccent(wrap, this._model.accent);
     const s = { wrap, painter: new AheadPainter() };
     this._axSheet = s;
+    this._fullScreen(s, () => this._aheadClose());
     const body = this._model.body || {};
     wrap.innerHTML = `<div class="fsbox quiet fsahead">`
       + `<div class="fsclosebar"><button type="button" class="fsclose" aria-label="Close" data-fsclose>${iconMarkup("mdi:close")}</button></div>`
@@ -19262,6 +19263,7 @@ class SpectraCard extends HTMLElement {
     if (!s) return;
     s.painter.detach();
     clearInterval(s.clock);
+    if (s.idle) s.idle();
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
     if (s.wrap.open && s.wrap.close) s.wrap.close();
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
@@ -26567,6 +26569,7 @@ class SpectraCard extends HTMLElement {
       if (modal) wrap.addEventListener("cancel", (event) => { event.preventDefault(); this._festClose(); });
       else document.addEventListener("keydown", s.onKey, true);
       this._fsSheet = s;
+      this._fullScreen(s, () => this._festClose());
       this._holder.appendChild(wrap);
       if (modal && wrap.showModal) {
         try { wrap.showModal(); } catch (e) { /* not connected: stays a fixed box */ }
@@ -26583,6 +26586,7 @@ class SpectraCard extends HTMLElement {
   _festClose() {
     const s = this._fsSheet;
     if (!s) return;
+    if (s.idle) s.idle();
     if (s.painter) s.painter.detach();
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
     if (s.wrap.open && s.wrap.close) s.wrap.close();
@@ -26610,6 +26614,7 @@ class SpectraCard extends HTMLElement {
     this._wearAccent(wrap, model.accent);
     s.wrap = wrap;
     this._ccSheet = s;
+    this._fullScreen(s, () => this._cameraClose());
 
     const pad = (dir, icon, label) => `<button type="button" aria-label="${label}" data-ccmove="${dir}">${iconMarkup(icon)}</button>`;
     const padHtml = ptz && (ptz.left || ptz.right || ptz.up || ptz.down)
@@ -27012,6 +27017,7 @@ class SpectraCard extends HTMLElement {
   _cameraClose() {
     const s = this._ccSheet;
     if (!s) return;
+    if (s.idle) s.idle();
     if (s.end) s.end();
     this._frigateStopPlay();
     this._cameraStop();
@@ -27606,6 +27612,13 @@ class SpectraCard extends HTMLElement {
     wearAccent(element, accent);
   }
 
+  /* A full screen opened: it closes itself after a minute untouched. The
+     sheet keeps the disposer as `idle`, and its close calls it. */
+  _fullScreen(sheet, close) {
+    if (sheet.idle) sheet.idle();
+    sheet.idle = fullScreenIdle(sheet.wrap, close);
+  }
+
   /* The dialog itself lives outside the class (`confirmDialog`) because the
      dock has to ask the same question of its own buttons: the rule that an
      unlock asks first has to hold wherever an unlock can be pressed. */
@@ -27633,6 +27646,27 @@ class SpectraCard extends HTMLElement {
 
 /* The three properties everything in a dialog takes its colour from. See
    `_wearAccent` on the card for why they are set on the dialog itself. */
+/* Every full screen closes itself after a minute nobody has touched it, so
+   a wall panel left on one goes back to the dashboard rather than hiding
+   it all day. Any touch, drag, wheel or key inside it starts the minute
+   again. Each full screen registers through the card's _fullScreen, which
+   is the one place a new one has to call. */
+const FULL_IDLE_MS = 60000;
+const FULL_IDLE_EVENTS = ["pointerdown", "pointermove", "wheel", "keydown", "touchstart"];
+function fullScreenIdle(wrap, close, ms = FULL_IDLE_MS) {
+  let timer = 0;
+  const arm = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { if (wrap.isConnected) close(); }, ms);
+  };
+  FULL_IDLE_EVENTS.forEach((name) => wrap.addEventListener(name, arm, { capture: true, passive: true }));
+  arm();
+  return () => {
+    clearTimeout(timer);
+    FULL_IDLE_EVENTS.forEach((name) => wrap.removeEventListener(name, arm, { capture: true }));
+  };
+}
+
 function wearAccent(element, accent) {
   const a = accentNumber(accent) || 4;
   element.style.setProperty("--accent", `var(--sp-a${a})`);
