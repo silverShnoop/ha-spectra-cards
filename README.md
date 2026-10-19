@@ -12,6 +12,15 @@ cell draws its own title bar, so none of them can drift.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
+## Full screens close themselves
+
+Every full screen a card opens (the camera's live view, a celebration, Now
+and next) closes itself after **a minute untouched**, so a wall panel left
+on one goes back to the dashboard. Any touch, drag, wheel or key inside it
+starts the minute again. A new full screen registers through the card's
+`_fullScreen(sheet, close)`, which is what gives it this; `tools/checkfullidle.js`
+checks each one.
+
 ## Why there is no template language
 
 The data is shaped in the backend, by
