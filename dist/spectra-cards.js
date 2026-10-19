@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.192.1";
+const VERSION = "0.192.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3816,6 +3816,10 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   z-index:1001; background:#000; display:flex; justify-content:center;
   animation:sheetfade .16s ease-out;
 }
+/* A card on a tab the panel has drawn smaller (fit) is inside its zoom,
+   and so is anything fixed it opens. Undone here, every full screen is
+   the size of the screen again, wherever its card sits. */
+.fsfull, .ccfull, .camwrap, .confirmwrap { zoom:calc(1 / var(--pn-zoom, 1)); }
 .fsbox { position:relative; width:100%; height:100%; overflow:auto;
   background:var(--fg); color:#fff; overscroll-behavior:contain; box-sizing:border-box;
   padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -29275,7 +29279,7 @@ class SpectraPanel extends HTMLElement {
     const on = fit === true || (Array.isArray(fit) && fit.map(String).includes(String(tab)));
     const was = this._fitZoom || 1;
     if (!on || this._panel.classList.contains("phone")) {
-      if (was !== 1) { this._fitZoom = 1; g.style.removeProperty("zoom"); }
+      if (was !== 1) { this._fitZoom = 1; g.style.removeProperty("zoom"); g.style.removeProperty("--pn-zoom"); }
       return;
     }
     const cs = getComputedStyle(sc);
@@ -29304,8 +29308,11 @@ class SpectraPanel extends HTMLElement {
     z = Math.max(least, Math.min(1, Math.floor(z * 1000) / 1000));
     if (Math.abs(z - was) < .004) return;
     this._fitZoom = z;
-    if (z === 1) g.style.removeProperty("zoom");
-    else g.style.zoom = String(z);
+    /* --pn-zoom goes down to the cards with it, so a full screen opened
+       from one can undo it: a fixed box inside a zoomed grid is zoomed
+       too, and covered only that much of the screen. */
+    if (z === 1) { g.style.removeProperty("zoom"); g.style.removeProperty("--pn-zoom"); }
+    else { g.style.zoom = String(z); g.style.setProperty("--pn-zoom", String(z)); }
   }
 }
 
