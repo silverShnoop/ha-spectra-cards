@@ -47,7 +47,8 @@ const js = fs.readFileSync(file);
     const M = mid.getTime(), H = 3600000;
     const rows = Array.from({ length: 48 }, (_, i) => ({
       datetime: new Date(M + (12 + i) * H).toISOString(), temperature: 8 + 4 * Math.sin(i / 4),
-      condition: i % 9 === 8 ? "rainy" : "partlycloudy", cloud_coverage: 40, precipitation: i % 9 === 8 ? 1 : 0 }));
+      condition: i % 9 === 8 ? "rainy" : "partlycloudy", cloud_coverage: 40, precipitation: i % 9 === 8 ? 1 : 0,
+      precipitation_probability: Math.round(50 + 45 * Math.sin(i / 3)) }));
     const hass = {
       states: {
         "sensor.outdoor": { state: "11.1", attributes: {} },
@@ -177,6 +178,26 @@ const js = fs.readFileSync(file);
   check("the way back shows, and the hour at the line is named", ahead.back && /\d\d:\d\d/.test(ahead.tag), ahead);
   check("it holds while the 30 seconds run", waited.sc > 0, waited);
   check("then eases back to now by itself", back.sc === 0 && !back.back, back);
+  /* The day chips: today and tomorrow, and a tap on tomorrow glides the
+     hours to its morning and lights its chip. Each hour carries its chance
+     of rain under its time. */
+  const chips = await page.evaluate(async () => {
+    const s = window.CARDS.wide._axSheet;
+    const all = [...s.wrap.querySelectorAll("[data-axday]")];
+    const first = all.map((el) => el.classList.contains("on"));
+    all[1].click();
+    return { n: all.length, first, names: all.map((el) => el.getAttribute("aria-label")) };
+  });
+  await page.clock.runFor(1500);
+  const went = await page.evaluate(() => {
+    const s = window.CARDS.wide._axSheet;
+    const p = s.painter;
+    return { lead: p.laid.leadH, on: [...s.wrap.querySelectorAll("[data-axday]")].map((el) => el.classList.contains("on")),
+      pops: p.model.rows.filter((r) => r.pop !== null).length };
+  });
+  check("the days are there to jump to", chips.n >= 2 && chips.first[0] && chips.names[0] === "Today", chips);
+  check("tomorrow's chip glides to its morning and lights", went.lead > 30 && went.lead < 32 && went.on[1] && !went.on[0], went);
+  check("the hours carry the chance of rain", went.pops > 20, went);
   await page.keyboard.press("Escape");
   await page.clock.runFor(300);
   const closed = await page.evaluate(() => {

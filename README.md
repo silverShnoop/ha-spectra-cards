@@ -1101,7 +1101,13 @@ cloud, none in overcast.
 **Full screen looks further ahead.** The card itself stays still, so it
 always reads from now. A tap on it, or the expand symbol by its title, opens
 it full screen, over everything, as the camera's live view and a
-celebration do; the cross or Escape closes it. There, drag the hours (or scroll them with a
+celebration do; the cross or Escape closes it. Full screen is more than the card made
+bigger: the date and time along the top, a chip for today and each day the
+hourly forecast reaches (high, low, the weather most of the day, and the
+chance of rain when it is 20% or more) that glides the hours to that day's
+morning when tapped, the chance of rain as columns rising from the ground,
+and under each hour's time its chance of rain and how much is forecast to
+fall. There, drag the hours (or scroll them with a
 wheel) and they slide on past the line, as far as the hourly forecast goes,
 with a little give at each end; let go and they glide to a stop. Now does not
 move. While the hours are pulled, a tag at the line names the day and hour
