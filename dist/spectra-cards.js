@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.184.0";
+const VERSION = "0.185.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3687,6 +3687,133 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .festtext { margin:0; padding:4px 0 2px; font-size:13px; line-height:1.55;
   color:var(--sp-ink-2); }
 
+/* Celebrations, drawn. The scene is the card: a canvas across the whole of
+   it, a scrim on the side the words sit, and the words on top. Only the
+   name wears the display face. Nothing here is a level -- the colours are
+   the festival's own, and none of them asks anyone to do anything. */
+.card.festscene {
+  background:var(--fg); border-color:transparent; padding:0; overflow:hidden;
+  color:#fff; container-type:inline-size;
+}
+.fscanvas { position:absolute; inset:0; width:100%; height:100%; display:block;
+  z-index:0; pointer-events:none; border-radius:4px; }
+.fsscrim { position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:linear-gradient(90deg, rgba(8,5,12,.72) 0%, rgba(8,5,12,.45) 55%, rgba(8,5,12,0) 100%); }
+.fsin { position:relative; z-index:2; min-height:184px; box-sizing:border-box;
+  padding:12px 14px 14px; display:flex; flex-direction:column; gap:4px; cursor:pointer; }
+.fsin > :not(.fsxp) { max-width:66%; }
+.fsin:focus-visible, .fsquiet:focus-visible { outline:2px solid #fff; outline-offset:-4px; }
+.fseye { font-size:11px; letter-spacing:.09em; text-transform:uppercase; font-weight:600;
+  color:rgba(255,255,255,.78); }
+.fsname { font-family:"Rozha One", Georgia, "Times New Roman", serif; font-size:24px;
+  line-height:1.05; text-wrap:balance; text-shadow:0 2px 14px rgba(0,0,0,.45); margin-top:1px; }
+.fswhen { font-family:var(--sp-mono); font-size:12px; color:rgba(255,255,255,.85); }
+.fswhen b { color:#FFD166; font-weight:600; }
+.fsshort { margin:3px 0 0; font-size:13px; line-height:1.45; color:rgba(255,255,255,.92);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.fsalso { margin-top:6px; display:flex; gap:8px; align-items:baseline; font-size:12px;
+  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); border-radius:4px;
+  padding:5px 8px; width:fit-content; }
+.fsalso i { font-style:normal; color:rgba(255,255,255,.65); text-transform:uppercase;
+  letter-spacing:.08em; font-size:10px; font-weight:600; white-space:nowrap; }
+.fsxp { position:absolute; top:9px; right:9px; width:28px; height:28px; border-radius:50%;
+  display:grid; place-items:center; background:rgba(0,0,0,.35); color:#fff; }
+.fsxp ha-icon, .fsxp .mdi { --mdc-icon-size:16px; width:16px; height:16px; }
+.fspips { display:flex; gap:6px; margin-top:4px; flex-wrap:wrap; }
+.fspips span { width:12px; height:12px; border-radius:50%; background:rgba(255,255,255,.18); }
+.fspips span.on { background:var(--c); box-shadow:0 0 9px 1px var(--c); }
+.fspips span.now { outline:2px solid #fff; outline-offset:2px; }
+.fspips.bar { display:block; height:5px; border-radius:3px; background:rgba(255,255,255,.18);
+  width:160px; overflow:hidden; }
+.fspips.bar i { display:block; height:100%; background:#FFD166; }
+@container (max-width: 420px) {
+  .fsin > :not(.fsxp) { max-width:100%; }
+  .fsin { padding-right:44px; }
+  .fsscrim { background:linear-gradient(90deg, rgba(8,5,12,.78), rgba(8,5,12,.4)); }
+}
+
+/* A bank holiday or an awareness day: the plain card, a motif, the words. */
+.fsquiet { position:relative; display:flex; gap:12px; padding-right:36px; cursor:pointer; }
+.fsquiet .fseye { color:var(--sp-ink-3); }
+.fsquiet h4 { margin:2px 0 0; font-size:15px; font-weight:600; color:var(--sp-ink); }
+.fsquiet p { margin:4px 0 0; font-size:13px; line-height:1.5; color:var(--sp-ink-2); }
+.fsqwhen { font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-2); margin-top:2px; }
+.fsqwhen b { font-weight:600; color:var(--sp-ink); }
+.fsquiet .fsalso { background:var(--sp-sink); border-color:var(--sp-edge); color:var(--sp-ink-2); }
+.fsquiet .fsalso i { color:var(--sp-ink-3); }
+.fsquiet .fsxp { top:0; right:0; background:var(--sp-sink); color:var(--sp-ink-2); }
+.fsmotif { flex:none; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round;
+  stroke-linejoin:round; color:var(--accent); margin-top:2px; }
+.fscandle { flex:none; width:22px; display:flex; flex-direction:column; align-items:center; padding-top:4px; }
+.fscandle i { width:7px; height:12px; border-radius:50% 50% 45% 45%; background:#F2C14E;
+  box-shadow:0 0 8px #F2C14E; animation:sp-flicker 2.6s ease-in-out infinite; transform-origin:50% 100%; }
+.fscandle u { width:10px; height:26px; background:var(--sp-ink-3); border-radius:2px; margin-top:2px; }
+
+/* Full screen: the scene large, then all of the words. */
+.fsfull {
+  position:fixed; left:0; right:0; top:var(--sp-vvtop, 0px); height:var(--sp-vvh, 100dvh);
+  z-index:1001; background:rgba(8,5,12,.66); display:flex; justify-content:center;
+  animation:sheetfade .16s ease-out;
+}
+.fsbox { position:relative; width:min(1000px, 100%); height:100%; overflow:auto;
+  background:var(--fg); color:#fff; overscroll-behavior:contain; box-sizing:border-box;
+  padding-bottom:env(safe-area-inset-bottom, 0px); }
+.fsbox.quiet { background:var(--sp-surface); color:var(--sp-ink); }
+.fsclosebar { position:sticky; top:0; height:0; z-index:5; }
+.fsclose { position:absolute; top:calc(12px + env(safe-area-inset-top, 0px)); right:12px;
+  width:40px; height:40px; border-radius:50%; border:0; background:rgba(0,0,0,.45); color:#fff;
+  display:grid; place-items:center; cursor:pointer; }
+.fsbox.quiet .fsclose { background:var(--sp-sink); color:var(--sp-ink); }
+.fsstage { position:relative; height:clamp(240px, 46vh, 460px); }
+.fsstage .fscanvas { border-radius:0; }
+.fsfade { position:absolute; left:0; right:0; bottom:0; height:90px; z-index:1;
+  background:linear-gradient(180deg, transparent, var(--fg)); }
+.fsbody { position:relative; z-index:2; padding:0 24px 48px; max-width:760px; margin-top:-28px;
+  display:flex; flex-direction:column; gap:8px; }
+.fsbox.quiet .fsbody { margin-top:0; }
+.fshead { padding:calc(44px + env(safe-area-inset-top, 0px)) 24px 8px; }
+.fsbox.quiet .fseye { color:var(--sp-ink-3); }
+.fsbig { font-family:"Rozha One", Georgia, "Times New Roman", serif; font-size:clamp(32px, 5vw, 50px);
+  line-height:1.02; text-wrap:balance; }
+.fsbox.quiet .fsbig { font-family:inherit; font-weight:600; font-size:clamp(26px, 4vw, 36px); }
+.fsbody .fswhen { font-size:13px; }
+.fsbox.quiet .fswhen { color:var(--sp-ink-2); }
+.fsbox.quiet .fswhen b { color:var(--sp-ink); }
+.fsstory h5 { margin:16px 0 4px; font-size:12px; letter-spacing:.09em; text-transform:uppercase;
+  color:#FFD166; font-weight:700; }
+.fsstory p { margin:0; font-size:16px; line-height:1.68; max-width:64ch; color:rgba(255,255,255,.92); }
+.fsbox.quiet .fsstory h5 { color:var(--sp-ink-2); }
+.fsbox.quiet .fsstory p { color:var(--sp-ink); }
+.fsmore { margin-top:18px; }
+.fsmore h5 { margin:0 0 4px; font-size:12px; letter-spacing:.09em; text-transform:uppercase;
+  color:rgba(255,255,255,.65); font-weight:700; }
+.fsbox.quiet .fsmore h5 { color:var(--sp-ink-3); }
+.fsgo { display:block; width:100%; text-align:left; margin-top:8px; padding:10px 12px;
+  border-radius:6px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08);
+  color:inherit; font:inherit; cursor:pointer; }
+.fsgo b { display:block; font-size:15px; font-weight:600; }
+.fsgo span { display:block; font-size:13px; line-height:1.45; opacity:.8; margin-top:2px; }
+.fsbox.quiet .fsgo { background:var(--sp-sink); border-color:var(--sp-edge); }
+.fsdoors { display:grid; grid-template-columns:repeat(8, 1fr); gap:4px; max-width:420px;
+  margin-top:6px; perspective:500px; }
+.fsdoors span { position:relative; aspect-ratio:1; border-radius:3px; background:#E8C46A;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.25); }
+.fsdoors span::after { content:"\\2605"; position:absolute; inset:0; display:grid; place-items:center;
+  color:#7A1E22; font-size:12px; }
+.fsdoors span.shut::after { content:""; }
+.fsdoors b { position:absolute; inset:0; display:grid; place-items:center; font:600 11px var(--sp-mono);
+  color:#F7E9D0; background:#7A1E22; border-radius:3px; transform-origin:left center;
+  backface-visibility:hidden; z-index:1; }
+.fsdoors span.open b { transform:rotateY(-118deg); }
+.fsdoors span.today { box-shadow:0 0 0 2px #FFD166, 0 0 14px #FFB020; }
+.fsdoors span.today b { animation:fs-swing 6s ease-in-out infinite; }
+@keyframes fs-swing { 0%,8% { transform:none; } 22%,80% { transform:rotateY(-118deg); } 94%,100% { transform:none; } }
+@media (prefers-reduced-motion: reduce) {
+  .fsfull { animation:none; }
+  .fscandle i, .fsdoors span.today b { animation:none; }
+  .fsdoors span.today b { transform:rotateY(-118deg); }
+}
+
 /* The count, directly under the title: lit for nights already had. */
 .festcount { display:flex; gap:9px; padding:9px 0 2px; }
 .diya svg { width:24px; height:24px; display:block; }
@@ -5568,7 +5695,7 @@ function placeSketch(art) {
    calendar's state is just "is something on right now". Same shape as a
    forecast or a to-do list. */
 function calendarKey(spec) {
-  return `${spec.calendar}|${spec.days || 7}`;
+  return `${spec.calendar}|${spec.days || 7}${Number(spec.back) > 0 ? `|back${Number(spec.back)}` : ""}`;
 }
 
 function readCalendar(store, spec) {
@@ -5840,6 +5967,7 @@ function collectSources(spec, found) {
     found.calendars.set(calendarKey(spec), {
       entity: spec.calendar,
       days: Number(spec.days) || 7,
+      back: Math.max(0, Math.min(60, Number(spec.back) || 0)),
     });
     return found;
   }
@@ -6324,6 +6452,1632 @@ function pad2(n) {
   return String(n).padStart(2, "0");
 }
 
+
+/* The celebrations' scenes, drawn on a canvas. Generated rather than
+   stored, like the rest of the card's pictures. Each is a function of a
+   state it keeps between frames, the size, the time and the step. */
+const FEST_SCENES = (() => {
+  const TAU = Math.PI * 2;
+  const rnd = ((seed) => () => (seed = (seed * 16807) % 2147483647) / 2147483647)(7);
+  // ---------- scenes ----------
+  const grad = (c, w, h, stops, ang = 0.6) => {
+    const g = c.createLinearGradient(0, 0, w * Math.cos(ang) + h * Math.sin(ang) * 0.4, h);
+    stops.forEach(([o, col]) => g.addColorStop(o, col)); return g;
+  };
+
+  /* Durga: ten arms, each holding what a god gave her, in front of the
+     chalchitra (the painted arch behind every pandal idol), riding her lion.
+     Units are fractions of s, the figure's height; (cx, foot) is the ground. */
+  function drawDurga(c, cx, foot, s, t) {
+    const top = foot - s, Y = f => top + f * s, X = f => cx + f * s;
+    const SKIN = "#F2B25C", SKIN_D = "#B9772E", GOLD = "#F4C04E", GOLD_D = "#A8741A", RED = "#C8102E";
+    const beat = (t * 1.8) % 3, pulse = Math.max(0, 1 - Math.min(Math.abs(beat - 1.1), Math.abs(beat)) * 2.2);
+
+    // chalchitra halo
+    const hx = cx, hy = Y(.34);
+    const g = c.createRadialGradient(hx, hy, s * .05, hx, hy, s * .62);
+    g.addColorStop(0, `rgba(255,214,120,${.55 + pulse * .25})`); g.addColorStop(.6, "rgba(255,160,60,.18)");
+    g.addColorStop(1, "rgba(255,160,60,0)");
+    c.fillStyle = g; c.beginPath(); c.arc(hx, hy, s * .62, 0, TAU); c.fill();
+    [[.5, 5, "#E8B33A"], [.45, 2, "#7A0F1E"], [.41, 3, "#F4C04E"]].forEach(([r, lw, col]) => {
+      c.beginPath(); c.arc(hx, hy, s * r, Math.PI * .85, Math.PI * 2.15);
+      c.strokeStyle = col; c.lineWidth = lw; c.stroke();
+    });
+    for (let i = 0; i <= 28; i++) {
+      const a = Math.PI * .85 + i / 28 * Math.PI * 1.3;
+      c.beginPath(); c.arc(hx + Math.cos(a) * s * .475, hy + Math.sin(a) * s * .475, s * .009, 0, TAU);
+      c.fillStyle = i % 2 ? "#FFF4DC" : "#E8343A"; c.fill();
+    }
+
+    // hair, falling behind the shoulders
+    c.fillStyle = "#140A0A";
+    c.beginPath(); c.moveTo(X(-.07), Y(.17));
+    c.quadraticCurveTo(X(-.15), Y(.36), X(-.12), Y(.5)); c.lineTo(X(.12), Y(.5));
+    c.quadraticCurveTo(X(.15), Y(.36), X(.07), Y(.17)); c.closePath(); c.fill();
+
+    // ten arms, five a side, fanned like the idol's
+    const items = [["chakra", "sword", "arrow", "vajra", "trishul"], ["conch", "bow", "lotus", "mace", "bell"]];
+    const fan = [-62, -34, -8, 18, 44];
+    [1, -1].forEach((side, si) => {
+      const shx = X(.065 * side), shy = Y(.34);
+      fan.forEach((deg, i) => {
+        const sway = Math.sin(t * 1.3 + i * .8 + si) * 3 + (i < 2 ? pulse * 2 : 0);
+        const a1 = (side > 0 ? deg + sway : 180 - deg - sway) * Math.PI / 180;
+        const ex = shx + Math.cos(a1) * s * .14, ey = shy + Math.sin(a1) * s * .14;
+        const bend = (side > 0 ? -38 : 38) * Math.PI / 180;
+        const a2 = a1 + bend;
+        const hx2 = ex + Math.cos(a2) * s * .12, hy2 = ey + Math.sin(a2) * s * .12;
+        c.lineCap = "round"; c.lineJoin = "round";
+        c.strokeStyle = SKIN_D; c.lineWidth = s * .034;
+        c.beginPath(); c.moveTo(shx, shy); c.lineTo(ex, ey); c.lineTo(hx2, hy2); c.stroke();
+        c.strokeStyle = SKIN; c.lineWidth = s * .026;
+        c.beginPath(); c.moveTo(shx, shy); c.lineTo(ex, ey); c.lineTo(hx2, hy2); c.stroke();
+        // bangles
+        const bx = ex + Math.cos(a2) * s * .095, by = ey + Math.sin(a2) * s * .095;
+        c.strokeStyle = GOLD; c.lineWidth = s * .008;
+        c.beginPath(); c.arc(bx, by, s * .015, 0, TAU); c.stroke();
+        drawItem(c, items[si][i], hx2, hy2, s * .05, t, side);
+        c.fillStyle = SKIN; c.beginPath(); c.arc(hx2, hy2, s * .017, 0, TAU); c.fill();
+      });
+    });
+
+    // skirt: red sari with gold border and pleats
+    const wy = Y(.55);
+    c.fillStyle = RED;
+    c.beginPath(); c.moveTo(X(-.065), wy); c.lineTo(X(.065), wy);
+    c.quadraticCurveTo(X(.12), Y(.8), X(.16), Y(.985)); c.lineTo(X(-.16), Y(.985));
+    c.quadraticCurveTo(X(-.12), Y(.8), X(-.065), wy); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(90,0,10,.45)"; c.lineWidth = 1;
+    for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(X(k * .012), wy + s * .03); c.lineTo(X(k * .045), Y(.96)); c.stroke(); }
+    c.fillStyle = GOLD; c.fillRect(X(-.16), Y(.955), s * .32, s * .03);
+    c.fillStyle = RED; for (let k = 0; k < 10; k++) c.fillRect(X(-.15 + k * .031), Y(.963), s * .012, s * .012);
+
+    // torso and the sari's pallu across it
+    c.fillStyle = SKIN;
+    c.beginPath(); c.moveTo(X(-.075), Y(.33)); c.lineTo(X(.075), Y(.33));
+    c.lineTo(X(.06), wy); c.lineTo(X(-.06), wy); c.closePath(); c.fill();
+    c.fillStyle = RED;
+    c.beginPath(); c.moveTo(X(.075), Y(.33)); c.lineTo(X(.03), Y(.33)); c.lineTo(X(-.065), wy); c.lineTo(X(.0), wy);
+    c.closePath(); c.fill();
+    c.strokeStyle = GOLD; c.lineWidth = s * .01;
+    c.beginPath(); c.moveTo(X(.03), Y(.33)); c.lineTo(X(-.065), wy); c.stroke();
+    c.fillStyle = GOLD; c.fillRect(X(-.065), wy - s * .012, s * .13, s * .018);
+
+    // necklaces
+    [[.035, .04], [.05, .065]].forEach(([r, d]) => {
+      c.strokeStyle = GOLD; c.lineWidth = s * .008;
+      c.beginPath(); c.ellipse(cx, Y(.33), s * r, s * d, 0, .15, Math.PI - .15); c.stroke();
+    });
+    c.fillStyle = "#E8343A"; c.beginPath(); c.arc(cx, Y(.33) + s * .065, s * .009, 0, TAU); c.fill();
+
+    // neck and head
+    c.fillStyle = SKIN; c.fillRect(X(-.018), Y(.27), s * .036, s * .06);
+    const fy = Y(.215);
+    c.beginPath(); c.ellipse(cx, fy, s * .058, s * .072, 0, 0, TAU); c.fill();
+    // earrings
+    [-1, 1].forEach(d => { c.fillStyle = GOLD; c.beginPath(); c.arc(X(.058 * d), fy + s * .03, s * .012, 0, TAU); c.fill(); });
+    // the long Bengali eyes
+    [-1, 1].forEach(d => {
+      const ex = X(.026 * d), ey = fy - s * .002, ew = s * .03;
+      c.fillStyle = "#FFF8EC";
+      c.beginPath(); c.moveTo(ex - ew * (d > 0 ? .7 : 1.25), ey + (d > 0 ? 0 : -s * .006));
+      c.quadraticCurveTo(ex, ey - s * .02, ex + ew * (d > 0 ? 1.25 : .7), ey + (d > 0 ? -s * .006 : 0));
+      c.quadraticCurveTo(ex, ey + s * .012, ex - ew * (d > 0 ? .7 : 1.25), ey + (d > 0 ? 0 : -s * .006));
+      c.fill(); c.strokeStyle = "#140A0A"; c.lineWidth = s * .006; c.stroke();
+      c.fillStyle = "#140A0A"; c.beginPath(); c.arc(ex, ey - s * .003, s * .008, 0, TAU); c.fill();
+      c.strokeStyle = "#140A0A"; c.lineWidth = s * .004;
+      c.beginPath(); c.arc(ex, ey - s * .006, s * .028, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+    });
+    // third eye, glowing with the drum
+    c.save(); c.shadowColor = "#FFB020"; c.shadowBlur = 6 + pulse * 14;
+    c.fillStyle = "#FFF8EC";
+    c.beginPath(); c.ellipse(cx, fy - s * .038, s * .006, s * .013, 0, 0, TAU); c.fill(); c.restore();
+    c.fillStyle = "#E8343A"; c.beginPath(); c.arc(cx, fy - s * .038, s * .004, 0, TAU); c.fill();
+    // nose ring and lips
+    c.strokeStyle = GOLD; c.lineWidth = s * .004;
+    c.beginPath(); c.arc(X(.012), fy + s * .022, s * .01, 0, TAU); c.stroke();
+    c.fillStyle = "#B3122A"; c.beginPath(); c.ellipse(cx, fy + s * .042, s * .012, s * .005, 0, 0, TAU); c.fill();
+    // crown
+    c.fillStyle = GOLD;
+    c.beginPath(); c.moveTo(X(-.06), Y(.165));
+    for (let k = 0; k <= 6; k++) {
+      const x = -.06 + k * .02, peak = k === 3 ? .02 : k % 2 ? .085 : .11;
+      c.lineTo(X(x - .01), Y(.165 - (k % 2 ? 0 : .02))); c.lineTo(X(x), Y(peak));
+    }
+    c.lineTo(X(.06), Y(.165)); c.closePath(); c.fill();
+    c.strokeStyle = GOLD_D; c.lineWidth = 1; c.stroke();
+    c.fillStyle = "#E8343A"; c.beginPath(); c.arc(cx, Y(.12), s * .012, 0, TAU); c.fill();
+    c.fillStyle = "#2FA84F"; [-1, 1].forEach(d => { c.beginPath(); c.arc(X(.03 * d), Y(.14), s * .007, 0, TAU); c.fill(); });
+
+    drawLion(c, X(-.2), foot, s, t, pulse);
+  }
+
+  function drawItem(c, kind, x, y, u, t, side) {
+    c.save(); c.translate(x, y); c.lineCap = "round";
+    const SILVER = "#E6E9EF", GOLD = "#F4C04E";
+    switch (kind) {
+      case "trishul":
+        c.strokeStyle = SILVER; c.lineWidth = u * .14;
+        c.beginPath(); c.moveTo(0, u * 1.3); c.lineTo(0, -u * 1.9); c.stroke();
+        c.beginPath(); c.moveTo(-u * .55, -u * 1.3); c.quadraticCurveTo(-u * .55, -u * 1.7, -u * .45, -u * 2.05);
+        c.moveTo(u * .55, -u * 1.3); c.quadraticCurveTo(u * .55, -u * 1.7, u * .45, -u * 2.05);
+        c.moveTo(-u * .55, -u * 1.3); c.quadraticCurveTo(0, -u * 1.05, u * .55, -u * 1.3); c.stroke();
+        break;
+      case "chakra":
+        c.translate(0, -u * .9); c.rotate(t * 3 * side);
+        c.strokeStyle = GOLD; c.lineWidth = u * .14;
+        c.beginPath(); c.arc(0, 0, u * .62, 0, TAU); c.stroke();
+        for (let k = 0; k < 8; k++) { const a = k / 8 * TAU;
+          c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.cos(a) * u * .62, Math.sin(a) * u * .62); c.stroke();
+          c.beginPath(); c.moveTo(Math.cos(a) * u * .62, Math.sin(a) * u * .62);
+          c.lineTo(Math.cos(a + .2) * u * .85, Math.sin(a + .2) * u * .85); c.stroke(); }
+        break;
+      case "sword":
+        c.fillStyle = SILVER;
+        c.beginPath(); c.moveTo(-u * .13, -u * .3); c.lineTo(u * .13, -u * .3); c.lineTo(u * .05, -u * 2); c.lineTo(-u * .02, -u * 2.1);
+        c.closePath(); c.fill();
+        c.strokeStyle = GOLD; c.lineWidth = u * .16; c.beginPath(); c.moveTo(-u * .35, -u * .3); c.lineTo(u * .35, -u * .3); c.stroke();
+        break;
+      case "arrow":
+        c.strokeStyle = "#D9B27C"; c.lineWidth = u * .09;
+        c.beginPath(); c.moveTo(0, u * .9); c.lineTo(0, -u * 1.7); c.stroke();
+        c.fillStyle = SILVER; c.beginPath(); c.moveTo(-u * .22, -u * 1.6); c.lineTo(u * .22, -u * 1.6); c.lineTo(0, -u * 2.05); c.fill();
+        c.strokeStyle = "#E8343A"; c.lineWidth = u * .08;
+        c.beginPath(); c.moveTo(0, u * .7); c.lineTo(-u * .22, u * 1); c.moveTo(0, u * .7); c.lineTo(u * .22, u * 1); c.stroke();
+        break;
+      case "vajra":
+        c.translate(0, -u * .8); c.fillStyle = GOLD; c.strokeStyle = GOLD; c.lineWidth = u * .12;
+        c.beginPath(); c.arc(0, 0, u * .2, 0, TAU); c.fill();
+        [-1, 1].forEach(d => { c.beginPath();
+          c.moveTo(0, d * u * .2); c.quadraticCurveTo(-u * .45, d * u * .55, 0, d * u * .95);
+          c.moveTo(0, d * u * .2); c.quadraticCurveTo(u * .45, d * u * .55, 0, d * u * .95);
+          c.moveTo(0, d * u * .2); c.lineTo(0, d * u * .95); c.stroke(); });
+        break;
+      case "conch":
+        c.translate(0, -u * .6); c.rotate(-.5 * side); c.fillStyle = "#FFF8EC";
+        c.beginPath(); c.moveTo(-u * .45, 0); c.quadraticCurveTo(-u * .3, -u * .55, u * .15, -u * .45);
+        c.quadraticCurveTo(u * .7, -u * .2, u * .55, u * .15); c.quadraticCurveTo(u * .1, u * .45, -u * .45, 0); c.fill();
+        c.strokeStyle = "#C9A27A"; c.lineWidth = u * .06;
+        c.beginPath(); c.arc(u * .15, -u * .05, u * .2, 0, Math.PI * 1.5); c.stroke();
+        break;
+      case "bow":
+        c.strokeStyle = "#A0522D"; c.lineWidth = u * .14;
+        c.beginPath(); c.moveTo(0, -u * 1.6); c.quadraticCurveTo(side * u * 1.3, -u * .3, 0, u * 1.0); c.stroke();
+        c.strokeStyle = "rgba(255,255,255,.75)"; c.lineWidth = 1;
+        c.beginPath(); c.moveTo(0, -u * 1.6); c.lineTo(0, u * 1.0); c.stroke();
+        break;
+      case "lotus":
+        c.translate(0, -u * .55);
+        for (let k = -2; k <= 2; k++) { c.save(); c.rotate(k * .38);
+          c.fillStyle = k % 2 ? "#F59BC0" : "#E8679C";
+          c.beginPath(); c.ellipse(0, -u * .45, u * .18, u * .5, 0, 0, TAU); c.fill(); c.restore(); }
+        break;
+      case "mace":
+        c.strokeStyle = "#C9A27A"; c.lineWidth = u * .12;
+        c.beginPath(); c.moveTo(0, u * .6); c.lineTo(0, -u * 1.2); c.stroke();
+        c.fillStyle = GOLD; c.beginPath(); c.arc(0, -u * 1.45, u * .42, 0, TAU); c.fill();
+        c.fillStyle = "#A8741A"; c.beginPath(); c.arc(0, -u * 1.9, u * .1, 0, TAU); c.fill();
+        break;
+      case "bell":
+        c.rotate(Math.sin(t * 4) * .12);
+        c.strokeStyle = GOLD; c.lineWidth = u * .12; c.beginPath(); c.moveTo(0, -u * .6); c.lineTo(0, u * .15); c.stroke();
+        c.fillStyle = GOLD; c.beginPath(); c.moveTo(-u * .08, u * .15);
+        c.quadraticCurveTo(-u * .32, u * .25, -u * .45, u * .9); c.lineTo(u * .45, u * .9);
+        c.quadraticCurveTo(u * .32, u * .25, u * .08, u * .15); c.closePath(); c.fill();
+        c.fillStyle = "#A8741A"; c.beginPath(); c.arc(0, u * .98, u * .1, 0, TAU); c.fill();
+        break;
+    }
+    c.restore();
+  }
+
+  function drawLion(c, lx, foot, s, t, pulse) {
+    const u = s * .1, base = foot - s * .015, GOLD = "#E0A33A", MANE = "#B5651D";
+    const roar = Math.max(0, Math.sin(t * .9)) ** 6;
+    c.save(); c.translate(lx, base);
+    // tail
+    c.strokeStyle = GOLD; c.lineWidth = u * .14; c.lineCap = "round";
+    c.beginPath(); c.moveTo(u * 1.2, -u * 1.0);
+    c.quadraticCurveTo(u * 2.0, -u * 1.2 + Math.sin(t * 2) * u * .2, u * 1.8, -u * 2.0); c.stroke();
+    c.fillStyle = MANE; c.beginPath(); c.arc(u * 1.8, -u * 2.05, u * .16, 0, TAU); c.fill();
+    // legs
+    c.fillStyle = "#C88B2C";
+    [-.75, -.45, .65, .95].forEach(x => c.fillRect(x * u, -u * .9, u * .26, u * .9));
+    // body
+    c.fillStyle = GOLD; c.beginPath(); c.ellipse(u * .1, -u * 1.05, u * 1.25, u * .55, 0, 0, TAU); c.fill();
+    // mane
+    const mx = -u * .95, my = -u * 1.55;
+    c.fillStyle = MANE; c.beginPath();
+    for (let k = 0; k <= 22; k++) { const a = k / 22 * TAU, r = (k % 2 ? .62 : .82) * u;
+      c.lineTo(mx + Math.cos(a) * r, my + Math.sin(a) * r); }
+    c.fill();
+    // head
+    c.fillStyle = GOLD; c.beginPath(); c.ellipse(mx - u * .08, my + u * .02, u * .42, u * .44, 0, 0, TAU); c.fill();
+    c.fillStyle = "#3A1A0A";
+    c.beginPath(); c.arc(mx - u * .25, my - u * .1, u * .06, 0, TAU); c.arc(mx + u * .02, my - u * .1, u * .06, 0, TAU); c.fill();
+    c.beginPath(); c.moveTo(mx - u * .2, my + u * .1); c.lineTo(mx - u * .06, my + u * .1); c.lineTo(mx - u * .13, my + u * .2); c.fill();
+    // jaw, opening into a roar every few seconds
+    c.fillStyle = "#7A1E22"; c.beginPath();
+    c.ellipse(mx - u * .13, my + u * .3, u * .16, u * (.03 + roar * .14), 0, 0, TAU); c.fill();
+    if (roar > .2) { c.strokeStyle = `rgba(255,230,180,${roar * .6})`; c.lineWidth = 1.5;
+      for (let k = 0; k < 3; k++) { c.beginPath(); c.arc(mx - u * .4, my + u * .3, u * (.4 + k * .25 + roar * .2), Math.PI * .8, Math.PI * 1.2); c.stroke(); } }
+    c.restore();
+  }
+
+  const SCENES = {
+    durga(st) {
+      st.smoke = Array.from({ length: 60 }, () => ({ life: rnd() }));
+      st.kash = Array.from({ length: 34 }, (_, i) => ({ x: i / 33, h: .14 + rnd() * .16, ph: rnd() * TAU }));
+      return (c, w, h, t) => {
+        const narrow = w / h < 1.4;
+        c.fillStyle = grad(c, w, h, [[0, "#3A0610"], [.45, "#7A0F1E"], [.8, "#B5361C"], [1, "#E58A1F"]]);
+        c.fillRect(0, 0, w, h);
+        // smoke
+        st.smoke.forEach((p, i) => {
+          p.life += .0025 + (i % 5) * .0004; if (p.life > 1) p.life -= 1;
+          const L = p.life, sx = w * (.08 + (i % 7) * .14);
+          const x = sx + Math.sin(L * 7 + i) * 18 * L, y = h * .95 - L * h, r = 6 + L * 38;
+          c.beginPath(); c.arc(x, y, r, 0, TAU);
+          c.fillStyle = `rgba(240,230,220,${.06 * (1 - L) * Math.min(1, L * 6)})`; c.fill();
+        });
+        // On a phone the figure stands in a band at the top and the words run underneath.
+        // Portrait frames centre her; wide ones stand her at the right, beside the words.
+        const portrait = w / h < 1.4, ground = h, foot = ground - 16;
+        const s = portrait ? Math.min(h * .8, w * .85) : Math.min(h * .82, w * .4);
+        drawDurga(c, portrait ? w / 2 : w * .78, foot, s, t);
+        // laal paar border
+        c.fillStyle = "#F7F2E8"; c.fillRect(0, ground - 12, w, 12);
+        c.fillStyle = "#C8102E"; c.fillRect(0, ground - 9, w, 6);
+        c.fillStyle = "#E8B33A"; for (let x = 4; x < w; x += 14) c.fillRect(x, ground - 7, 6, 2);
+        // kash flowers
+        st.kash.forEach(k => {
+          // Kept clear of the words on a wide card.
+          const x = narrow ? k.x * w : w * (.5 + k.x * .5), base = ground - 12, top = base - k.h * Math.min(ground, 300) * (narrow ? .6 : 1);
+          const sway = Math.sin(t * 1.1 + k.ph) * 9;
+          c.strokeStyle = "rgba(200,190,150,.55)"; c.lineWidth = 1;
+          c.beginPath(); c.moveTo(x, base); c.quadraticCurveTo(x + sway * .3, (base + top) / 2, x + sway, top); c.stroke();
+          c.save(); c.translate(x + sway, top); c.rotate(sway * .03);
+          for (let j = 0; j < 7; j++) {
+            c.beginPath(); c.ellipse(0, -j * 3, 3.5 - j * .3, 5, 0, 0, TAU);
+            c.fillStyle = "rgba(255,250,240,.55)"; c.fill();
+          }
+          c.restore();
+        });
+      };
+    },
+
+    navaratri(st) {
+      const cols = ["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#BDBDBD","#F28A2E","#3FB6C9","#E84F9A"];
+      return (c, w, h, t) => {
+        c.fillStyle = grad(c, w, h, [[0, "#140F2C"], [.5, "#3D2160"], [1, "#9C2F6E"]]); c.fillRect(0, 0, w, h);
+        const cx = w * .78, cy = h * .58;
+        // glow + garbo lamp
+        const g = c.createRadialGradient(cx, cy, 0, cx, cy, h * .6);
+        g.addColorStop(0, "rgba(255,190,80,.45)"); g.addColorStop(1, "rgba(255,190,80,0)");
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+        c.fillStyle = "#B5651D"; c.beginPath(); c.ellipse(cx, cy + 6, 13, 11, 0, 0, TAU); c.fill();
+        c.fillStyle = "#3A1A0A"; for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(cx - 8 + i * 4, cy + 6, 1.4, 0, TAU); c.fill(); }
+        const fl = 1 + Math.sin(t * 13) * .1;
+        c.save(); c.shadowColor = "#FFB020"; c.shadowBlur = 16; c.fillStyle = "#FFD166";
+        c.beginPath(); c.ellipse(cx, cy - 10, 4, 8 * fl, 0, 0, TAU); c.fill(); c.restore();
+        // two rings of dancers
+        [[1, 9, .58, .26, .5], [-1, 14, .9, .38, .36]].forEach(([dir, n, rx, ry, sp]) => {
+          const ds = [];
+          for (let i = 0; i < n; i++) {
+            const a = dir * t * sp + i / n * TAU;
+            ds.push({ a, x: cx + Math.cos(a) * h * rx, y: cy + Math.sin(a) * h * ry, col: cols[i % 9] });
+          }
+          ds.sort((p, q) => p.y - q.y).forEach(d => {
+            const depth = .65 + (Math.sin(d.a) + 1) * .2, bob = Math.abs(Math.sin(t * 4 + d.a * 3)) * 4;
+            c.globalAlpha = .55 + depth * .4;
+            c.fillStyle = d.col;
+            c.beginPath(); c.moveTo(d.x - 7 * depth, d.y + 10 * depth - bob);
+            c.lineTo(d.x + 7 * depth, d.y + 10 * depth - bob); c.lineTo(d.x, d.y - 6 * depth - bob); c.fill();
+            c.beginPath(); c.arc(d.x, d.y - 9 * depth - bob, 3.2 * depth, 0, TAU); c.fill();
+          });
+          c.globalAlpha = 1;
+        });
+      };
+    },
+
+    holi(st) {
+      const cols = ["#FF3D7F", "#FFD000", "#21C27A", "#2D8CFF", "#FF7A1A", "#B44BFF"];
+      st.puffs = []; st.next = 0; st.dust = [];
+      return (c, w, h, t, dt) => {
+        c.fillStyle = grad(c, w, h, [[0, "#20163A"], [.45, "#1F5E63"], [.8, "#B03A6B"], [1, "#F2B705"]]); c.fillRect(0, 0, w, h);
+        st.dust.forEach(d => { c.beginPath(); c.arc(d.x * w, d.y * h, d.r, 0, TAU); c.fillStyle = d.col; c.globalAlpha = .18; c.fill(); });
+        c.globalAlpha = 1;
+        st.next -= dt;
+        if (st.next <= 0) { st.next = .5 + rnd() * .6;
+          const fromR = rnd() > .3, y = h * (.2 + rnd() * .7);
+          st.puffs.push({ x: fromR ? w + 10 : w * .45, y: fromR ? y : h + 10,
+            vx: fromR ? -w * (.35 + rnd() * .3) : w * (.1 + rnd() * .2), vy: fromR ? -h * .1 * rnd() : -h * (.6 + rnd() * .3),
+            col: cols[Math.floor(rnd() * cols.length)], life: 1, parts: Array.from({ length: 18 }, () => [rnd() * TAU, rnd()]) }); }
+        st.puffs = st.puffs.filter(p => {
+          p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .95; p.vy *= .95; p.life -= dt * .38;
+          const spread = (1 - p.life) * 60 + 8;
+          p.parts.forEach(([a, k]) => { c.beginPath();
+            c.arc(p.x + Math.cos(a) * spread * k, p.y + Math.sin(a) * spread * k, 8 + (1 - p.life) * 22 * k, 0, TAU);
+            c.fillStyle = p.col; c.globalAlpha = Math.max(0, p.life) * .32; c.fill(); });
+          if (p.life <= 0 && st.dust.length < 40) st.dust.push({ x: p.x / w, y: p.y / h, r: 30 + rnd() * 30, col: p.col });
+          return p.life > 0; });
+        c.globalAlpha = 1;
+      };
+    },
+
+    /* `v` is today's door: the candle burns down one mark a day. */
+    advent(st, v) {
+      const door = Math.max(1, Math.min(24, Number(v) || 1)), left0 = 25 - door;
+      st.snow = Array.from({ length: 70 }, () => ({ x: rnd(), y: rnd(), r: .8 + rnd() * 2.2, s: .03 + rnd() * .06 }));
+      return (c, w, h, t, dt) => {
+        c.fillStyle = grad(c, w, h, [[0, "#0B1F17"], [.55, "#123526"], [1, "#4A1418"]]); c.fillRect(0, 0, w, h);
+        // advent candle
+        const cx = w * .86, base = h - 14, full = h * .62, left = full * (left0 / 24);
+        c.fillStyle = "#F4ECDD"; c.fillRect(cx - 12, base - left, 24, left);
+        c.fillStyle = "#B3202A";
+        for (let i = 0; i < left0; i++) { const y = base - left + i * (full / 24) + 4; if (y < base) c.fillRect(cx - 12, y, 24, 1.2); }
+        c.font = "600 8px ui-monospace,monospace"; c.fillStyle = "#7A1E22"; c.textAlign = "center";
+        for (let i = 0; i < left0; i++) { const y = base - left + i * (full / 24) + 11; if (y < base) c.fillText(door + i, cx, y); }
+        const f = 1 + Math.sin(t * 9) * .12;
+        const gl = c.createRadialGradient(cx, base - left - 12, 0, cx, base - left - 12, 60);
+        gl.addColorStop(0, "rgba(255,200,90,.45)"); gl.addColorStop(1, "rgba(255,200,90,0)");
+        c.fillStyle = gl; c.fillRect(cx - 60, base - left - 72, 120, 120);
+        c.save(); c.shadowColor = "#FFB020"; c.shadowBlur = 14; c.fillStyle = "#FFD166";
+        c.beginPath(); c.ellipse(cx, base - left - 10, 4, 9 * f, Math.sin(t * 2) * .1, 0, TAU); c.fill(); c.restore();
+        // holly sprig
+        c.fillStyle = "#1F6B3A"; [[-22, 0, -.5], [22, 0, .5]].forEach(([dx, dy, a]) => { c.save();
+          c.translate(cx + dx, base + dy - 2); c.rotate(a); c.beginPath(); c.ellipse(0, 0, 13, 5, 0, 0, TAU); c.fill(); c.restore(); });
+        c.fillStyle = "#D7263D"; [[-3, -4], [3, -3], [0, 2]].forEach(([dx, dy]) => { c.beginPath(); c.arc(cx + dx, base + dy, 3, 0, TAU); c.fill(); });
+        // snow
+        st.snow.forEach(s => { s.y += s.s * dt; if (s.y > 1) { s.y = 0; s.x = rnd(); }
+          c.beginPath(); c.arc((s.x + Math.sin(t * .6 + s.r * 9) * .01) * w, s.y * h, s.r, 0, TAU);
+          c.fillStyle = "rgba(255,255,255,.75)"; c.fill(); });
+      };
+    },
+
+  };
+
+  /* ---------- shared drawing helpers ---------- */
+  const vg = (c, h, stops) => { const g = c.createLinearGradient(0, 0, 0, h);
+    stops.forEach(([o, k]) => g.addColorStop(o, k)); return g; };
+  const fill = (c, w, h, stops) => { c.fillStyle = vg(c, h, stops); c.fillRect(0, 0, w, h); };
+  const mkStars = n => Array.from({ length: n }, () => ({ x: rnd(), y: rnd() * .75, r: .4 + rnd() * 1.2, p: rnd() * TAU }));
+  const stars = (c, w, h, t, S) => { c.fillStyle = "#fff"; S.forEach(s => {
+    c.globalAlpha = .35 + .65 * Math.abs(Math.sin(t * 1.3 + s.p));
+    c.beginPath(); c.arc(s.x * w, s.y * h, s.r, 0, TAU); c.fill(); }); c.globalAlpha = 1; };
+  const glow = (c, x, y, r, col, a = 1) => { const g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, col); g.addColorStop(1, "rgba(0,0,0,0)"); c.globalAlpha = a; c.fillStyle = g;
+    c.fillRect(x - r, y - r, r * 2, r * 2); c.globalAlpha = 1; };
+  const moonDisc = (c, x, y, r) => { glow(c, x, y, r * 3.4, "#FFF3C4", .3); c.fillStyle = "#FFF6D8";
+    c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); c.fillStyle = "rgba(190,180,140,.35)";
+    [[-.3, -.2, .22], [.28, .15, .16], [-.05, .38, .12], [.35, -.35, .09]].forEach(([a, b, k]) => {
+      c.beginPath(); c.arc(x + a * r, y + b * r, k * r, 0, TAU); c.fill(); }); };
+  const flame = (c, x, y, s, t, i = 0) => { const f = 1 + Math.sin(t * 11 + i * 2.1) * .14;
+    glow(c, x, y - s * .5, s * 2.6, "#FFB020", .35);
+    c.fillStyle = "#FFD166"; c.beginPath(); c.ellipse(x, y - s * .5, s * .45, s * f, Math.sin(t * 3 + i) * .12, 0, TAU); c.fill(); };
+  const lamp = (c, x, y, s, t, i, lit = true) => {
+    c.fillStyle = lit ? "#C98A3E" : "#6B4423";
+    c.beginPath(); c.moveTo(x - s, y); c.quadraticCurveTo(x, y + s * 1.2, x + s, y); c.closePath(); c.fill();
+    if (lit) flame(c, x, y, s * .55, t, i); };
+  const kite = (c, x, y, s, col, a, t, i) => {
+    c.save(); c.translate(x, y); c.rotate(a);
+    c.fillStyle = col; c.beginPath(); c.moveTo(0, -s); c.lineTo(s * .7, 0); c.lineTo(0, s * 1.1); c.lineTo(-s * .7, 0); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(0,0,0,.25)"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -s); c.lineTo(0, s * 1.1); c.moveTo(-s * .7, 0); c.lineTo(s * .7, 0); c.stroke();
+    c.strokeStyle = col; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, s * 1.1);
+    for (let k = 1; k <= 6; k++) c.lineTo(Math.sin(t * 4 + k + i) * 4, s * 1.1 + k * s * .35); c.stroke();
+    c.restore(); };
+  const mkFw = () => ({ rockets: [], sparks: [], next: .3 });
+  const fireworks = (st, c, w, h, dt, cols, rate = 1, x0 = .35, x1 = .98) => {
+    st.next -= dt * rate;
+    if (st.next <= 0) { st.next = .8 + rnd() * 1.1;
+      st.rockets.push({ x: w * (x0 + rnd() * (x1 - x0)), y: h, vy: -h * (1 + rnd() * .3), ty: h * (.12 + rnd() * .3), col: cols[Math.floor(rnd() * cols.length)] }); }
+    st.rockets = st.rockets.filter(r => { r.y += r.vy * dt;
+      c.fillStyle = "rgba(255,230,180,.9)"; c.fillRect(r.x - 1, r.y, 2, 6);
+      if (r.y <= r.ty) { for (let i = 0; i < 44; i++) { const a = i / 44 * TAU, v = h * (.22 + rnd() * .2);
+        st.sparks.push({ x: r.x, y: r.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, col: r.col }); } return false; }
+      return true; });
+    st.sparks = st.sparks.filter(s => { s.vy += h * .35 * dt; s.vx *= .985; s.vy *= .985; s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt * .7;
+      c.globalAlpha = Math.max(0, s.life); c.fillStyle = s.col; c.fillRect(s.x - 1.2, s.y - 1.2, 2.4, 2.4); return s.life > 0; });
+    c.globalAlpha = 1; };
+  const marigolds = (c, w0, y, t, n = 16, x0 = 0) => { const w = w0 - x0; c.save(); c.translate(x0, 0); c.strokeStyle = "rgba(60,90,30,.8)"; c.lineWidth = 1.2; c.beginPath();
+    for (let i = 0; i <= n; i++) { const x = i / n * w, yy = y + Math.sin(i / n * Math.PI * 4) ** 2 * 10; i ? c.lineTo(x, yy) : c.moveTo(x, yy); } c.stroke();
+    for (let i = 0; i <= n * 2; i++) { const x = i / (n * 2) * w, yy = y + Math.sin(i / (n * 2) * Math.PI * 4) ** 2 * 10 + Math.sin(t * 1.5 + i) * 1.5;
+      c.fillStyle = i % 3 === 0 ? "#2F7A35" : i % 2 ? "#F59E0B" : "#F97316";
+      c.beginPath(); i % 3 === 0 ? c.ellipse(x, yy + 5, 3, 7, 0, 0, TAU) : c.arc(x, yy + 2, 5, 0, TAU); c.fill(); } c.restore(); };
+  const coin = (c, x, y, r, spin) => { const k = Math.abs(Math.cos(spin));
+    c.fillStyle = k > .3 ? "#F4C04E" : "#C8922A"; c.beginPath(); c.ellipse(x, y, r * Math.max(.12, k), r, 0, 0, TAU); c.fill();
+    if (k > .5) { c.strokeStyle = "#A8741A"; c.lineWidth = 1; c.beginPath(); c.ellipse(x, y, r * k * .65, r * .65, 0, 0, TAU); c.stroke(); } };
+
+  /* ---------- Santa, flying past now and then ---------- */
+  function drawSleigh(c, x, y, s, t) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    // sparkle trail drawn by caller; reindeer lead at the front (left-to-right flight)
+    for (let i = 0; i < 4; i++) {
+      const rx = 30 + i * 22, bob = Math.sin(t * 9 + i * 1.3) * 2;
+      c.fillStyle = "#6B3E1F";
+      c.beginPath(); c.ellipse(rx, bob, 9, 4.2, 0, 0, TAU); c.fill();                 // body
+      c.beginPath(); c.ellipse(rx + 9, bob - 5, 3.2, 2.6, -.4, 0, TAU); c.fill();      // head
+      c.strokeStyle = "#6B3E1F"; c.lineWidth = 1.6; c.lineCap = "round";
+      const g = Math.sin(t * 14 + i) * 4;
+      c.beginPath(); c.moveTo(rx - 6, bob + 2); c.lineTo(rx - 9 - g, bob + 9); c.moveTo(rx + 5, bob + 2); c.lineTo(rx + 8 + g, bob + 9); c.stroke();
+      c.strokeStyle = "#C9A27A"; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(rx + 8, bob - 7); c.lineTo(rx + 6, bob - 13); c.lineTo(rx + 3, bob - 15);
+      c.moveTo(rx + 6, bob - 11); c.lineTo(rx + 10, bob - 14); c.stroke();
+      if (i === 3) { glow(c, rx + 12.5, bob - 5, 9, "#FF3B30", .8); c.fillStyle = "#FF3B30"; c.beginPath(); c.arc(rx + 12, bob - 5, 1.8, 0, TAU); c.fill(); }
+    }
+    c.strokeStyle = "rgba(255,215,140,.8)"; c.lineWidth = .8;
+    c.beginPath(); c.moveTo(14, -2); c.lineTo(96, -2 + Math.sin(t * 9 + 3.9) * 2); c.stroke();
+    // sleigh
+    c.fillStyle = "#B3202A";
+    c.beginPath(); c.moveTo(-18, -10); c.lineTo(12, -10); c.quadraticCurveTo(18, -2, 12, 4); c.lineTo(-16, 4); c.quadraticCurveTo(-24, -4, -18, -10); c.fill();
+    c.strokeStyle = "#F4C04E"; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(-22, 9); c.lineTo(14, 9); c.quadraticCurveTo(20, 9, 20, 4); c.stroke();
+    c.beginPath(); c.moveTo(-12, 4); c.lineTo(-12, 9); c.moveTo(6, 4); c.lineTo(6, 9); c.stroke();
+    // sack
+    c.fillStyle = "#8B5A2B"; c.beginPath(); c.ellipse(-12, -14, 7, 7, 0, 0, TAU); c.fill();
+    // Santa
+    c.fillStyle = "#D7263D"; c.beginPath(); c.ellipse(2, -15, 6, 7, 0, 0, TAU); c.fill();
+    c.fillStyle = "#F6D2B5"; c.beginPath(); c.arc(4, -24, 3.6, 0, TAU); c.fill();
+    c.fillStyle = "#fff"; c.beginPath(); c.ellipse(5.5, -20.5, 3.4, 3, 0, 0, TAU); c.fill();
+    c.fillStyle = "#D7263D"; c.beginPath(); c.moveTo(.5, -26); c.lineTo(7.5, -26); c.lineTo(1, -32); c.fill();
+    c.fillStyle = "#fff"; c.beginPath(); c.arc(1, -32, 1.4, 0, TAU); c.fill(); c.fillRect(0, -27, 8, 1.8);
+    c.strokeStyle = "#D7263D"; c.lineWidth = 2.2; c.beginPath(); c.moveTo(6, -16); c.lineTo(14, -6 + Math.sin(t * 5) * 1.5); c.stroke();
+    c.restore();
+  }
+  function santaPass(st, c, w, h, t, dt, every = 11) {
+    if (t < 5) return; // the still drawn on arrival; he only flies once the scene is live
+    if (st.start === undefined) st.start = t;
+    const lt = t - st.start - 1; if (lt < 0) return;
+    const p = (lt % every) / 5.5; // fly for 5.5 s of every `every`
+    if (p > 1) { st.trail && (st.trail.length = 0); return; }
+    st.trail = st.trail || [];
+    const x = -160 + p * (w + 260), y = h * (.42 - Math.sin(p * Math.PI) * .26);
+    const s = Math.max(.7, Math.min(1.5, h / 220));
+    st.trail.push({ x: x - 20 * s, y: y + 8 * s, life: 1 });
+    st.trail = st.trail.filter(q => { q.life -= dt * 1.1; q.y += dt * 8;
+      c.globalAlpha = Math.max(0, q.life) * .9; c.fillStyle = q.life > .6 ? "#FFF6C2" : "#FFD166";
+      c.fillRect(q.x + Math.sin(q.life * 20) * 3, q.y, 2, 2); return q.life > 0; });
+    c.globalAlpha = 1; drawSleigh(c, x, y, s, t);
+  }
+
+  /* ---------- Ganesha ---------- */
+  function drawGanesha(c, cx, foot, s, t) {
+    const Y = f => foot - s + f * s, X = f => cx + f * s;
+    const SKIN = "#F08A5D", SKIN_D = "#B8553A", GOLD = "#F4C04E";
+    glow(c, cx, Y(.4), s * .7, "#FFD27A", .55);
+    c.strokeStyle = GOLD; c.lineWidth = 3; c.beginPath(); c.arc(cx, Y(.38), s * .44, Math.PI * .9, Math.PI * 2.1); c.stroke();
+    // lotus seat
+    for (let k = -4; k <= 4; k++) { c.fillStyle = k % 2 ? "#F59BC0" : "#E8679C";
+      c.beginPath(); c.ellipse(X(k * .05), Y(.95), s * .05, s * .035, 0, 0, TAU); c.fill(); }
+    // arms (four)
+    const arms = [[-1, -40, "axe"], [1, -40, "noose"], [-1, 25, "modak"], [1, 25, "bless"]];
+    arms.forEach(([side, deg, item], i) => {
+      const sw = Math.sin(t * 1.4 + i) * 3, a = (side > 0 ? deg + sw : 180 - deg - sw) * Math.PI / 180;
+      const sx = X(.1 * side), sy = Y(.5), hx = sx + Math.cos(a) * s * .2, hy = sy + Math.sin(a) * s * .2;
+      c.lineCap = "round"; c.strokeStyle = SKIN_D; c.lineWidth = s * .05; c.beginPath(); c.moveTo(sx, sy); c.lineTo(hx, hy); c.stroke();
+      c.strokeStyle = SKIN; c.lineWidth = s * .04; c.beginPath(); c.moveTo(sx, sy); c.lineTo(hx, hy); c.stroke();
+      c.fillStyle = SKIN; c.beginPath(); c.arc(hx, hy, s * .03, 0, TAU); c.fill();
+      c.save(); c.translate(hx, hy);
+      if (item === "axe") { c.strokeStyle = "#8B5A2B"; c.lineWidth = s * .015; c.beginPath(); c.moveTo(0, s * .05); c.lineTo(0, -s * .14); c.stroke();
+        c.fillStyle = "#D9DEE6"; c.beginPath(); c.moveTo(0, -s * .14); c.quadraticCurveTo(-s * .08, -s * .12, -s * .07, -s * .06); c.lineTo(0, -s * .09); c.fill(); }
+      if (item === "noose") { c.strokeStyle = GOLD; c.lineWidth = s * .01; c.beginPath(); c.ellipse(0, -s * .07, s * .04, s * .05, 0, 0, TAU); c.stroke(); }
+      if (item === "modak") { c.fillStyle = "#FFF1D6"; c.beginPath(); c.moveTo(-s * .03, s * .0); c.quadraticCurveTo(0, -s * .09, s * .03, 0); c.closePath(); c.fill(); }
+      if (item === "bless") { c.fillStyle = SKIN; c.beginPath(); c.ellipse(0, -s * .03, s * .025, s * .04, 0, 0, TAU); c.fill(); }
+      c.restore();
+    });
+    // belly
+    c.fillStyle = SKIN; c.beginPath(); c.ellipse(cx, Y(.66), s * .17, s * .2, 0, 0, TAU); c.fill();
+    c.fillStyle = "#F6C24A"; c.beginPath(); c.ellipse(cx, Y(.85), s * .19, s * .08, 0, 0, TAU); c.fill(); // dhoti
+    c.strokeStyle = GOLD; c.lineWidth = s * .012; c.beginPath(); c.ellipse(cx, Y(.66), s * .15, s * .03, 0, 0, Math.PI); c.stroke();
+    c.strokeStyle = "#F59E0B"; c.lineWidth = s * .02; c.beginPath(); c.arc(cx, Y(.4), s * .12, .3, Math.PI - .3); c.stroke(); // garland
+    // ears, flapping
+    const flap = 1 + Math.sin(t * 2.2) * .12;
+    [-1, 1].forEach(d => { c.save(); c.translate(X(.11 * d), Y(.3)); c.scale(flap, 1);
+      c.fillStyle = SKIN_D; c.beginPath(); c.ellipse(d * s * .08, 0, s * .11, s * .13, 0, 0, TAU); c.fill();
+      c.fillStyle = "#F7A98A"; c.beginPath(); c.ellipse(d * s * .085, 0, s * .08, s * .1, 0, 0, TAU); c.fill(); c.restore(); });
+    // head
+    c.fillStyle = SKIN; c.beginPath(); c.ellipse(cx, Y(.3), s * .12, s * .13, 0, 0, TAU); c.fill();
+    // trunk curling
+    const curl = Math.sin(t * 1.2) * .03;
+    c.lineCap = "round";
+    const trunk = () => { c.beginPath(); c.moveTo(cx, Y(.32)); c.bezierCurveTo(X(.015), Y(.47), X(.0), Y(.58), X(-.07 + curl), Y(.56));
+      c.quadraticCurveTo(X(-.12 + curl), Y(.54), X(-.1 + curl), Y(.48)); };
+    trunk(); c.strokeStyle = SKIN_D; c.lineWidth = s * .068; c.stroke();
+    trunk(); c.strokeStyle = SKIN; c.lineWidth = s * .052; c.stroke();
+    c.strokeStyle = "rgba(150,70,40,.5)"; c.lineWidth = 1;
+    for (let k = 1; k < 6; k++) { const yy = Y(.34 + k * .035); c.beginPath(); c.moveTo(X(-.012), yy); c.lineTo(X(.018), yy); c.stroke(); }
+    // tusk (one, the other broken)
+    c.fillStyle = "#FFF8EC"; c.beginPath(); c.moveTo(X(.03), Y(.36)); c.quadraticCurveTo(X(.07), Y(.4), X(.075), Y(.43)); c.lineTo(X(.045), Y(.37)); c.fill();
+    // eyes, tilak
+    [-1, 1].forEach(d => { c.fillStyle = "#fff"; c.beginPath(); c.ellipse(X(.045 * d), Y(.28), s * .018, s * .012, 0, 0, TAU); c.fill();
+      c.fillStyle = "#140A0A"; c.beginPath(); c.arc(X(.045 * d), Y(.28), s * .008, 0, TAU); c.fill(); });
+    c.fillStyle = "#C8102E"; c.fillRect(X(-.006), Y(.2), s * .012, s * .05);
+    // crown
+    c.fillStyle = GOLD; c.beginPath(); c.moveTo(X(-.09), Y(.2)); c.lineTo(X(-.07), Y(.08)); c.lineTo(X(-.03), Y(.12));
+    c.lineTo(cx, Y(.02)); c.lineTo(X(.03), Y(.12)); c.lineTo(X(.07), Y(.08)); c.lineTo(X(.09), Y(.2)); c.closePath(); c.fill();
+    c.fillStyle = "#2FA84F"; c.beginPath(); c.arc(cx, Y(.13), s * .015, 0, TAU); c.fill();
+    // mouse with a modak
+    const mx = X(.26), my = foot - s * .03, nib = Math.sin(t * 6) * 1.5;
+    c.fillStyle = "#8C8C96"; c.beginPath(); c.ellipse(mx, my, s * .05, s * .03, 0, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(mx - s * .05, my - s * .01 + nib * .3, s * .025, s * .02, 0, 0, TAU); c.fill();
+    c.fillStyle = "#B9B9C4"; c.beginPath(); c.arc(mx - s * .045, my - s * .03, s * .012, 0, TAU); c.fill();
+    c.strokeStyle = "#8C8C96"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(mx + s * .05, my); c.quadraticCurveTo(mx + s * .1, my - s * .05, mx + s * .12, my); c.stroke();
+    c.fillStyle = "#FFF1D6"; c.beginPath(); c.moveTo(mx - s * .1, my + s * .02); c.quadraticCurveTo(mx - s * .085, my - s * .04, mx - s * .07, my + s * .02); c.fill();
+  }
+
+  /* ---------- the scenes ---------- */
+  const MORE = {
+    christmas(st, v) {
+      st.snow = Array.from({ length: 80 }, () => ({ x: rnd(), y: rnd(), r: .8 + rnd() * 2.4, s: .03 + rnd() * .07 }));
+      st.tree = [];
+      for (let row = 0; row < 9; row++) for (let i = 0; i <= row * 2; i++)
+        st.tree.push({ row, i, n: row * 2, ph: rnd() * TAU, col: ["#FFD166", "#FF5A5F", "#7FD1FF", "#9BE38B", "#FFFFFF"][Math.floor(rnd() * 5)] });
+      const dim = v === "boxing" ? .55 : 1;
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#06140F"], [.55, "#0E2A1E"], [1, "#3A1418"]]);
+        moonDisc(c, w * .58, h * .2, Math.min(h * .07, 16));
+        const cx = w * .82, top = h * .22, rows = 9, rh = (h * .64) / rows;
+        st.tree.forEach(b => { const y = top + (b.row + 1) * rh, span = (b.row + 1) * rh * .62;
+          const x = cx - span + (b.n ? b.i / b.n : .5) * span * 2, on = (.45 + .55 * Math.max(0, Math.sin(t * 2.4 + b.ph))) * dim;
+          c.globalAlpha = on; c.fillStyle = b.col; c.beginPath(); c.arc(x, y, 2.6, 0, TAU); c.fill();
+          c.globalAlpha = on * .18; c.beginPath(); c.arc(x, y, 7, 0, TAU); c.fill(); });
+        c.globalAlpha = 1; c.fillStyle = "#4A2E1A"; c.fillRect(cx - 6, top + (rows + 1) * rh - 4, 12, 12);
+        const flare = 1 + Math.max(0, Math.sin(t * 1.3)) * .35 * dim;
+        c.save(); c.translate(cx, top); c.scale(flare, flare); c.shadowColor = "#FFD166"; c.shadowBlur = 22;
+        c.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 4.5 : 11, a = i / 10 * TAU - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+        c.closePath(); c.fillStyle = "#FFE08A"; c.fill(); c.restore();
+        // presents
+        [["#D7263D", -.09, 16], ["#2E6B4F", -.03, 12], ["#F4C04E", .05, 14]].forEach(([col, dx, sz]) => {
+          const x = cx + dx * w * .6, y = h - sz - 4; c.fillStyle = col; c.fillRect(x, y, sz * 1.3, sz);
+          c.fillStyle = "#fff"; c.fillRect(x + sz * .55, y, 2.5, sz); c.fillRect(x, y + sz * .4, sz * 1.3, 2.5); });
+        c.strokeStyle = "rgba(255,255,255,.3)"; c.lineWidth = 1; c.beginPath();
+        for (let x = 0; x <= w; x += 4) c.lineTo(x, 8 + Math.abs(Math.sin(x / w * Math.PI * 7)) * 7); c.stroke();
+        for (let i = 0; i < 14; i++) { const x = (i + .5) / 14 * w, y = 10 + Math.abs(Math.sin((x / w) * Math.PI * 7)) * 7;
+          c.globalAlpha = (.5 + .5 * Math.sin(t * 3 + i)) * dim; c.fillStyle = ["#FF5A5F", "#FFD166", "#7FD1FF", "#9BE38B"][i % 4];
+          c.beginPath(); c.arc(x, y + 3, 3.2, 0, TAU); c.fill(); }
+        c.globalAlpha = 1;
+        if (v !== "boxing") santaPass(st, c, w, h, t, dt, 12);
+        st.snow.forEach(s => { s.y += s.s * dt; if (s.y > 1) { s.y = 0; s.x = rnd(); }
+          c.beginPath(); c.arc(s.x * w, s.y * h, s.r, 0, TAU); c.fillStyle = "rgba(255,255,255,.8)"; c.fill(); });
+      };
+    },
+
+    fireworks(st) { const fw = mkFw(); st.wheel = 0;
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#020418"], [.8, "#0B1440"], [1, "#1A1030"]]);
+        fireworks(fw, c, w, h * .78, dt, ["#FFD166", "#FF5A8A", "#7FD1FF", "#B48CFF", "#9BE38B"], 1.8, .05, .98);
+        const base = h * .8;
+        c.fillStyle = "#05060F"; let x = 0, k = 0;
+        while (x < w) { const bw = 14 + (k * 37 % 30), bh = 18 + (k * 53 % 46); c.fillRect(x, base - bh, bw, bh + 2); x += bw + 2; k++; }
+        const wx = w * .7, wy = base - h * .22, wr = h * .2;
+        c.strokeStyle = "#1B1F3A"; c.lineWidth = 2; c.beginPath(); c.arc(wx, wy, wr, 0, TAU); c.stroke();
+        for (let i = 0; i < 16; i++) { const a = i / 16 * TAU + t * .08;
+          c.beginPath(); c.moveTo(wx, wy); c.lineTo(wx + Math.cos(a) * wr, wy + Math.sin(a) * wr); c.stroke();
+          c.fillStyle = "#7FD1FF"; c.beginPath(); c.arc(wx + Math.cos(a) * wr, wy + Math.sin(a) * wr, 2.2, 0, TAU); c.fill(); }
+        c.fillStyle = "#0A0E24"; c.fillRect(0, base, w, h - base);
+        for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(255,210,140,${.06 + .06 * Math.sin(t * 2 + i)})`; c.fillRect((i * 53) % w, base + 4 + (i * 7) % (h - base - 4), 18, 1.5); }
+      };
+    },
+
+    sankranti(st) {
+      st.k = Array.from({ length: 7 }, (_, i) => ({ bx: .35 + i * .1, by: .2 + (i % 3) * .14, p: rnd() * TAU,
+        col: ["#FF3D7F", "#FFD000", "#21C27A", "#2D8CFF", "#FF7A1A", "#B44BFF", "#E8343A"][i] }));
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#2E6FD6"], [.6, "#8DBEF2"], [1, "#F7D38A"]]);
+        glow(c, w * .9, h * .3, h * .45, "#FFE7A0", .8); c.fillStyle = "#FFE9A8"; c.beginPath(); c.arc(w * .9, h * .3, h * .1, 0, TAU); c.fill();
+        st.k.forEach((k, i) => { const x = k.bx * w + Math.sin(t * .7 + k.p) * 14, y = k.by * h + Math.cos(t * .9 + k.p) * 8;
+          c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = .7; c.beginPath(); c.moveTo(x, y + 10); c.quadraticCurveTo(x - 30, h * .8, w * .3, h); c.stroke();
+          kite(c, x, y, Math.min(14, h * .07), k.col, Math.sin(t + k.p) * .25, t, i); });
+        // the pot boiling over
+        const px = w * .86, py = h * .86, r = h * .1;
+        glow(c, px, py + r, r * 1.5, "#FF8A00", .5);
+        c.fillStyle = "#A0522D"; c.beginPath(); c.ellipse(px, py, r, r * .85, 0, 0, TAU); c.fill();
+        c.fillStyle = "#7A3A1A"; c.fillRect(px - r * .6, py - r * .95, r * 1.2, r * .25);
+        c.strokeStyle = "#F4C04E"; c.lineWidth = 2; c.beginPath(); c.ellipse(px, py, r * .9, r * .2, 0, 0, Math.PI); c.stroke();
+        for (let i = 0; i < 7; i++) { const a = Math.sin(t * 2 + i * 1.7), bx = px + (i - 3) * r * .2;
+          c.fillStyle = "#FFF8EC"; c.beginPath(); c.arc(bx, py - r * .95 - Math.max(0, a) * r * .25, r * (.12 + .05 * a), 0, TAU); c.fill(); }
+        c.fillStyle = "#FFF8EC"; c.beginPath(); c.ellipse(px - r * .7, py - r * .5 + ((t * 8) % 12), r * .07, r * .14, 0, 0, TAU); c.fill();
+        // sugar cane
+        c.strokeStyle = "#5E8C31"; c.lineWidth = 4; [-1.5, -1.3].forEach(d => { c.beginPath(); c.moveTo(px + d * r, h); c.lineTo(px + d * r + 6, h * .45); c.stroke(); });
+      };
+    },
+
+    mustard(st) {
+      st.f = Array.from({ length: 140 }, () => ({ x: rnd(), y: .55 + rnd() * .45, p: rnd() * TAU, r: 2 + rnd() * 2.5 }));
+      st.pet = Array.from({ length: 24 }, () => ({ x: rnd(), y: rnd(), s: .02 + rnd() * .04, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#9FD3F2"], [.5, "#FCE9A6"], [1, "#E9B949"]]);
+        glow(c, w * .78, h * .25, h * .5, "#FFF4C2", .9);
+        c.fillStyle = "#7FA34A"; c.fillRect(0, h * .6, w, h * .4);
+        st.f.sort((a, b) => a.y - b.y).forEach(f => { const x = f.x * w + Math.sin(t * 1.2 + f.p + f.y * 3) * 4 * f.y, y = f.y * h;
+          c.strokeStyle = "#4E7A2A"; c.lineWidth = 1; c.beginPath(); c.moveTo(f.x * w, h); c.lineTo(x, y); c.stroke();
+          c.fillStyle = "#FFD400"; c.beginPath(); c.arc(x, y, f.r * f.y * 1.4, 0, TAU); c.fill(); });
+        st.pet.forEach(p => { p.x += p.s * dt * .5; p.y += Math.sin(t + p.p) * dt * .05; if (p.x > 1) p.x = 0;
+          c.fillStyle = "#FFC300"; c.beginPath(); c.ellipse(p.x * w, (p.y * .55) * h, 3, 1.6, t + p.p, 0, TAU); c.fill(); });
+        kite(c, w * .62 + Math.sin(t * .6) * 10, h * .18 + Math.cos(t * .8) * 6, Math.min(13, h * .07), "#F2B705", Math.sin(t) * .2, t, 0);
+      };
+    },
+
+    tricolour(st, v) {
+      st.k = Array.from({ length: 6 }, (_, i) => ({ bx: .3 + i * .11, by: .15 + (i % 2) * .16, p: rnd() * TAU, col: ["#FF9933", "#FFFFFF", "#138808"][i % 3] }));
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#4A8FD8"], [1, "#BFE0FF"]]);
+        const fx = w * .52, fw = w * .44, fh = Math.min(h * .55, fw * .66), fy = h * .22, band = fh / 3;
+        c.fillStyle = "#6B6B6B"; c.fillRect(fx - 4, fy - 6, 4, h);
+        const wave = x => Math.sin(x / fw * 5 - t * 2.4) * 6 * (x / fw);
+        ["#FF9933", "#FFFFFF", "#138808"].forEach((col, i) => { c.fillStyle = col; c.beginPath();
+          for (let x = 0; x <= fw; x += 4) c.lineTo(fx + x, fy + i * band + wave(x));
+          for (let x = fw; x >= 0; x -= 4) c.lineTo(fx + x, fy + (i + 1) * band + wave(x) + .5); c.fill(); });
+        for (let x = 0; x < fw; x += 4) { const s = Math.sin(x / fw * 5 - t * 2.4); c.fillStyle = s > 0 ? `rgba(255,255,255,${s * .1})` : `rgba(0,0,0,${-s * .12})`;
+          c.fillRect(fx + x, fy + wave(x), 4, fh); }
+        const cx = fx + fw / 2, cy = fy + band * 1.5 + wave(fw / 2), r = band * .42;
+        c.strokeStyle = "#000080"; c.lineWidth = 1.4; c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.stroke();
+        for (let i = 0; i < 24; i++) { const a = i / 24 * TAU + t * .4; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); c.stroke(); }
+        if (v === "kites") st.k.forEach((k, i) => kite(c, k.bx * w + Math.sin(t * .7 + k.p) * 12, k.by * h + Math.cos(t + k.p) * 6, Math.min(11, h * .06), k.col, Math.sin(t + k.p) * .25, t, i));
+      };
+    },
+
+    kavadi() {
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#2A1446"], [.6, "#B8456A"], [1, "#F2A65A"]]);
+        glow(c, w * .85, h * .7, h * .6, "#FFD27A", .6);
+        c.fillStyle = "#3A1E2A"; c.fillRect(0, h * .86, w, h * .14);
+        const g = h * .86, sz = Math.min(1.3, h / 200);
+        for (let i = 0; i < 6; i++) {
+          const x = (((i / 6) + t * .025) % 1.15 - .08) * w, step = Math.abs(Math.sin(t * 3 + i)) * 3 * sz;
+          c.save(); c.translate(x, g - step); c.scale(sz, sz);
+          c.fillStyle = "#1C0F1A"; c.fillRect(-5, -34, 10, 22); c.beginPath(); c.arc(0, -40, 5, 0, TAU); c.fill();
+          c.fillRect(-5, -12, 4, 12); c.fillRect(1, -12, 4, 12);
+          c.strokeStyle = "#F2B33A"; c.lineWidth = 3; c.beginPath(); c.arc(0, -36, 20, Math.PI, TAU); c.stroke();
+          for (let k = 0; k <= 8; k++) { const a = Math.PI + k / 8 * Math.PI, fx = Math.cos(a) * 26, fy = -36 + Math.sin(a) * 26;
+            c.fillStyle = "#1F8A70"; c.beginPath(); c.ellipse(fx, fy, 3, 6, a + Math.PI / 2, 0, TAU); c.fill();
+            c.fillStyle = "#2D5BD8"; c.beginPath(); c.arc(fx, fy, 1.6, 0, TAU); c.fill(); }
+          c.restore(); }
+      };
+    },
+
+    shiva(st) { st.s = mkStars(70);
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#070B24"], [.7, "#1B2556"], [1, "#2B2050"]]);
+        stars(c, w, h, t, st.s);
+        const mx = w * .8, my = h * .26, r = Math.min(h * .12, 26);
+        glow(c, mx, my, r * 3.5, "#E8F0FF", .3);
+        c.fillStyle = "#F4F1E0"; c.beginPath(); c.arc(mx, my, r, 0, TAU); c.fill();
+        c.fillStyle = "#0B1032"; c.beginPath(); c.arc(mx + r * .45, my - r * .2, r * .92, 0, TAU); c.fill();
+        c.fillStyle = "#121A40"; c.beginPath(); c.moveTo(0, h * .8);
+        [[.1, .55], [.22, .7], [.38, .42], [.52, .66], [.66, .38], [.82, .62], [1, .5]].forEach(([x, y]) => c.lineTo(x * w, y * h)); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        c.fillStyle = "#E6ECF8"; [[.38, .42], [.66, .38]].forEach(([x, y]) => { c.beginPath(); c.moveTo(x * w, y * h); c.lineTo(x * w - 16, y * h + 14); c.lineTo(x * w + 14, y * h + 12); c.fill(); });
+        for (let i = 0; i < 9; i++) lamp(c, w * (.3 + i * .075), h * .93, Math.min(8, h * .04), t, i);
+      };
+    },
+
+    bonfire(st) { st.p = [];
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#0B0612"], [.7, "#2B0D12"], [1, "#3A1508"]]);
+        const bx = w * .78, by = h * .9, bw = Math.min(w * .18, h * .5);
+        glow(c, bx, by - h * .2, h * .8, "#FF7A1A", .45);
+        for (let i = 0; i < 6; i++) st.p.push({ x: bx + (rnd() - .5) * bw, y: by, vx: (rnd() - .5) * 10, vy: -(h * .35 + rnd() * h * .4), life: 1, r: 6 + rnd() * 10, spark: rnd() < .08 });
+        c.globalCompositeOperation = "lighter";
+        st.p = st.p.filter(p => { p.x += p.vx * dt + Math.sin(t * 6 + p.y * .05) * .6; p.y += p.vy * dt; p.life -= dt * (p.spark ? .5 : 1.4);
+          const L = Math.max(0, p.life);
+          c.fillStyle = p.spark ? `rgba(255,220,140,${L})` : L > .6 ? `rgba(255,214,90,${L * .35})` : L > .3 ? `rgba(255,120,30,${L * .4})` : `rgba(200,40,20,${L * .4})`;
+          c.beginPath(); c.arc(p.x, p.y, p.spark ? 1.4 : p.r * (.4 + L * .7), 0, TAU); c.fill(); return p.life > 0; });
+        c.globalCompositeOperation = "source-over";
+        c.strokeStyle = "#3A1E0E"; c.lineWidth = 6; c.lineCap = "round";
+        [[-1, 1], [1, -1], [-.6, .7]].forEach(([a, b]) => { c.beginPath(); c.moveTo(bx + a * bw * .5, by + 4); c.lineTo(bx + b * bw * .5, by - 8); c.stroke(); });
+        c.fillStyle = "#0A0508"; for (let i = 0; i < 5; i++) { const x = w * (.45 + i * .1); if (Math.abs(x - bx) < bw * .7) continue;
+          c.beginPath(); c.arc(x, h * .8, 7, 0, TAU); c.fill(); c.fillRect(x - 8, h * .82, 16, h * .2); }
+      };
+    },
+
+    newyear(st, v) {
+      const dots = []; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (Math.abs(i - 2) + Math.abs(j - 2) <= 3) dots.push([i - 2, j - 2]);
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#F7C873"], [.5, "#E9806A"], [1, "#6A2550"]]);
+        const kx = w * .78, ky = h * .58, g = Math.min(h * .085, 18), prog = (t % 12) / 9;
+        c.fillStyle = "rgba(255,255,255,.9)"; dots.forEach(([i, j]) => { c.beginPath(); c.arc(kx + i * g, ky + j * g, 1.8, 0, TAU); c.fill(); });
+        c.strokeStyle = "#FFFFFF"; c.lineWidth = 1.6;
+        dots.forEach(([i, j], n) => { const k = n / dots.length; if (k > prog) return;
+          c.beginPath(); c.arc(kx + i * g, ky + j * g, g * .7, 0, TAU * Math.min(1, (prog - k) * 6)); c.stroke(); });
+        if (v === "gudi") { const gx = w * .58, gy = h * .2;
+          c.strokeStyle = "#8B5A2B"; c.lineWidth = 3; c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx, h); c.stroke();
+          c.fillStyle = "#2FA84F"; c.beginPath(); c.moveTo(gx, gy + 8);
+          for (let y = 0; y <= h * .32; y += 4) c.lineTo(gx + 16 + Math.sin(y * .1 - t * 3) * 4, gy + 8 + y);
+          c.lineTo(gx, gy + 8 + h * .32); c.fill();
+          c.fillStyle = "#F2B33A"; c.fillRect(gx - 1, gy + 8, 3, h * .32);
+          c.fillStyle = "#B87333"; c.beginPath(); c.arc(gx, gy, 10, Math.PI, TAU); c.fill(); c.fillRect(gx - 4, gy, 8, 6); }
+        if (v === "bihu") { const beat = (t * 2) % 1; c.strokeStyle = `rgba(255,255,255,${(1 - beat) * .5})`; c.lineWidth = 2;
+          c.beginPath(); c.arc(w * .58, h * .7, 10 + beat * 40, 0, TAU); c.stroke();
+          c.fillStyle = "#8B3A1A"; c.beginPath(); c.ellipse(w * .58, h * .7, 14, 10, 0, 0, TAU); c.fill(); }
+        // toran
+        const tx0 = h > 260 ? 0 : w * .5, n = h > 260 ? 30 : 15;
+        c.strokeStyle = "#5A3A1A"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(tx0, 6); c.lineTo(w, 6); c.stroke();
+        for (let i = 0; i < n; i++) { const x = tx0 + (i + .5) / n * (w - tx0), sw = Math.sin(t * 1.6 + i * .6) * .12;
+          c.save(); c.translate(x, 6); c.rotate(sw);
+          if (i % 3 === 1) { c.fillStyle = "#F97316"; c.beginPath(); c.arc(0, 10, 5, 0, TAU); c.fill(); }
+          else { c.fillStyle = "#2F7A35"; c.beginPath(); c.ellipse(0, 12, 4, 11, 0, 0, TAU); c.fill(); }
+          c.restore(); }
+      };
+    },
+
+    vaisakhi(st) { st.w = Array.from({ length: 70 }, () => ({ x: rnd(), hh: .35 + rnd() * .3, p: rnd() * TAU }));
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#F6C344"], [.55, "#F2A03A"], [1, "#C8642A"]]);
+        glow(c, w * .82, h * .3, h * .5, "#FFF0B0", .9); c.fillStyle = "#FFF0B0"; c.beginPath(); c.arc(w * .82, h * .3, h * .1, 0, TAU); c.fill();
+        const beat = (t * 2.2) % 1; c.strokeStyle = `rgba(255,255,255,${(1 - beat) * .4})`; c.lineWidth = 2; c.beginPath(); c.arc(w * .82, h * .3, h * .12 + beat * h * .3, 0, TAU); c.stroke();
+        st.w.forEach(s => { const bx = s.x * w, top = h - s.hh * h, sw = Math.sin(t * 1.3 + s.p + s.x * 3) * 8;
+          c.strokeStyle = "#B5791E"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(bx, h); c.quadraticCurveTo(bx + sw * .3, (h + top) / 2, bx + sw, top); c.stroke();
+          c.fillStyle = "#E8B04A"; for (let k = 0; k < 6; k++) { c.beginPath(); c.ellipse(bx + sw + (k % 2 ? 2 : -2), top - k * 3.4, 2, 3.4, (k % 2 ? .4 : -.4), 0, TAU); c.fill(); }
+          c.strokeStyle = "#F6D58A"; c.lineWidth = .5; c.beginPath(); c.moveTo(bx + sw, top - 18); c.lineTo(bx + sw + 2, top - 26); c.stroke(); });
+      };
+    },
+
+    rama(st) { st.arrow = 0;
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#FFD06B"], [.6, "#F29440"], [1, "#B5461F"]]);
+        const sx = w * .8, sy = h * .38, r = Math.min(h * .14, 30);
+        c.save(); c.translate(sx, sy); c.rotate(t * .25); c.fillStyle = "rgba(255,240,180,.55)";
+        for (let i = 0; i < 16; i++) { c.rotate(TAU / 16); c.beginPath(); c.moveTo(-4, r * 1.2); c.lineTo(0, r * 2.4 + (i % 2) * r * .5); c.lineTo(4, r * 1.2); c.fill(); }
+        c.restore(); glow(c, sx, sy, r * 3, "#FFF6C8", .8);
+        c.fillStyle = "#FFF3B0"; c.beginPath(); c.arc(sx, sy, r, 0, TAU); c.fill();
+        const p = (t % 5) / 1.2; if (p < 1) { const ax = -40 + p * (w + 80), ay = h * .62 - Math.sin(p * Math.PI) * h * .12;
+          c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = 2; c.beginPath(); c.moveTo(ax - 60, ay + 4); c.lineTo(ax, ay); c.stroke();
+          c.strokeStyle = "#5A2A0A"; c.lineWidth = 2; c.beginPath(); c.moveTo(ax - 26, ay + 2); c.lineTo(ax, ay); c.stroke();
+          c.fillStyle = "#5A2A0A"; c.beginPath(); c.moveTo(ax + 6, ay); c.lineTo(ax - 2, ay - 4); c.lineTo(ax - 2, ay + 4); c.fill(); }
+        c.strokeStyle = "#5A2A0A"; c.lineWidth = 4; c.beginPath(); c.moveTo(w * .62, h * .55); c.quadraticCurveTo(w * .55, h * .8, w * .62, h * 1.05); c.stroke();
+        c.strokeStyle = "rgba(255,255,255,.6)"; c.lineWidth = 1; c.beginPath(); c.moveTo(w * .62, h * .55); c.lineTo(w * .62, h * 1.05); c.stroke();
+      };
+    },
+
+    hanuman(st) { st.s = mkStars(50); st.trail = [];
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#140E36"], [.55, "#4A2466"], [1, "#E07A45"]]);
+        stars(c, w, h * .6, t, st.s);
+        const p = (t * .07) % 1, x0 = h > 260 ? -.1 : .45, x = x0 * w + p * w * (1.12 - x0), y = h * (.72 - Math.sin(p * Math.PI) * .5), s = Math.min(h * .22, 46);
+        st.trail.push({ x, y: y + s * .3, life: 1 });
+        st.trail = st.trail.filter(q => { q.life -= dt * .6; c.globalAlpha = Math.max(0, q.life) * .5; c.fillStyle = "#FF9933";
+          c.beginPath(); c.arc(q.x, q.y, 3 + (1 - q.life) * 8, 0, TAU); c.fill(); return q.life > 0; }); c.globalAlpha = 1;
+        c.save(); c.translate(x, y); c.rotate(Math.sin(t) * .06);
+        c.fillStyle = "#4A5A3A"; c.beginPath(); c.moveTo(-s, s * .3); c.lineTo(-s * .3, -s * .6); c.lineTo(0, -s * .3); c.lineTo(s * .4, -s * .8); c.lineTo(s, s * .3);
+        c.quadraticCurveTo(0, s * .7, -s, s * .3); c.fill();
+        c.fillStyle = "#E6ECF8"; c.beginPath(); c.moveTo(s * .4, -s * .8); c.lineTo(s * .25, -s * .55); c.lineTo(s * .55, -s * .55); c.fill();
+        for (let i = 0; i < 9; i++) { const hx = ((i * 37 % 100) / 100) * s * 1.4 - s * .7, hy = -s * .1 + (i * 13 % 30) / 100 * s;
+          glow(c, hx, hy, 8, "#7CFF9A", .55 + .45 * Math.sin(t * 3 + i)); c.fillStyle = "#B8FFC8"; c.beginPath(); c.arc(hx, hy, 1.5, 0, TAU); c.fill(); }
+        c.restore();
+        c.fillStyle = "#1A1236"; c.beginPath(); c.moveTo(0, h);
+        for (let xx = 0; xx <= w; xx += 10) c.lineTo(xx, h * .9 + Math.sin(xx * .03 + t) * 3); c.lineTo(w, h); c.fill();
+      };
+    },
+
+    gold(st) { st.c = Array.from({ length: 34 }, () => ({ x: rnd(), y: rnd(), v: .06 + rnd() * .1, p: rnd() * TAU, r: 5 + rnd() * 6 }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#2A1604"], [.6, "#6A420C"], [1, "#C9922A"]]);
+        glow(c, w * .78, h * .6, h * .7, "#FFD27A", .45);
+        st.c.forEach(k => { k.y += k.v * dt; if (k.y > 1.1) { k.y = -.1; k.x = .35 + rnd() * .65; }
+          coin(c, k.x * w, k.y * h, k.r * Math.min(1.4, h / 180), t * 3 + k.p);
+          if (Math.sin(t * 4 + k.p * 3) > .97) { c.strokeStyle = "#FFF6D0"; c.lineWidth = 1; const gx = k.x * w + 3, gy = k.y * h - 3;
+            c.beginPath(); c.moveTo(gx - 5, gy); c.lineTo(gx + 5, gy); c.moveTo(gx, gy - 5); c.lineTo(gx, gy + 5); c.stroke(); } });
+        for (let i = 0; i < 9; i++) coin(c, w * (.6 + i * .04), h - 8 - (i % 3) * 5, 9, .2);
+      };
+    },
+
+    banyan(st) {
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#F1E3B4"], [.65, "#B9CF85"], [1, "#5E8A40"]]);
+        const tx = w * .76, tw = Math.min(w * .07, 28);
+        c.fillStyle = "#3E6B2E"; [[-.15, .22, .2], [0, .14, .23], [.15, .22, .2], [-.24, .32, .14], [.24, .32, .14]].forEach(([dx, dy, r]) => {
+          c.beginPath(); c.ellipse(tx + dx * w, dy * h, r * w * .9, r * h * 1.1, 0, 0, TAU); c.fill(); });
+        c.fillStyle = "#2E5524"; [[-.08, .28, .12], [.08, .28, .12]].forEach(([dx, dy, r]) => { c.beginPath(); c.ellipse(tx + dx * w, dy * h, r * w, r * h, 0, 0, TAU); c.fill(); });
+        c.strokeStyle = "#6B4A2A"; c.lineWidth = 1;
+        for (let i = 0; i < 18; i++) { const x = tx + (i / 17 - .5) * w * .5; const sw = Math.sin(t + i) * 3;
+          c.beginPath(); c.moveTo(x, h * .38); c.quadraticCurveTo(x + sw, h * .6, x + sw * .5, h * (.7 + (i % 3) * .08)); c.stroke(); }
+        c.fillStyle = "#5A3A1E"; c.beginPath(); c.moveTo(tx - tw, h); c.lineTo(tx - tw * .6, h * .35); c.lineTo(tx + tw * .6, h * .35); c.lineTo(tx + tw, h); c.fill();
+        const prog = (t % 10) / 8, turns = 6;
+        for (let k = 0; k < turns * 20; k++) { const f = k / (turns * 20); if (f > prog) break;
+          const y = h * .92 - f * h * .45, ph = f * turns * TAU, x = tx + Math.cos(ph) * tw * .75;
+          if (Math.sin(ph) < 0) continue; c.fillStyle = k % 40 < 20 ? "#D7263D" : "#F2C230"; c.fillRect(x - 1.5, y - 1, 3, 2.4); }
+      };
+    },
+
+    chariots() {
+      const cars = [["#C8102E", "#F2C230"], ["#C8102E", "#2FA84F"], ["#C8102E", "#151515"]];
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#F9D58B"], [.6, "#F2A65A"], [1, "#B85A30"]]);
+        c.fillStyle = "#8C5A3A"; c.fillRect(0, h * .82, w, h * .18);
+        const sz = Math.min(h * .55, 120), base = h * .86;
+        cars.forEach(([a, b], i) => {
+          const x = ((.3 + i * .27 - t * .01) % 1.2 + 1.2) % 1.2 * w - w * .05;
+          // crowd and ropes
+          c.strokeStyle = "#E8D6A6"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - sz * .3, base - sz * .1); c.lineTo(x - sz * .9, base - sz * .05); c.stroke();
+          for (let k = 0; k < 6; k++) { c.fillStyle = k % 2 ? "#F2F2F2" : "#F59E0B"; c.beginPath(); c.arc(x - sz * .4 - k * sz * .09, base - sz * .1 - Math.abs(Math.sin(t * 4 + k)) * 2, sz * .035, 0, TAU); c.fill(); }
+          c.fillStyle = "#6B3A1A"; c.fillRect(x - sz * .32, base - sz * .32, sz * .64, sz * .2);
+          c.fillStyle = "#8B5A2B"; c.fillRect(x - sz * .22, base - sz * .5, sz * .44, sz * .18);
+          for (let k = 0; k < 8; k++) { c.fillStyle = k % 2 ? a : b; c.beginPath();
+            const l = x - sz * .3 + k * sz * .075, r2 = l + sz * .075; c.moveTo(l, base - sz * .5); c.lineTo(r2, base - sz * .5); c.lineTo(x, base - sz * 1.05); c.fill(); }
+          c.strokeStyle = "#5A3A1A"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x, base - sz * 1.05); c.lineTo(x, base - sz * 1.2); c.stroke();
+          c.fillStyle = a; c.beginPath(); c.moveTo(x, base - sz * 1.2); c.lineTo(x + sz * .12 + Math.sin(t * 4 + i) * 2, base - sz * 1.16); c.lineTo(x, base - sz * 1.12); c.fill();
+          [-.24, -.08, .08, .24].forEach(dx => { const wx = x + dx * sz, wy = base - sz * .08, wr = sz * .08;
+            c.strokeStyle = "#3A1E0E"; c.lineWidth = 2; c.beginPath(); c.arc(wx, wy, wr, 0, TAU); c.stroke();
+            for (let s = 0; s < 6; s++) { const an = s / 6 * TAU - t * .6; c.beginPath(); c.moveTo(wx, wy); c.lineTo(wx + Math.cos(an) * wr, wy + Math.sin(an) * wr); c.stroke(); } });
+        });
+      };
+    },
+
+    moon(st, v) { st.s = mkStars(60);
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#05081C"], [.7, "#14204A"], [1, "#2A2050"]]);
+        stars(c, w, h, t, st.s);
+        const mx = w * .76, my = h * (.4 - Math.min(1, (t % 30) / 30) * .05), r = Math.min(h * .17, 40);
+        moonDisc(c, mx, my, r);
+        if (v === "sieve") { const sx = mx + Math.sin(t * .35) * r * 2.4;
+          c.save(); c.beginPath(); c.arc(sx, my, r * 1.25, 0, TAU); c.clip();
+          c.fillStyle = "rgba(10,10,30,.35)"; c.fillRect(sx - r * 1.3, my - r * 1.3, r * 2.6, r * 2.6);
+          c.strokeStyle = "rgba(220,200,160,.5)"; c.lineWidth = .7;
+          for (let k = -r * 1.3; k < r * 1.3; k += 4) { c.beginPath(); c.moveTo(sx + k, my - r * 1.3); c.lineTo(sx + k, my + r * 1.3); c.moveTo(sx - r * 1.3, my + k); c.lineTo(sx + r * 1.3, my + k); c.stroke(); }
+          c.restore(); c.strokeStyle = "#B38B4D"; c.lineWidth = 5; c.beginPath(); c.arc(sx, my, r * 1.25, 0, TAU); c.stroke();
+          c.fillStyle = "#B87333"; c.beginPath(); c.ellipse(w * .55, h * .92, 30, 7, 0, 0, TAU); c.fill(); lamp(c, w * .55, h * .88, 7, t, 0); }
+        if (v === "kheer") { const bx = w * .76, by = h * .88;
+          c.fillStyle = "rgba(255,246,216,.08)"; c.beginPath(); c.moveTo(mx - r * .6, my); c.lineTo(mx + r * .6, my); c.lineTo(bx + 34, by); c.lineTo(bx - 34, by); c.fill();
+          c.fillStyle = "#B87333"; c.beginPath(); c.ellipse(bx, by, 34, 9, 0, 0, Math.PI); c.fill(); c.fillStyle = "#FFF4DE"; c.beginPath(); c.ellipse(bx, by, 32, 6, 0, 0, TAU); c.fill();
+          for (let i = 0; i < 3; i++) { const s = (t * .5 + i / 3) % 1; c.strokeStyle = `rgba(255,255,255,${(1 - s) * .4})`; c.lineWidth = 2;
+            c.beginPath(); c.moveTo(bx - 12 + i * 12, by - 6 - s * 30); c.quadraticCurveTo(bx - 4 + i * 12, by - 14 - s * 30, bx - 12 + i * 12, by - 22 - s * 30); c.stroke(); } }
+        if (v === "guru") { const bx = w * .6, by = h * .9;
+          c.fillStyle = "#F4ECDD"; c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(bx - 20, by - 8, bx - 40, by - 4); c.lineTo(bx - 40, by + 4); c.quadraticCurveTo(bx - 20, by, bx, by + 6); c.fill();
+          c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(bx + 20, by - 8, bx + 40, by - 4); c.lineTo(bx + 40, by + 4); c.quadraticCurveTo(bx + 20, by, bx, by + 6); c.fill();
+          lamp(c, w * .9, h * .9, 8, t, 0); }
+      };
+    },
+
+    snake(st) { st.rain = Array.from({ length: 60 }, () => ({ x: rnd(), y: rnd(), v: .6 + rnd() * .5 }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#0F2A1E"], [.7, "#2F5D3A"], [1, "#4E6E2A"]]);
+        c.strokeStyle = "rgba(200,230,255,.35)"; c.lineWidth = 1;
+        st.rain.forEach(r => { r.y += r.v * dt; if (r.y > 1) { r.y = 0; r.x = rnd(); } c.beginPath(); c.moveTo(r.x * w, r.y * h); c.lineTo(r.x * w - 2, r.y * h + 8); c.stroke(); });
+        const cx = w * .76, base = h * .9, s = Math.min(h * .75, 150), sway = Math.sin(t * 1.1) * s * .06;
+        c.fillStyle = "#2B3A1A"; c.beginPath(); c.ellipse(cx, base, s * .32, s * .08, 0, 0, TAU); c.fill();
+        c.strokeStyle = "#3A2A12"; c.lineWidth = s * .09; c.lineCap = "round";
+        c.beginPath(); c.moveTo(cx - s * .2, base - s * .02); c.bezierCurveTo(cx + s * .25, base - s * .02, cx - s * .25, base - s * .45, cx + sway, base - s * .6); c.stroke();
+        c.strokeStyle = "#C9A55A"; c.lineWidth = s * .03; c.stroke();
+        c.fillStyle = "#3A2A12"; c.beginPath(); c.ellipse(cx + sway, base - s * .64, s * .1, s * .13, 0, 0, TAU); c.fill();
+        c.fillStyle = "#C9A55A"; c.beginPath(); c.ellipse(cx + sway, base - s * .62, s * .05, s * .08, 0, 0, TAU); c.fill();
+        c.fillStyle = "#3A2A12"; c.beginPath(); c.ellipse(cx + sway, base - s * .75, s * .045, s * .035, 0, 0, TAU); c.fill();
+        c.fillStyle = "#FFD166"; [-1, 1].forEach(d => { c.beginPath(); c.arc(cx + sway + d * s * .018, base - s * .76, 1.6, 0, TAU); c.fill(); });
+        if (Math.sin(t * 2) > .6) { c.strokeStyle = "#D7263D"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(cx + sway, base - s * .72); c.lineTo(cx + sway, base - s * .68); c.stroke(); }
+        for (let i = 0; i < 9; i++) { c.fillStyle = i % 2 ? "#F59E0B" : "#F97316"; c.beginPath(); c.arc(cx + (i - 4) * s * .09, base + s * .03 + (i % 2) * 3, 4.5, 0, TAU); c.fill(); }
+      };
+    },
+
+    onam() {
+      const rings = ["#FFF8EC", "#F2C230", "#F97316", "#D7263D", "#8E3A9E", "#F59BC0", "#2FA84F", "#F2C230", "#F97316", "#D7263D"];
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#0E3B2E"], [.6, "#1E6B4A"], [.62, "#164E6B"], [1, "#0D3550"]]);
+        const px = w * .78, py = h * .4, R = Math.min(h * .34, w * .17), prog = Math.min(10, Math.floor((t % 14) / 1.1) + 1);
+        for (let k = prog - 1; k >= 0; k--) { const r = R * (k + 1) / 10; c.fillStyle = rings[k]; c.beginPath(); c.arc(px, py, r, 0, TAU); c.fill();
+          if (k % 2) { c.fillStyle = rings[(k + 3) % 10]; for (let p = 0; p < 8 + k * 2; p++) { const a = p / (8 + k * 2) * TAU;
+            c.beginPath(); c.arc(px + Math.cos(a) * r * .9, py + Math.sin(a) * r * .9, R * .025, 0, TAU); c.fill(); } } }
+        const bx = ((t * .06) % 1.4 - .3) * w, by = h * .86;
+        c.fillStyle = "#151515"; c.beginPath(); c.moveTo(bx - 10, by); c.lineTo(bx + w * .32, by); c.quadraticCurveTo(bx + w * .36, by - 8, bx + w * .37, by - h * .2); c.quadraticCurveTo(bx + w * .32, by + 8, bx + w * .2, by + 6); c.lineTo(bx, by + 6); c.fill();
+        c.strokeStyle = "#E8D6A6"; c.lineWidth = 1;
+        for (let k = 0; k < 16; k++) { const ox = bx + k * w * .018, a = Math.sin(t * 6 + k * .2) * .6;
+          c.fillStyle = "#FFF8EC"; c.beginPath(); c.arc(ox, by - 5, 2, 0, TAU); c.fill();
+          c.beginPath(); c.moveTo(ox, by - 2); c.lineTo(ox - 6 + Math.cos(a) * 3, by + 10); c.stroke(); }
+        c.strokeStyle = "rgba(255,255,255,.2)"; for (let i = 0; i < 12; i++) { c.beginPath(); c.moveTo((i * 71 + t * 20) % w, h * .95); c.lineTo((i * 71 + t * 20) % w + 14, h * .95); c.stroke(); }
+      };
+    },
+
+    rakhi() {
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#3A0B3A"], [.6, "#A8326E"], [1, "#F2B33A"]]);
+        const cx = w * .76, cy = h * .5, R = Math.min(h * .3, 60);
+        [["#D7263D", 0], ["#F2C230", 1.5]].forEach(([col, ph]) => { c.strokeStyle = col; c.lineWidth = 3; c.beginPath();
+          for (let x = 0; x <= w; x += 6) c.lineTo(x, cy + Math.sin(x * .03 + t * 2 + ph) * 6 * Math.min(1, Math.abs(x - cx) / (R * 2))); c.stroke(); });
+        glow(c, cx, cy, R * 2, "#FFD27A", .5);
+        c.save(); c.translate(cx, cy); c.rotate(t * .4);
+        for (let k = 0; k < 12; k++) { c.rotate(TAU / 12); c.fillStyle = k % 2 ? "#F97316" : "#F2C230"; c.beginPath(); c.ellipse(R * .55, 0, R * .42, R * .18, 0, 0, TAU); c.fill(); }
+        c.rotate(-t * .8); for (let k = 0; k < 8; k++) { c.rotate(TAU / 8); c.fillStyle = "#D7263D"; c.beginPath(); c.ellipse(R * .3, 0, R * .26, R * .12, 0, 0, TAU); c.fill(); }
+        c.restore(); c.fillStyle = "#F4C04E"; c.beginPath(); c.arc(cx, cy, R * .2, 0, TAU); c.fill();
+        c.fillStyle = "#2D5BD8"; c.beginPath(); c.arc(cx, cy, R * .09, 0, TAU); c.fill();
+        for (let i = 0; i < 8; i++) { const a = t * .5 + i, rr = R * (1.3 + .3 * Math.sin(t * 2 + i)); c.fillStyle = `rgba(255,240,200,${.5 + .5 * Math.sin(t * 3 + i)})`;
+          c.beginPath(); c.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 1.6, 0, TAU); c.fill(); }
+      };
+    },
+
+    kalash() {
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#3B0E2E"], [.6, "#8C2B4E"], [1, "#D9773A"]]);
+        const cx = w * .78, base = h * .92, s = Math.min(h * .8, 160);
+        glow(c, cx, base - s * .45, s * .7, "#FFD27A", .55);
+        for (let i = 0; i < 7; i++) { const a = (i / 6 - .5) * 1.8 + Math.sin(t + i) * .05;
+          c.save(); c.translate(cx, base - s * .62); c.rotate(a); c.fillStyle = i % 2 ? "#2F7A35" : "#3E9142";
+          c.beginPath(); c.ellipse(0, -s * .14, s * .035, s * .15, 0, 0, TAU); c.fill(); c.restore(); }
+        c.fillStyle = "#8B5A2B"; c.beginPath(); c.ellipse(cx, base - s * .7, s * .09, s * .1, 0, 0, TAU); c.fill();
+        c.strokeStyle = "#6B3E1F"; c.lineWidth = 1; for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(cx + k * s * .02, base - s * .78); c.lineTo(cx + k * s * .03, base - s * .62); c.stroke(); }
+        c.fillStyle = "#C47A3A"; c.beginPath(); c.ellipse(cx, base - s * .28, s * .22, s * .25, 0, 0, TAU); c.fill();
+        c.fillRect(cx - s * .1, base - s * .6, s * .2, s * .12);
+        c.fillStyle = "#D7263D"; c.fillRect(cx - s * .22, base - s * .32, s * .44, s * .06);
+        c.fillStyle = "#F4C04E"; c.fillRect(cx - s * .22, base - s * .32, s * .44, s * .015);
+        c.fillStyle = "#FFF"; c.beginPath(); c.arc(cx, base - s * .42, s * .02, 0, TAU); c.fill();
+        for (let i = 0; i < 10; i++) { const x = w * (.5 + ((i * .11 + t * .02) % .5)), y = h * (.1 + ((i * .17 + t * .03) % .8));
+          c.fillStyle = i % 2 ? "#F59BC0" : "#E8679C"; c.beginPath(); c.ellipse(x, y, 4, 2, t + i, 0, TAU); c.fill(); }
+        for (let i = 0; i < 5; i++) coin(c, cx - s * .3 + i * s * .15, base - 3, 6, .3);
+      };
+    },
+
+    janmashtami(st) { st.s = mkStars(60); st.splash = [];
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#060A24"], [.7, "#18235A"], [1, "#2D1F5E"]]);
+        stars(c, w, h, t, st.s);
+        const cyc = t % 12, tiers = Math.min(4, Math.floor(cyc / 2) + 1), px = w * .76;
+        const sw = Math.sin(t * 1.4) * .15, py = h * .2, ropeTop = 0;
+        c.strokeStyle = "#C9A27A"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(w * .5, ropeTop); c.lineTo(w, ropeTop); c.stroke();
+        const potX = px + Math.sin(sw) * h * .2, potY = py;
+        c.beginPath(); c.moveTo(px, 0); c.lineTo(potX, potY - 12); c.stroke();
+        const broken = cyc > 9.2;
+        if (!broken) { c.fillStyle = "#A0522D"; c.beginPath(); c.arc(potX, potY, 12, 0, TAU); c.fill(); c.fillStyle = "#FFF4DE"; c.beginPath(); c.ellipse(potX, potY - 10, 7, 3, 0, 0, TAU); c.fill();
+          c.strokeStyle = "#F4C04E"; c.lineWidth = 2; c.beginPath(); c.arc(potX, potY, 12, .2, Math.PI - .2); c.stroke(); }
+        else if (st.splash.length === 0 && cyc < 9.4) for (let i = 0; i < 40; i++) st.splash.push({ x: potX, y: potY, vx: (rnd() - .5) * 120, vy: -rnd() * 80, life: 1 });
+        st.splash = st.splash.filter(p => { p.vy += 200 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * .9;
+          c.globalAlpha = Math.max(0, p.life); c.fillStyle = "#FFF4DE"; c.beginPath(); c.arc(p.x, p.y, 2.2, 0, TAU); c.fill(); return p.life > 0; }); c.globalAlpha = 1;
+        const unit = Math.min(h * .16, 30), base = h * .97;
+        for (let r = 0; r < tiers; r++) { const n = 4 - r, y = base - r * unit;
+          for (let k = 0; k < n; k++) { const x = px + (k - (n - 1) / 2) * unit * .7;
+            c.fillStyle = r % 2 ? "#F97316" : "#FFF8EC"; c.fillRect(x - unit * .2, y - unit * .7, unit * .4, unit * .55);
+            c.fillStyle = "#7A4A2A"; c.beginPath(); c.arc(x, y - unit * .82, unit * .14, 0, TAU); c.fill(); } }
+        if (tiers === 4 && cyc > 8) { c.strokeStyle = "#7A4A2A"; c.lineWidth = 3; c.beginPath(); c.moveTo(px, base - 3.8 * unit); c.lineTo(potX, potY + 10 + (9.2 - Math.min(9.2, cyc)) * 10); c.stroke(); }
+        if (cyc > 10.5) { c.fillStyle = "rgba(255,255,255,.08)"; c.fillRect(0, 0, w, h); }
+        // peacock feather
+        c.save(); c.translate(w * .55, h); c.rotate(-.4 + Math.sin(t) * .05);
+        c.strokeStyle = "#7FB069"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -h * .5); c.stroke();
+        for (let k = 0; k < 14; k++) { c.strokeStyle = "rgba(60,160,120,.6)"; c.beginPath(); c.moveTo(0, -h * .1 - k * h * .025); c.lineTo(-10, -h * .14 - k * h * .025); c.moveTo(0, -h * .1 - k * h * .025); c.lineTo(10, -h * .14 - k * h * .025); c.stroke(); }
+        c.fillStyle = "#1F8A70"; c.beginPath(); c.ellipse(0, -h * .5, 9, 12, 0, 0, TAU); c.fill();
+        c.fillStyle = "#F2C230"; c.beginPath(); c.ellipse(0, -h * .5, 6, 8, 0, 0, TAU); c.fill();
+        c.fillStyle = "#1E3A8A"; c.beginPath(); c.ellipse(0, -h * .49, 3.5, 5, 0, 0, TAU); c.fill(); c.restore();
+      };
+    },
+
+    ganesha() {
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#4A0E0E"], [.6, "#A8321C"], [1, "#E8932E"]]);
+        const portrait = w / h < 1.4;
+        marigolds(c, w, 2, t, portrait ? 14 : 8, portrait || h > 260 ? 0 : w * .5);
+        const s = portrait ? Math.min(h * .82, w * .8) : Math.min(h * .85, w * .38);
+        drawGanesha(c, portrait ? w / 2 : w * .76, h - 6, s, t);
+      };
+    },
+
+    tools(st) { st.k = [0, 1].map(i => ({ bx: .4 + i * .2, by: .2, p: rnd() * TAU }));
+      const gear = (c, x, y, r, n, a, col) => { c.save(); c.translate(x, y); c.rotate(a); c.fillStyle = col;
+        c.beginPath(); for (let i = 0; i < n * 2; i++) { const rr = i % 2 ? r : r * 1.18, an = i / (n * 2) * TAU; c.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); } c.fill();
+        c.fillStyle = "#1D1F2A"; c.beginPath(); c.arc(0, 0, r * .35, 0, TAU); c.fill(); c.restore(); };
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#1D1F2A"], [.7, "#3A3F55"], [1, "#5A4A2A"]]);
+        const r = Math.min(h * .2, 40), x0 = w * .7, y0 = h * .58;
+        gear(c, x0, y0, r, 12, t * .6, "#9AA3B5");
+        gear(c, x0 + r * 2.05, y0 - r * .5, r * .7, 9, -t * .6 * 12 / 9 + .2, "#C8A35A");
+        gear(c, x0 - r * 1.2, y0 + r * 1.1, r * .55, 7, -t * .6 * 12 / 7, "#7E8CA8");
+        marigolds(c, w, 4, t, h > 260 ? 12 : 7, h > 260 ? 0 : w * .5);
+        for (let i = 0; i < 5; i++) { const p = (t * 1.5 + i * .37) % 1; c.fillStyle = `rgba(255,200,100,${1 - p})`; c.fillRect(x0 + r * 1.1 + p * 30, y0 + r * .2 + p * p * 30, 2, 2); }
+        st.k.forEach((k, i) => kite(c, k.bx * w + Math.sin(t * .7 + k.p) * 10, k.by * h + 16 + Math.cos(t + k.p) * 5, Math.min(10, h * .05), ["#F97316", "#2D8CFF"][i], Math.sin(t + k.p) * .2, t, i));
+      };
+    },
+
+    dawn() {
+      return (c, w, h, t) => {
+        const k = (Math.sin(t * .25 - 1.2) + 1) / 2;
+        const mix = (a, b) => { const p = x => parseInt(x, 16); const r = [1, 3, 5].map(i => Math.round(p(a.substr(i, 2)) * (1 - k) + p(b.substr(i, 2)) * k)); return `rgb(${r})`; };
+        fill(c, w, h, [[0, mix("#070A1E", "#2A3A7A")], [.6, mix("#141A3A", "#E07A5F")], [.68, mix("#1A2246", "#F2B36A")], [1, "#0E1630"]]);
+        glow(c, w * .3, h * .66, h * .5, "#FFD27A", k * .6);
+        c.fillStyle = "#0E1630"; c.fillRect(0, h * .68, w, h * .32);
+        for (let i = 0; i < 10; i++) { c.fillStyle = `rgba(255,210,140,${.05 + k * .12})`; c.fillRect((i * 61 + t * 6) % w, h * (.72 + (i % 4) * .06), 20, 1.5); }
+        const rx = w * .8, ry = h * .55;
+        c.fillStyle = "#6B4A2A"; c.fillRect(rx - 26, ry - 14, 52, 28); c.fillStyle = "#2A1A0E"; c.beginPath(); c.arc(rx - 10, ry, 8, 0, TAU); c.fill();
+        c.fillStyle = "#E8D6A6"; c.fillRect(rx + 4, ry - 6, 16, 3); c.fillRect(rx + 4, ry, 16, 3);
+        c.strokeStyle = "#E8D6A6"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(rx + 18, ry - 14); c.lineTo(rx + 30, ry - 34); c.stroke();
+        for (let i = 0; i < 3; i++) { const p = (t * .6 + i / 3) % 1; c.strokeStyle = `rgba(255,230,180,${(1 - p) * .6})`; c.lineWidth = 2;
+          c.beginPath(); c.arc(rx - 30, ry - 6, 12 + p * 50, Math.PI * .8, Math.PI * 1.25); c.stroke(); }
+      };
+    },
+
+    ravana(st) { const fw = mkFw(); st.f = [];
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#0B0612"], [.7, "#2A0E1E"], [1, "#4A1A10"]]);
+        const cyc = t % 12, ex = w * .78, s = Math.min(h * .85, 170), base = h * .98;
+        if (cyc > 3.5) fireworks(fw, c, w, h, dt, ["#FFD166", "#FF5A5F", "#7FD1FF", "#F28A2E"], 1.6, .45, .98);
+        c.fillStyle = "#6B1E2E"; c.fillRect(ex - s * .12, base - s * .62, s * .24, s * .62);
+        c.fillStyle = "#F2B33A"; for (let k = 0; k < 6; k++) c.fillRect(ex - s * .12, base - s * .6 + k * s * .1, s * .24, 3);
+        c.fillStyle = "#2A5A8A"; c.fillRect(ex - s * .2, base - s * .62, s * .08, s * .3); c.fillRect(ex + s * .12, base - s * .62, s * .08, s * .3);
+        for (let k = 0; k < 10; k++) { const hx = ex + (k - 4.5) * s * .085, hy = base - s * .72 - Math.abs(k - 4.5) * -1;
+          c.fillStyle = "#E8A87C"; c.beginPath(); c.arc(hx, hy, s * .045, 0, TAU); c.fill();
+          c.fillStyle = "#F2B33A"; c.beginPath(); c.moveTo(hx - s * .04, hy - s * .03); c.lineTo(hx, hy - s * .1); c.lineTo(hx + s * .04, hy - s * .03); c.fill();
+          c.fillStyle = "#140A0A"; c.fillRect(hx - s * .02, hy - 2, 2, 2); c.fillRect(hx + s * .012, hy - 2, 2, 2); }
+        if (cyc < 2) { const p = cyc / 2, ax = p * ex, ay = h * .6 - Math.sin(p * Math.PI) * h * .3;
+          glow(c, ax, ay, 14, "#FF9A2A", .9); c.strokeStyle = "#5A2A0A"; c.lineWidth = 2; c.beginPath(); c.moveTo(ax - 22, ay + 6); c.lineTo(ax, ay); c.stroke(); }
+        if (cyc > 2) { const burn = Math.min(1, (cyc - 2) / 3);
+          for (let i = 0; i < 5; i++) st.f.push({ x: ex + (rnd() - .5) * s * .4 * burn, y: base - rnd() * s * .7 * burn, vy: -40 - rnd() * 60, life: 1, r: 4 + rnd() * 8 });
+          c.globalCompositeOperation = "lighter";
+          st.f = st.f.filter(p => { p.y += p.vy * dt; p.life -= dt * 1.5; const L = Math.max(0, p.life);
+            c.fillStyle = L > .5 ? `rgba(255,200,80,${L * .4})` : `rgba(255,90,20,${L * .4})`; c.beginPath(); c.arc(p.x, p.y, p.r, 0, TAU); c.fill(); return p.life > 0; });
+          c.globalCompositeOperation = "source-over"; }
+        else st.f.length = 0;
+      };
+    },
+
+    diwali(st, v) {
+      st.rockets = []; st.sparks = []; st.next = 0; const fw = mkFw();
+      st.c = Array.from({ length: 18 }, () => ({ x: .4 + rnd() * .6, y: rnd(), v: .08 + rnd() * .08, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#140A28"], [.5, "#3B1446"], [.85, "#7A2A3A"], [1, "#C96A1E"]]);
+        const rx = w * .8, ry = h * .5, R = Math.min(h * .34, w * .17), prog = v === "calm" ? 1 : (t % 14) / 10;
+        [["#E8343A", 8, 1], ["#F2D03A", 8, .72], ["#2FA84F", 16, .5], ["#E84F9A", 8, .3]].forEach(([col, n, f], li) => {
+          for (let i = 0; i < n; i++) { const k = (li * n + i) / 40; if (k > prog) continue; const a = i / n * TAU + li * .2;
+            c.save(); c.translate(rx, ry); c.rotate(a); c.beginPath(); c.ellipse(R * f * .55, 0, R * f * .45, R * f * .16, 0, 0, TAU);
+            c.fillStyle = col; c.globalAlpha = .85; c.fill(); c.restore(); } });
+        c.globalAlpha = 1; if (prog > .9) { c.beginPath(); c.arc(rx, ry, R * .12, 0, TAU); c.fillStyle = "#FFD166"; c.fill(); }
+        if (v !== "calm") fireworks(fw, c, w, h, dt, ["#FFD166", "#E84F9A", "#7FD1FF", "#F28A2E", "#B48CFF"], v === "coins" ? .4 : 1, .2, .95);
+        if (v === "coins") st.c.forEach(k => { k.y += k.v * dt; if (k.y > 1.1) k.y = -.1; coin(c, k.x * w, k.y * h, 6, t * 3 + k.p); });
+        const lit = v === "coins" ? 1 : v === "calm" ? 6 : 3;
+        for (let i = 0; i < 6; i++) lamp(c, w * (.08 + i * .085), h - 16, Math.min(11, h * .055), t, i, i < lit);
+      };
+    },
+
+    chhath() {
+      return (c, w, h, t) => {
+        const sink = (t % 30) / 30;
+        fill(c, w, h, [[0, "#2A0F2E"], [.45, "#B8402D"], [.62, "#F6A13A"], [.621, "#7A2E2A"], [1, "#2A0F1E"]]);
+        const hz = h * .62, sx = w * .76, r = Math.min(h * .2, 46), sy = hz - r * .55 + sink * r * .5;
+        glow(c, sx, sy, r * 3.5, "#FFD27A", .6);
+        c.save(); c.beginPath(); c.rect(0, 0, w, hz); c.clip(); c.fillStyle = "#FFC94A"; c.beginPath(); c.arc(sx, sy, r, 0, TAU); c.fill(); c.restore();
+        for (let i = 0; i < 14; i++) { const y = hz + 4 + i * (h - hz) / 14, ww = r * (1.6 - i * .08) * (1 + .1 * Math.sin(t * 2 + i));
+          c.fillStyle = `rgba(255,200,90,${.5 - i * .03})`; c.fillRect(sx - ww / 2, y, ww, 2); }
+        for (let i = 0; i < 4; i++) { const fx = w * (.5 + i * .12), fy = hz + h * .1, lift = Math.sin(t * 1.2 + i) * 2;
+          c.fillStyle = "#1A0A12"; c.beginPath(); c.arc(fx, fy - 18, 5, 0, TAU); c.fill(); c.fillRect(fx - 5, fy - 13, 10, 14);
+          c.strokeStyle = "#1A0A12"; c.lineWidth = 2.5; c.beginPath(); c.moveTo(fx - 4, fy - 10); c.lineTo(fx - 7, fy - 26 + lift); c.moveTo(fx + 4, fy - 10); c.lineTo(fx + 7, fy - 26 + lift); c.stroke();
+          c.fillStyle = "#C8922A"; c.beginPath(); c.ellipse(fx, fy - 28 + lift, 10, 3.5, 0, 0, TAU); c.fill();
+          c.fillStyle = "#F97316"; c.beginPath(); c.arc(fx - 3, fy - 31 + lift, 2.5, 0, TAU); c.arc(fx + 3, fy - 31 + lift, 2.5, 0, TAU); c.fill();
+          c.strokeStyle = "rgba(255,200,120,.35)"; c.lineWidth = 1; c.beginPath(); c.ellipse(fx, fy + 1, 9 + Math.sin(t * 2 + i) * 2, 2, 0, 0, TAU); c.stroke(); }
+      };
+    },
+
+    riverlamps(st) { st.l = Array.from({ length: 26 }, () => ({ x: rnd(), y: .6 + rnd() * .38, v: .01 + rnd() * .015, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#04081A"], [.5, "#0E1A3A"], [.55, "#081430"], [1, "#050A1C"]]);
+        moonDisc(c, w * .86, h * .18, Math.min(h * .07, 16));
+        c.fillStyle = "#1A1430"; for (let k = 0; k < 6; k++) c.fillRect(0, h * .3 + k * h * .05, w * (.32 - k * .03), h * .05 + 1);
+        c.beginPath(); c.moveTo(w * .05, h * .3); c.lineTo(w * .1, h * .08); c.lineTo(w * .15, h * .3); c.fill();
+        c.beginPath(); c.moveTo(w * .18, h * .3); c.lineTo(w * .22, h * .14); c.lineTo(w * .26, h * .3); c.fill();
+        for (let k = 0; k < 6; k++) for (let i = 0; i < 12; i++) { const x = i / 12 * w * (.32 - k * .03) + 4, y = h * .3 + k * h * .05;
+          c.fillStyle = `rgba(255,${190 + (i % 3) * 15},90,${.6 + .4 * Math.sin(t * 6 + i + k)})`; c.beginPath(); c.arc(x, y, 1.6, 0, TAU); c.fill(); }
+        st.l.forEach((l, i) => { l.x += l.v * dt; if (l.x > 1.05) l.x = .25; const x = l.x * w, y = l.y * h + Math.sin(t * 1.5 + l.p) * 1.5;
+          glow(c, x, y + 6, 14, "#FFB020", .35);
+          c.fillStyle = "#3E8A3A"; c.beginPath(); c.ellipse(x, y + 2, 7, 2.5, 0, 0, TAU); c.fill(); flame(c, x, y, 5, t, i); });
+      };
+    },
+
+    dhanu(st) { st.s = mkStars(80);
+      const T = [[.62, .5], [.68, .38], [.76, .42], [.8, .55], [.72, .62], [.64, .6], [.85, .33], [.9, .45], [.58, .38]];
+      const L = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [2, 6], [6, 7], [7, 3], [1, 8]];
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#050816"], [.8, "#121A3E"], [1, "#2A1E4A"]]);
+        stars(c, w, h, t, st.s);
+        c.strokeStyle = "rgba(255,210,140,.25)"; c.lineWidth = 1; c.beginPath(); c.ellipse(w * .5, h * 1.3, w * .7, h * .95, 0, Math.PI * 1.05, Math.PI * 1.95); c.stroke();
+        const prog = Math.min(1, (t % 10) / 6);
+        c.strokeStyle = "rgba(180,200,255,.7)"; L.forEach(([a, b], i) => { if (i / L.length > prog) return;
+          c.beginPath(); c.moveTo(T[a][0] * w, T[a][1] * h); c.lineTo(T[b][0] * w, T[b][1] * h); c.stroke(); });
+        T.forEach(([x, y], i) => { glow(c, x * w, y * h, 8, "#DDE6FF", .8); c.fillStyle = "#fff"; c.beginPath(); c.arc(x * w, y * h, 2, 0, TAU); c.fill(); });
+        const sp = (t % 10) / 10, sx = w * (.25 + sp * .4), sy = h * (.75 - sp * .25);
+        glow(c, sx, sy, 40, "#FFC94A", .7); c.fillStyle = "#FFD166"; c.beginPath(); c.arc(sx, sy, 9, 0, TAU); c.fill();
+      };
+    },
+
+    gita() {
+      return (c, w, h, t) => {
+        fill(c, w, h, [[0, "#2A1206"], [.6, "#7A3A12"], [1, "#D9963A"]]);
+        const wx = w * .8, wy = h * .5, R = Math.min(h * .42, 90);
+        c.strokeStyle = "rgba(255,210,140,.5)"; c.lineWidth = 4; c.beginPath(); c.arc(wx, wy, R, 0, TAU); c.stroke();
+        c.lineWidth = 2; for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + t * .15; c.beginPath(); c.moveTo(wx, wy); c.lineTo(wx + Math.cos(a) * R, wy + Math.sin(a) * R); c.stroke(); }
+        c.fillStyle = "rgba(255,210,140,.6)"; c.beginPath(); c.arc(wx, wy, R * .14, 0, TAU); c.fill();
+        const bx = wx, by = h * .82, pw = Math.min(56, R * .7);
+        glow(c, bx, by - 10, pw * 2, "#FFE7A0", .7);
+        c.fillStyle = "#F4ECDD"; c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(bx - pw / 2, by - 10, bx - pw, by - 6); c.lineTo(bx - pw, by + 6); c.quadraticCurveTo(bx - pw / 2, by + 2, bx, by + 8); c.fill();
+        c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(bx + pw / 2, by - 10, bx + pw, by - 6); c.lineTo(bx + pw, by + 6); c.quadraticCurveTo(bx + pw / 2, by + 2, bx, by + 8); c.fill();
+        const f = (t % 3) / 1.2; if (f < 1) { const x = bx + Math.cos(f * Math.PI) * pw; c.fillStyle = "#FFF8EC";
+          c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo((bx + x) / 2, by - 12 - Math.sin(f * Math.PI) * 14, x, by - 6 - Math.sin(f * Math.PI) * 10); c.lineTo(x, by + 4); c.quadraticCurveTo((bx + x) / 2, by, bx, by + 8); c.fill(); }
+        c.fillStyle = "rgba(120,70,30,.5)"; for (let k = 0; k < 4; k++) { c.fillRect(bx - pw * .85, by - 2 + k * 2.4, pw * .7, .8); c.fillRect(bx + pw * .15, by - 2 + k * 2.4, pw * .7, .8); }
+      };
+    },
+
+    pride(st, v) {
+      const prog = ["#000000", "#784F17", "#E40303", "#FF8C00", "#FFED00", "#008026", "#24408E", "#732982"];
+      const trans = ["#5BCEFA", "#F5A9B8", "#FFFFFF", "#F5A9B8", "#5BCEFA"];
+      const cols = v === "trans" ? trans : prog;
+      st.conf = Array.from({ length: 50 }, () => ({ x: rnd(), y: rnd(), v: .1 + rnd() * .15, p: rnd() * TAU, col: prog[2 + Math.floor(rnd() * 6)] }));
+      return (c, w, h, t, dt) => {
+        c.fillStyle = "#1A1426"; c.fillRect(0, 0, w, h);
+        const band = h / cols.length, wave = x => Math.sin(x / w * 5 - t * 2.2) * 10 * (x / w) + Math.sin(x / 70 + t) * 2;
+        cols.forEach((col, i) => { c.beginPath();
+          for (let x = 0; x <= w; x += 6) c.lineTo(x, i * band + wave(x));
+          for (let x = w; x >= 0; x -= 6) c.lineTo(x, (i + 1) * band + wave(x) + 1);
+          c.fillStyle = col; c.fill(); });
+        for (let x = 0; x < w; x += 4) { const s = Math.sin(x / w * 5 - t * 2.2); c.fillStyle = s > 0 ? `rgba(255,255,255,${s * .1})` : `rgba(0,0,0,${-s * .22})`; c.fillRect(x, 0, 4, h); }
+        if (v !== "trans") { const cw = Math.min(w * .26, h * .7);
+          [["#000000", 56], ["#613915", 42], ["#5BCEFA", 28], ["#F5A9B8", 14], ["#FFFFFF", 0]].forEach(([col, off]) => {
+            const o = off * cw / 90; c.beginPath(); c.moveTo(0, 0); c.lineTo(cw - o, h / 2); c.lineTo(0, h); c.closePath(); c.fillStyle = col; c.fill(); }); }
+        if (v === "london") st.conf.forEach(q => { q.y += q.v * dt; if (q.y > 1) q.y = 0; c.save(); c.translate(q.x * w + Math.sin(t + q.p) * 6, q.y * h); c.rotate(t * 3 + q.p);
+          c.fillStyle = q.col; c.fillRect(-3, -1.5, 6, 3); c.restore(); });
+      };
+    },
+  };
+  Object.assign(SCENES, MORE);
+
+  return SCENES;
+})();
+
+/* Every celebration the card knows: its scene or motif, its short line
+   for Home and its full explanation, in the words a child can read. */
+const FEST_TABLE = {
+  "New Year’s Day": {"src":"UK","tier":"festive","scene":"fireworks","bg":"#0A0F2E","eyebrow":"Bank holiday","short":"The first day of the year. Fireworks at midnight, Auld Lang Syne, and resolutions that last until February.","full":[["What is it?","1 January is the first day of the year in the calendar most of the world uses. It has not always been: in England, until 1752, the new year officially began on 25 March. In Scotland, Hogmanay on New Year’s Eve was for centuries a bigger celebration than Christmas."],["What happens","At midnight people count down the last ten seconds, cheer, hug and sing Auld Lang Syne, a Scottish song about old friends, usually without knowing most of the words. London sets off fireworks over the Thames as Big Ben strikes twelve. The next morning is the traditional time for resolutions, promises to yourself about the year ahead, which most people have forgotten by February."]],"art":"Fireworks over a city skyline and a turning wheel, reflected in the river."},
+  "Makar Sankranti / Pongal": {"src":"Hindu","tier":"festive","scene":"sankranti","bg":"#2B3F6E","eyebrow":"Celebrating","short":"The harvest is in and the days start getting longer. Kites fill the sky, and Pongal rice is boiled until it bubbles over for luck.","full":[["What is it?","Makar Sankranti marks the day the sun starts its journey north, so the days begin to get longer. It is also harvest time, the moment to say thank you for the crops. Different parts of India celebrate it in their own way and under their own names."],["What happens","In Gujarat the sky fills with thousands of kites, and people try to cut each other’s strings. In Tamil Nadu it is Pongal, which lasts four days: rice is boiled with milk and sugar in a new pot until it bubbles over, and everyone shouts “Pongalo Pongal!”, because overflowing means plenty for the year ahead. Cows are washed and decorated too."]],"art":"Kites bob on their strings while a pot of Pongal rice bubbles over."},
+  "Vasant Panchami": {"src":"Hindu","tier":"festive","scene":"mustard","bg":"#5A4210","eyebrow":"Celebrating","short":"Spring is welcomed in yellow, and Saraswati, goddess of learning and music, is thanked. Some children write their first letters today.","full":[["What is it?","Vasant means spring, and this day welcomes it, even though it comes in January or February. It belongs to Saraswati, the goddess of learning, music and art, who is usually shown dressed in white, sitting on a lotus and playing a stringed instrument called a veena."],["What happens","Yellow is everywhere: yellow clothes, yellow flowers and yellow sweet rice, the colour of the mustard fields that bloom at this time. Books, pens and instruments are placed in front of Saraswati to be blessed, and some little children write their very first letters today. In parts of north India, people fly kites."]],"art":"A field of yellow mustard flowers sways while petals and one kite drift past."},
+  "Republic Day": {"src":"Observance","tier":"festive","scene":"tricolour","bg":"#1D3557","eyebrow":"India","short":"India’s constitution came into force in 1950 and the country began choosing its own leaders. A huge parade fills New Delhi.","full":[["What is it?","On 26 January 1950, India’s constitution came into force and the country became a republic, choosing its own leaders instead of a king. The constitution, written over nearly three years by a team led by B. R. Ambedkar, is one of the longest in the world. Ambedkar was born into a group treated as “untouchable”, and he made sure the constitution banned that."],["What happens","In New Delhi there is a huge parade along a wide avenue called Kartavya Path, with marching soldiers, camels, dancers and colourful floats from every state, while jets fly overhead trailing the colours of the flag."]],"art":"India’s flag waves, its wheel of 24 spokes turning."},
+  "Thaipusam": {"src":"Hindu","tier":"festive","scene":"kavadi","bg":"#2A1446","eyebrow":"Celebrating","short":"A Tamil festival for the warrior god Murugan. Devotees walk to his temple carrying kavadi, arches decorated with peacock feathers.","full":[["What is it?","Thaipusam is a Tamil festival for Murugan, a young warrior god and a son of Shiva. The story says that on this day his mother Parvati gave him a spear called a vel, which he used to defeat a demon. It is celebrated wherever Tamil people live, from India to Malaysia and Singapore."],["What happens","After weeks of fasting and prayer, devotees walk to Murugan’s temple carrying a kavadi, a decorated arch on their shoulders, often covered in peacock feathers. Some carry pots of milk on their heads. A few even pierce their cheeks or skin with small silver spears, which they say they barely feel because their mind is fixed on the god."]],"art":"A procession walks at dusk, each person carrying a kavadi arch tipped with peacock feathers."},
+  "LGBT+ History Month": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"This month","short":"A month for remembering LGBT+ people and their history, held every February in the UK since 2005.","full":[["What is it?","A month of remembering LGBT+ lives and history, held every February in the UK. It was started here in 2005, soon after Section 28 was scrapped. That was a law that stopped schools from talking about gay people as if they were a normal part of life."],["What happens","Schools, libraries and museums hold talks and displays, and each year has a theme. It is a chance to learn about LGBT+ people from history: scientists like Alan Turing, who helped crack secret codes in the Second World War, writers, sports stars and campaigners."]],"art":"The Progress flag ripples across the band."},
+  "International Day of Women and Girls in Science": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"United Nations day","short":"A United Nations day for the women and girls doing science, and for asking why so many are still put off it.","full":[["","A United Nations day, started in 2016, for the women and girls doing science, and for asking why so many are still put off it. Only about a third of the world’s scientists are women. Scientists like Rosalind Franklin, whose X-ray photograph helped show the shape of DNA, often went without credit in their own lifetimes."]]},
+  "Maha Shivaratri": {"src":"Hindu","tier":"festive","scene":"shiva","bg":"#0B1030","eyebrow":"Celebrating","short":"The great night of Shiva. Many people fast and stay awake all night, singing until sunrise.","full":[["What is it?","Maha Shivaratri means “the great night of Shiva”. Shiva is one of the most important Hindu gods: the destroyer, who clears away the old so that new things can begin. He is shown with a crescent moon in his hair, a snake around his neck and a trident in his hand, living high in the Himalayas."],["What happens","Many people fast all day and stay awake all night, singing and praying. At temples, milk, water and leaves from the bael tree are poured over a stone symbol of Shiva called a lingam. The chant “Om Namah Shivaya” can go on until sunrise."]],"art":"A crescent moon over snowy Himalayan peaks, with a row of lamps that burn all night."},
+  "Holika Dahan": {"src":"Hindu","tier":"festive","scene":"bonfire","bg":"#1A0A0C","eyebrow":"Tonight","short":"The bonfire on the night before Holi, remembering a prince who walked out of the flames unharmed.","full":[["The story","Prince Prahlad prayed to the god Vishnu, which made his father, a proud demon king, furious. The king’s sister Holika could not be hurt by fire, so she sat in a bonfire holding Prahlad to get rid of him. Instead Holika burned, and Prahlad walked out without a scratch."],["What happens","On the night before Holi, people build a big bonfire in the street or square and walk around it, throwing in grains, coconuts and popcorn. It stands for good beating harm. Some take a little of the ash home for luck, and then everyone goes to bed ready for the colours in the morning."]],"art":"A bonfire roars and throws sparks into the night."},
+  "Holi": {"src":"Hindu","tier":"festive","scene":"holi","bg":"#1C1830","eyebrow":"Celebrating","w":2,"short":"The festival of colours. Everyone throws coloured powder at everyone else, and by lunchtime nobody is clean.","full":[["The story","Holi marks the end of winter and the start of spring. A favourite story is about the god Krishna, who had blue skin as a boy and worried that Radha, the girl he liked, would think it strange. His mother told him to colour Radha’s face any colour he liked. He did, and a tradition was born."],["What happens","Everyone goes outside to throw coloured powder, called gulal, and squirt coloured water at each other: friends, neighbours, grandparents, even strangers. By lunchtime nobody is clean and nobody minds. It is also a day for making up with people you have argued with, and for eating gujiya, sweet pastries filled with nuts."]],"art":"Handfuls of coloured powder are flung in from the edges and drift, overlap and settle."},
+  "British Science Week": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"Starts today","short":"Ten days of experiments, talks and competitions in schools and museums across the UK.","full":[["","Ten days of science events in schools, museums and towns across the UK, run by the British Science Association, with experiments, talks and competitions. It started in 1994 as National Science Week, and each year has a theme. Anyone can take part, and a lot of the best experiments need nothing more than a kitchen."]]},
+  "International Women’s Day": {"src":"Observance","tier":"quiet","motif":"star","eyebrow":"Observance","short":"A day since 1911 for what women have won, from the vote to equal pay laws, and for what is still unfinished.","full":[["","Marked since 1911. A day for what women have won, like the vote, equal pay laws and the right to their own bank account, and for how much is still unfinished. Its colours, purple, green and white, come from the suffragettes, who campaigned for women’s votes in Britain. Women over 30 first voted here in 1918, and women got the same voting rights as men in 1928."]]},
+  "Hindi New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in the Hindu calendar, which follows the moon. Homes are cleaned and doorways hung with mango leaves.","full":[["What is it?","The Hindu calendar follows the moon, so its new year does not fall on 1 January. In much of north India the year starts in spring, on the first day of the month of Chaitra, which is also the start of Chaitra Navratri, nine more nights for the goddess Durga."],["What happens","Homes are swept and washed from top to bottom, doorways are hung with mango leaves and marigolds, and patterns are drawn at the entrance to welcome good luck. Families visit the temple, wear new clothes and share sweets, and many look up the new year’s almanac, called a panchang, to see what the year might bring."]],"art":"A string of mango leaves and marigolds sways over the door while a kolam draws itself."},
+  "Ugadi / Gudi Padwa": {"src":"Hindu","tier":"festive","scene":"newyear","v":"gudi","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in several Indian states. A dish is eaten that is sweet, sour, salty and bitter at once, like the year ahead.","full":[["What is it?","This is new year in several states at once: Ugadi in Andhra Pradesh, Telangana and Karnataka, and Gudi Padwa in Maharashtra. The name Ugadi comes from words meaning “the start of a new age”."],["What happens","In Maharashtra families raise a gudi outside the window: a tall pole topped with bright silk, a garland and an upside-down pot, like a flag of victory. In the south people eat ugadi pachadi, a dish that is sweet, sour, salty, bitter, spicy and tangy all at once, because the year ahead will hold all of those, and it is best to taste them together."]],"art":"A gudi, a pole flying bright silk under an upturned pot, stands beside the door."},
+  "International Day for the Elimination of Racial Discrimination": {"src":"Observance","tier":"quiet","motif":"globe","eyebrow":"United Nations day","short":"Remembers 21 March 1960, when police shot at a peaceful protest against apartheid in Sharpeville, South Africa.","full":[["","On 21 March 1960, in Sharpeville, South Africa, police opened fire on a peaceful protest against apartheid, the laws that kept Black and white people apart and unequal. Sixty-nine people were killed. The United Nations chose the date so that it would not be forgotten. In South Africa it is now a public holiday, Human Rights Day."]]},
+  "Ramanavami": {"src":"Hindu","tier":"festive","scene":"rama","bg":"#6A2A12","eyebrow":"Celebrating","short":"The birthday of Rama, hero of the Ramayana, celebrated at noon, the hour he was born.","full":[["Who is Rama?","Ramanavami is the birthday of Rama, hero of the Ramayana, one of the oldest and longest stories in the world. Rama is a prince famous for always doing the right thing, even when it cost him his throne, and for rescuing his wife Sita from the demon king Ravana."],["What happens","Rama is said to have been born at midday, so the biggest prayers happen at noon. His story is read aloud in temples, sometimes over the nine days before, and statues of baby Rama are placed in little cradles and rocked. People share a cooling drink called panakam, made from jaggery, pepper and cardamom."]],"art":"The midday sun turns, a bow stands ready and an arrow flies across."},
+  "Transgender Day of Visibility": {"src":"Observance","tier":"festive","scene":"pride","v":"trans","bg":"#1E2A3A","eyebrow":"Observance","short":"A day for trans people living their lives openly, and for celebrating them rather than only remembering.","full":[["What is it?","A day for trans people living their lives openly. It was started in 2009 by Rachel Crandall, a trans woman in the United States, who noticed that the only well-known day for trans people was about those who had died."],["The flag","The trans flag was designed by Monica Helms in 1999: light blue for boys, pink for girls, and white in the middle for people who are in between or neither. She made it read the same whichever way up it is flown, so it is never upside down."]],"art":"The trans flag waves: light blue, pink and white."},
+  "Hanuman Jayanti": {"src":"Hindu","tier":"festive","scene":"hanuman","bg":"#2A1240","eyebrow":"Celebrating","short":"The birthday of Hanuman, the monkey god so strong he once carried a whole mountain across India.","full":[["Who is Hanuman?","This is the birthday of Hanuman, the monkey god and Rama’s most loyal friend. In the Ramayana he can leap across the sea, grow as big as a mountain and shrink as small as a cat. He stands for strength, courage and loyalty."],["The mountain","When Rama’s brother was badly hurt in battle, Hanuman flew to the Himalayas to fetch a healing herb. He could not tell which plant it was, so he picked up the whole mountain and flew back with it. Today people visit his temples, often painted bright orange, and sing the Hanuman Chalisa, a prayer of forty verses."]],"art":"A whole mountain, its healing herbs glowing, flies across the sky in a saffron streak."},
+  "Good Friday": {"src":"UK","tier":"quiet","motif":"candle","eyebrow":"Bank holiday","short":"Christians remember the day Jesus died on the cross. A quiet day, and a bank holiday.","full":[["","The Friday before Easter, when Christians remember the day Jesus was put to death on a cross in Jerusalem. It is a sad and serious day in church, often with quiet services at three in the afternoon, the time Jesus is said to have died. The “Good” probably comes from an old meaning of the word: holy. Hot cross buns are traditional today, and in the UK it is a bank holiday."]]},
+  "Easter Monday": {"src":"UK","tier":"quiet","motif":"egg","eyebrow":"Bank holiday","short":"The day after Easter Sunday, which celebrates Jesus coming back to life. Eggs stand for new life.","full":[["","Easter Sunday is the most important day of the Christian year, celebrating the belief that Jesus came back to life three days after he died. Eggs, a sign of new life, became part of it, which is why there are chocolate eggs and egg hunts. Easter Monday is the day after, with traditions like rolling eggs down hills. Easter moves every year because it follows the moon: it is the first Sunday after the first full moon after 21 March."]]},
+  "International Day of Human Space Flight": {"src":"Observance","tier":"quiet","motif":"rocket","eyebrow":"United Nations day","short":"On this day in 1961 Yuri Gagarin became the first person to travel into space.","full":[["","On 12 April 1961 Yuri Gagarin, a Soviet pilot, became the first person in space. He went once around the Earth in a spacecraft called Vostok 1, in 108 minutes, then parachuted into a field in Russia, where a farmer and her granddaughter were the first people to meet him. Twenty years later to the day, in 1981, the first space shuttle launched."]]},
+  "Vaisakhi / Vishu": {"src":"Hindu","tier":"festive","scene":"vaisakhi","bg":"#4A2E08","eyebrow":"Celebrating","short":"The spring harvest in Punjab and a big day for Sikhs, who mark the founding of the Khalsa in 1699.","full":[["What is it?","In Punjab this is the spring harvest, when the wheat is golden and ready to cut. For Sikhs it is one of the most important days of the year: in 1699 Guru Gobind Singh founded the Khalsa, the community of baptised Sikhs, on this day, after asking for five volunteers who became known as the Panj Pyare, the five beloved ones."],["What happens","Sikhs go to the gurdwara, and there are processions called Nagar Kirtan with singing and music, including big ones in Southall and Birmingham. In Punjab people dance bhangra to the dhol drum. In Kerala it is Vishu, the new year, when children are woken with their eyes covered and shown a tray of lucky things first: rice, fruit, gold, a mirror and yellow flowers."]],"art":"Golden wheat sways under the sun while a dhol drum beats."},
+  "Tamil New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"Puthandu, the Tamil new year. Kolam patterns are drawn at the door before sunrise.","full":[["What is it?","Puthandu is the Tamil new year, on the first day of the Tamil month of Chithirai, usually 14 April. The sun moves into Aries in the zodiac on this day, which is why several other new years land around now too."],["What happens","Before sunrise, women draw kolam at the doorstep: patterns of white rice-flour lines looping around rows of dots, a little invitation to good luck. A tray of fruit, flowers, gold and a mirror is the first thing many families look at. Lunch includes mango pachadi, sweet, sour and bitter together, and the new year’s almanac is read aloud."]],"art":"A kolam draws itself loop by loop around its dots under a string of mango leaves."},
+  "Bengali New Year / Bihu": {"src":"Hindu","tier":"festive","scene":"newyear","v":"bihu","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in Bengal and Assam. New account books, parades with giant masks, and Bihu dancing.","full":[["What is it?","Pohela Boishakh is new year in Bengal, and Bohag Bihu is new year in Assam, both in mid-April. In Bangladesh the new year is a national holiday celebrated by everyone, whatever their religion."],["What happens","In Bengal shopkeepers close their old account books and open fresh red ones called haal khata, and customers are offered sweets. In Dhaka there is a huge, colourful parade with giant masks and puppets. In Assam, Bihu lasts several days: young people dance the fast Bihu dance to drums and buffalo-horn pipes, and cattle are washed and garlanded on the first day."]],"art":"Mango leaves and marigolds sway, a kolam draws itself and a drum beats."},
+  "Akshaya Tritiya": {"src":"Hindu","tier":"festive","scene":"gold","bg":"#3A2205","eyebrow":"Celebrating","short":"The luckiest day of the year, when whatever you start is said to keep growing. Many people buy a little gold.","full":[["What is it?","Akshaya means “never-ending”, and this is thought to be the luckiest day of the whole year: whatever you begin today is said to keep growing. Stories say it is the day the river Ganga came down to Earth, and the day the sage Vyasa began the Mahabharata, with Ganesha writing it down for him."],["What happens","Lots of people buy gold today, even a tiny coin, so jewellery shops are packed. It is a popular day to start a business, move house, get married or begin learning something. Many also give food, water or clothes to people who need them, since a kindness done today is said to keep giving too."]],"art":"Gold coins spin as they fall, catching the light."},
+  "Early May bank holiday": {"src":"UK","tier":"quiet","motif":"flower","eyebrow":"Bank holiday","short":"A day off that grew out of May Day, with maypoles, May Queens and Morris dancers.","full":[["","The first Monday in May is a bank holiday that grew out of May Day, an ancient spring festival. Villages would crown a May Queen and dance round a maypole, weaving its coloured ribbons together, while Morris dancers with bells on their legs waved hankies and clashed sticks. 1 May is also International Workers’ Day in many countries. The UK holiday was first added in 1978."]]},
+  "Savitri Pooja": {"src":"Hindu","tier":"festive","scene":"banyan","bg":"#22361C","eyebrow":"Celebrating","short":"Married women wind thread round a banyan tree, remembering Savitri, who argued with death and won.","full":[["The story","Savitri’s husband Satyavan was told he would die within a year. When Yama, the god of death, came to take him, Savitri followed and would not turn back. She talked to Yama so cleverly and so politely that he offered her any wish except her husband’s life. She asked to have children with Satyavan, and Yama, caught by his own promise, had to give him back."],["What happens","Married women, especially in Odisha, Bihar and Maharashtra, fast and pray for their husbands’ long lives. They gather at a banyan tree, which can live for hundreds of years, and walk around it winding a red or yellow thread round its trunk while the story of Savitri is told."]],"art":"A banyan tree sways its hanging roots as a red and yellow thread winds round its trunk."},
+  "IDAHOBIT": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"Observance","short":"The International Day Against Homophobia, Biphobia and Transphobia, on the date in 1990 the WHO stopped calling being gay an illness.","full":[["What is it?","The International Day Against Homophobia, Biphobia and Transphobia. It is held on 17 May because on that date in 1990 the World Health Organization stopped calling being gay an illness. It began in 2004."],["Why it matters","In more than sixty countries it is still against the law to be gay, and in many more LGBT+ people are bullied or treated unfairly. The day is about changing that, with events, flags on town halls and campaigns around the world."]],"art":"The Progress flag ripples across the band."},
+  "Spring bank holiday": {"src":"UK","tier":"quiet","motif":"sun","eyebrow":"Bank holiday","short":"The last Monday in May, often the first warm weekend, and the day people chase a cheese down a hill in Gloucestershire.","full":[["","The last Monday in May. It replaced Whit Monday, a holiday that moved around with Easter, in 1971, and is often the first warm weekend of the year. It has some odd traditions: at Cooper’s Hill in Gloucestershire, people chase a big round cheese down a hill so steep that most of them fall over, and the winner keeps the cheese."]]},
+  "Pride Month": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"This month","short":"A month for LGBT+ people and everyone who supports them, held in June because of the Stonewall riots in 1969.","full":[["Why June?","Pride Month is for LGBT+ people (lesbian, gay, bisexual, trans and more) and for everyone who supports them. It is held in June because of the Stonewall riots in New York in June 1969. Police often raided bars where gay people met, and one night the people at the Stonewall Inn fought back. Pride began as a protest about being treated fairly, not as a party."],["What happens","Today there are marches and parades in cities all over the world, with music, costumes and a lot of rainbow. The flag on this card is the Progress flag: the rainbow, with extra stripes added for trans people and for Black people and people of colour."]],"art":"The Progress flag ripples across the band."},
+  "Windrush Day": {"src":"Observance","tier":"quiet","motif":"ship","eyebrow":"Observance","short":"Honours the people who came from the Caribbean from 1948 to help rebuild Britain, and everyone who followed.","full":[["","On 22 June 1948 the ship Empire Windrush arrived at Tilbury, near London, carrying around a thousand passengers, many from Jamaica and other Caribbean islands, invited to help rebuild Britain after the Second World War. They and the people who came after them worked as nurses, bus drivers, builders and much more. In 2018 it came out that some had been wrongly told they had no right to live here, and the official day began that same year."]]},
+  "Pride in London": {"src":"Observance","tier":"festive","scene":"pride","v":"london","bg":"#1A1426","eyebrow":"Today","short":"London’s Pride parade, first marched by about 2,000 people in 1972 and now watched by around a million.","full":[["What is it?","London’s first Pride march was in 1972, when about 2,000 people walked from Trafalgar Square to Hyde Park. It was brave: being openly gay could still cost you your job or your home."],["What happens","Now around a million people line the streets each summer to watch a parade of floats, bands and marching groups, from schools and hospitals to football clubs and the fire brigade, with music and stages across the city centre."]],"art":"The Progress flag waves while confetti falls."},
+  "Puri Rath Yatra": {"src":"Hindu","tier":"festive","scene":"chariots","bg":"#5A2A12","eyebrow":"Celebrating","short":"Three giant chariots carry the god Jagannath and his brother and sister through the streets of Puri.","full":[["What is it?","In the city of Puri, on India’s east coast, the god Jagannath, with his brother Balabhadra and sister Subhadra, leaves the temple once a year to visit another temple about three kilometres away. Jagannath means “lord of the universe”, and the English word juggernaut comes from his enormous chariot."],["What happens","Three giant wooden chariots, as tall as a four-storey building, are built new every year and pulled through the streets on thick ropes by huge crowds. Pulling a rope even for a moment is thought to bring great luck. The gods stay for a week, then ride home again."]],"art":"Three chariots roll down the street, wheels turning, crowds hauling on the ropes. Jagannath’s is red and yellow, his brother’s red and green, his sister’s red and black."},
+  "South Asian Heritage Month": {"src":"Observance","tier":"quiet","motif":"book","eyebrow":"Starts today","short":"A month celebrating people with roots in South Asia and their place in Britain.","full":[["","A month celebrating the history and culture of people with roots in India, Pakistan, Bangladesh, Sri Lanka, Nepal, Bhutan, the Maldives and Afghanistan, and their place in Britain. The dates are deliberate: on 18 July 1947 the law ending British rule in India was signed, and on 17 August the new border between India and Pakistan was announced."]]},
+  "Guru Purnima": {"src":"Hindu","tier":"festive","scene":"moon","v":"guru","bg":"#0E1430","eyebrow":"Celebrating","short":"A full moon for thanking your teachers, and anyone else who taught you something that stuck.","full":[["What is it?","Guru means teacher, and on this full moon people thank their teachers. It is also the birthday of Vyasa, the sage said to have written the Mahabharata. Buddhists mark the same full moon as the day the Buddha gave his first teaching."],["What happens","Students visit their teachers with flowers, fruit or a small gift, and touch their feet as a sign of respect. Music and dance schools hold special performances. It is a good day to think of anyone who taught you something that stuck: a parent, a coach, a friend, not only someone at school."]],"art":"A full moon rises over an open book and a lamp."},
+  "Indian Independence Day": {"src":"Observance","tier":"festive","scene":"tricolour","v":"kites","bg":"#1D3557","eyebrow":"India","short":"India became independent in 1947. The flag is raised at the Red Fort and the sky over Delhi fills with kites.","full":[["What is it?","On 15 August 1947 India became independent after nearly two hundred years of British rule. The same week the country was split in two, into India and Pakistan, and millions of people had to leave their homes, a time called Partition that many families still remember."],["What happens","The prime minister raises the flag at the Red Fort in Delhi and gives a speech to the nation. Schools hold flag ceremonies and sing the national anthem, and the sky over Delhi fills with kites, many in orange, white and green."]],"art":"The flag waves while kites dance over it."},
+  "Nag Panchami": {"src":"Hindu","tier":"festive","scene":"snake","bg":"#12291C","eyebrow":"Celebrating","short":"Snakes are honoured rather than feared, in the monsoon, when they are seen most.","full":[["What is it?","Nag means snake, and on this day snakes are honoured instead of feared. It falls in the monsoon, when heavy rain floods snakes out of their holes and they are seen more than at any other time of year. In Hindu stories snakes are powerful: Shiva wears one round his neck, and Vishnu rests on a giant many-headed snake called Shesha."],["What happens","People draw snakes on their walls with turmeric or sandalwood paste and pray to images of cobras, offering flowers and sweets. Many avoid digging the ground today, in case they hurt a snake below. Real snakes cannot digest milk, though, so many people now offer it only to images."]],"art":"A cobra rises and sways in the monsoon rain among marigolds."},
+  "Onam": {"src":"Hindu","tier":"festive","scene":"onam","bg":"#103424","eyebrow":"Celebrating","w":2,"short":"Kerala’s harvest festival, welcoming back the kind King Mahabali with flower carpets, boat races and a huge feast.","full":[["The story","Onam is Kerala’s harvest festival, and it welcomes home King Mahabali, whose rule was so fair that nobody was poor. The gods worried he was too powerful, so Vishnu came as a small boy called Vamana and asked for just three steps of land. Mahabali agreed. Vamana grew enormous and covered everything in three steps, and Mahabali was sent below the earth, but he is allowed to visit his people once a year."],["What happens","For ten days families make a pookalam, a carpet of flower petals at the front door, adding a ring each day. There are snake-boat races with around a hundred rowers in each long, narrow boat, tiger dancers with painted bellies, and the onasadya: a feast of more than twenty dishes eaten off a banana leaf."]],"art":"A flower carpet grows ring by ring while a snake boat races across the water."},
+  "Raksha Bandhan": {"src":"Hindu","tier":"festive","scene":"rakhi","bg":"#3A0B3A","eyebrow":"Celebrating","short":"Sisters tie a rakhi thread round their brothers’ wrists, and the brothers promise to look out for them.","full":[["What is it?","Raksha means protection and bandhan means bond. The day celebrates brothers and sisters, and the promise to look out for each other. In one old story Draupadi tore a strip from her sari to bandage Krishna’s cut finger, and he promised to protect her whenever she needed him, which he later did."],["What happens","Sisters tie a rakhi, a decorated thread, round their brothers’ wrists, mark their foreheads and feed them a sweet. Brothers give a present and a promise in return. Cousins and close friends join in too, and these days sisters often tie rakhis on each other, since anyone can promise to look after someone."]],"art":"A rakhi turns slowly, its threads waving out to both edges."},
+  "Varalakshmi Vrat": {"src":"Hindu","tier":"festive","scene":"kalash","bg":"#3B0E2E","eyebrow":"Celebrating","short":"Women in southern India invite Lakshmi, goddess of good fortune, into the home for the year ahead.","full":[["What is it?","Lakshmi is the goddess of wealth and good fortune, and vara means a gift or blessing. On this Friday, women in southern India, especially in Karnataka, Tamil Nadu and Andhra Pradesh, invite her into their homes for the year ahead."],["What happens","A kalash, a pot filled with rice or water, is topped with mango leaves and a coconut, then dressed with a sari and jewellery and given a face, so Lakshmi seems to be visiting in person. Women pray for their families, tie a yellow thread on their wrists, and share sweets and small gifts with friends."]],"art":"A kalash pot crowned with mango leaves and a coconut glows while lotus petals drift."},
+  "Summer bank holiday": {"src":"UK","tier":"quiet","motif":"sun","eyebrow":"Bank holiday","short":"The last bank holiday before Christmas, and the weekend of Notting Hill Carnival.","full":[["","The last Monday in August, and the final bank holiday before Christmas, so lots gets crammed in: the seaside, barbecues and festivals. Notting Hill Carnival in London, started by the Caribbean community in the 1960s, fills the streets with steel bands, sound systems and dancers in feathered costumes, and is one of the biggest street parties in Europe."]]},
+  "Krishna Janmashtami": {"src":"Hindu","tier":"festive","scene":"janmashtami","bg":"#0B1238","eyebrow":"Celebrating","w":2,"short":"Krishna’s birthday, celebrated at midnight. Teams build human pyramids to reach a pot of butter hung over the street.","full":[["Who is Krishna?","Janmashtami is the birthday of Krishna, one of the most loved Hindu gods. As a child he was famous for mischief, especially for stealing butter from the pots the village women hung out of reach. He grew up to be a wise hero, and the friend and guide in the Bhagavad Gita."],["What happens","Krishna was born at midnight, so people fast all day and stay up until then, when bells ring, conch shells blow and a statue of baby Krishna is placed in a cradle. The next day in Mumbai, teams build human pyramids up to nine people high to reach a pot of butter or yoghurt hung above the street, and break it, just like the young Krishna."]],"art":"At midnight a human pyramid climbs towards a swinging pot of butter, and breaks it."},
+  "Ganesh Chaturthi": {"src":"Hindu","tier":"festive","scene":"ganesha","bg":"#4A0E0E","eyebrow":"Celebrating","w":2,"short":"Ganesha, the elephant-headed god who clears obstacles, is welcomed home as a clay statue, then let go into the water.","full":[["Who is Ganesha?","Ganesha is the god with an elephant’s head, who removes obstacles and is prayed to before starting anything new. In the story his mother Parvati made him from clay and asked him to guard her door. Shiva, not knowing who he was, fought him and cut off his head, then, to put it right, gave him the head of the first animal he found: an elephant."],["What happens","Families and whole neighbourhoods bring home clay statues of Ganesha, some taller than a house, and feed him his favourite sweets, steamed dumplings called modak. After up to ten days the statues are carried to the sea or a river with drums and dancing, and let go into the water while everyone chants “Ganpati Bappa Morya!”, asking him to come back soon."]],"art":"Ganesha waves his ears and curls his trunk, holding a sweet modak, with his mouse at his feet."},
+  "Vishwakarma Puja": {"src":"Hindu","tier":"festive","scene":"tools","bg":"#1D1F2A","eyebrow":"Celebrating","short":"The day tools get thanked. Machines are cleaned and garlanded for Vishwakarma, engineer of the gods.","full":[["Who is Vishwakarma?","Vishwakarma is the architect and engineer of the gods. In the stories he built their palaces, their flying chariots and their weapons, and even whole cities, including the golden city of Lanka and Krishna’s city of Dwarka."],["What happens","This is the day tools get a thank you. In factories, workshops and garages across eastern India, workers clean their machines, decorate them with marigold garlands and stop work to pray. Cars, rickshaws and even computers get a garland. In Bengal and Bihar people fly kites, and the sky can be full of them."]],"art":"Gears turn under marigold garlands while kites fly overhead."},
+  "Black History Month": {"src":"Observance","tier":"quiet","motif":"book","eyebrow":"This month","short":"A month for Black British history, held every October in the UK since 1987.","full":[["","Held every October in the UK since 1987. A month for Black British history, which mostly is not taught, rather than only the American story. It is a chance to learn about people like Mary Seacole, a Jamaican nurse who cared for soldiers in the Crimean War, and Walter Tull, one of Britain’s first Black professional footballers and its first Black army officer to lead troops in battle."]]},
+  "Mahalaya Amavasya": {"src":"Hindu","tier":"festive","scene":"dawn","bg":"#141A3A","eyebrow":"Today","short":"Ancestors are remembered, and before dawn Bengal listens to the radio programme that says Durga is on her way.","full":[["What is it?","Mahalaya is the new moon that ends a two-week time called Pitru Paksha, when Hindus remember family members who have died. On the river banks people offer water, sesame seeds and rice in their memory. It also marks the start of the goddess season: Durga is said to set off on her journey home."],["What happens","In Bengal, before dawn, millions of people switch on the radio to hear Mahishasura Mardini, a programme of songs and Sanskrit verses first broadcast in the 1930s and repeated every year since, at four in the morning. Many say Durga Puja has not really begun until they have heard it. Artists paint the eyes on the clay Durga statues today."]],"art":"The sky lightens towards dawn over the river while a radio plays."},
+  "Navaratri": {"src":"Hindu","tier":"festive","scene":"navaratri","bg":"#1E1430","eyebrow":"Celebrating","pal":["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#8A8A8A","#F28A2E","#3FB6C9","#E84F9A"],"w":2,"short":"Nine nights of dancing in wide circles for the goddess Durga, with a different colour each night.","full":[["What is it?","Navaratri means “nine nights”. It honours the goddess Durga, and many people say each night belongs to a different one of her nine forms, some gentle and some fierce. The nine nights remember the nine days she fought the demon Mahishasura, and the tenth day, Dusshera, celebrates her win."],["What happens","In Gujarat, and in halls all over Britain, people dance garba every night: big circles of dancers clapping and spinning around a lamp in the middle. Later comes dandiya, where partners clack painted wooden sticks together in time with the drums. Many people wear a different colour each night, and some fast, eating only simple food until the festival ends."]],"art":"Two rings of dancers circle the lamp in opposite directions; each pip is a night’s colour."},
+  "Ada Lovelace Day": {"src":"Observance","tier":"quiet","motif":"gear","eyebrow":"Observance","short":"Ada Lovelace wrote the first computer program in the 1840s, a century before there was a computer to run it.","full":[["","Ada Lovelace worked out, in the 1840s, that a machine could follow a written set of steps: the first computer program, written a century before there was a computer to run it. She was the daughter of the poet Lord Byron and worked with Charles Babbage on his Analytical Engine, a mechanical computer that was never finished. The day, the second Tuesday of October, celebrates women in science, technology, engineering and maths."]]},
+  "Durga Puja": {"src":"Hindu","tier":"festive","scene":"durga","bg":"#2A0610","eyebrow":"Celebrating","pal":["#E8343A","#F7F2E8","#E8343A","#F7F2E8","#F2B33A"],"w":3,"short":"Bengal celebrates the warrior goddess Durga, who beat a demon no god could defeat, with spectacular temporary temples called pandals.","full":[["Who is Durga?","Durga is a Hindu goddess: a warrior and a mother who protects the world from harm. A buffalo demon called Mahishasura was promised that no man or god could ever beat him, so the gods joined their powers together, and out of that light came Durga, with a weapon from each god in her ten hands and a lion to ride."],["What happens","In Bengal whole neighbourhoods build temporary temples called pandals, each with a clay Durga inside, and people go pandal-hopping late into the night. On the last day the statues are carried to the river and everyone calls out “Asche bochor abar hobe”: it will happen again next year."]],"art":"Durga with ten arms in front of her halo, her lion at her feet. Shown full size at the top of this page."},
+  "Maha Navami": {"src":"Hindu","tier":"festive","scene":"navaratri","bg":"#1E1430","eyebrow":"Last night","pal":["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#8A8A8A","#F28A2E","#3FB6C9","#E84F9A"],"short":"The ninth and biggest night of Navaratri, the last day of Durga’s battle.","full":[["What is it?","Maha Navami is the ninth and last night of Navaratri, and the biggest. In the story it is the final day of Durga’s battle with the demon Mahishasura, the day before her victory. In Bengal it falls in the middle of Durga Puja."],["What happens","The garba circles are fullest and last longest tonight. In many homes in the south, books, musical instruments and tools are placed before the goddess and left untouched for the day, called Ayudha Puja. In the north, families invite nine young girls into their home, wash their feet and feed them, honouring them as forms of the goddess."]],"art":"The garba scene again, with all nine pips lit."},
+  "Dusshera": {"src":"Hindu","tier":"festive","scene":"ravana","bg":"#170811","eyebrow":"Celebrating","w":2,"short":"Good beats evil. Giant figures of the demon king Ravana are burned, fireworks packed inside them.","full":[["What is it?","Dusshera, also called Vijayadashami, “the tenth day of victory”, celebrates good beating evil, in two stories at once. In one, Rama defeats Ravana, the ten-headed demon king who kidnapped Sita. In the other, Durga finally defeats the buffalo demon Mahishasura."],["What happens","In north India, plays of the Ramayana called Ramlila are acted out over the nine nights before. On the last evening, giant figures of Ravana, sometimes taller than a house and stuffed with fireworks, are set alight with a flaming arrow, and the crowd cheers as they burn. In Bengal the Durga statues are carried to the river, and in Mysore elephants dressed in gold lead a royal procession."]],"art":"A flaming arrow strikes a ten-headed effigy of Ravana, which burns and bursts into fireworks."},
+  "Sharad Purnima": {"src":"Hindu","tier":"festive","scene":"moon","v":"kheer","bg":"#0E1430","eyebrow":"Tonight","short":"The brightest full moon of the year. Rice pudding is left out overnight to soak up the moonlight.","full":[["What is it?","Sharad Purnima is the full moon after the monsoon rains, when the air is clear and the moon is said to be at its brightest of the year. In the stories it is the night Krishna danced with the village girls in a great circle in the moonlight."],["What happens","People make kheer, a rice pudding with milk, sugar and cardamom, and leave it outside overnight under thin cloth to soak up the moonlight, then eat it in the morning. In Bengal it is Kojagari Lakshmi Puja: Lakshmi is said to visit homes asking “Ko jagarti?”, which means “Who is awake?”, and to bless those who are."]],"art":"The brightest full moon of the year shines into a steaming bowl of kheer."},
+  "Karwa Chauth": {"src":"Hindu","tier":"festive","scene":"moon","v":"sieve","bg":"#0E1430","eyebrow":"Tonight","short":"Married women fast from sunrise until the moon appears, then look at it through a sieve before eating.","full":[["What is it?","Karwa Chauth is a day when married women, mostly in north India, fast for their husbands’ long and healthy lives. Karwa is the clay pot of water used in the prayers, and chauth means the fourth day after the full moon."],["What happens","Women eat a meal called sargi before sunrise, then go without food or even water all day. They dress up, have mehndi patterns drawn on their hands and gather in the evening to hear the story of the day. When the moon rises they look at it through a sieve, then at their husband’s face, and he gives them their first sip of water. Many husbands now fast too."]],"art":"The rising moon is seen through a sieve, then shines clear."},
+  "National Engineering Day": {"src":"Observance","tier":"quiet","motif":"gear","eyebrow":"Observance","short":"A day to show what engineers actually do, from bridges and wind turbines to games consoles.","full":[["","Run by the Royal Academy of Engineering since 2021, a day to show what engineers actually do: design the bridges, phones, wind turbines, games consoles and medical machines people use every day. Engineers solve problems, and a lot of them started out by taking things apart to see how they worked."]]},
+  "Dhan Teras": {"src":"Hindu","tier":"festive","scene":"diwali","v":"coins","bg":"#231028","eyebrow":"Diwali begins","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"short":"The first day of Diwali, and the day for buying something metal, which is meant to bring luck for the year.","full":[["What is it?","Dhan Teras is the first day of Diwali. Dhan means wealth, and teras the thirteenth day of the moon’s cycle. It honours Dhanvantari, the doctor of the gods, who rose out of the ocean holding a pot of the nectar of life, and Lakshmi, the goddess of good fortune."],["What happens","It is the day for buying something metal, gold, silver or even a new steel pot or spoon, which is meant to bring luck for the year, so the markets are packed. Houses are cleaned and the first lamps of Diwali are lit. One lamp is set facing south, the direction of Yama, the god of death, asking him to keep the family safe."]],"art":"The first lamp of Diwali is lit while gold coins fall."},
+  "Diwali": {"src":"Hindu","tier":"festive","scene":"diwali","bg":"#231028","eyebrow":"Celebrating","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"w":3,"short":"The festival of lights. Rows of little clay lamps, rangoli at the door, sweets for everyone and fireworks.","full":[["What is it?","Diwali is the festival of lights, celebrated by over a billion people: Hindus, Sikhs and Jains. For many Hindus it remembers Prince Rama coming home after fourteen years away, having rescued his wife Sita from the demon king Ravana. It was a night with no moon, so people lit rows of lamps to show him the way. Sikhs mark Bandi Chhor Divas at the same time, remembering Guru Hargobind being freed from prison."],["What happens","Houses are cleaned from top to bottom, and patterns called rangoli are made at the front door with coloured powder, rice or petals. After dark, little clay lamps called diyas go on every step and windowsill. Families visit each other with boxes of sweets, welcome Lakshmi, the goddess of good fortune, into the home, and finish with fireworks."]],"art":"A rangoli draws itself, one more lamp is lit each day, and rockets burst overhead."},
+  "World Science Day for Peace and Development": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"United Nations day","short":"A UNESCO day for science that is shared openly and used to make life better.","full":[["","A day started by UNESCO, the United Nations body for education, science and culture, in 2001. It is for science done in the open and shared across borders, and used for things like clean water, vaccines and warning of earthquakes, rather than for winning."]]},
+  "Bhai Dooj": {"src":"Hindu","tier":"festive","scene":"diwali","v":"calm","bg":"#231028","eyebrow":"Last day of Diwali","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"short":"The last day of Diwali, when sisters mark their brothers’ foreheads and feed them, and brothers bring gifts.","full":[["The story","Bhai Dooj comes two days after Diwali and celebrates brothers and sisters, a little like Raksha Bandhan. In the story Yama, the god of death, visited his sister Yamuna on this day. She welcomed him, marked his forehead and fed him so well that he promised any brother who visits his sister today will be blessed with a long life."],["What happens","Sisters invite their brothers home, put a tilak, a mark of red powder and rice, on their foreheads, say a small prayer with a lamp and feed them their favourite food. Brothers bring presents. In Bengal it is called Bhai Phonta, and in Nepal Bhai Tika, where the tika is made in seven colours."]],"art":"Every lamp lit, the rangoli finished, and a quieter sky."},
+  "Chhath Puja": {"src":"Hindu","tier":"festive","scene":"chhath","bg":"#2A0F2E","eyebrow":"Celebrating","short":"Families stand in rivers at sunset and again at sunrise to thank the sun.","full":[["What is it?","Chhath is a festival for Surya, the sun god, mostly in Bihar, Jharkhand and eastern Uttar Pradesh, and among Bihari families around the world. It thanks the sun for life on Earth and asks for health for the family. It lasts four days."],["What happens","People fast for about 36 hours, without even water. At sunset on the third day, families walk to a river or pond, stand waist-deep in the water and offer the setting sun fruit and sweets in bamboo baskets. They come back before dawn to do the same for the rising sun. It is one of the few festivals that thanks the setting sun first."]],"art":"The sun sets into the river, where families stand in the water holding up baskets."},
+  "Transgender Day of Remembrance": {"src":"Observance","tier":"quiet","motif":"candle","solemn":true,"eyebrow":"Remembrance","short":"Names of trans people killed in the past year are read aloud and candles are lit.","full":[["","Every year on 20 November, people gather to remember trans people around the world who were killed in the past year because of who they were. Their names are read out and candles are lit. It started in 1999, a year after a woman called Rita Hester was killed in Boston, and is now held in towns and cities all over the world."]]},
+  "Kartik Poornima": {"src":"Hindu","tier":"festive","scene":"riverlamps","bg":"#08102A","eyebrow":"Tonight","short":"Thousands of tiny lamps float down the river at Varanasi, so the water looks full of stars.","full":[["What is it?","Kartik Poornima is the full moon of the month of Kartik, about two weeks after Diwali. It is said to be the day Shiva defeated the demon Tripurasura, and the day the gods themselves come down to bathe in the river Ganga. Sikhs celebrate Guru Nanak’s birthday on this full moon too."],["What happens","In Varanasi it is Dev Deepawali, the Diwali of the gods: lamps are lit all along the stone steps leading down to the river, and thousands more float on it, so the water looks full of stars. People bathe in the river at dawn, and in Odisha families float little boats to remember the sailors among their ancestors."]],"art":"Lamps float down the river past steps lined with flames."},
+  "International Day for the Elimination of Violence against Women": {"src":"Observance","tier":"quiet","motif":"ribbonorange","eyebrow":"United Nations day","short":"A United Nations day, and the start of sixteen days of action against violence towards women and girls.","full":[["","A United Nations day for ending violence against women and girls, which around one in three women around the world face at some point in their lives. The date remembers the Mirabal sisters, killed in 1960 for standing up to a dictator in the Dominican Republic. It starts sixteen days of action that end on Human Rights Day, 10 December. Its colour is orange."]]},
+  "Advent": {"src":"Advent","tier":"festive","scene":"advent","bg":"#0F241B","eyebrow":"Counting down","w":1.5,"short":"The countdown to Christmas: one door a day from 1 December, and the last one on Christmas Eve.","full":[["What is it?","Advent means “coming”. It is the time before Christmas when Christians get ready to celebrate the birth of Jesus. Advent calendars began in Germany in the 1800s, when families chalked a line on the door for every day left until Christmas Eve. Calendars with little doors to open came about a hundred years ago."],["What happens","Every morning from 1 December you open one door, and the last one, number 24, is Christmas Eve. Some homes burn an Advent candle down one mark a day, and many churches light one more candle on an Advent wreath each Sunday, with one in the middle for Christmas Day."]],"art":"Today’s door swings open, snow falls and the Advent candle burns down one mark a day."},
+  "World AIDS Day": {"src":"Observance","tier":"quiet","motif":"ribbon","solemn":true,"eyebrow":"Observance","short":"Support for people living with HIV, and remembrance of the many who died. Marked with a red ribbon.","full":[["","HIV is a virus that attacks the body’s defences. In the 1980s and 90s it killed millions of people, partly because many governments were slow to act and people living with it were treated badly. Today medicine means people with HIV can live long, healthy lives and cannot pass it on. The red ribbon, worn since 1991, shows support for people living with HIV and remembers those who died."]]},
+  "Dhanu Sankranti": {"src":"Hindu","tier":"festive","scene":"dhanu","bg":"#0A0F26","eyebrow":"Today","short":"The sun moves into Sagittarius, the archer, starting a month thought especially good for prayer.","full":[["What is it?","Sankranti is the day the sun moves into a new sign of the zodiac, which happens twelve times a year. Dhanu Sankranti is when it moves into Dhanu, the archer, which is Sagittarius. It starts a month called Dhanurmasa, thought especially good for prayer."],["What happens","In Odisha the god Jagannath is offered special sweet rice cakes. Around this time the town of Bargarh puts on Dhanu Jatra, said to be the world’s biggest open-air theatre: for eleven days the whole town becomes the set for a play about Krishna and his wicked uncle, King Kansa. In Tamil Nadu, women draw extra-large kolams every morning of this month."]],"art":"The sun drifts into the stars of Sagittarius, the archer, as they join up."},
+  "Geeta Jayanti": {"src":"Hindu","tier":"festive","scene":"gita","bg":"#2A1206","eyebrow":"Today","short":"Marks the day the Bhagavad Gita was spoken: a conversation about doing the right thing when it is hard.","full":[["What is it?","The Bhagavad Gita, “the song of God”, is a conversation in the middle of the Mahabharata. Just before a great battle, the warrior Arjuna looks across the field, sees his cousins, teachers and friends on the other side, and puts down his bow. His charioteer, the god Krishna, talks to him about duty, courage and how to do the right thing when it is hard."],["What happens","Geeta Jayanti marks the day Krishna is said to have spoken it. People read it aloud, sometimes all 700 verses at once, and in Kurukshetra, the town said to stand on the old battlefield, there is a big festival with lamps on the lake. It is one of the most read books in the world, and its ideas are still argued about today."]],"art":"A book’s pages turn and glow in front of a slowly turning chariot wheel."},
+  "Christmas Day": {"src":"UK","tier":"festive","scene":"christmas","bg":"#0C2219","eyebrow":"Celebrating","w":3,"short":"Christians celebrate the birth of Jesus. Family, food, presents, and Santa somewhere overhead.","full":[["The story","Christians celebrate the birth of Jesus, who they believe is the son of God, born in a stable in Bethlehem about 2,000 years ago. The story tells of shepherds visited by angels, and wise men who followed a bright star to find him, which is why there is often a star on top of the tree."],["Where our traditions come from","Decorated trees became popular in Britain in Victorian times, after Queen Victoria and Prince Albert, who was German, put one up. Crackers were invented by a London sweet-maker called Tom Smith in the 1840s. Father Christmas is a mix of an old English winter figure and Saint Nicholas, a bishop famous for giving presents in secret."]],"art":"A tree of twinkling lights, a star that flares, a strand of bulbs and snow."},
+  "Boxing Day": {"src":"UK","tier":"festive","scene":"christmas","v":"boxing","bg":"#0C2219","eyebrow":"Bank holiday","short":"The day after Christmas, named after the Christmas boxes once given to workers. Leftovers and long walks.","full":[["Why “Boxing”?","The name probably comes from Christmas boxes: money or presents given to servants, delivery people and workers, many of whom had to work on Christmas Day itself. Churches also opened their alms boxes and shared the money out among the poor. It is St Stephen’s Day too."],["What happens","These days it is a day for leftovers, long walks, visiting the relatives you did not see yesterday, football matches and a lot of sitting down."]],"art":"The Christmas scene, with the tree’s lights a little dimmer."},
+  "Boxing Day (observed)": {"src":"UK","tier":"quiet","motif":"sun","eyebrow":"Bank holiday","short":"Boxing Day fell on a Saturday, so the bank holiday moves to today.","full":[["","When Boxing Day falls on a weekend, the bank holiday moves to the next weekday so everyone still gets a day off. In 2026 Boxing Day is a Saturday, so the holiday is on Monday 28 December."]]},
+};
+
+/* ------------------------------------------------------------------ *
+ * Celebrations
+ *
+ * What is on today, how far through it we are, and what to say about it.
+ * The calendars give each festival as one day ("Durga Puja begins"), so a
+ * five-day festival used to show on its first day and vanish on the
+ * second. The card now reads the calendars a few weeks back and a few
+ * days ahead and works the run out itself: Navaratri from its first night
+ * to Maha Navami, Diwali from Dhan Teras to Bhai Dooj, Durga Puja for
+ * five days, and Advent and the month-long observances from the date.
+ *
+ * The words live here too, one short line for Home and a fuller
+ * explanation for the full-screen view, written to be read by a child.
+ * The dashboard names the sources; it no longer carries five copies of
+ * every explainer.
+ * ------------------------------------------------------------------ */
+
+/* The calendars' own spellings, where they differ from the table's. */
+const FEST_ALIAS = {
+  "Makarsankranti / Pongal": "Makar Sankranti / Pongal",
+  "Ugadi / Gudi Padwa / Telugu New Year": "Ugadi / Gudi Padwa",
+  "Vaisakhi / Baisakhi / Vishu": "Vaisakhi / Vishu",
+  "Durga Puja begins": "Durga Puja",
+  "Navaratri begins": "Navaratri",
+  "Navaratri ends / Maha Navami": "Maha Navami",
+};
+
+const festNorm = (name) => String(name || "").replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim();
+const FEST_INDEX = {};
+for (const key of Object.keys(FEST_TABLE)) FEST_INDEX[festNorm(key)] = key;
+for (const [from, to] of Object.entries(FEST_ALIAS)) FEST_INDEX[festNorm(from)] = to;
+
+/* A calendar's or a sensor's name for something, as the table knows it.
+   Something the table has never heard of keeps its own name and gets the
+   plain card, rather than disappearing. */
+function festKey(name) {
+  const n = festNorm(name);
+  return n ? (FEST_INDEX[n] || n) : "";
+}
+
+function festEntry(key) {
+  return FEST_TABLE[key] || { tier: "quiet", motif: "star", eyebrow: "Today", short: "", full: [] };
+}
+
+/* How a run is worked out from the calendar. `days` counts from the named
+   day; `until` stretches to another event's day when the calendar has it;
+   `ends` puts the named day last, for Onam, whose calendar day is its
+   tenth. `daily` is what the days in between are called. */
+const FEST_RUNS = {
+  "Navaratri": { until: "Maha Navami", days: 9 },
+  "Durga Puja": { days: 5 },
+  "Dhan Teras": { until: "Bhai Dooj", days: 5, daily: "Diwali" },
+  "Onam": { days: 10, ends: true },
+  "Ganesh Chaturthi": { days: 10 },
+  "Makar Sankranti / Pongal": { days: 4, first: -1 },
+  "Puri Rath Yatra": { days: 9 },
+};
+
+/* Observances that last a month or so, from the date alone. */
+const FEST_MONTHS = [
+  { name: "LGBT+ History Month", from: [2, 1], to: [2, 0] },
+  { name: "Pride Month", from: [6, 1], to: [6, 30] },
+  { name: "South Asian Heritage Month", from: [7, 18], to: [8, 17] },
+  { name: "Black History Month", from: [10, 1], to: [10, 31] },
+];
+
+const festDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const festDiff = (a, b) => Math.round((festDay(a) - festDay(b)) / 86400000);
+const festDate = (iso) => {
+  if (!iso) return null;
+  const s = typeof iso === "string" ? iso : (iso.date || iso.dateTime || "");
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+};
+const FEST_WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const FEST_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const festShort = (d) => `${FEST_WD[d.getDay()]} ${d.getDate()} ${FEST_MON[d.getMonth()]}`;
+
+/* Everything on today, loudest first. Each item: key, day, of, rank, and
+   the line that says how far through it is.
+
+   Rank decides the lead: a festival's own day (and Advent) beats a day in
+   the middle of a run, which beats a bank holiday or an awareness day,
+   which beats the month-long observances. Within a rank the bigger
+   festival wins: Durga Puja over Maha Navami, Advent over the small days
+   that fall inside it. */
+function festActive(b, nowArg) {
+  const now = festDay(nowArg ? new Date(nowArg) : new Date());
+  const lists = Array.isArray(b.events) ? b.events : [b.events];
+  const days = [];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const ev of list) {
+      const date = festDate(ev && ev.start);
+      const key = festKey(ev && ev.summary);
+      if (date && key) days.push({ key, date });
+    }
+  }
+  /* The same thing found twice -- a run's day and its own calendar day --
+     is one item: the louder rank, and whichever knows how far through. */
+  const found = new Map();
+  const add = (item) => {
+    const was = found.get(item.key);
+    if (!was) { found.set(item.key, item); return; }
+    const keep = item.rank < was.rank ? item : was;
+    const other = keep === item ? was : item;
+    if (!keep.of && other.of) Object.assign(keep, { day: other.day, of: other.of, until: other.until });
+    found.set(item.key, keep);
+  };
+
+  /* A preview names one event and shows it as if it were today. */
+  const preview = festKey(b.preview);
+  if (preview) {
+    const run = FEST_RUNS[preview];
+    const of = run ? run.days : 0;
+    add({ key: preview, day: of ? 1 : 0, of, rank: 0 });
+    return festRanked(found);
+  }
+
+  for (const { key, date } of days) {
+    const off = festDiff(now, date);
+    const run = FEST_RUNS[key];
+    const of = run ? festRunLength(run, key, date, days) : 0;
+    if (off === 0) {
+      add({ key, day: run ? (run.ends ? of : 1 - (run.first || 0)) : 0, of,
+        rank: festEntry(key).tier === "festive" ? 1 : 4, until: run ? festRunEnd(run, date, of) : null });
+      continue;
+    }
+    if (!run) continue;
+    const start = new Date(date);
+    if (run.ends) start.setDate(start.getDate() - (of - 1));
+    if (run.first) start.setDate(start.getDate() + run.first);
+    const into = festDiff(now, start);
+    if (into < 0 || into >= of) continue;
+    add({ key: run.daily || key, day: into + 1, of, rank: 2, until: festRunEnd(run, date, of) });
+  }
+  /* The day a run ends on is that day by name -- Maha Navami, Bhai Dooj --
+     and it is still the last day of the run. */
+  for (const [start, run] of Object.entries(FEST_RUNS)) {
+    const end = run.until && found.get(run.until);
+    const mid = found.get(run.daily || start);
+    if (!end || !mid || mid.rank !== 2) continue;
+    if (!end.of) Object.assign(end, { day: mid.day, of: mid.of, until: mid.until });
+    found.delete(run.daily || start);
+  }
+
+  /* Advent, until Christmas Eve. */
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  if (m === 12 && d <= 24) add({ key: "Advent", day: d, of: 24, rank: 1 });
+
+  /* An awareness day, from the sensor that knows them. */
+  const obs = festKey(b.observance);
+  if (obs) add({ key: obs, day: 0, of: 0, rank: 4 });
+
+  for (const span of FEST_MONTHS) {
+    const y = now.getFullYear();
+    const from = new Date(y, span.from[0] - 1, span.from[1]);
+    const to = span.to[1] ? new Date(y, span.to[0] - 1, span.to[1]) : new Date(y, span.to[0], 0);
+    if (now < from || now > to) continue;
+    add({ key: span.name, day: festDiff(now, from) + 1, of: festDiff(to, from) + 1, rank: 5 });
+  }
+  return festRanked(found);
+}
+
+function festRunLength(run, key, date, days) {
+  if (run.until) {
+    const end = days.find((x) => x.key === run.until && festDiff(x.date, date) > 0 && festDiff(x.date, date) < 14);
+    if (end) return festDiff(end.date, date) + 1;
+  }
+  return run.days;
+}
+
+function festRunEnd(run, date, of) {
+  const end = new Date(date);
+  if (!run.ends) end.setDate(end.getDate() + of - 1 + (run.first || 0));
+  return end;
+}
+
+function festRanked(found) {
+  return [...found.values()].sort((a, b) => a.rank - b.rank
+    || (festEntry(b.key).w || 1) - (festEntry(a.key).w || 1));
+}
+
+/* The line under the name: how far through, and until when. */
+function festWhen(item) {
+  if (item.key === "Advent") {
+    const left = 25 - item.day;
+    return `<b>Door ${item.day} of 24</b> · ${left} ${left === 1 ? "sleep" : "sleeps"} to Christmas`;
+  }
+  if (!item.of) return "";
+  if (item.day >= item.of) return `<b>Last day</b> · day ${item.day} of ${item.of}`;
+  return `<b>Day ${item.day} of ${item.of}</b>${item.until ? ` · until ${esc(festShort(item.until))}` : ""}`;
+}
+
+function festPips(item, entry) {
+  if (!item.of || item.key === "Advent") return "";
+  const day = Math.max(0, Math.min(item.of, item.day));
+  if (item.of > 12) {
+    return `<div class="fspips bar" role="img" aria-label="Day ${day} of ${item.of}">`
+      + `<i style="width:${(day / item.of * 100).toFixed(1)}%"></i></div>`;
+  }
+  const pal = (entry.pal || ["#FFD166", "#F28A2E", "#E84F9A", "#7FD1FF"]).filter((c) => cssColor(c));
+  let out = "";
+  for (let i = 0; i < item.of; i += 1) {
+    const on = i < day;
+    out += `<span class="${on ? "on" : ""}${i === day - 1 ? " now" : ""}"`
+      + `${on ? ` style="--c:${esc(pal[i % pal.length])}"` : ""}></span>`;
+  }
+  return `<div class="fspips" role="img" aria-label="Day ${day} of ${item.of}">${out}</div>`;
+}
+
+const FEST_MOTIF = {
+  atom: '<circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/>',
+  star: '<path d="M12 2.5l2.9 6.2 6.6.7-5 4.5 1.4 6.6L12 17.2 6.1 20.5l1.4-6.6-5-4.5 6.6-.7z"/>',
+  globe: '<circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19M12 2.5c3 3 3 16 0 19M12 2.5c-3 3-3 16 0 19"/>',
+  egg: '<path d="M12 2.5c4 0 7 6.5 7 11a7 7 0 0 1-14 0c0-4.5 3-11 7-11z"/><path d="M5.5 13l2.5-2 2.5 2 2.5-2 2.5 2 2.5-2"/>',
+  rocket: '<path d="M12 2.5c3 2 4.5 5.5 4.5 9.5l-2 4h-5l-2-4c0-4 1.5-7.5 4.5-9.5z"/><circle cx="12" cy="9.5" r="1.8"/><path d="M9.5 16l-3 3.5M14.5 16l3 3.5M12 17v4"/>',
+  flower: '<circle cx="12" cy="12" r="2.5"/><path d="M12 9.5c-2-4 2-7 0-7s2 3 0 7zM12 14.5c2 4-2 7 0 7s-2-3 0-7zM9.5 12c-4 2-7-2-7 0s3-2 7 0zM14.5 12c4-2 7 2 7 0s-3 2-7 0z"/>',
+  sun: '<circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
+  ship: '<path d="M3 15h18l-3 5H6z"/><path d="M6 15V9h12v6M9 9V5h6v4"/><path d="M2 22c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 4-1"/>',
+  book: '<path d="M12 6c-2-1.5-5-2-9-2v14c4 0 7 .5 9 2 2-1.5 5-2 9-2V4c-4 0-7 .5-9 2z"/><path d="M12 6v14"/>',
+  gear: '<circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4M4.6 4.6l2.8 2.8M16.6 16.6l2.8 2.8M4.6 19.4l2.8-2.8M16.6 7.4l2.8-2.8"/>',
+  ribbon: '<path d="M12 3c-2.5 0-3.5 2-3.5 3.5 0 2 1.5 4 3.5 6.5 2-2.5 3.5-4.5 3.5-6.5C15.5 5 14.5 3 12 3z"/><path d="M12 13l-5 8.5M12 13l5 8.5"/>',
+};
+FEST_MOTIF.ribbonorange = FEST_MOTIF.ribbon;
+/* A ribbon is its cause's colour. Everything else wears the card's accent. */
+const FEST_MOTIF_COL = { ribbon: "#D7263D", ribbonorange: "#F28A2E" };
+
+function festMotif(m, size) {
+  if (m === "candle") return `<span class="fscandle" aria-hidden="true"><i></i><u></u></span>`;
+  return `<svg class="fsmotif" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"`
+    + `${FEST_MOTIF_COL[m] ? ` style="color:${FEST_MOTIF_COL[m]}"` : ""}>${FEST_MOTIF[m] || FEST_MOTIF.star}</svg>`;
+}
+
+function festAlsoLine(also) {
+  if (!also.length) return "";
+  const names = also.slice(0, 2).map((x) => esc(x.key)).join(" · ");
+  const more = also.length > 2 ? ` · and ${also.length - 2} more` : "";
+  return `<div class="fsalso"><i>Also today</i> ${names}${more}</div>`;
+}
+
+const festXp = () => `<span class="fsxp" aria-hidden="true">${iconMarkup("mdi:arrow-expand")}</span>`;
+
+/* The new body: today's lead, drawn as its scene, with one line for anything
+   else on. The words are short here; the whole of them opens full screen. */
+function festScenesBody(b) {
+  const list = festActive(b, b.now);
+  if (!list.length) return "";
+  const lead = list[0];
+  const entry = festEntry(lead.key);
+  const also = festAlsoLine(list.slice(1));
+  const open = ` role="button" tabindex="0" aria-label="${esc(lead.key)}: open full screen" data-festopen="${esc(lead.key)}"`;
+  if (entry.tier !== "festive") {
+    return `<div class="fsquiet"${open}>${festMotif(entry.motif, 26)}`
+      + `<div class="fsqbody"><div class="fseye">${esc(entry.eyebrow || "Today")}</div>`
+      + `<h4>${esc(lead.key)}</h4>${festWhen(lead) ? `<div class="fsqwhen">${festWhen(lead)}</div>` : ""}`
+      + `${entry.short ? `<p>${esc(entry.short)}</p>` : ""}${also}</div>${festXp()}</div>`;
+  }
+  return `<canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsscrim"></span>`
+    + `<div class="fsin"${open}>${festXp()}<div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div>`
+    + `<div class="fsname">${esc(lead.key)}</div>`
+    + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}${festPips(lead, entry)}`
+    + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>`;
+}
+
+/* The full-screen view of one event: its scene large, then all of the
+   words, then a line for each other thing on today that opens in turn. */
+function festSheetMarkup(item, others) {
+  const entry = festEntry(item.key);
+  const story = (entry.full || []).map(([h, p]) => (h ? `<h5>${esc(h)}</h5>` : "") + `<p>${esc(p)}</p>`).join("")
+    || (entry.short ? `<p>${esc(entry.short)}</p>` : "");
+  const also = others.length
+    ? `<div class="fsmore"><h5>Also today</h5>${others.map((o) => `<button type="button" class="fsgo" data-festgo="${esc(o.key)}">`
+      + `<b>${esc(o.key)}</b><span>${esc(festEntry(o.key).short || "")}</span></button>`).join("")}</div>`
+    : "";
+  const close = `<div class="fsclosebar"><button type="button" class="fsclose" aria-label="Close" data-fsclose>${iconMarkup("mdi:close")}</button></div>`;
+  if (entry.tier !== "festive") {
+    return `<div class="fsbox quiet">${close}<div class="fshead">${festMotif(entry.motif, 56)}</div>`
+      + `<div class="fsbody"><div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsbig">${esc(item.key)}</div>`
+      + `${festWhen(item) ? `<div class="fswhen">${festWhen(item)}</div>` : ""}<div class="fsstory">${story}</div>${also}</div></div>`;
+  }
+  const doors = item.key === "Advent" ? `<div class="fsdoors">${Array.from({ length: 24 }, (_, i) => {
+    const n = i + 1;
+    return `<span class="${n < item.day ? "open" : n === item.day ? "today" : "shut"}"><b>${n}</b></span>`;
+  }).join("")}</div>` : "";
+  return `<div class="fsbox" style="--fg:${esc(cssColor(entry.bg) || "#1A1426")}">${close}`
+    + `<div class="fsstage"><canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsfade"></span></div>`
+    + `<div class="fsbody"><div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div><div class="fsbig">${esc(item.key)}</div>`
+    + `${festWhen(item) ? `<div class="fswhen">${festWhen(item)}</div>` : ""}${festPips(item, entry)}${doors}`
+    + `<div class="fsstory">${story}</div>${also}</div></div>`;
+}
+
+/* One painter per canvas: the card's scene and the sheet's each have one.
+   Kept across repaints, so a light switching somewhere in the house does
+   not send Santa back to the start of his run. */
+const FEST_FPS = 30;
+class FestPainter {
+  constructor() {
+    this.canvas = null; this.raf = 0; this.visible = true; this.key = ""; this.draw = null;
+    this.t0 = 0; this.last = 0; this.w = 0; this.h = 0;
+    this.still = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  attach(canvas, scene, v) {
+    const key = `${scene}|${v || ""}`;
+    if (key !== this.key || !this.draw) {
+      const make = FEST_SCENES[scene];
+      this.key = key;
+      this.draw = make ? make({}, v || "") : null;
+      this.warm = false;
+    }
+    if (canvas !== this.canvas) {
+      this.detach();
+      this.canvas = canvas;
+      this.ctx = canvas.getContext("2d");
+      if (typeof IntersectionObserver === "function") {
+        this.observer = new IntersectionObserver((entries) => {
+          this.visible = entries.some((e) => e.isIntersecting);
+          if (this.visible) this.run();
+        });
+        this.observer.observe(canvas);
+      }
+      if (typeof ResizeObserver === "function") {
+        this.sizer = new ResizeObserver(() => this.size());
+        this.sizer.observe(canvas);
+      }
+      this.size();
+    }
+    this.run();
+  }
+
+  size() {
+    if (!this.canvas) return;
+    const r = this.canvas.getBoundingClientRect();
+    const dpr = Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+    if (!r.width || !r.height) return;
+    this.w = r.width; this.h = r.height;
+    this.canvas.width = Math.round(r.width * dpr);
+    this.canvas.height = Math.round(r.height * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    /* A composed picture on arrival rather than the first frame of
+       everything: snow already falling, the rangoli part drawn. Times
+       under five are the warm-up; the scenes that need a live clock
+       (Santa) wait for five. */
+    if (this.draw) for (let i = 0; i < (this.still ? 90 : 30); i += 1) this.draw(this.ctx, this.w, this.h, 4 + i / 30, 1 / 30);
+  }
+
+  stop() {
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  }
+
+  detach() {
+    this.stop();
+    if (this.observer) this.observer.disconnect();
+    if (this.sizer) this.sizer.disconnect();
+    this.observer = null; this.sizer = null; this.canvas = null; this.ctx = null;
+  }
+
+  run() {
+    if (this.raf || this.still || !this.canvas || !this.draw || typeof requestAnimationFrame !== "function") return;
+    const loop = (now) => {
+      this.raf = 0;
+      if (!this.canvas || !this.canvas.isConnected || !this.visible) return;
+      this.raf = requestAnimationFrame(loop);
+      if (now - this.last < 1000 / FEST_FPS - 2) return;
+      if (!this.t0) this.t0 = now;
+      const dt = this.last ? Math.max(0, Math.min(.05, (now - this.last) / 1000)) : 1 / FEST_FPS;
+      this.last = now;
+      if (this.w && this.h) this.draw(this.ctx, this.w, this.h, 5 + (now - this.t0) / 1000, dt);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+}
+
+/* What a scene is told besides its name: Advent's door, else the entry's
+   own variant. */
+function festVariant(item, entry) {
+  return item && item.key === "Advent" ? String(item.day || 1) : (entry.v || "");
+}
+
+/* The display face for an event's name, fetched once for the whole page.
+   Georgia stands in until it arrives, and for good if it never does. */
+let FEST_FONT = false;
+function festFont() {
+  if (FEST_FONT || typeof document === "undefined") return;
+  FEST_FONT = true;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Rozha+One&display=swap";
+  document.head.appendChild(link);
+}
 
 /* Festival art is generated rather than stored, so one function serves every
    palette and every count. It lives beside WEATHER_ART for the same reason
@@ -11421,6 +13175,7 @@ const BODIES = {
    */
   festival(b) {
     if (!b || typeof b !== "object") return "";
+    if (b.scenes) return festScenesBody(b);
     const palette = festPalette(b);
     const decor = Array.isArray(b.decor) ? b.decor : [];
     const has = (name) => decor.indexOf(name) >= 0;
@@ -12662,6 +14417,7 @@ function bodyIsEmpty(type, b) {
       return isBlank(b.info) && !b.action;
     /* Nothing to explain and no day to count is not a celebration. */
     case "festival":
+      if (b.scenes) return !festActive(b, b.now).length;
       return isBlank(b.text) && !(Number(b.of) > 0);
     /* A zone with no target to show and nothing to drive is not a control,
        and a card with nothing to say renders nothing rather than a shell. */
@@ -16269,6 +18025,7 @@ class SpectraCard extends HTMLElement {
     if (this._sky) this._sky.detach();
     if (this._day) this._day.detach();
     if (this._ahead) this._ahead.detach();
+    if (this._fest) this._fest.detach();
     if (this._diary) { this._diary.detach(); this._diary.box = null; }
     if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     /* A camera stream left running off-screen is a camera left streaming
@@ -16475,7 +18232,16 @@ class SpectraCard extends HTMLElement {
         type: "call_service",
         domain: "calendar",
         service: "get_events",
-        service_data: { duration: { days: source.days } },
+        /* `back` reads from midnight that many days ago, for a card that
+           needs to know what began before today -- a festival's first day. */
+        service_data: source.back
+          ? (() => {
+            const from = new Date();
+            from.setHours(0, 0, 0, 0);
+            from.setDate(from.getDate() - source.back);
+            return { start_date_time: from.toISOString(), duration: { days: source.back + source.days } };
+          })()
+          : { duration: { days: source.days } },
         target: { entity_id: source.entity },
         return_response: true,
       }),
@@ -16704,6 +18470,8 @@ class SpectraCard extends HTMLElement {
       this._ccSheet.refresh(model);
       return;
     }
+    /* A celebration open full screen holds the card the same way. */
+    if (this._fsSheet && this._holder.contains(this._fsSheet.wrap)) return;
     this._applyPending(model);
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
@@ -16999,7 +18767,9 @@ class SpectraCard extends HTMLElement {
     /* Only a body with nothing in it needs to explain itself, so the ask is
        never made for the cards that read straight off the state machine. */
     const bare = bodyIsEmpty(type, model.body);
-    const waiting = bare ? this._awaiting() : "";
+    /* A celebration card with nothing on is simply not there, waiting or
+       not: "Waiting for the calendar" on an ordinary Tuesday is noise. */
+    const waiting = bare && !(type === "festival" && model.body && model.body.scenes) ? this._awaiting() : "";
     const empty = bare && !waiting;
     /* Hiding a card in the dashboard editor makes it unselectable, so a
        preview always renders. */
@@ -17027,6 +18797,11 @@ class SpectraCard extends HTMLElement {
     /* A festival dresses the card itself rather than a div inside it, so the
        wash reaches the real edge and the bulbs sit on the real border. */
     const fb = type === "festival" ? (model.body || {}) : null;
+    /* The new festival body is its own scene: the card wears the event's
+       ground and the canvas covers it edge to edge. */
+    const fsLead = fb && fb.scenes ? festActive(fb, fb.now)[0] : null;
+    const fsEntry = fsLead ? festEntry(fsLead.key) : null;
+    const fsGround = fsEntry && fsEntry.tier === "festive" ? cssColor(fsEntry.bg) || "#1A1426" : null;
     /* The wash lands in the card's style attribute and the palette in the
        bulbs', so both are checked here exactly as the body checks them:
        a wash that is not a colour is no wash, not a stylesheet. */
@@ -17049,6 +18824,7 @@ class SpectraCard extends HTMLElement {
       + (config.invert ? " invert" : "")
       + (tappable ? " tappable" : "")
       + (festive ? " festive" : "")
+      + (fsGround ? " festscene" : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "")
       + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "")
@@ -17063,7 +18839,8 @@ class SpectraCard extends HTMLElement {
       `<div class="${classes}${aside ? " split" : ""}"`,
       ` style="${accentStyle(model.accent)}`
         + `${outline ? levelStyle(outline) : ""}`
-        + `${festive ? `;--fg:${esc(wash)}` : ""}"`,
+        + `${festive ? `;--fg:${esc(wash)}` : ""}`
+        + `${fsGround ? `;--fg:${esc(fsGround)}` : ""}"`,
       tappable ? ` role="button" tabindex="0"` : "",
       `>`,
       /* Behind the words and anchored to the card, so snow falls the full
@@ -17094,6 +18871,7 @@ class SpectraCard extends HTMLElement {
     if (type === "ahead") this._aheadAttach(model.body);
     if (type === "diary") this._diaryAttach();
     if (type === "clock") this._seasonAttach(model.body);
+    if (type === "festival") this._festAttach(model.body);
   }
 
   /* The clock's season: one painter per card, kept across the minute's
@@ -19257,6 +21035,7 @@ class SpectraCard extends HTMLElement {
     press("[data-aidismiss]", (el) => onPress(el, () => this._callAction({
       service: "home_signals.dismiss", data: { item_id: el.dataset.aidismiss } })));
     press("[data-frsummary]", (el) => { if (!el.disabled) this._frigateSummarise(); });
+    press("[data-festopen]", (el) => this._festSheet(el.dataset.festopen));
 
     /* A photo that will not load -- Mealie down, a recipe whose picture
        was removed -- takes itself away rather than leaving a broken frame. */
@@ -24331,6 +26110,77 @@ class SpectraCard extends HTMLElement {
      off the page for a moment, and a <video> taken off the page stops --
      so state changes are handed to it instead, and the card catches up
      when it closes. */
+  /* The celebration's scene: one painter for the card, kept across
+     repaints like the season's. */
+  _festAttach(b) {
+    const canvas = this._holder.querySelector(".fscanvas");
+    if (!canvas) {
+      if (this._fest) this._fest.stop();
+      return;
+    }
+    const lead = festActive(b || {}, (b || {}).now)[0];
+    const entry = lead ? festEntry(lead.key) : null;
+    if (!entry || !entry.scene) return;
+    festFont();
+    if (!this._fest) this._fest = new FestPainter();
+    this._fest.attach(canvas, entry.scene, festVariant(lead, entry));
+  }
+
+  /* Full screen, for one event and the others on today. Opened from the
+     card, closed by the cross, Escape, or a tap outside it on a wide
+     screen. The card holds its repaints while it is up, the same as the
+     camera's live view, so the house changing underneath does not take
+     it off the screen. */
+  _festSheet(name) {
+    const b = (this._model && this._model.body) || {};
+    const list = festActive(b, b.now);
+    const show = (key) => {
+      const item = list.find((x) => x.key === key) || { key, day: 0, of: 0 };
+      const others = list.filter((x) => x.key !== key);
+      const s = this._fsSheet;
+      if (s.painter) { s.painter.detach(); s.painter = null; }
+      s.wrap.setAttribute("aria-label", key);
+      s.wrap.innerHTML = festSheetMarkup(item, others);
+      const box = s.wrap.querySelector(".fsbox");
+      if (box) box.scrollTop = 0;
+      const entry = festEntry(key);
+      const canvas = s.wrap.querySelector(".fscanvas");
+      if (canvas && entry.scene) {
+        s.painter = new FestPainter();
+        s.painter.attach(canvas, entry.scene, festVariant(item, entry));
+      }
+      s.wrap.querySelector("[data-fsclose]").addEventListener("click", () => this._festClose());
+      s.wrap.querySelectorAll("[data-festgo]").forEach((el) => el.addEventListener("click", () => show(el.dataset.festgo)));
+      const close = s.wrap.querySelector("[data-fsclose]");
+      if (close && close.focus) close.focus();
+    };
+    if (!this._fsSheet) {
+      festFont();
+      const wrap = document.createElement("div");
+      wrap.className = "fsfull";
+      wrap.setAttribute("role", "dialog");
+      wrap.setAttribute("aria-modal", "true");
+      const s = { wrap, painter: null };
+      s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._festClose(); } };
+      document.addEventListener("keydown", s.onKey, true);
+      wrap.addEventListener("click", (event) => { if (event.target === wrap) this._festClose(); });
+      this._fsSheet = s;
+      this._holder.appendChild(wrap);
+    }
+    show(name);
+  }
+
+  _festClose() {
+    const s = this._fsSheet;
+    if (!s) return;
+    if (s.painter) s.painter.detach();
+    if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
+    if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
+    this._fsSheet = null;
+    this._signature = null;
+    if (this._hass && this._config) this._update();
+  }
+
   _cameraSheet() {
     if (this._ccSheet || !this._model) return;
     const model = this._model;
