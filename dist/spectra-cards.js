@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.186.1";
+const VERSION = "0.187.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4238,7 +4238,19 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    ahead. The painter says where now ends, as --ahead-now, and the readings
    and the figures keep to it. */
 .aheadbox { position:relative; height:calc(264px + max(0px, var(--pn-row-grow, 0px))); border-radius:4px; overflow:hidden; container-type:inline-size; }
-.aheadcanvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:pan-y; }
+.aheadcanvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:pan-y; cursor:pointer; }
+/* Full screen: the box is the screen, the readings larger, and the hours
+   are dragged rather than tapped. The way back sits clear of the cross. */
+.fsahead { overflow:hidden; }
+.fsahead .aheadbox { height:100%; border-radius:0; }
+.fsahead .aheadcanvas { touch-action:none; cursor:grab; }
+.fsahead .aheadbox .aheadback { top:calc(16px + env(safe-area-inset-top, 0px)); right:64px; padding:7px 12px 7px 9px; font-size:13px; }
+.fsahead .aheadbox .aheadwhen { top:calc(64px + env(safe-area-inset-top, 0px)); font-size:13px; }
+.fsahead .aheadbox .skyread { top:calc(64px + env(safe-area-inset-top, 0px)); left:24px; }
+.fsahead .aheadbox .skyhero { font-size:clamp(44px, 8cqw, 104px); }
+.fsahead .aheadbox .skycond, .fsahead .aheadbox .heronote { font-size:clamp(14px, 2cqw, 22px); }
+.fsahead .aheadbox .skyfc { font-size:clamp(13px, 1.7cqw, 18px); }
+.fsahead .fsclose { z-index:6; }
 /* Looking ahead: the way back at the top right, counting down as a ring,
    and the day and hour at the line. Only while the hours are pulled. */
 .aheadback { position:absolute; top:7px; right:8px; z-index:3; display:flex; align-items:center; gap:7px;
@@ -6191,6 +6203,11 @@ const BODY_TOOL = {
    has anything to open. Each draws the same symbol beside its title, so a
    card that opens full screen says so before it is pressed. */
 const BODY_EXPANDS = {
+  /* Now and next: the hours ahead, at the size of the screen and free to
+     drag. The card itself stays still, so it always reads from now. */
+  ahead(b) {
+    return Boolean(b);
+  },
   camera(b) {
     return Boolean(b) && (cameraOn(b.privacy) || Boolean(safePicture(b.picture)));
   },
@@ -10575,13 +10592,13 @@ class AheadPainter extends DayPainter {
     this.build(w, skyH, L);
     const U = this.axis.U;
     const nowH = (Date.now() - m.mid) / 3600000;
-    if (!once) this.bindScroll(canvas);
+    if (!once && this.free) this.bindScroll(canvas);
     /* As far as the hourly forecast goes, less what already shows. */
     const lastH = m.rows && m.rows.length ? m.rows[m.rows.length - 1].h + 1 : nowH;
     this.maxSc = Math.max(0, (U(Math.min(lastH, this.axis.H1)) - U(nowH)) * px - (w - x0) + 12);
     this.returnAfter = this.returnAfter || 30000;
-    if (!once) this.stepScroll(performance.now());
-    const sc = once ? 0 : (this.sc || 0);
+    if (!once && this.free) this.stepScroll(performance.now());
+    const sc = once || !this.free ? 0 : (this.sc || 0);
     const X = (hh) => x0 + (U(hh) - U(nowH)) * px - sc;
     const off = U(nowH) * px - x0 + sc;
     /* The hour at the line: now, or as far ahead as the hours are pulled. */
@@ -12871,7 +12888,7 @@ const BODIES = {
     const metrics = (Array.isArray(b.metrics) ? b.metrics : []).filter((m) => m && !isBlank(m.value));
     const said = [b.text, b.hero].filter((v) => !isBlank(v)).join(", ");
     return `<div class="aheadbox">`
-      + `<canvas class="aheadcanvas" role="img" aria-label="${esc(said || "Sky")}, and the hours ahead. Drag to look further ahead."></canvas>`
+      + `<canvas class="aheadcanvas" role="img" aria-label="${esc(said || "Sky")}, and the hours ahead."></canvas>`
       + `<button class="aheadback" type="button" hidden aria-label="Back to now">`
       + `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke-width="2" class="track"/>`
       + `<circle cx="10" cy="10" r="8" fill="none" stroke-width="2" class="ring" stroke-dasharray="50.27" transform="rotate(-90 10 10)"/></svg>`
@@ -18565,6 +18582,11 @@ class SpectraCard extends HTMLElement {
     }
     /* A celebration open full screen holds the card the same way. */
     if (this._fsSheet && this._holder.contains(this._fsSheet.wrap)) return;
+    /* So does Now and next, passing on the news. */
+    if (this._axSheet && this._holder.contains(this._axSheet.wrap)) {
+      this._axSheet.refresh(model);
+      return;
+    }
     this._applyPending(model);
     const signature = JSON.stringify(model);
     if (signature === this._signature) return;
@@ -19006,6 +19028,80 @@ class SpectraCard extends HTMLElement {
     this._ahead.label = this._holder.querySelector(".aheadleft");
     this._ahead.returnAfter = Math.max(3, Number((b || {}).return_after) || 30) * 1000;
     this._ahead.attach(canvas, aheadModel(b || {}, Date.now()));
+    /* The card does not scroll: a tap, or the symbol by the title, opens it
+       full screen, where the hours do. */
+    this._holder.querySelectorAll("[data-expand], .aheadcanvas").forEach((el) => {
+      if (el.aheadBound) return;
+      el.aheadBound = true;
+      const run = (event) => { event.stopPropagation(); this._aheadSheet(); };
+      el.addEventListener("click", run);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); run(event); }
+      });
+    });
+  }
+
+  /* Now and next, full screen: the whole screen, as a celebration's and the
+     camera's are, with the hours free to drag. The same body's markup at a
+     larger size and a painter of its own; the card's waits behind it. While
+     it is up the card holds its repaints and hands the news to the sheet:
+     the readings swap and the painter takes the new hours where it stands. */
+  _aheadSheet() {
+    if (this._axSheet || !this._model) return;
+    const modal = typeof HTMLDialogElement === "function";
+    const wrap = document.createElement(modal ? "dialog" : "div");
+    wrap.className = "fsfull";
+    if (!modal) { wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); }
+    wrap.setAttribute("aria-label", String(firstOf(this._model.title, "Now and next")));
+    this._wearAccent(wrap, this._model.accent);
+    const s = { wrap, painter: new AheadPainter() };
+    this._axSheet = s;
+    const body = this._model.body || {};
+    wrap.innerHTML = `<div class="fsbox quiet fsahead">`
+      + `<div class="fsclosebar"><button type="button" class="fsclose" aria-label="Close" data-fsclose>${iconMarkup("mdi:close")}</button></div>`
+      + BODIES.ahead(body) + `</div>`;
+    const canvas = wrap.querySelector(".aheadcanvas");
+    canvas.setAttribute("aria-label", `${canvas.getAttribute("aria-label")} Drag to look further ahead.`);
+    s.painter.free = true;
+    s.painter.returnAfter = Math.max(3, Number(body.return_after) || 30) * 1000;
+    s.refresh = (model) => {
+      const b = (model && model.body) || {};
+      const box = wrap.querySelector(".aheadbox");
+      const fresh = document.createElement("div");
+      fresh.innerHTML = BODIES.ahead(b);
+      ["skyread", "skybase"].forEach((k) => {
+        const was = box.querySelector(`.${k}`);
+        const now = fresh.querySelector(`.${k}`);
+        if (was && now && was.innerHTML !== now.innerHTML) was.innerHTML = now.innerHTML;
+      });
+      s.painter.label = box.querySelector(".aheadleft");
+      s.painter.attach(canvas, aheadModel(b, Date.now()));
+    };
+    s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._aheadClose(); } };
+    if (modal) wrap.addEventListener("cancel", (event) => { event.preventDefault(); this._aheadClose(); });
+    else document.addEventListener("keydown", s.onKey, true);
+    wrap.querySelector("[data-fsclose]").addEventListener("click", () => this._aheadClose());
+    if (this._ahead) this._ahead.stop();
+    this._holder.appendChild(wrap);
+    if (modal && wrap.showModal) {
+      try { wrap.showModal(); } catch (e) { /* not connected: stays a fixed box */ }
+    }
+    s.refresh(this._model);
+    const close = wrap.querySelector("[data-fsclose]");
+    if (close && close.focus) close.focus({ preventScroll: true });
+  }
+
+  _aheadClose() {
+    const s = this._axSheet;
+    if (!s) return;
+    s.painter.detach();
+    if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
+    if (s.wrap.open && s.wrap.close) s.wrap.close();
+    if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
+    this._axSheet = null;
+    this._signature = null;
+    if (this._hass && this._config) this._update();
+    else if (this._ahead) this._ahead.run();
   }
 
   /* The day body's painter, and the past it needs: the temperature
