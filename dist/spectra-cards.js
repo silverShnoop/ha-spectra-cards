@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.187.0";
+const VERSION = "0.188.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4244,9 +4244,41 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .fsahead { overflow:hidden; }
 .fsahead .aheadbox { height:100%; border-radius:0; }
 .fsahead .aheadcanvas { touch-action:none; cursor:grab; }
-.fsahead .aheadbox .aheadback { top:calc(16px + env(safe-area-inset-top, 0px)); right:64px; padding:7px 12px 7px 9px; font-size:13px; }
-.fsahead .aheadbox .aheadwhen { top:calc(64px + env(safe-area-inset-top, 0px)); font-size:13px; }
-.fsahead .aheadbox .skyread { top:calc(64px + env(safe-area-inset-top, 0px)); left:24px; }
+.fsahead .aheadbox .aheadwhen { top:calc(112px + env(safe-area-inset-top, 0px)); font-size:14px; padding:4px 10px; }
+.fsahead .aheadbox .skyread { top:calc(96px + env(safe-area-inset-top, 0px)); left:28px; }
+.fsahead .aheadbox .skybase { font-size:14px; padding-left:28px; }
+/* The top: the title and the date on the left, the days on the right,
+   over a shade of the paper so they read on any sky. */
+.axtop { position:absolute; left:0; right:0; top:0; z-index:4; display:flex; align-items:center; gap:12px;
+  padding:calc(14px + env(safe-area-inset-top, 0px)) 72px 22px 28px; box-sizing:border-box;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--sp-paper) 62%, transparent), transparent); }
+.axtitle { display:flex; flex-direction:column; gap:3px; flex:none; color:var(--sp-ink); }
+.axtitle b { font-size:12px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--accent); }
+.axtitle span { font-size:17px; font-weight:600; }
+.axgap { flex:1; }
+.axdays { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; }
+.axdays:empty { display:none; }
+.axday { display:grid; grid-template-columns:auto auto; column-gap:9px; align-items:center; text-align:left;
+  padding:6px 14px 6px 9px; border-radius:6px; border:2px solid var(--sp-edge); cursor:pointer;
+  background:color-mix(in srgb, var(--sp-paper) 70%, transparent); color:var(--sp-ink); font:inherit;
+  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
+.axday > :first-child { grid-row:1 / 3; width:30px; height:30px; }
+.axdn { font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; color:var(--sp-ink-2); }
+.axt { font-family:var(--sp-mono); font-size:13px; color:var(--sp-ink-2); white-space:nowrap; }
+.axt b { font-size:16px; color:var(--sp-ink); font-weight:600; }
+.axt em { font-style:normal; color:var(--sp-a5); }
+.axday.on { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 22%, var(--sp-paper)); }
+.axday.on .axdn { color:var(--accent); }
+.fsahead .aheadbox .axtop .aheadback { position:static; padding:8px 13px 8px 10px; font-size:13px; }
+.fsahead .aheadbox .axtop .aheadback span { white-space:nowrap; }
+@media (max-width: 700px) {
+  .axtitle { display:none; }
+  .axtop { padding-left:12px; padding-right:60px; }
+  .fsahead .aheadbox .axtop .aheadback span { display:none; }
+  .fsahead .aheadbox .axtop .aheadback { padding:8px; }
+  .fsahead .aheadbox .skyread { left:14px; }
+  .fsahead .aheadbox .skyhero { font-size:34px; }
+}
 .fsahead .aheadbox .skyhero { font-size:clamp(44px, 8cqw, 104px); }
 .fsahead .aheadbox .skycond, .fsahead .aheadbox .heronote { font-size:clamp(14px, 2cqw, 22px); }
 .fsahead .aheadbox .skyfc { font-size:clamp(13px, 1.7cqw, 18px); }
@@ -10269,7 +10301,7 @@ function aheadModel(b, now) {
     .map((r) => ({ h: at(skyTime(r && r.datetime) || NaN), r }))
     .filter((x) => Number.isFinite(x.h))
     .sort((x, y) => x.h - y.h)
-    .map(({ h, r }) => Object.assign({ h, temp: skyNum(r.temperature) },
+    .map(({ h, r }) => Object.assign({ h, temp: skyNum(r.temperature), pop: skyNum(r.precipitation_probability), mm: skyNum(r.precipitation) },
       aheadWeather(usable(r.condition) ? String(r.condition) : "", skyNum(r.cloud_coverage), skyNum(r.precipitation) || 0)));
   const cond = String(b.condition || "").toLowerCase();
   const current = aheadWeather(cond, skyNum(b.cloud_cover), 0);
@@ -10289,6 +10321,36 @@ function aheadModel(b, now) {
     moon: skyNum(b.moon), times: skyTimes(b),
     key: [rows.map((r) => `${r.h.toFixed(2)}${r.cond}${r.cover.toFixed(2)}${r.rain}`).join(","), cond, current.cover.toFixed(2),
       String(b.rising), String(b.setting), night.from, night.until].join("|") };
+}
+
+/* The full screen's day chips: today, and each day the hourly forecast
+   reaches into daylight, with its high, low and the weather most of its
+   day. A tap glides the hours to that day's morning. */
+function aheadDayChips(m) {
+  const today = Math.floor(m.now / 24);
+  const out = [];
+  for (let k = today; k < today + 8; k++) {
+    const its = m.rows.filter((r) => r.h >= k * 24 && r.h < k * 24 + 24 && (k > today || r.h + 1 > m.now));
+    const lit = its.filter((r) => r.h % 24 >= 7 && r.h % 24 < 19);
+    if (k > today && lit.length < 4) break;
+    const temps = its.map((r) => r.temp).filter((v) => v !== null);
+    if (k === today && m.temps.length) temps.push(m.temps[0][1]);
+    if (!temps.length) continue;
+    const pool = (lit.length ? lit : its).map((r) => r.cond).filter(Boolean);
+    const count = (c) => pool.filter((z) => z === c).length;
+    const rank = (c) => { const i = DAY_WETTER.indexOf(c); return i < 0 ? 99 : i; };
+    const cond = [...new Set(pool)].sort((p, q) => count(q) - count(p) || rank(p) - rank(q))[0] || "";
+    const name = k === today ? "Today" : k === today + 1 ? "Tomorrow"
+      : new Date(m.mid + k * 86400000 + 43200000).toLocaleDateString([], { weekday: "long" });
+    const pops = its.map((r) => r.pop).filter((v) => v !== null);
+    const pop = pops.length ? Math.round(Math.max(...pops)) : null;
+    out.push(`<button type="button" class="axday" data-axday="${k}" aria-label="${esc(name)}">`
+      + (WEATHER_ART[cond] ? `<svg class="wicon" viewBox="0 0 24 24" aria-hidden="true">${WEATHER_ART[cond]}</svg>` : `<span></span>`)
+      + `<span class="axdn">${esc(name)}</span>`
+      + `<span class="axt"><b>${Math.round(Math.max(...temps))}°</b> ${Math.round(Math.min(...temps))}°`
+      + (pop !== null && pop >= 20 ? ` <em>${pop}%</em>` : "") + `</span></button>`);
+  }
+  return out.length > 1 ? out.join("") : "";
 }
 
 /* The weather in an hour: now's own until the forecast's first hour starts,
@@ -10462,6 +10524,17 @@ class AheadPainter extends DayPainter {
     if (this.sc > 1 && now - (this.touched || 0) > this.returnAfter) this.goHome(now);
   }
 
+  /* A day's chip glides the hours to that day's morning. */
+  glideTo(h) {
+    const m = this.model;
+    if (!m || !this.axis || !this.laid || !this.laid.px) return;
+    const nowH = (Date.now() - m.mid) / 3600000;
+    const to = Math.max(0, Math.min(this.maxSc || 0, (this.axis.U(Math.max(nowH, h)) - this.axis.U(nowH)) * this.laid.px));
+    this.vel = 0;
+    this.touched = performance.now();
+    this.home = { from: this.sc || 0, to, at: performance.now(), ms: 900 };
+  }
+
   goHome(now) {
     this.vel = 0;
     this.home = { from: this.sc, to: 0, at: now || performance.now(), ms: 900 };
@@ -10494,6 +10567,13 @@ class AheadPainter extends DayPainter {
   /* The layout for a width: where now ends, how wide an hour is, the blocks. */
   layout(w) {
     const wide = w >= DAY_WIDE;
+    /* Full screen: now a little narrower, every hour wider, and a deep
+       ground for the time, the chance of rain and how much. */
+    if (this.big) {
+      const x0 = Math.round(w * (wide ? .3 : .4));
+      const px = wide ? Math.max(64, (w - x0) / 11) : Math.max(30, (w - x0) / 6);
+      return { x0, step: wide ? 1 : 2, px, band: wide ? 136 : 112, icon: wide ? 40 : 30, big: true, wide };
+    }
     const x0 = Math.round(w * (wide ? .33 : .44));
     const step = wide ? 1 : 2;
     const px = wide ? Math.max(48, (w - x0) / 12) : Math.max(22, (w - x0) / 8);
@@ -10614,7 +10694,8 @@ class AheadPainter extends DayPainter {
       box.style.setProperty("--ahead-now", `${x0}px`);
       box.style.setProperty("--ahead-band", `${L.band}px`);
     }
-    this.laid = { w, x0, step: L.step };
+    this.laid = { w, x0, step: L.step, px };
+    const big = Boolean(L.big);
 
     ctx.clearRect(0, 0, w, h);
     /* The hours ahead, sliding left. */
@@ -10774,6 +10855,27 @@ class AheadPainter extends DayPainter {
     }
     ctx.stroke();
 
+    /* Full screen: the chance of rain as columns rising from the ground,
+       an hour each, a third of the sky at a certainty. */
+    if (big) {
+      for (const r of m.rows) {
+        if (r.pop === null || r.pop <= 0 || r.h + 1 <= leadH) continue;
+        const a = Math.max(X(r.h), x0);
+        const b = X(r.h + 1);
+        if (b <= x0 || a > w) continue;
+        const k = r.pop / 100;
+        const top = skyH - k * skyH * .32;
+        const fadeIn = daySmooth(x0, x0 + 24, (a + b) / 2);
+        const cg = ctx.createLinearGradient(0, top, 0, skyH);
+        cg.addColorStop(0, A(tk.rain, (.22 + .3 * k) * fadeIn));
+        cg.addColorStop(1, A(tk.rain, (.06 + .12 * k) * fadeIn));
+        ctx.fillStyle = cg;
+        ctx.fillRect(a + 1.5, top, Math.max(0, b - a - 3), skyH - top);
+        ctx.fillStyle = A(tk.rain, (.5 + .5 * k) * fadeIn);
+        ctx.fillRect(a + 1.5, top, Math.max(0, b - a - 3), 2);
+      }
+    }
+
     /* The now line, broken around the sun and the moon. */
     ctx.strokeStyle = A(tk.ink, .35); ctx.lineWidth = 1;
     ctx.beginPath();
@@ -10795,32 +10897,35 @@ class AheadPainter extends DayPainter {
     if (vals.length) {
       const lo = Math.floor(Math.min(...vals)) - 1;
       const hi = Math.ceil(Math.max(...vals)) + 1;
-      const top = Math.max(56, skyH * .5);
-      const Y = (v) => top + (1 - (v - lo) / (hi - lo)) * (skyH - top - 24);
+      const top = big ? skyH * .36 : Math.max(56, skyH * .5);
+      const bot = big ? skyH * .66 : skyH - 24;
+      const Y = (v) => top + (1 - (v - lo) / (hi - lo)) * (bot - top);
       const pts = [];
       for (let hh = leadH; hh <= end; hh += .25) { const v = aheadTempAt(m, hh); if (v !== null) pts.push([X(hh), Y(v)]); }
       const ramp = ctx.createLinearGradient(0, Y(RAMP_STOPS[0]), 0, Y(RAMP_STOPS[RAMP_STOPS.length - 1]));
       RAMP_STOPS.forEach((v, i) => ramp.addColorStop(i / (RAMP_STOPS.length - 1), tk[`r${i}`]));
       const path = () => { ctx.beginPath(); pts.forEach(([a, b], i) => (i ? ctx.lineTo(a, b) : ctx.moveTo(a, b))); };
       ctx.lineCap = "round"; ctx.lineJoin = "round";
-      ctx.strokeStyle = A("#000", .4); ctx.lineWidth = 6; path(); ctx.stroke();
-      ctx.strokeStyle = ramp; ctx.setLineDash([5, 5]); ctx.lineDashOffset = (U(nowH) * px + sc) % 10;
-      ctx.lineWidth = 2.2; path(); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+      ctx.strokeStyle = A("#000", .4); ctx.lineWidth = big ? 9 : 6; path(); ctx.stroke();
+      ctx.strokeStyle = ramp; ctx.setLineDash(big ? [8, 7] : [5, 5]); ctx.lineDashOffset = (U(nowH) * px + sc) % (big ? 15 : 10);
+      ctx.lineWidth = big ? 3.4 : 2.2; path(); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
       const ny = Y(aheadTempAt(m, leadH));
       ctx.globalAlpha = sc > 1 ? .45 : 1;
-      ctx.fillStyle = A(tk.ink, .25); ctx.beginPath(); ctx.arc(x0, ny, 9, 0, 7); ctx.fill();
-      ctx.fillStyle = tk.ink; ctx.beginPath(); ctx.arc(x0, ny, 4.5, 0, 7); ctx.fill();
+      ctx.fillStyle = A(tk.ink, .25); ctx.beginPath(); ctx.arc(x0, ny, big ? 12 : 9, 0, 7); ctx.fill();
+      ctx.fillStyle = tk.ink; ctx.beginPath(); ctx.arc(x0, ny, big ? 6 : 4.5, 0, 7); ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.font = `500 ${L.icon > 24 ? 14 : 12}px ${tk.mono}`; ctx.textAlign = "center";
+      ctx.font = `${big ? 600 : 500} ${big ? (L.wide ? 18 : 15) : (L.icon > 24 ? 14 : 12)}px ${tk.mono}`; ctx.textAlign = "center";
       for (const [a, b] of blocks) {
         const x = X((a + b) / 2);
         const v = aheadTempAt(m, (a + b) / 2);
         if (v === null) continue;
         ctx.globalAlpha = daySmooth(x0 + 4, x0 + 30, x);
         const y = Y(v);
-        ctx.fillStyle = tk.ink; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fill();
-        ctx.strokeStyle = A("#000", .6); ctx.lineWidth = 3;
-        ctx.strokeText(`${Math.round(v)}°`, x, y - 9); ctx.fillText(`${Math.round(v)}°`, x, y - 9);
+        ctx.fillStyle = tk.ink; ctx.beginPath(); ctx.arc(x, y, big ? 3.6 : 2.6, 0, 7); ctx.fill();
+        /* Full screen haloes the figures in the ground's own colour, which
+           reads on a pale sky as well as a dark one. */
+        ctx.strokeStyle = big ? A(tk.sink, .85) : A("#000", .6); ctx.lineWidth = big ? 5 : 3;
+        ctx.strokeText(`${Math.round(v)}°`, x, y - (big ? 13 : 9)); ctx.fillText(`${Math.round(v)}°`, x, y - (big ? 13 : 9));
       }
       ctx.globalAlpha = 1;
     }
@@ -10839,12 +10944,12 @@ class AheadPainter extends DayPainter {
          own time; the ones ahead stay whole until they get there. */
       const bw = X(b) - X(a);
       ctx.globalAlpha = a <= leadH ? daySmooth(x0 + bw * .3, x0 + bw * .5, x) : 1;
-      if (a > leadH) { ctx.beginPath(); ctx.moveTo(X(a), 30); ctx.lineTo(X(a), skyH); ctx.stroke(); }
+      if (a > leadH) { ctx.beginPath(); ctx.moveTo(X(a), big ? 84 : 30); ctx.lineTo(X(a), skyH); ctx.stroke(); }
       /* Midnight: the day's name at the head of its first block, so 06:00
          tomorrow is never read as this morning. */
       if (a > leadH && a % 24 === 0) {
-        ctx.save(); ctx.globalAlpha = 1; ctx.font = `600 10px ${tk.mono}`; ctx.textAlign = "left"; ctx.fillStyle = tk.ink;
-        ctx.fillText(new Date(m.mid + a * 3600000).toLocaleDateString([], { weekday: "short" }).toUpperCase(), X(a) + 5, 62);
+        ctx.save(); ctx.globalAlpha = 1; ctx.font = `600 ${big ? 13 : 10}px ${tk.mono}`; ctx.textAlign = "left"; ctx.fillStyle = tk.ink;
+        ctx.fillText(new Date(m.mid + a * 3600000).toLocaleDateString([], { weekday: big ? "long" : "short" }).toUpperCase(), X(a) + (big ? 8 : 5), big ? 100 : 62);
         ctx.restore();
       }
       const conds = [];
@@ -10852,11 +10957,30 @@ class AheadPainter extends DayPainter {
       const count = (c) => conds.filter((z) => z === c).length;
       const rank = (c) => { const i = DAY_WETTER.indexOf(c); return i < 0 ? 99 : i; };
       const cond = [...new Set(conds)].filter((c) => c).sort((p, q) => count(q) - count(p) || rank(p) - rank(q))[0] || "";
-      if (cond) this.glyph(cond, x, skyH + 6 + L.icon / 2, L.icon, aheadSun(m, mid) <= 0);
-      ctx.font = `${L.icon > 24 ? 12 : 10}px ${tk.mono}`; ctx.textAlign = "center"; ctx.fillStyle = tk.ink2;
+      if (cond) this.glyph(cond, x, skyH + (big ? 10 : 6) + L.icon / 2, L.icon, aheadSun(m, mid) <= 0);
+      ctx.font = `${big ? "600 " : ""}${big ? (L.wide ? 15 : 13) : (L.icon > 24 ? 12 : 10)}px ${tk.mono}`; ctx.textAlign = "center";
+      ctx.fillStyle = big ? tk.ink : tk.ink2;
       /* Each block by the time it starts, written as a time: "18:00", not
          "18" or "18–20", which read as anything but a clock. */
-      ctx.fillText(`${pad(a)}:00`, x, skyH + L.band - 9);
+      const tY = big ? skyH + L.icon + 34 : skyH + L.band - 9;
+      ctx.fillText(`${pad(a)}:00`, x, tY);
+      /* Full screen: under the time, the chance of rain in the block, and
+         how much is forecast to fall in it. */
+      if (big) {
+        const its = m.rows.filter((r) => r.h > a - .01 && r.h < b - .01);
+        const pops = its.map((r) => r.pop).filter((v) => v !== null);
+        if (pops.length) {
+          const pop = Math.max(...pops);
+          ctx.font = `600 ${L.wide ? 14 : 12}px ${tk.mono}`;
+          ctx.fillStyle = pop >= 20 ? tk.rain : tk.ink3;
+          ctx.fillText(`${Math.round(pop)}%`, x, tY + (L.wide ? 24 : 21));
+        }
+        const mm = its.reduce((t, r) => t + (r.mm || 0), 0);
+        if (mm >= .1) {
+          ctx.font = `${L.wide ? 12 : 11}px ${tk.mono}`; ctx.fillStyle = tk.ink2;
+          ctx.fillText(`${mm < 10 ? mm.toFixed(1) : Math.round(mm)} mm`, x, tY + (L.wide ? 44 : 38));
+        }
+      }
       shown.push({ a, b, cond });
     }
     ctx.globalAlpha = 1;
@@ -10864,6 +10988,15 @@ class AheadPainter extends DayPainter {
     this.laid.sc = sc;
     this.laid.leadH = leadH;
     this.laid.maxSc = this.maxSc;
+
+    /* The day the line is in, lit among the full screen's day chips. */
+    if (big && box) {
+      const day = String(Math.floor((leadH + 1e-6) / 24));
+      if (this.dayOn !== day) {
+        this.dayOn = day;
+        box.querySelectorAll("[data-axday]").forEach((el) => el.classList.toggle("on", el.dataset.axday === day));
+      }
+    }
 
     /* The way back, and where the line has got to, only while looking ahead. */
     if (!once && box) {
@@ -19062,7 +19195,36 @@ class SpectraCard extends HTMLElement {
       + BODIES.ahead(body) + `</div>`;
     const canvas = wrap.querySelector(".aheadcanvas");
     canvas.setAttribute("aria-label", `${canvas.getAttribute("aria-label")} Drag to look further ahead.`);
+    /* Along the top: what this is and when, the way back while looking
+       ahead, and the days to jump to. */
+    const top = document.createElement("div");
+    top.className = "axtop";
+    top.innerHTML = `<div class="axtitle"><b>${esc(String(firstOf(this._model.title, "Now and next")))}</b><span data-axclock></span></div>`
+      + `<span class="axgap"></span><div class="axdays" role="group" aria-label="Days" data-axdays></div>`;
+    const abox = wrap.querySelector(".aheadbox");
+    abox.appendChild(top);
+    top.insertBefore(abox.querySelector(".aheadback"), top.querySelector("[data-axdays]"));
+    const tick = () => {
+      const el = top.querySelector("[data-axclock]");
+      const d = new Date();
+      const text = `${d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" })} · `
+        + `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      if (el && el.textContent !== text) el.textContent = text;
+    };
+    tick();
+    s.clock = setInterval(tick, 15000);
+    top.querySelector("[data-axdays]").addEventListener("click", (event) => {
+      const chip = event.target.closest && event.target.closest("[data-axday]");
+      if (!chip) return;
+      event.stopPropagation();
+      const k = Number(chip.dataset.axday);
+      const m = s.painter.model;
+      if (!m) return;
+      if (k <= Math.floor(m.now / 24)) s.painter.goHome();
+      else s.painter.glideTo(k * 24 + 7);
+    });
     s.painter.free = true;
+    s.painter.big = true;
     s.painter.returnAfter = Math.max(3, Number(body.return_after) || 30) * 1000;
     s.refresh = (model) => {
       const b = (model && model.body) || {};
@@ -19075,7 +19237,11 @@ class SpectraCard extends HTMLElement {
         if (was && now && was.innerHTML !== now.innerHTML) was.innerHTML = now.innerHTML;
       });
       s.painter.label = box.querySelector(".aheadleft");
-      s.painter.attach(canvas, aheadModel(b, Date.now()));
+      const m = aheadModel(b, Date.now());
+      const days = wrap.querySelector("[data-axdays]");
+      const chips = aheadDayChips(m);
+      if (days && days.dataset.html !== chips) { days.dataset.html = chips; days.innerHTML = chips; s.painter.dayOn = null; }
+      s.painter.attach(canvas, m);
     };
     s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._aheadClose(); } };
     if (modal) wrap.addEventListener("cancel", (event) => { event.preventDefault(); this._aheadClose(); });
@@ -19095,6 +19261,7 @@ class SpectraCard extends HTMLElement {
     const s = this._axSheet;
     if (!s) return;
     s.painter.detach();
+    clearInterval(s.clock);
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
     if (s.wrap.open && s.wrap.close) s.wrap.close();
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
