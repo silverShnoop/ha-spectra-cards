@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.191.1";
+const VERSION = "0.191.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -26762,6 +26762,9 @@ class SpectraCard extends HTMLElement {
 
     const close = () => this._cameraClose();
     wrap.querySelector("[data-no]").addEventListener("click", close);
+    /* Turned on its side, a zoomed picture is kept inside the new frame. */
+    s.onResize = () => setTimeout(() => { if (this._ccSheet === s) this._cameraPan(s.zoom.x, s.zoom.y); }, 350);
+    window.addEventListener("resize", s.onResize);
     s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); close(); } };
     document.addEventListener("keydown", s.onKey, true);
 
@@ -27136,6 +27139,7 @@ class SpectraCard extends HTMLElement {
     this._cameraStop();
     if (s.onVisible) document.removeEventListener("visibilitychange", s.onVisible);
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
+    if (s.onResize) window.removeEventListener("resize", s.onResize);
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
     this._ccSheet = null;
     this._signature = null;
@@ -27851,6 +27855,21 @@ if (!customElements.get("spectra-card")) {
   };
   vv.addEventListener("resize", set);
   vv.addEventListener("scroll", set);
+  /* A phone turned on its side. Android's web view can report the visible
+     viewport mid-turn, still the old shape, and send nothing once it has
+     settled, which left a full screen at the portrait height across a
+     landscape screen. So a turn, or any resize of the window, measures
+     again as the frames go by until the turn has finished. */
+  let settle = [];
+  const again = () => {
+    settle.forEach(clearTimeout);
+    set();
+    requestAnimationFrame(set);
+    settle = [120, 300, 600, 1000].map((ms) => setTimeout(set, ms));
+  };
+  window.addEventListener("resize", again);
+  window.addEventListener("orientationchange", again);
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", again);
   set();
 })();
 

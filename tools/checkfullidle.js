@@ -108,6 +108,38 @@ const GIF = Buffer.from("R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAE
     check(`${name}: closed a minute after the last touch, the card back`, !after && back, { after, back });
   }
 
+  /* A phone turned on its side with a full screen up: the view fills the
+     new screen, and a painted one redraws at the new size, even when the
+     turn is first reported with the old height. */
+  for (const name of Object.keys(sheets)) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.clock.runFor(300);
+    await page.evaluate(([n, src]) => { (0, eval)(src)(window.CARDS[n]); }, [name, sheets[name].open.toString()]);
+    await page.clock.runFor(500);
+    await page.setViewportSize({ width: 844, height: 390 });
+    /* As Android's web view does: the visible height still the portrait
+       one when the turn is announced, and no resize after it settles. */
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty("--sp-vvh", "844px");
+      window.dispatchEvent(new Event("orientationchange"));
+      document.documentElement.style.setProperty("--sp-vvh", "844px");
+    });
+    await page.clock.runFor(1200);
+    const fit = await page.evaluate(([n, key]) => {
+      const s = window.CARDS[n][key];
+      if (!s) return null;
+      const r = s.wrap.getBoundingClientRect();
+      const c = s.wrap.querySelector(".aheadcanvas, .fscanvas");
+      const cr = c ? c.getBoundingClientRect() : null;
+      return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), vw: innerWidth, vh: innerHeight,
+        canvas: c ? { w: c.width, cw: Math.round(cr.width * Math.min(2, devicePixelRatio || 1)) } : null };
+    }, [name, sheets[name].key]);
+    check(`${name}: turned on its side, it fills the new screen`, fit && fit.w === fit.vw && fit.h === fit.vh && fit.top === 0
+      && (!fit.canvas || Math.abs(fit.canvas.w - fit.canvas.cw) <= 2), fit);
+    await page.keyboard.press("Escape");
+    await page.clock.runFor(300);
+  }
+
   await browser.close();
   server.close();
   console.log(problems.length ? `FAILED (${problems.length})` : "OK (every full screen closes after a minute untouched)");
