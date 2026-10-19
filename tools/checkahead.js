@@ -120,30 +120,52 @@ const js = fs.readFileSync(file);
   const c = await read();
   check("a repainted card's new canvas is sized to its box", sized && c.wide.width === c.wide.want, c.wide);
 
-  /* Looking ahead: a drag pulls the hours past the line and the day and
-     hour there are named; now never moves; after 30 seconds untouched the
-     hours ease back. A drag that starts over now does nothing. */
-  const state = () => page.evaluate(() => {
-    const el = window.CARDS.wide;
-    const r = el.shadowRoot || el;
-    const p = el._ahead;
-    return { sc: Math.round(p.sc || 0), max: Math.round(p.maxSc || 0), x0: p.laid.x0, lead: p.laid.leadH,
-      back: !r.querySelector(".aheadback").hidden, tag: r.querySelector(".aheadwhen").textContent,
-      looking: r.querySelector(".card").classList.contains("looking") };
-  });
+  /* The card itself does not scroll: a drag on it leaves the hours at now.
+     A tap opens it full screen, over everything, where a drag pulls the
+     hours past the line and the day and hour there are named; now never
+     moves; after 30 seconds untouched the hours ease back. A drag that
+     starts over now does nothing. Escape closes it, and the card is back. */
   const box = await page.evaluate(() => { const r = window.CARDS.wide.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width }; });
-  const drag = async (from, by) => {
-    await page.mouse.move(from, box.y + 120); await page.mouse.down();
-    for (let i = 1; i <= 10; i++) { await page.mouse.move(from - (by * i) / 10, box.y + 120); await page.clock.runFor(16); }
+  const drag = async (from, y, by) => {
+    await page.mouse.move(from, y); await page.mouse.down();
+    for (let i = 1; i <= 10; i++) { await page.mouse.move(from - (by * i) / 10, y); await page.clock.runFor(16); }
     await page.mouse.up();
   };
+  await drag(box.x + box.w * .9, box.y + 120, 400);
+  await page.clock.runFor(1000);
+  const still = await page.evaluate(() => ({ sc: window.CARDS.wide._ahead.laid.sc, open: Boolean(window.CARDS.wide._axSheet) }));
+  check("the card does not scroll", still.sc === 0, still);
+  if (still.open) await page.keyboard.press("Escape");
+  const expand = await page.evaluate(() => Boolean((window.CARDS.wide.shadowRoot || window.CARDS.wide).querySelector("[data-expand]")));
+  check("the title says it opens full screen", expand, expand);
+  await page.mouse.click(box.x + box.w * .7, box.y + 140);
+  await page.clock.runFor(500);
+  const sheet = await page.evaluate(() => {
+    const el = window.CARDS.wide;
+    const s = el._axSheet;
+    if (!s) return null;
+    const r = s.wrap.getBoundingClientRect();
+    const c = s.wrap.querySelector(".aheadcanvas").getBoundingClientRect();
+    return { modal: s.wrap.matches(":modal"), w: r.width, h: r.height, cw: c.width, ch: c.height, vw: innerWidth, vh: innerHeight,
+      top: document.elementFromPoint(innerWidth / 2, innerHeight / 2) === el };
+  });
+  check("a tap opens it full screen, over everything", sheet && sheet.modal && sheet.w === sheet.vw && sheet.h === sheet.vh
+    && sheet.cw === sheet.vw && sheet.ch === sheet.vh, sheet);
+  const state = () => page.evaluate(() => {
+    const el = window.CARDS.wide;
+    const s = el._axSheet;
+    const p = s.painter;
+    return { sc: Math.round(p.sc || 0), max: Math.round(p.maxSc || 0), x0: p.laid.x0, lead: p.laid.leadH,
+      back: !s.wrap.querySelector(".aheadback").hidden, tag: s.wrap.querySelector(".aheadwhen").textContent };
+  });
   const before = await state();
-  await drag(box.x + 120, 300);
+  await drag(60, 300, 300);
   await page.clock.runFor(300);
   const overNow = await state();
-  await drag(box.x + box.w * .9, 400);
+  await drag(900, 300, 400);
   await page.clock.runFor(2500);
   const ahead = await state();
+  if (shot) await page.screenshot({ path: shot.replace(/(\.png)?$/, "-full.png") });
   await page.clock.runFor(29000);
   const waited = await state();
   await page.clock.runFor(2500);
@@ -152,9 +174,16 @@ const js = fs.readFileSync(file);
   check("a drag over now leaves the hours alone", overNow.sc === 0, overNow);
   check("a drag over the hours pulls them ahead", ahead.sc > 200 && ahead.sc <= ahead.max + 1, ahead);
   check("and now stays where it is", ahead.x0 === before.x0, [before.x0, ahead.x0]);
-  check("the way back shows, and the hour at the line is named", ahead.back && ahead.looking && /\d\d:\d\d/.test(ahead.tag), ahead);
+  check("the way back shows, and the hour at the line is named", ahead.back && /\d\d:\d\d/.test(ahead.tag), ahead);
   check("it holds while the 30 seconds run", waited.sc > 0, waited);
-  check("then eases back to now by itself", back.sc === 0 && !back.back && !back.looking, back);
+  check("then eases back to now by itself", back.sc === 0 && !back.back, back);
+  await page.keyboard.press("Escape");
+  await page.clock.runFor(300);
+  const closed = await page.evaluate(() => {
+    const el = window.CARDS.wide;
+    return { gone: !el._axSheet && !(el.shadowRoot || el).querySelector(".fsfull"), card: Boolean((el.shadowRoot || el).querySelector(".aheadcanvas")), raf: Boolean(el._ahead.raf) };
+  });
+  check("Escape closes it and the card paints again", closed.gone && closed.card && closed.raf, closed);
 
   await browser.close();
   server.close();

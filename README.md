@@ -1079,7 +1079,7 @@ body:
     separator: " · "
   # ...and the hours ahead
   hours: {forecast: weather.home, type: hourly}
-  return_after: 30               # seconds untouched before a look ahead eases back
+  return_after: 30               # seconds untouched before a look ahead (full screen) eases back
 ```
 
 The Now card and the hours after it, in one picture. The left of the card is
@@ -1098,7 +1098,10 @@ rays turn slowly as on `sky`, but shine over now, the sky somebody is under,
 and thin away towards the hours ahead: strong in a clear sky, weaker under
 cloud, none in overcast.
 
-**A finger can look further ahead.** Drag the hours (or scroll them with a
+**Full screen looks further ahead.** The card itself stays still, so it
+always reads from now. A tap on it, or the expand symbol by its title, opens
+it full screen, over everything, as the camera's live view and a
+celebration do; the cross or Escape closes it. There, drag the hours (or scroll them with a
 wheel) and they slide on past the line, as far as the hourly forecast goes,
 with a little give at each end; let go and they glide to a stop. Now does not
 move. While the hours are pulled, a tag at the line names the day and hour
