@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.190.1";
+const VERSION = "0.191.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -26528,6 +26528,7 @@ class SpectraCard extends HTMLElement {
      repaints like the season's. */
   _festAttach(b) {
     this._festTurns(b || {});
+    this._festSteady(b || {});
     const canvas = this._holder.querySelector(".fscanvas");
     if (!canvas) {
       if (this._fest) this._fest.stop();
@@ -26540,6 +26541,55 @@ class SpectraCard extends HTMLElement {
     festFont();
     if (!this._fest) this._fest = new FestPainter();
     this._fest.attach(canvas, entry.scene, festVariant(lead, entry));
+  }
+
+  /* Taking turns, the card is as tall as the tallest of today's, so the
+     cards below it do not move up and down as it changes. Each is laid
+     out once off-screen in a copy of the card at the same width, and the
+     one showing is given the difference as extra height on its words.
+     The copy leaves out the panel's grow, which is added outside the
+     words, so the two never feed on each other. Measured again when the
+     width or the list changes, and once the scene's font has loaded. */
+  _festSteady(b) {
+    const card = this._holder.querySelector(".card");
+    const pick = festPick(b);
+    const body = this._holder.querySelector("[data-festopen]");
+    if (!card || !body || !pick || pick.list.length < 2 || pick.also.length) {
+      this._festTall = null;
+      return;
+    }
+    const width = card.offsetWidth;
+    const fonts = typeof document !== "undefined" && document.fonts ? document.fonts.status : "loaded";
+    const key = `${pick.list.map((x) => x.key).join("|")}#${width}#${fonts}`;
+    if (!this._festTall || this._festTall.key !== key) {
+      const shell = document.createElement("div");
+      shell.style.cssText = `position:absolute;left:0;top:0;width:${width}px;visibility:hidden;pointer-events:none;`;
+      const base = card.className.split(/\s+/).filter((c) => !/^(grow|fsnext|fsprev|festscene)$/.test(c)).join(" ");
+      const bar = this._model ? this._titlebar(this._model, this._phase) : "";
+      shell.innerHTML = pick.list.map((x, i) => {
+        const festive = festEntry(x.key).tier === "festive";
+        return `<div class="${base}${festive ? " festscene" : ""}" style="${card.getAttribute("style") || ""}">`
+          + `${bar}${BODIES.festival(Object.assign({}, b, { index: i }))}</div>`;
+      }).join("");
+      this._holder.appendChild(shell);
+      const each = [...shell.children].map((c) => {
+        const words = c.querySelector("[data-festopen]");
+        return { card: c.offsetHeight, words: words ? words.offsetHeight : 0 };
+      });
+      shell.remove();
+      this._festTall = { key, each, most: Math.max(...each.map((e) => e.card)) };
+      if (fonts !== "loaded" && document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => { if (this._model) this._festSteady((this._model.body) || {}); });
+      }
+    }
+    const t = this._festTall;
+    const at = t.each[pick.at];
+    const extra = at ? t.most - at.card : 0;
+    const want = extra > 0 ? `${at.words + extra}px` : "";
+    if (body.style.minHeight !== want) {
+      body.style.boxSizing = want ? "border-box" : "";
+      body.style.minHeight = want;
+    }
   }
 
   /* One step through today's, forwards or back. */

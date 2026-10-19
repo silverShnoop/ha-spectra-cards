@@ -198,6 +198,19 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   };
   const swiped = { left: await swipe(-140), right: await swipe(140) };
 
+  /* Taking turns, the card keeps one height: the tallest of today's, so
+     nothing below it moves as it changes. */
+  const heights = await page.evaluate(async () => {
+    const el = window.CARDS.turns;
+    const out = [];
+    for (let i = 0; i < 3; i++) {
+      el._festIdx = i; el._signature = null; el._update();
+      await new Promise((x) => setTimeout(x, 60));
+      out.push(Math.round(el.getBoundingClientRect().height));
+    }
+    return out;
+  });
+
   /* Open the lead full screen, follow its "Also today", close it. */
   const sheet = await page.evaluate(async () => {
     const el = window.CARDS.durga1;
@@ -292,6 +305,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("the next one slides in", steps.second === "Maha Navami" && steps.slid && steps.lit === 1, steps);
   check("a dot goes straight to its one, without opening it", steps.third === "Black History Month" && !steps.opened, steps);
   check("a swipe left goes to the next, round to the first", swiped.left.name === "Durga Puja" && !swiped.left.back && !swiped.left.opened, swiped);
+  check("taking turns, the card keeps one height", heights.length === 3 && heights.every((h) => h === heights[0]) && heights[0] > 100, heights);
   check("a swipe right goes back, in from the left", swiped.right.name === "Black History Month" && swiped.right.back && !swiped.right.opened, swiped);
   const lateWrapperHidden = await page.evaluate(() => window.LATE_WRAPPER.hasAttribute("hidden") || getComputedStyle(window.LATE_WRAPPER).display === "none");
   check("after a refresh with slow calendars it still appears, in Home Assistant's wrapper",
