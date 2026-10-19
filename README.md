@@ -1299,6 +1299,17 @@ explanation, written for a child to read, and a line for each other thing on
 today that opens in turn. Bank holidays and awareness days are the plain card
 with a small motif; days of remembrance stay quiet on purpose.
 
+Tapped, the card opens full screen in the browser's top layer, like the
+camera's live view: nothing of the dashboard shows, not the rail, not Home
+Assistant's header. On a wall panel the words fit beside the scene without
+scrolling; the cross or Escape closes it.
+
+Two festivals on one day get a card each. Put two cards side by side with
+`slot: 1` and `slot: 2` and otherwise the same body: the second shows the
+second festival and is not there at all on a day with only one, and the
+first leaves that festival out of its "Also today". An awareness day or a
+month-long observance never takes the second card.
+
 When two things fall on one day, one leads and the rest are "Also today":
 a festival's own day, or Advent, beats a day in the middle of a run, which
 beats a bank holiday or an awareness day, which beats a month-long

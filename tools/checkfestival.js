@@ -92,6 +92,27 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       el.hass = hass;
       cards[name] = el;
     }
+    /* Two festivals, two cards: slot 1 and slot 2, on three days. */
+    for (const [name, now] of Object.entries({ durga1: dates.durga1, dusshera: dates.dusshera, bhm: dates.bhm })) {
+      for (const slot of [1, 2]) {
+        const el = document.createElement("spectra-card");
+        document.getElementById("a").appendChild(el);
+        el.setConfig({ type: "custom:spectra-card", accent: 6, body: {
+          type: "festival", scenes: true, now, slot,
+          events: [{ calendar: "calendar.hindu", back: 35, days: 12 }, { calendar: "calendar.uk", back: 35, days: 12 }],
+          observance: { entity: "sensor.observance_today" },
+        } });
+        el.hass = hass;
+        cards[`${name}_slot${slot}`] = el;
+      }
+    }
+    /* A rail fixed over the bottom of the screen, as high as a z-index goes,
+       the way the panel's own chrome could be. The full-screen view has to
+       cover it all the same. */
+    const rail = document.createElement("div");
+    rail.id = "rail";
+    rail.style.cssText = "position:fixed;left:0;right:0;bottom:0;height:70px;z-index:2147483647;background:#f0f";
+    document.body.appendChild(rail);
     window.CARDS = cards;
   }, { dates, hindu: asEvents(HINDU), uk: asEvents(UK) });
   await page.waitForTimeout(800);
@@ -135,14 +156,18 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       covers: (() => { if (!wrap) return false; const box = wrap.querySelector(".fsbox").getBoundingClientRect();
         return box.left <= 0 && box.top <= 0 && box.right >= innerWidth && box.bottom >= innerHeight; })(),
     };
+    /* What is on top where the rail is: the card's view, not the rail. */
+    first.modal = !!(wrap && wrap.matches && wrap.matches(":modal"));
+    first.overRail = document.elementFromPoint(innerWidth / 2, innerHeight - 30) === el;
     const go = wrap && wrap.querySelector('[data-festgo="Maha Navami"]');
     if (go) go.click();
     await new Promise((x) => setTimeout(x, 200));
     const second = r.querySelector(".fsfull .fsbig") ? r.querySelector(".fsfull .fsbig").textContent : "";
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    await new Promise((x) => setTimeout(x, 100));
-    return { first, second, closed: !r.querySelector(".fsfull") };
+    return { first, second };
   });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  sheet.closed = await page.evaluate(() => !(window.CARDS.durga1.shadowRoot || window.CARDS.durga1).querySelector(".fsfull"));
 
   /* A wall panel never scrolls the full-screen view: every event, opened
      on a 1280x800 screen with today's others beside it, fits. */
@@ -202,6 +227,15 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("every card has its short line", ["durga1", "diwali", "advent12", "christmas", "bhm"].every((k) => r[k].short.length > 20), r);
   check("tapping opens it full screen, scene and all", sheet.first.open && sheet.first.title === "Durga Puja" && sheet.first.canvas, sheet.first);
   check("full screen means the whole screen, nothing of the dashboard round it", sheet.first.covers, sheet.first);
+  check("it opens in the browser's top layer, as a modal", sheet.first.modal, sheet.first);
+  check("and covers a rail fixed above everything else on the page", sheet.first.overRail, sheet.first);
+  check("two festivals, two cards: Durga Puja on the first, Maha Navami on the second",
+    r.durga1_slot1.name === "Durga Puja" && r.durga1_slot2.name === "Maha Navami" && !r.durga1_slot2.hidden, [r.durga1_slot1, r.durga1_slot2]);
+  check("the first card's Also today leaves out what has its own card",
+    !r.durga1_slot1.also.includes("Maha Navami") && r.durga1_slot1.also.includes("Black History Month"), r.durga1_slot1.also);
+  check("Dusshera and day 2 of Durga Puja get a card each",
+    r.dusshera_slot1.name === "Dusshera" && r.dusshera_slot2.name === "Durga Puja" && r.dusshera_slot2.when.startsWith("Day 2 of 5"), [r.dusshera_slot1, r.dusshera_slot2]);
+  check("an observance never takes the second card", r.bhm_slot2.hidden && r.bhm_slot1.name === "Black History Month", [r.bhm_slot1, r.bhm_slot2]);
   check("with the whole explanation", sheet.first.sections === 2 && sheet.first.story.includes("Asche bochor abar hobe"), sheet.first);
   check("and the others on today, which open in turn",
     sheet.first.others.includes("Maha Navami") && sheet.second === "Maha Navami", sheet);

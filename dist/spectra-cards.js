@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.185.2";
+const VERSION = "0.186.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3754,9 +3754,12 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    then all of the words. */
 .fsfull {
   position:fixed; left:0; right:0; top:var(--sp-vvtop, 0px); height:var(--sp-vvh, 100dvh);
+  width:100%; max-width:none; max-height:none; margin:0; padding:0; border:0; box-sizing:border-box;
+  color:inherit; overflow:hidden;
   z-index:1001; background:#000; display:flex; justify-content:center;
   animation:sheetfade .16s ease-out;
 }
+.fsfull::backdrop { background:#000; }
 .fsbox { position:relative; width:100%; height:100%; overflow:auto;
   background:var(--fg); color:#fff; overscroll-behavior:contain; box-sizing:border-box;
   padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -7961,12 +7964,31 @@ const festXp = () => `<span class="fsxp" aria-hidden="true">${iconMarkup("mdi:ar
 
 /* The new body: today's lead, drawn as its scene, with one line for anything
    else on. The words are short here; the whole of them opens full screen. */
-function festScenesBody(b) {
+/* Which event a card shows, and what its "Also today" names.
+
+   Two festivals on one day get a card each: the dashboard puts two cards
+   side by side, `slot: 1` and `slot: 2`. The second shows the second
+   festival -- a festival's own day or a day of its run, drawn as a scene --
+   and is not there at all on a day with only one. The first then leaves
+   that festival out of its "Also today", since it has a card of its own.
+   An awareness day or a month-long observance never takes the second card.
+   Without `slot`, one card shows the lead and names everything else. */
+function festPick(b) {
   const list = festActive(b, b.now);
-  if (!list.length) return "";
-  const lead = list[0];
+  const slot = Number(b.slot) || 0;
+  const festive = list.filter((x) => x.rank <= 2 && festEntry(x.key).tier === "festive");
+  const second = festive.length > 1 && festive[0] === list[0] ? festive[1] : null;
+  if (slot >= 2) return second ? { item: second, also: [], list } : null;
+  if (!list.length) return null;
+  return { item: list[0], also: list.slice(1).filter((x) => !(slot && x === second)), list };
+}
+
+function festScenesBody(b) {
+  const pick = festPick(b);
+  if (!pick) return "";
+  const lead = pick.item;
   const entry = festEntry(lead.key);
-  const also = festAlsoLine(list.slice(1));
+  const also = festAlsoLine(pick.also);
   const open = ` role="button" tabindex="0" aria-label="${esc(lead.key)}: open full screen" data-festopen="${esc(lead.key)}"`;
   if (entry.tier !== "festive") {
     return `<div class="fsquiet"${open}>${festMotif(entry.motif, 26)}`
@@ -14447,7 +14469,7 @@ function bodyIsEmpty(type, b) {
       return isBlank(b.info) && !b.action;
     /* Nothing to explain and no day to count is not a celebration. */
     case "festival":
-      if (b.scenes) return !festActive(b, b.now).length;
+      if (b.scenes) return !festPick(b);
       return isBlank(b.text) && !(Number(b.of) > 0);
     /* A zone with no target to show and nothing to drive is not a control,
        and a card with nothing to say renders nothing rather than a shell. */
@@ -18829,7 +18851,8 @@ class SpectraCard extends HTMLElement {
     const fb = type === "festival" ? (model.body || {}) : null;
     /* The new festival body is its own scene: the card wears the event's
        ground and the canvas covers it edge to edge. */
-    const fsLead = fb && fb.scenes ? festActive(fb, fb.now)[0] : null;
+    const fsPick = fb && fb.scenes ? festPick(fb) : null;
+    const fsLead = fsPick ? fsPick.item : null;
     const fsEntry = fsLead ? festEntry(fsLead.key) : null;
     const fsGround = fsEntry && fsEntry.tier === "festive" ? cssColor(fsEntry.bg) || "#1A1426" : null;
     /* The wash lands in the card's style attribute and the palette in the
@@ -19098,6 +19121,7 @@ class SpectraCard extends HTMLElement {
     const sheets = Array.from(holder.children)
       .filter((el) => el.classList && (el.classList.contains("confirmwrap")
         || el.classList.contains("camwrap") || el.classList.contains("ccfull")
+        || el.classList.contains("fsfull")
         || el.classList.contains("mltoast")));
     holder.innerHTML = html;
     for (const sheet of sheets) holder.appendChild(sheet);
@@ -26148,7 +26172,8 @@ class SpectraCard extends HTMLElement {
       if (this._fest) this._fest.stop();
       return;
     }
-    const lead = festActive(b || {}, (b || {}).now)[0];
+    const pick = festPick(b || {});
+    const lead = pick ? pick.item : null;
     const entry = lead ? festEntry(lead.key) : null;
     if (!entry || !entry.scene) return;
     festFont();
@@ -26186,15 +26211,26 @@ class SpectraCard extends HTMLElement {
     };
     if (!this._fsSheet) {
       festFont();
-      const wrap = document.createElement("div");
+      /* A modal dialog, so the browser draws it in its top layer: above
+         the rail, Home Assistant's header and sidebar and anything else on
+         the page, whatever stacking those sit in. A fixed box with a high
+         z-index only wins against what shares its stacking context, and
+         the panel is free to put the rail in a different one. */
+      const modal = typeof HTMLDialogElement === "function";
+      const wrap = document.createElement(modal ? "dialog" : "div");
       wrap.className = "fsfull";
-      wrap.setAttribute("role", "dialog");
-      wrap.setAttribute("aria-modal", "true");
+      if (!modal) { wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); }
       const s = { wrap, painter: null };
       s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._festClose(); } };
-      document.addEventListener("keydown", s.onKey, true);
+      /* A dialog answers Escape itself, as "cancel"; it is closed here so
+         the painter stops and the card repaints. */
+      if (modal) wrap.addEventListener("cancel", (event) => { event.preventDefault(); this._festClose(); });
+      else document.addEventListener("keydown", s.onKey, true);
       this._fsSheet = s;
       this._holder.appendChild(wrap);
+      if (modal && wrap.showModal) {
+        try { wrap.showModal(); } catch (e) { /* not connected: stays a fixed box */ }
+      }
     }
     show(name);
   }
@@ -26209,6 +26245,7 @@ class SpectraCard extends HTMLElement {
     if (!s) return;
     if (s.painter) s.painter.detach();
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
+    if (s.wrap.open && s.wrap.close) s.wrap.close();
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
     this._fsSheet = null;
     this._signature = null;
