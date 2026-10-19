@@ -163,6 +163,8 @@ const js = fs.readFileSync(file);
     return { modal: s.wrap.matches(":modal"), w: r.width, h: r.height, cw: c.width, ch: c.height, vw: innerWidth, vh: innerHeight,
       top: document.elementFromPoint(innerWidth / 2, innerHeight / 2) === el };
   });
+  const strip = await page.evaluate(() => { const p = window.CARDS.wide._axSheet.painter; return { w: p.strip.width, k: p.stripK }; });
+  check("full screen's sky strip stays inside a tablet GPU's texture size", strip.w <= 4000 && strip.k < 1, strip);
   check("a tap opens it full screen, over everything", sheet && sheet.modal && sheet.w === sheet.vw && sheet.h === sheet.vh
     && sheet.cw === sheet.vw && sheet.ch === sheet.vh, sheet);
   const state = () => page.evaluate(() => {

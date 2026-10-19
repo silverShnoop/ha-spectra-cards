@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.191.0";
+const VERSION = "0.191.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -10279,6 +10279,9 @@ const DAY_PAST = new Map();
 /* The ground band, which carries the icons and their times: taller on a
    wide card, which shows fewer hours so each can be bigger. */
 const AHEAD_BAND = { wide: 64, narrow: 50 };
+/* The widest the painted sky strip is ever made, in pixels: well inside
+   the largest texture a tablet's GPU takes (often 8192, sometimes 4096). */
+const AHEAD_STRIP_MAX = 4000;
 
 /* The sun's days around now, in hours since today's midnight. The entity
    gives only the next rising and setting; the days either side are those
@@ -10607,8 +10610,14 @@ class AheadPainter extends DayPainter {
     this.axis = axis;
     const U = axis.U;
     const sw = Math.ceil(U(axis.H1) * L.px) + 2;
+    /* The sky's colour is a smooth gradient, so the strip is kept to at
+       most AHEAD_STRIP_MAX pixels wide and stretched as it is drawn. Full
+       screen on a wide panel made it over 9000, past what a tablet's GPU
+       holds as one texture, and the sky came out torn. */
+    const k = Math.min(1, AHEAD_STRIP_MAX / sw);
+    this.stripK = k;
     const strip = document.createElement("canvas");
-    strip.width = sw; strip.height = Math.round(skyH);
+    strip.width = Math.ceil(sw * k); strip.height = Math.round(skyH);
     const x = strip.getContext("2d");
     const hourAt = (u) => {
       let lo = axis.H0;
@@ -10616,8 +10625,8 @@ class AheadPainter extends DayPainter {
       for (let i = 0; i < 32; i++) { const mm = (lo + hi) / 2; if (U(mm) * L.px < u) lo = mm; else hi = mm; }
       return lo;
     };
-    for (let u = 0; u < sw; u += 1) {
-      const s = this.skyAt(hourAt(u + .5));
+    for (let u = 0; u < strip.width; u += 1) {
+      const s = this.skyAt(hourAt((u + .5) / k));
       const g = x.createLinearGradient(0, 0, 0, skyH);
       g.addColorStop(0, s.top); g.addColorStop(1, s.low);
       x.fillStyle = g;
@@ -10717,8 +10726,9 @@ class AheadPainter extends DayPainter {
     /* The hours ahead, sliding left. */
     const F = Math.min(90, Math.round(x0 * .4));
     const sx = U(nowH) * px + sc - F;
-    const sw = Math.min(w - x0 + F, this.strip.width - Math.max(0, sx));
-    if (sw > 0) ctx.drawImage(this.strip, Math.max(0, sx), 0, sw, skyH, x0 - F + Math.max(0, -sx), 0, sw, skyH);
+    const k = this.stripK || 1;
+    const sw = Math.min(w - x0 + F, this.strip.width / k - Math.max(0, sx));
+    if (sw > 0) ctx.drawImage(this.strip, Math.max(0, sx) * k, 0, sw * k, skyH, x0 - F + Math.max(0, -sx), 0, sw, skyH);
     /* The sky now, behind the readings, fading into the strip at the line. */
     const s = this.skyAt(nowH);
     const g = ctx.createLinearGradient(0, 0, 0, skyH);
@@ -10830,6 +10840,9 @@ class AheadPainter extends DayPainter {
       this.discs.push([my, 13]);
     }
 
+    /* Full screen's sky is several times the card's height; its clouds
+       grow with it, up to twice the size, rather than speckling it. */
+    const cz = big ? Math.min(2, Math.max(1, skyH / 260)) : 1;
     /* Clouds: ahead they bob in their own hours; over now they blow left,
        out from behind the line and away at the edge. */
     for (const c of this.clouds) {
@@ -10837,20 +10850,21 @@ class AheadPainter extends DayPainter {
       const x = c.u - off;
       if (x < x0 - 60 || x > w + 60) continue;
       ctx.globalAlpha = c.a * daySmooth(x0 - 60, x0 + 10, x);
-      ctx.drawImage(c.img, x - 150 * c.sc + Math.sin(t * .3 + c.ph) * 5, c.y + Math.sin(t * .5 + c.ph) * 2, 300 * c.sc, 140 * c.sc);
+      const cs = c.sc * cz;
+      ctx.drawImage(c.img, x - 150 * cs + Math.sin(t * .3 + c.ph) * 5, c.y + Math.sin(t * .5 + c.ph) * 2, 300 * cs, 140 * cs);
     }
     const wetNow = s.rain > .1 || s.snow > .1;
     const set = wetNow ? this.wet : this.fair;
     const n = Math.round(s.cover * 8);
     for (const c of this.nowClouds) {
-      const cw = 300 * c.sc;
+      const cw = 300 * c.sc * cz;
       c.x -= (5 + 9 * c.d) * dt;
       if (c.x + cw < -20) { c.x = x0 - cw * .35; c.y = skyRand(skyH * .02, skyH * .42); }
       if (c.i >= n || !set) continue;
       const midX = c.x + cw / 2;
       ctx.globalAlpha = (wetNow ? .35 + .55 * s.cover : .3 + .45 * s.cover) * (.6 + .4 * c.d)
         * (1 - daySmooth(x0 - 90, x0 - 10, midX)) * daySmooth(-cw * .3, cw * .4, midX);
-      ctx.drawImage(set[c.i % 3], c.x, c.y, cw, 140 * c.sc);
+      ctx.drawImage(set[c.i % 3], c.x, c.y, cw, 140 * c.sc * cz);
     }
     ctx.globalAlpha = 1;
     /* Rain where it falls. */
