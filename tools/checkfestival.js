@@ -132,6 +132,8 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       story: wrap ? wrap.querySelector(".fsstory").textContent : "",
       others: wrap ? [...wrap.querySelectorAll("[data-festgo]")].map((b) => b.dataset.festgo) : [],
       canvas: !!(wrap && wrap.querySelector(".fsstage .fscanvas")),
+      covers: (() => { if (!wrap) return false; const box = wrap.querySelector(".fsbox").getBoundingClientRect();
+        return box.left <= 0 && box.top <= 0 && box.right >= innerWidth && box.bottom >= innerHeight; })(),
     };
     const go = wrap && wrap.querySelector('[data-festgo="Maha Navami"]');
     if (go) go.click();
@@ -141,6 +143,27 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     await new Promise((x) => setTimeout(x, 100));
     return { first, second, closed: !r.querySelector(".fsfull") };
   });
+
+  /* A wall panel never scrolls the full-screen view: every event, opened
+     on a 1280x800 screen with today's others beside it, fits. */
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const scrolls = await page.evaluate(async () => {
+    const el = window.CARDS.durga1;
+    const r = el.shadowRoot || el;
+    const names = el._festNames();
+    const out = [];
+    for (const n of names) {
+      el._festSheet(n);
+      await new Promise((x) => setTimeout(x, 20));
+      const box = r.querySelector(".fsfull .fsbox");
+      const body = r.querySelector(".fsfull .fsbody");
+      const over = Math.max(box.scrollHeight - box.clientHeight, body.scrollHeight - body.clientHeight);
+      if (over > 1) out.push([n, over]);
+    }
+    el._festClose();
+    return { count: names.length, out };
+  });
+  await page.setViewportSize({ width: 960, height: 900 });
 
   if (shot) {
     await page.evaluate(() => (window.CARDS.christmas.shadowRoot || window.CARDS.christmas).querySelector("[data-festopen]").click());
@@ -178,10 +201,12 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("a day with nothing on renders nothing", r.nothing.hidden, r.nothing);
   check("every card has its short line", ["durga1", "diwali", "advent12", "christmas", "bhm"].every((k) => r[k].short.length > 20), r);
   check("tapping opens it full screen, scene and all", sheet.first.open && sheet.first.title === "Durga Puja" && sheet.first.canvas, sheet.first);
+  check("full screen means the whole screen, nothing of the dashboard round it", sheet.first.covers, sheet.first);
   check("with the whole explanation", sheet.first.sections === 2 && sheet.first.story.includes("Asche bochor abar hobe"), sheet.first);
   check("and the others on today, which open in turn",
     sheet.first.others.includes("Maha Navami") && sheet.second === "Maha Navami", sheet);
   check("Escape closes it", sheet.closed, sheet);
+  check(`no event scrolls full screen on a 1280x800 panel (${scrolls.count} checked)`, scrolls.count > 60 && !scrolls.out.length, scrolls);
 
   await browser.close();
   server.close();

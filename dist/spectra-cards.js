@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.185.0";
+const VERSION = "0.185.2";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3749,13 +3749,15 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   box-shadow:0 0 8px #F2C14E; animation:sp-flicker 2.6s ease-in-out infinite; transform-origin:50% 100%; }
 .fscandle u { width:10px; height:26px; background:var(--sp-ink-3); border-radius:2px; margin-top:2px; }
 
-/* Full screen: the scene large, then all of the words. */
+/* Full screen means the whole screen, as the camera's live view does:
+   nothing of the dashboard shows round it, at any width. The scene large,
+   then all of the words. */
 .fsfull {
   position:fixed; left:0; right:0; top:var(--sp-vvtop, 0px); height:var(--sp-vvh, 100dvh);
-  z-index:1001; background:rgba(8,5,12,.66); display:flex; justify-content:center;
+  z-index:1001; background:#000; display:flex; justify-content:center;
   animation:sheetfade .16s ease-out;
 }
-.fsbox { position:relative; width:min(1000px, 100%); height:100%; overflow:auto;
+.fsbox { position:relative; width:100%; height:100%; overflow:auto;
   background:var(--fg); color:#fff; overscroll-behavior:contain; box-sizing:border-box;
   padding-bottom:env(safe-area-inset-bottom, 0px); }
 .fsbox.quiet { background:var(--sp-surface); color:var(--sp-ink); }
@@ -3794,6 +3796,34 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .fsgo b { display:block; font-size:15px; font-weight:600; }
 .fsgo span { display:block; font-size:13px; line-height:1.45; opacity:.8; margin-top:2px; }
 .fsbox.quiet .fsgo { background:var(--sp-sink); border-color:var(--sp-edge); }
+/* A tablet held upright: a shorter scene leaves the words room. */
+@media (min-width: 700px) and (max-aspect-ratio: 5/4) {
+  .fsstage { height:clamp(240px, 32vh, 460px); }
+}
+/* On a wide screen nothing scrolls. The scene fills the whole screen, as it
+   fills the card on Home, and the words take the left over a shade, set in
+   columns. The type is sized to the screen's height, so a short panel gets
+   smaller type rather than a scroll bar. */
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  .fsbox:not(.quiet) { width:100%; overflow:hidden; padding-bottom:0; }
+  .fsbox:not(.quiet) .fsstage { position:absolute; inset:0; height:auto; }
+  .fsbox:not(.quiet) .fsfade { left:0; right:auto; top:0; bottom:0; width:66%; height:auto;
+    background:linear-gradient(90deg, rgba(8,5,12,.86) 0%, rgba(8,5,12,.74) 62%, rgba(8,5,12,0) 100%); }
+  .fsbox:not(.quiet) .fsbody { position:relative; width:58%; height:100%; margin:0; max-width:none;
+    overflow:auto; box-sizing:border-box; justify-content:center; gap:clamp(4px, 1vh, 8px);
+    padding:clamp(20px, 4vh, 40px) clamp(16px, 2vw, 32px) clamp(20px, 4vh, 40px) clamp(24px, 3vw, 48px); }
+  .fsbox:not(.quiet) .fsbig { font-size:clamp(28px, 6vh, 50px); }
+  .fsbox:not(.quiet) .fsstory { columns:2 230px; column-gap:clamp(20px, 2.5vw, 36px); }
+  .fsbox:not(.quiet) .fsstory h5 { break-after:avoid; margin-top:clamp(6px, 1.4vh, 14px); }
+  .fsbox:not(.quiet) .fsstory h5:first-child { margin-top:0; }
+  .fsbox:not(.quiet) .fsstory p { font-size:clamp(13px, 2.15vh, 17px); line-height:1.5; orphans:2; widows:2; }
+  .fsmore { display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; margin-top:clamp(6px, 1.6vh, 18px); }
+  .fsmore h5 { flex:1 0 100%; }
+  .fsgo { flex:1 1 160px; width:auto; margin:0; }
+  .fsgo span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .fsbox:not(.quiet) .fsdoors { grid-template-columns:repeat(12, 1fr); max-width:min(100%, 56vh); gap:3px; }
+  .fsbox.quiet .fsstory p { font-size:clamp(14px, 2.3vh, 17px); }
+}
 .fsdoors { display:grid; grid-template-columns:repeat(8, 1fr); gap:4px; max-width:420px;
   margin-top:6px; perspective:500px; }
 .fsdoors span { position:relative; aspect-ratio:1; border-radius:3px; background:#E8C46A;
@@ -7662,7 +7692,7 @@ const FEST_TABLE = {
   "Mahalaya Amavasya": {"src":"Hindu","tier":"festive","scene":"dawn","bg":"#141A3A","eyebrow":"Today","short":"Ancestors are remembered, and before dawn Bengal listens to the radio programme that says Durga is on her way.","full":[["What is it?","Mahalaya is the new moon that ends a two-week time called Pitru Paksha, when Hindus remember family members who have died. On the river banks people offer water, sesame seeds and rice in their memory. It also marks the start of the goddess season: Durga is said to set off on her journey home."],["What happens","In Bengal, before dawn, millions of people switch on the radio to hear Mahishasura Mardini, a programme of songs and Sanskrit verses first broadcast in the 1930s and repeated every year since, at four in the morning. Many say Durga Puja has not really begun until they have heard it. Artists paint the eyes on the clay Durga statues today."]],"art":"The sky lightens towards dawn over the river while a radio plays."},
   "Navaratri": {"src":"Hindu","tier":"festive","scene":"navaratri","bg":"#1E1430","eyebrow":"Celebrating","pal":["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#8A8A8A","#F28A2E","#3FB6C9","#E84F9A"],"w":2,"short":"Nine nights of dancing in wide circles for the goddess Durga, with a different colour each night.","full":[["What is it?","Navaratri means “nine nights”. It honours the goddess Durga, and many people say each night belongs to a different one of her nine forms, some gentle and some fierce. The nine nights remember the nine days she fought the demon Mahishasura, and the tenth day, Dusshera, celebrates her win."],["What happens","In Gujarat, and in halls all over Britain, people dance garba every night: big circles of dancers clapping and spinning around a lamp in the middle. Later comes dandiya, where partners clack painted wooden sticks together in time with the drums. Many people wear a different colour each night, and some fast, eating only simple food until the festival ends."]],"art":"Two rings of dancers circle the lamp in opposite directions; each pip is a night’s colour."},
   "Ada Lovelace Day": {"src":"Observance","tier":"quiet","motif":"gear","eyebrow":"Observance","short":"Ada Lovelace wrote the first computer program in the 1840s, a century before there was a computer to run it.","full":[["","Ada Lovelace worked out, in the 1840s, that a machine could follow a written set of steps: the first computer program, written a century before there was a computer to run it. She was the daughter of the poet Lord Byron and worked with Charles Babbage on his Analytical Engine, a mechanical computer that was never finished. The day, the second Tuesday of October, celebrates women in science, technology, engineering and maths."]]},
-  "Durga Puja": {"src":"Hindu","tier":"festive","scene":"durga","bg":"#2A0610","eyebrow":"Celebrating","pal":["#E8343A","#F7F2E8","#E8343A","#F7F2E8","#F2B33A"],"w":3,"short":"Bengal celebrates the warrior goddess Durga, who beat a demon no god could defeat, with spectacular temporary temples called pandals.","full":[["Who is Durga?","Durga is a Hindu goddess: a warrior and a mother who protects the world from harm. A buffalo demon called Mahishasura was promised that no man or god could ever beat him, so the gods joined their powers together, and out of that light came Durga, with a weapon from each god in her ten hands and a lion to ride."],["What happens","In Bengal whole neighbourhoods build temporary temples called pandals, each with a clay Durga inside, and people go pandal-hopping late into the night. On the last day the statues are carried to the river and everyone calls out “Asche bochor abar hobe”: it will happen again next year."]],"art":"Durga with ten arms in front of her halo, her lion at her feet. Shown full size at the top of this page."},
+  "Durga Puja": {"src":"Hindu","tier":"festive","scene":"durga","bg":"#2A0610","eyebrow":"Celebrating","pal":["#E8343A","#F7F2E8","#E8343A","#F7F2E8","#F2B33A"],"w":3,"short":"Bengal celebrates the warrior goddess Durga, who beat a demon no god could defeat, with spectacular temporary temples called pandals.","full":[["Who is Durga?","Durga is a Hindu goddess: a warrior and a mother who protects the world from harm. In the old story, a buffalo demon called Mahishasura was promised that no man or god could ever beat him, so he took over the heavens. The gods joined all their powers together, and out of that light came Durga. Each god gave her a weapon, which is why she has ten arms to hold them all, and the mountain king gave her a lion to ride. She fought the demon for nine days and won on the tenth."],["What happens","Durga Puja is the biggest festival in Bengal, in eastern India, and it is also a homecoming. Every autumn Durga is said to visit her parents’ home for a few days, bringing her four children: Ganesha, Lakshmi, Saraswati and Kartik. Whole neighbourhoods build huge temporary temples called pandals, some shaped like palaces or ships, each with a clay Durga inside, and people go pandal-hopping late into the night. On the last day the statues are carried to the river and let go into the water, and everyone calls out “Asche bochor abar hobe”: it will happen again next year."]],"art":"Durga with ten arms in front of her halo, her lion at her feet. Shown full size at the top of this page."},
   "Maha Navami": {"src":"Hindu","tier":"festive","scene":"navaratri","bg":"#1E1430","eyebrow":"Last night","pal":["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#8A8A8A","#F28A2E","#3FB6C9","#E84F9A"],"short":"The ninth and biggest night of Navaratri, the last day of Durga’s battle.","full":[["What is it?","Maha Navami is the ninth and last night of Navaratri, and the biggest. In the story it is the final day of Durga’s battle with the demon Mahishasura, the day before her victory. In Bengal it falls in the middle of Durga Puja."],["What happens","The garba circles are fullest and last longest tonight. In many homes in the south, books, musical instruments and tools are placed before the goddess and left untouched for the day, called Ayudha Puja. In the north, families invite nine young girls into their home, wash their feet and feed them, honouring them as forms of the goddess."]],"art":"The garba scene again, with all nine pips lit."},
   "Dusshera": {"src":"Hindu","tier":"festive","scene":"ravana","bg":"#170811","eyebrow":"Celebrating","w":2,"short":"Good beats evil. Giant figures of the demon king Ravana are burned, fireworks packed inside them.","full":[["What is it?","Dusshera, also called Vijayadashami, “the tenth day of victory”, celebrates good beating evil, in two stories at once. In one, Rama defeats Ravana, the ten-headed demon king who kidnapped Sita. In the other, Durga finally defeats the buffalo demon Mahishasura."],["What happens","In north India, plays of the Ramayana called Ramlila are acted out over the nine nights before. On the last evening, giant figures of Ravana, sometimes taller than a house and stuffed with fireworks, are set alight with a flaming arrow, and the crowd cheers as they burn. In Bengal the Durga statues are carried to the river, and in Mysore elephants dressed in gold lead a royal procession."]],"art":"A flaming arrow strikes a ten-headed effigy of Ravana, which burns and bursts into fireworks."},
   "Sharad Purnima": {"src":"Hindu","tier":"festive","scene":"moon","v":"kheer","bg":"#0E1430","eyebrow":"Tonight","short":"The brightest full moon of the year. Rice pudding is left out overnight to soak up the moonlight.","full":[["What is it?","Sharad Purnima is the full moon after the monsoon rains, when the air is clear and the moon is said to be at its brightest of the year. In the stories it is the night Krishna danced with the village girls in a great circle in the moonlight."],["What happens","People make kheer, a rice pudding with milk, sugar and cardamom, and leave it outside overnight under thin cloth to soak up the moonlight, then eat it in the morning. In Bengal it is Kojagari Lakshmi Puja: Lakshmi is said to visit homes asking “Ko jagarti?”, which means “Who is awake?”, and to bless those who are."]],"art":"The brightest full moon of the year shines into a steaming bowl of kheer."},
@@ -26127,8 +26157,8 @@ class SpectraCard extends HTMLElement {
   }
 
   /* Full screen, for one event and the others on today. Opened from the
-     card, closed by the cross, Escape, or a tap outside it on a wide
-     screen. The card holds its repaints while it is up, the same as the
+     card, closed by the cross or Escape. It covers the whole screen, as
+     the camera's live view does. The card holds its repaints while it is up, the same as the
      camera's live view, so the house changing underneath does not take
      it off the screen. */
   _festSheet(name) {
@@ -26163,11 +26193,15 @@ class SpectraCard extends HTMLElement {
       const s = { wrap, painter: null };
       s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._festClose(); } };
       document.addEventListener("keydown", s.onKey, true);
-      wrap.addEventListener("click", (event) => { if (event.target === wrap) this._festClose(); });
       this._fsSheet = s;
       this._holder.appendChild(wrap);
     }
     show(name);
+  }
+
+  /* Every name the card can explain, for tools/checkfestival.js. */
+  _festNames() {
+    return Object.keys(FEST_TABLE);
   }
 
   _festClose() {
