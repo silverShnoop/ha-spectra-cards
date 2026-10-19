@@ -1324,7 +1324,8 @@ scrolling; the cross or Escape closes it.
 
 Two or more things on one day take turns: the card slides from one to the
 next every `every` seconds (12 by default), with a dot for each that jumps
-straight to it. A swipe left goes to the next, a swipe right to the one before
+straight to it. While they take turns the card keeps the height of the tallest of them,
+so the cards below it never move. A swipe left goes to the next, a swipe right to the one before
 (it slides in from the left), and the count starts again; a swipe never opens
 it full screen. Tapped, it opens whichever is showing. `rotate: false`
 keeps the lead and names the rest as "Also today" instead. Nothing shows
