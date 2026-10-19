@@ -3716,6 +3716,23 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   padding:5px 8px; width:fit-content; }
 .fsalso i { font-style:normal; color:rgba(255,255,255,.65); text-transform:uppercase;
   letter-spacing:.08em; font-size:10px; font-weight:600; white-space:nowrap; }
+/* Which of today's is showing. Small, at the foot, out of the words' way. */
+.fsdots { display:flex; gap:2px; margin-top:auto; padding-top:8px; }
+.fsdots button { width:22px; height:22px; padding:0; border:0; background:none; cursor:pointer;
+  display:grid; place-items:center; }
+.fsdots button::after { content:""; width:8px; height:8px; border-radius:50%;
+  background:rgba(255,255,255,.35); transition:background .2s, transform .2s; }
+.fsdots button.on::after { background:#fff; transform:scale(1.25); }
+.fsquiet .fsdots button::after { background:var(--sp-edge); }
+.fsquiet .fsdots button.on::after { background:var(--sp-ink-2); }
+/* The next one slides in from the right: the scene a little behind the words. */
+.card.fsnext .fsin, .card.fsnext .fsquiet { animation:fs-in .5s cubic-bezier(.2,.7,.2,1) both; }
+.card.fsnext .fscanvas { animation:fs-in-bg .7s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes fs-in { from { opacity:0; transform:translateX(32px); } }
+@keyframes fs-in-bg { from { opacity:0; transform:translateX(48px); } }
+@media (prefers-reduced-motion: reduce) {
+  .card.fsnext .fsin, .card.fsnext .fsquiet, .card.fsnext .fscanvas { animation:none; }
+}
 .fsxp { position:absolute; top:9px; right:9px; width:28px; height:28px; border-radius:50%;
   display:grid; place-items:center; background:rgba(0,0,0,.35); color:#fff; }
 .fsxp ha-icon, .fsxp .mdi { --mdc-icon-size:16px; width:16px; height:16px; }
@@ -7964,23 +7981,33 @@ const festXp = () => `<span class="fsxp" aria-hidden="true">${iconMarkup("mdi:ar
 
 /* The new body: today's lead, drawn as its scene, with one line for anything
    else on. The words are short here; the whole of them opens full screen. */
-/* Which event a card shows, and what its "Also today" names.
+/* Which event the card shows, and how many it is taking turns with.
 
-   Two festivals on one day get a card each: the dashboard puts two cards
-   side by side, `slot: 1` and `slot: 2`. The second shows the second
-   festival -- a festival's own day or a day of its run, drawn as a scene --
-   and is not there at all on a day with only one. The first then leaves
-   that festival out of its "Also today", since it has a card of its own.
-   An awareness day or a month-long observance never takes the second card.
-   Without `slot`, one card shows the lead and names everything else. */
+   Two or more things on one day take turns: the card slides from one to
+   the next every `every` seconds (12 by default), with a dot for each, so
+   every festival gets its own scene rather than a line under another's.
+   `rotate: false` keeps the lead and names the rest as "Also today".
+
+   Nothing is shown until the calendars have answered. Before they do, the
+   only thing the card knows about today is what comes from the date -- a
+   month-long observance -- and drawing that for a second before the
+   festival replaced it was a flash of the wrong card on every refresh. */
 function festPick(b) {
+  const waiting = !b.preview && Array.isArray(b.events) && b.events.some((l) => !Array.isArray(l));
+  if (waiting) return null;
   const list = festActive(b, b.now);
-  const slot = Number(b.slot) || 0;
-  const festive = list.filter((x) => x.rank <= 2 && festEntry(x.key).tier === "festive");
-  const second = festive.length > 1 && festive[0] === list[0] ? festive[1] : null;
-  if (slot >= 2) return second ? { item: second, also: [], list } : null;
   if (!list.length) return null;
-  return { item: list[0], also: list.slice(1).filter((x) => !(slot && x === second)), list };
+  if (b.rotate === false || list.length < 2) return { item: list[0], also: list.slice(1), list, at: 0 };
+  const at = ((Math.floor(Number(b.index) || 0) % list.length) + list.length) % list.length;
+  return { item: list[at], also: [], list, at };
+}
+
+/* A dot for each thing on today, the one showing filled. Each is a button:
+   pressed, the card goes straight to that one. */
+function festDots(pick) {
+  if (!pick || pick.also.length || pick.list.length < 2) return "";
+  return `<div class="fsdots">${pick.list.map((x, i) => `<button type="button" class="${i === pick.at ? "on" : ""}"`
+    + ` data-festat="${i}" aria-label="${esc(x.key)}"${i === pick.at ? ' aria-current="true"' : ""}></button>`).join("")}</div>`;
 }
 
 function festScenesBody(b) {
@@ -7988,7 +8015,7 @@ function festScenesBody(b) {
   if (!pick) return "";
   const lead = pick.item;
   const entry = festEntry(lead.key);
-  const also = festAlsoLine(pick.also);
+  const also = festAlsoLine(pick.also) + festDots(pick);
   const open = ` role="button" tabindex="0" aria-label="${esc(lead.key)}: open full screen" data-festopen="${esc(lead.key)}"`;
   if (entry.tier !== "festive") {
     return `<div class="fsquiet"${open}>${festMotif(entry.motif, 26)}`
@@ -18078,6 +18105,8 @@ class SpectraCard extends HTMLElement {
     if (this._day) this._day.detach();
     if (this._ahead) this._ahead.detach();
     if (this._fest) this._fest.detach();
+    clearInterval(this._festTimer);
+    this._festTimer = null;
     if (this._diary) { this._diary.detach(); this._diary.box = null; }
     if (this._onOpenTask) window.removeEventListener(OPEN_TASK_EVENT, this._onOpenTask);
     /* A camera stream left running off-screen is a camera left streaming
@@ -18461,6 +18490,10 @@ class SpectraCard extends HTMLElement {
       outline: resolveValue(this._hass, config.outline, f),
       body: resolveValue(this._hass, config.body, f) || {},
     };
+    /* Which of today's celebrations is showing is the card's own state. */
+    if (config.body && config.body.type === "festival" && config.body.scenes) {
+      model.body = Object.assign({}, model.body, { index: this._festIdx || 0 });
+    }
     /* A finished AI task is this card's notice. The louder of that and the
        card's own level: two needs on one card, each decided by its owner. */
     if (this._tasksCfg) {
@@ -18853,6 +18886,9 @@ class SpectraCard extends HTMLElement {
        ground and the canvas covers it edge to edge. */
     const fsPick = fb && fb.scenes ? festPick(fb) : null;
     const fsLead = fsPick ? fsPick.item : null;
+    /* Taking turns: the next one slides in. Not on the first paint. */
+    const fsSlide = Boolean(fsLead && this._fsShown && this._fsShown !== fsLead.key);
+    if (fsLead) this._fsShown = fsLead.key;
     const fsEntry = fsLead ? festEntry(fsLead.key) : null;
     const fsGround = fsEntry && fsEntry.tier === "festive" ? cssColor(fsEntry.bg) || "#1A1426" : null;
     /* The wash lands in the card's style attribute and the palette in the
@@ -18878,6 +18914,7 @@ class SpectraCard extends HTMLElement {
       + (tappable ? " tappable" : "")
       + (festive ? " festive" : "")
       + (fsGround ? " festscene" : "")
+      + (fsSlide ? " fsnext" : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "")
       + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "")
@@ -21090,6 +21127,12 @@ class SpectraCard extends HTMLElement {
       service: "home_signals.dismiss", data: { item_id: el.dataset.aidismiss } })));
     press("[data-frsummary]", (el) => { if (!el.disabled) this._frigateSummarise(); });
     press("[data-festopen]", (el) => this._festSheet(el.dataset.festopen));
+    press("[data-festat]", (el) => {
+      this._festIdx = Number(el.dataset.festat) || 0;
+      this._festTurns((this._model && this._model.body) || {}, true);
+      this._signature = null;
+      this._update();
+    });
 
     /* A photo that will not load -- Mealie down, a recipe whose picture
        was removed -- takes itself away rather than leaving a broken frame. */
@@ -26167,6 +26210,7 @@ class SpectraCard extends HTMLElement {
   /* The celebration's scene: one painter for the card, kept across
      repaints like the season's. */
   _festAttach(b) {
+    this._festTurns(b || {});
     const canvas = this._holder.querySelector(".fscanvas");
     if (!canvas) {
       if (this._fest) this._fest.stop();
@@ -26179,6 +26223,27 @@ class SpectraCard extends HTMLElement {
     festFont();
     if (!this._fest) this._fest = new FestPainter();
     this._fest.attach(canvas, entry.scene, festVariant(lead, entry));
+  }
+
+  /* Several things on today take turns on the card. The timer only runs
+     while there is more than one; it holds while the full-screen view is
+     up or the screen is off, so nothing moves under someone reading. */
+  _festTurns(b, restart) {
+    const pick = festPick(b);
+    const turns = Boolean(pick && pick.list.length > 1 && !pick.also.length);
+    const every = Math.max(4, Number(b.every) || 12) * 1000;
+    if (!turns || restart || every !== this._festEvery) {
+      clearInterval(this._festTimer);
+      this._festTimer = null;
+    }
+    if (!turns || this._festTimer) return;
+    this._festEvery = every;
+    this._festTimer = setInterval(() => {
+      if (this._fsSheet || !this.isConnected || (typeof document !== "undefined" && document.hidden)) return;
+      this._festIdx = (this._festIdx || 0) + 1;
+      this._signature = null;
+      this._update();
+    }, every);
   }
 
   /* Full screen, for one event and the others on today. Opened from the

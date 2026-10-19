@@ -84,7 +84,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       const el = document.createElement("spectra-card");
       document.getElementById("a").appendChild(el);
       el.setConfig({ type: "custom:spectra-card", accent: 6, body: {
-        type: "festival", scenes: true, now,
+        type: "festival", scenes: true, now, rotate: false,
         events: [{ calendar: "calendar.hindu", back: 35, days: 12 }, { calendar: "calendar.uk", back: 35, days: 12 }],
         observance: { entity: "sensor.observance_today" },
         preview: { entity: "input_text.panel_preview_holiday" },
@@ -92,20 +92,25 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
       el.hass = hass;
       cards[name] = el;
     }
-    /* Two festivals, two cards: slot 1 and slot 2, on three days. */
-    for (const [name, now] of Object.entries({ durga1: dates.durga1, dusshera: dates.dusshera, bhm: dates.bhm })) {
-      for (const slot of [1, 2]) {
-        const el = document.createElement("spectra-card");
-        document.getElementById("a").appendChild(el);
-        el.setConfig({ type: "custom:spectra-card", accent: 6, body: {
-          type: "festival", scenes: true, now, slot,
-          events: [{ calendar: "calendar.hindu", back: 35, days: 12 }, { calendar: "calendar.uk", back: 35, days: 12 }],
-          observance: { entity: "sensor.observance_today" },
-        } });
-        el.hass = hass;
-        cards[`${name}_slot${slot}`] = el;
-      }
-    }
+    /* Taking turns: the same day as a card that rotates, and one whose
+       calendars never answer. */
+    const turns = document.createElement("spectra-card");
+    document.getElementById("a").appendChild(turns);
+    turns.setConfig({ type: "custom:spectra-card", accent: 6, body: {
+      type: "festival", scenes: true, now: dates.durga1,
+      events: [{ calendar: "calendar.hindu", back: 35, days: 12 }, { calendar: "calendar.uk", back: 35, days: 12 }],
+      observance: { entity: "sensor.observance_today" },
+    } });
+    turns.hass = hass;
+    cards.turns = turns;
+    const silent = document.createElement("spectra-card");
+    document.getElementById("a").appendChild(silent);
+    silent.setConfig({ type: "custom:spectra-card", accent: 6, body: {
+      type: "festival", scenes: true, now: dates.bhm,
+      events: [{ calendar: "calendar.hindu", back: 35, days: 12 }],
+    } });
+    silent.hass = Object.assign({}, hass, { callWS: () => new Promise(() => {}) });
+    cards.silent = silent;
     /* A rail fixed over the bottom of the screen, as high as a z-index goes,
        the way the panel's own chrome could be. The full-screen view has to
        cover it all the same. */
@@ -136,6 +141,24 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     };
     const out = {};
     for (const [k, el] of Object.entries(window.CARDS)) out[k] = read(el);
+    return out;
+  });
+
+  /* Step the rotating card on, and press a dot. */
+  const steps = await page.evaluate(async () => {
+    const el = window.CARDS.turns;
+    const r = el.shadowRoot || el;
+    const name = () => ((r.querySelector(".fsname") || r.querySelector(".fsquiet h4") || {}).textContent || "").trim();
+    const out = { first: name(), dots: r.querySelectorAll(".fsdots button").length, timer: !!el._festTimer };
+    el._festIdx = 1; el._signature = null; el._update();
+    await new Promise((x) => setTimeout(x, 50));
+    out.second = name();
+    out.slid = !!r.querySelector(".card.fsnext");
+    out.lit = [...r.querySelectorAll(".fsdots button")].findIndex((b) => b.classList.contains("on"));
+    r.querySelector('.fsdots [data-festat="2"]').click();
+    await new Promise((x) => setTimeout(x, 50));
+    out.third = name();
+    out.opened = !!r.querySelector(".fsfull");
     return out;
   });
 
@@ -229,13 +252,10 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("full screen means the whole screen, nothing of the dashboard round it", sheet.first.covers, sheet.first);
   check("it opens in the browser's top layer, as a modal", sheet.first.modal, sheet.first);
   check("and covers a rail fixed above everything else on the page", sheet.first.overRail, sheet.first);
-  check("two festivals, two cards: Durga Puja on the first, Maha Navami on the second",
-    r.durga1_slot1.name === "Durga Puja" && r.durga1_slot2.name === "Maha Navami" && !r.durga1_slot2.hidden, [r.durga1_slot1, r.durga1_slot2]);
-  check("the first card's Also today leaves out what has its own card",
-    !r.durga1_slot1.also.includes("Maha Navami") && r.durga1_slot1.also.includes("Black History Month"), r.durga1_slot1.also);
-  check("Dusshera and day 2 of Durga Puja get a card each",
-    r.dusshera_slot1.name === "Dusshera" && r.dusshera_slot2.name === "Durga Puja" && r.dusshera_slot2.when.startsWith("Day 2 of 5"), [r.dusshera_slot1, r.dusshera_slot2]);
-  check("an observance never takes the second card", r.bhm_slot2.hidden && r.bhm_slot1.name === "Black History Month", [r.bhm_slot1, r.bhm_slot2]);
+  check("several things on today take turns, a dot each", steps.first === "Durga Puja" && steps.dots === 3 && steps.timer, steps);
+  check("the next one slides in", steps.second === "Maha Navami" && steps.slid && steps.lit === 1, steps);
+  check("a dot goes straight to its one, without opening it", steps.third === "Black History Month" && !steps.opened, steps);
+  check("nothing shows until the calendars answer, so no flash of the month's observance", r.silent.hidden, r.silent);
   check("with the whole explanation", sheet.first.sections === 2 && sheet.first.story.includes("Asche bochor abar hobe"), sheet.first);
   check("and the others on today, which open in turn",
     sheet.first.others.includes("Maha Navami") && sheet.second === "Maha Navami", sheet);

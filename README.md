@@ -1304,13 +1304,14 @@ camera's live view: nothing of the dashboard shows, not the rail, not Home
 Assistant's header. On a wall panel the words fit beside the scene without
 scrolling; the cross or Escape closes it.
 
-Two festivals on one day get a card each. Put two cards side by side with
-`slot: 1` and `slot: 2` and otherwise the same body: the second shows the
-second festival and is not there at all on a day with only one, and the
-first leaves that festival out of its "Also today". An awareness day or a
-month-long observance never takes the second card.
+Two or more things on one day take turns: the card slides from one to the
+next every `every` seconds (12 by default), with a dot for each that jumps
+straight to it. Tapped, it opens whichever is showing. `rotate: false`
+keeps the lead and names the rest as "Also today" instead. Nothing shows
+until the calendars have answered, so a refresh never flashes the month's
+observance before the festival.
 
-When two things fall on one day, one leads and the rest are "Also today":
+The order they take turns in, and the lead when they do not:
 a festival's own day, or Advent, beats a day in the middle of a run, which
 beats a bank holiday or an awareness day, which beats a month-long
 observance; the bigger festival wins a tie. A day with nothing on renders
