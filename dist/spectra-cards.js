@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.191.3";
+const VERSION = "0.191.4";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3788,7 +3788,6 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   z-index:1001; background:#000; display:flex; justify-content:center;
   animation:sheetfade .16s ease-out;
 }
-.fsfull::backdrop { background:#000; }
 .fsbox { position:relative; width:100%; height:100%; overflow:auto;
   background:var(--fg); color:#fff; overscroll-behavior:contain; box-sizing:border-box;
   padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -19222,10 +19221,7 @@ class SpectraCard extends HTMLElement {
      the readings swap and the painter takes the new hours where it stands. */
   _aheadSheet() {
     if (this._axSheet || !this._model) return;
-    const modal = typeof HTMLDialogElement === "function";
-    const wrap = document.createElement(modal ? "dialog" : "div");
-    wrap.className = "fsfull";
-    if (!modal) { wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); }
+    const wrap = fullScreenBox();
     wrap.setAttribute("aria-label", String(firstOf(this._model.title, "Now and next")));
     this._wearAccent(wrap, this._model.accent);
     const s = { wrap, painter: new AheadPainter() };
@@ -19286,14 +19282,10 @@ class SpectraCard extends HTMLElement {
       s.painter.attach(canvas, m);
     };
     s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._aheadClose(); } };
-    if (modal) wrap.addEventListener("cancel", (event) => { event.preventDefault(); this._aheadClose(); });
-    else document.addEventListener("keydown", s.onKey, true);
+    document.addEventListener("keydown", s.onKey, true);
     wrap.querySelector("[data-fsclose]").addEventListener("click", () => this._aheadClose());
     if (this._ahead) this._ahead.stop();
     this._holder.appendChild(wrap);
-    if (modal && wrap.showModal) {
-      try { wrap.showModal(); } catch (e) { /* not connected: stays a fixed box */ }
-    }
     s.refresh(this._model);
     const close = wrap.querySelector("[data-fsclose]");
     if (close && close.focus) close.focus({ preventScroll: true });
@@ -19306,7 +19298,6 @@ class SpectraCard extends HTMLElement {
     clearInterval(s.clock);
     if (s.idle) s.idle();
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
-    if (s.wrap.open && s.wrap.close) s.wrap.close();
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
     this._axSheet = null;
     this._signature = null;
@@ -26675,27 +26666,13 @@ class SpectraCard extends HTMLElement {
     };
     if (!this._fsSheet) {
       festFont();
-      /* A modal dialog, so the browser draws it in its top layer: above
-         the rail, Home Assistant's header and sidebar and anything else on
-         the page, whatever stacking those sit in. A fixed box with a high
-         z-index only wins against what shares its stacking context, and
-         the panel is free to put the rail in a different one. */
-      const modal = typeof HTMLDialogElement === "function";
-      const wrap = document.createElement(modal ? "dialog" : "div");
-      wrap.className = "fsfull";
-      if (!modal) { wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); }
+      const wrap = fullScreenBox();
       const s = { wrap, painter: null };
       s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._festClose(); } };
-      /* A dialog answers Escape itself, as "cancel"; it is closed here so
-         the painter stops and the card repaints. */
-      if (modal) wrap.addEventListener("cancel", (event) => { event.preventDefault(); this._festClose(); });
-      else document.addEventListener("keydown", s.onKey, true);
+      document.addEventListener("keydown", s.onKey, true);
       this._fsSheet = s;
       this._fullScreen(s, () => this._festClose());
       this._holder.appendChild(wrap);
-      if (modal && wrap.showModal) {
-        try { wrap.showModal(); } catch (e) { /* not connected: stays a fixed box */ }
-      }
     }
     show(name);
   }
@@ -26711,7 +26688,6 @@ class SpectraCard extends HTMLElement {
     if (s.idle) s.idle();
     if (s.painter) s.painter.detach();
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
-    if (s.wrap.open && s.wrap.close) s.wrap.close();
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
     this._fsSheet = null;
     this._signature = null;
@@ -27777,6 +27753,19 @@ class SpectraCard extends HTMLElement {
    it all day. Any touch, drag, wheel or key inside it starts the minute
    again. Each full screen registers through the card's _fullScreen, which
    is the one place a new one has to call. */
+/* The box every full screen is drawn in: the camera's way, a fixed box
+   the size of the screen, above the page. A native modal <dialog> was
+   tried for the celebrations and now and next, to sit in the browser's
+   top layer, and on the wall tablet it did not fill the screen; the
+   camera's box always has. */
+function fullScreenBox() {
+  const wrap = document.createElement("div");
+  wrap.className = "fsfull";
+  wrap.setAttribute("role", "dialog");
+  wrap.setAttribute("aria-modal", "true");
+  return wrap;
+}
+
 const FULL_IDLE_MS = 60000;
 const FULL_IDLE_EVENTS = ["pointerdown", "pointermove", "wheel", "keydown", "touchstart"];
 function fullScreenIdle(wrap, close, ms = FULL_IDLE_MS) {
