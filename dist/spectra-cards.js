@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.191.2";
+const VERSION = "0.192.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3716,15 +3716,19 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   padding:5px 8px; width:fit-content; }
 .fsalso i { font-style:normal; color:rgba(255,255,255,.65); text-transform:uppercase;
   letter-spacing:.08em; font-size:10px; font-weight:600; white-space:nowrap; }
-/* Which of today's is showing. Small, at the foot, out of the words' way. */
-.fsdots { display:flex; gap:2px; margin-top:auto; padding-top:8px; }
+/* Which of today's is showing: pinned to the card's foot, at the same
+   place whichever is showing and however much it says. The words keep
+   clear of them. */
+.fsdots { position:absolute; left:8px; bottom:14px; z-index:3; display:flex; gap:2px; }
+.card.fsturns .fsin { padding-bottom:44px; }
+.card.fsturns .fsquiet { padding-bottom:44px; }
 .fsdots button { width:22px; height:22px; padding:0; border:0; background:none; cursor:pointer;
   display:grid; place-items:center; }
 .fsdots button::after { content:""; width:8px; height:8px; border-radius:50%;
   background:rgba(255,255,255,.35); transition:background .2s, transform .2s; }
 .fsdots button.on::after { background:#fff; transform:scale(1.25); }
-.fsquiet .fsdots button::after { background:var(--sp-edge); }
-.fsquiet .fsdots button.on::after { background:var(--sp-ink-2); }
+.card:not(.festscene) .fsdots button::after { background:var(--sp-edge); }
+.card:not(.festscene) .fsdots button.on::after { background:var(--sp-ink-2); }
 /* The next one slides in from the right: the scene a little behind the words. */
 .card.fsnext .fsin, .card.fsnext .fsquiet { animation:fs-in .5s cubic-bezier(.2,.7,.2,1) both; }
 .card.fsnext .fscanvas { animation:fs-in-bg .7s cubic-bezier(.2,.7,.2,1) both; }
@@ -3757,16 +3761,33 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   .fsscrim { background:linear-gradient(90deg, rgba(8,5,12,.78), rgba(8,5,12,.4)); }
 }
 
-/* A bank holiday or an awareness day: the plain card, a motif, the words. */
-.fsquiet { position:relative; display:flex; gap:12px; padding-right:36px; cursor:pointer; }
+/* A bank holiday or an awareness day: the plain card, laid out as a
+   festival is, with its motif large and faint on the right in place of
+   a scene. Same padding, same lines, the same name face, so the two
+   read as one card changing as it takes turns. */
+.card.festquiet { padding:0; container-type:inline-size; }
+.fsquiet { position:relative; z-index:2; min-height:184px; box-sizing:border-box;
+  padding:12px 14px 14px; display:flex; flex-direction:column; gap:4px; cursor:pointer; }
+.fsquiet > :not(.fsxp):not(.fsqart) { max-width:66%; position:relative; }
 .fsquiet .fseye { color:var(--sp-ink-3); }
-.fsquiet h4 { margin:2px 0 0; font-size:15px; font-weight:600; color:var(--sp-ink); }
-.fsquiet p { margin:4px 0 0; font-size:13px; line-height:1.5; color:var(--sp-ink-2); }
-.fsqwhen { font-family:var(--sp-mono); font-size:12px; color:var(--sp-ink-2); margin-top:2px; }
-.fsqwhen b { font-weight:600; color:var(--sp-ink); }
+.fsquiet .fsname { color:var(--sp-ink); text-shadow:none; }
+.fsquiet .fswhen { color:var(--sp-ink-2); }
+.fsquiet .fswhen b { color:var(--sp-ink); }
+.fsquiet .fsshort { color:var(--sp-ink-2); }
 .fsquiet .fsalso { background:var(--sp-sink); border-color:var(--sp-edge); color:var(--sp-ink-2); }
 .fsquiet .fsalso i { color:var(--sp-ink-3); }
-.fsquiet .fsxp { top:0; right:0; background:var(--sp-sink); color:var(--sp-ink-2); }
+.fsquiet .fsxp { background:var(--sp-sink); color:var(--sp-ink-2); }
+.fsqart { position:absolute; right:9%; top:50%; transform:translateY(-50%); opacity:.24;
+  pointer-events:none; display:grid; place-items:center; }
+.fsqart .fsmotif { width:clamp(72px, 24cqi, 120px); height:auto; stroke-width:1.2; margin:0; }
+/* A candle stays lit and stays itself: a day of remembrance. */
+.fsqart:has(.fscandle) { opacity:.9; }
+.fsqart .fscandle { transform:scale(2.4); }
+@container (max-width: 420px) {
+  .fsquiet > :not(.fsxp):not(.fsqart) { max-width:100%; }
+  .fsquiet { padding-right:44px; }
+  .fsqart { opacity:.12; }
+}
 .fsmotif { flex:none; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round;
   stroke-linejoin:round; color:var(--accent); margin-top:2px; }
 .fscandle { flex:none; width:22px; display:flex; flex-direction:column; align-items:center; padding-top:4px; }
@@ -3784,7 +3805,6 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   z-index:1001; background:#000; display:flex; justify-content:center;
   animation:sheetfade .16s ease-out;
 }
-.fsfull::backdrop { background:#000; }
 .fsbox { position:relative; width:100%; height:100%; overflow:auto;
   background:var(--fg); color:#fff; overscroll-behavior:contain; box-sizing:border-box;
   padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -8088,19 +8108,26 @@ function festScenesBody(b) {
   if (!pick) return "";
   const lead = pick.item;
   const entry = festEntry(lead.key);
-  const also = festAlsoLine(pick.also) + festDots(pick);
+  const also = festAlsoLine(pick.also);
+  /* The dots belong to the card, not the words: pinned to its foot at the
+     same place on a scene and on the plain card, so they never move as
+     the card changes from one of today's to the next. */
+  const dots = festDots(pick);
   const open = ` role="button" tabindex="0" aria-label="${esc(lead.key)}: open full screen" data-festopen="${esc(lead.key)}"`;
   if (entry.tier !== "festive") {
-    return `<div class="fsquiet"${open}>${festMotif(entry.motif, 26)}`
-      + `<div class="fsqbody"><div class="fseye">${esc(entry.eyebrow || "Today")}</div>`
-      + `<h4>${esc(lead.key)}</h4>${festWhen(lead) ? `<div class="fsqwhen">${festWhen(lead)}</div>` : ""}`
-      + `${entry.short ? `<p>${esc(entry.short)}</p>` : ""}${also}</div>${festXp()}</div>`;
+    /* Laid out as a festival is -- eyebrow, name, when, the short line --
+       with the motif standing large and faint on the right where a
+       festival's scene would be. */
+    return `<div class="fsquiet"${open}>${festXp()}<span class="fsqart" aria-hidden="true">${festMotif(entry.motif, 96)}</span>`
+      + `<div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsname">${esc(lead.key)}</div>`
+      + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}`
+      + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>${dots}`;
   }
   return `<canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsscrim"></span>`
     + `<div class="fsin"${open}>${festXp()}<div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div>`
     + `<div class="fsname">${esc(lead.key)}</div>`
     + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}${festPips(lead, entry)}`
-    + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>`;
+    + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>${dots}`;
 }
 
 /* The full-screen view of one event: its scene large, then all of the
@@ -19108,8 +19135,9 @@ class SpectraCard extends HTMLElement {
       + (config.invert ? " invert" : "")
       + (tappable ? " tappable" : "")
       + (festive ? " festive" : "")
-      + (fsGround ? " festscene" : "")
+      + (fsGround ? " festscene" : (fsLead ? " festquiet" : ""))
       + (fsSlide ? (fsBack ? " fsnext fsprev" : " fsnext") : "")
+      + (fsPick && fsPick.list.length > 1 && !fsPick.also.length ? " fsturns" : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "")
       + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "")
@@ -19213,10 +19241,7 @@ class SpectraCard extends HTMLElement {
      the readings swap and the painter takes the new hours where it stands. */
   _aheadSheet() {
     if (this._axSheet || !this._model) return;
-    const modal = typeof HTMLDialogElement === "function";
-    const wrap = document.createElement(modal ? "dialog" : "div");
-    wrap.className = "fsfull";
-    if (!modal) { wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); }
+    const wrap = fullScreenBox();
     wrap.setAttribute("aria-label", String(firstOf(this._model.title, "Now and next")));
     this._wearAccent(wrap, this._model.accent);
     const s = { wrap, painter: new AheadPainter() };
@@ -19277,14 +19302,10 @@ class SpectraCard extends HTMLElement {
       s.painter.attach(canvas, m);
     };
     s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._aheadClose(); } };
-    if (modal) wrap.addEventListener("cancel", (event) => { event.preventDefault(); this._aheadClose(); });
-    else document.addEventListener("keydown", s.onKey, true);
+    document.addEventListener("keydown", s.onKey, true);
     wrap.querySelector("[data-fsclose]").addEventListener("click", () => this._aheadClose());
     if (this._ahead) this._ahead.stop();
     this._holder.appendChild(wrap);
-    if (modal && wrap.showModal) {
-      try { wrap.showModal(); } catch (e) { /* not connected: stays a fixed box */ }
-    }
     s.refresh(this._model);
     const close = wrap.querySelector("[data-fsclose]");
     if (close && close.focus) close.focus({ preventScroll: true });
@@ -19297,7 +19318,6 @@ class SpectraCard extends HTMLElement {
     clearInterval(s.clock);
     if (s.idle) s.idle();
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
-    if (s.wrap.open && s.wrap.close) s.wrap.close();
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
     this._axSheet = null;
     this._signature = null;
@@ -26578,11 +26598,11 @@ class SpectraCard extends HTMLElement {
     if (!this._festTall || this._festTall.key !== key) {
       const shell = document.createElement("div");
       shell.style.cssText = `position:absolute;left:0;top:0;width:${width}px;visibility:hidden;pointer-events:none;`;
-      const base = card.className.split(/\s+/).filter((c) => !/^(grow|fsnext|fsprev|festscene)$/.test(c)).join(" ");
+      const base = card.className.split(/\s+/).filter((c) => !/^(grow|fsnext|fsprev|festscene|festquiet)$/.test(c)).join(" ");
       const bar = this._model ? this._titlebar(this._model, this._phase) : "";
       shell.innerHTML = pick.list.map((x, i) => {
         const festive = festEntry(x.key).tier === "festive";
-        return `<div class="${base}${festive ? " festscene" : ""}" style="${card.getAttribute("style") || ""}">`
+        return `<div class="${base}${festive ? " festscene" : " festquiet"}" style="${card.getAttribute("style") || ""}">`
           + `${bar}${BODIES.festival(Object.assign({}, b, { index: i }))}</div>`;
       }).join("");
       this._holder.appendChild(shell);
@@ -26666,27 +26686,13 @@ class SpectraCard extends HTMLElement {
     };
     if (!this._fsSheet) {
       festFont();
-      /* A modal dialog, so the browser draws it in its top layer: above
-         the rail, Home Assistant's header and sidebar and anything else on
-         the page, whatever stacking those sit in. A fixed box with a high
-         z-index only wins against what shares its stacking context, and
-         the panel is free to put the rail in a different one. */
-      const modal = typeof HTMLDialogElement === "function";
-      const wrap = document.createElement(modal ? "dialog" : "div");
-      wrap.className = "fsfull";
-      if (!modal) { wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); }
+      const wrap = fullScreenBox();
       const s = { wrap, painter: null };
       s.onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); this._festClose(); } };
-      /* A dialog answers Escape itself, as "cancel"; it is closed here so
-         the painter stops and the card repaints. */
-      if (modal) wrap.addEventListener("cancel", (event) => { event.preventDefault(); this._festClose(); });
-      else document.addEventListener("keydown", s.onKey, true);
+      document.addEventListener("keydown", s.onKey, true);
       this._fsSheet = s;
       this._fullScreen(s, () => this._festClose());
       this._holder.appendChild(wrap);
-      if (modal && wrap.showModal) {
-        try { wrap.showModal(); } catch (e) { /* not connected: stays a fixed box */ }
-      }
     }
     show(name);
   }
@@ -26702,7 +26708,6 @@ class SpectraCard extends HTMLElement {
     if (s.idle) s.idle();
     if (s.painter) s.painter.detach();
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
-    if (s.wrap.open && s.wrap.close) s.wrap.close();
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
     this._fsSheet = null;
     this._signature = null;
@@ -27768,6 +27773,19 @@ class SpectraCard extends HTMLElement {
    it all day. Any touch, drag, wheel or key inside it starts the minute
    again. Each full screen registers through the card's _fullScreen, which
    is the one place a new one has to call. */
+/* The box every full screen is drawn in: the camera's way, a fixed box
+   the size of the screen, above the page. A native modal <dialog> was
+   tried for the celebrations and now and next, to sit in the browser's
+   top layer, and on the wall tablet it did not fill the screen; the
+   camera's box always has. */
+function fullScreenBox() {
+  const wrap = document.createElement("div");
+  wrap.className = "fsfull";
+  wrap.setAttribute("role", "dialog");
+  wrap.setAttribute("aria-modal", "true");
+  return wrap;
+}
+
 const FULL_IDLE_MS = 60000;
 const FULL_IDLE_EVENTS = ["pointerdown", "pointermove", "wheel", "keydown", "touchstart"];
 function fullScreenIdle(wrap, close, ms = FULL_IDLE_MS) {

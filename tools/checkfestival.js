@@ -111,12 +111,11 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     } });
     silent.hass = Object.assign({}, hass, { callWS: () => new Promise(() => {}) });
     cards.silent = silent;
-    /* A rail fixed over the bottom of the screen, as high as a z-index goes,
-       the way the panel's own chrome could be. The full-screen view has to
-       cover it all the same. */
+    /* A rail fixed over the bottom of the screen, stacked the way the
+       panel's own is. The full-screen view has to cover it. */
     const rail = document.createElement("div");
     rail.id = "rail";
-    rail.style.cssText = "position:fixed;left:0;right:0;bottom:0;height:70px;z-index:2147483647;background:#f0f";
+    rail.style.cssText = "position:fixed;left:0;right:0;bottom:0;height:70px;z-index:10;background:#f0f";
     document.body.appendChild(rail);
     /* Inside Home Assistant's own wrapper, with calendars that answer
        late, as a refresh on the panel does. The wrapper marks itself
@@ -138,7 +137,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     window.LATE_WRAPPER = wrapper;
     window.CARDS = cards;
   }, { dates, hindu: asEvents(HINDU), uk: asEvents(UK) });
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(1500);
 
   const res = await page.evaluate(() => {
     const read = (el) => {
@@ -148,10 +147,10 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
         hidden: el.hidden || el.style.display === "none" || !r.querySelector(".card"),
         scene: !!r.querySelector(".card.festscene .fscanvas"),
         quiet: !!r.querySelector(".fsquiet"),
-        name: text(".fsname") || text(".fsquiet h4"),
-        when: text(".fswhen") || text(".fsqwhen"),
+        name: text(".fsname"),
+        when: text(".fswhen"),
         also: text(".fsalso"),
-        short: text(".fsshort") || text(".fsquiet p"),
+        short: text(".fsshort"),
         pips: r.querySelectorAll(".fspips span").length,
         lit: r.querySelectorAll(".fspips span.on").length,
         painting: !!(el._fest && el._fest.draw && el._fest.canvas && el._fest.canvas.width > 0),
@@ -167,17 +166,27 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   const steps = await page.evaluate(async () => {
     const el = window.CARDS.turns;
     const r = el.shadowRoot || el;
-    const name = () => ((r.querySelector(".fsname") || r.querySelector(".fsquiet h4") || {}).textContent || "").trim();
-    const out = { first: name(), dots: r.querySelectorAll(".fsdots button").length, timer: !!el._festTimer };
+    const name = () => ((r.querySelector(".fsname") || {}).textContent || "").trim();
+    /* Where the dots sit on the card, after the slide has settled. */
+    const spot = async () => {
+      await new Promise((x) => setTimeout(x, 800));
+      const card = r.querySelector(".card").getBoundingClientRect();
+      const d = r.querySelector(".fsdots").getBoundingClientRect();
+      const n = r.querySelector(".fsname").getBoundingClientRect();
+      return `${Math.round(d.left - card.left)},${Math.round(card.bottom - d.bottom)},${Math.round(card.height)}|${Math.round(n.left - card.left)},${Math.round(n.top - card.top)}`;
+    };
+    const out = { first: name(), dots: r.querySelectorAll(".fsdots button").length, timer: !!el._festTimer, spots: [await spot()] };
     el._festIdx = 1; el._signature = null; el._update();
     await new Promise((x) => setTimeout(x, 50));
     out.second = name();
     out.slid = !!r.querySelector(".card.fsnext");
     out.lit = [...r.querySelectorAll(".fsdots button")].findIndex((b) => b.classList.contains("on"));
+    out.spots.push(await spot());
     r.querySelector('.fsdots [data-festat="2"]').click();
     await new Promise((x) => setTimeout(x, 50));
     out.third = name();
     out.opened = !!r.querySelector(".fsfull");
+    out.spots.push(await spot());
     return out;
   });
 
@@ -192,7 +201,7 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     return page.evaluate(() => {
       const el = window.CARDS.turns;
       const r = el.shadowRoot || el;
-      return { name: ((r.querySelector(".fsname") || r.querySelector(".fsquiet h4") || {}).textContent || "").trim(),
+      return { name: ((r.querySelector(".fsname") || {}).textContent || "").trim(),
         back: !!r.querySelector(".card.fsprev"), opened: !!r.querySelector(".fsfull") };
     });
   };
@@ -229,7 +238,10 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
         return box.left <= 0 && box.top <= 0 && box.right >= innerWidth && box.bottom >= innerHeight; })(),
     };
     /* What is on top where the rail is: the card's view, not the rail. */
-    first.modal = !!(wrap && wrap.matches && wrap.matches(":modal"));
+    /* Drawn the camera's way, the one the wall tablet fills the screen
+       with: a fixed box, not a <dialog> in the browser's top layer. */
+    first.box = !!wrap && wrap.localName === "div" && getComputedStyle(wrap).position === "fixed"
+      && getComputedStyle(wrap).zIndex === "1001";
     first.overRail = document.elementFromPoint(innerWidth / 2, innerHeight - 30) === el;
     const go = wrap && wrap.querySelector('[data-festgo="Maha Navami"]');
     if (go) go.click();
@@ -299,10 +311,12 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("every card has its short line", ["durga1", "diwali", "advent12", "christmas", "bhm"].every((k) => r[k].short.length > 20), r);
   check("tapping opens it full screen, scene and all", sheet.first.open && sheet.first.title === "Durga Puja" && sheet.first.canvas, sheet.first);
   check("full screen means the whole screen, nothing of the dashboard round it", sheet.first.covers, sheet.first);
-  check("it opens in the browser's top layer, as a modal", sheet.first.modal, sheet.first);
-  check("and covers a rail fixed above everything else on the page", sheet.first.overRail, sheet.first);
+  check("it opens as the camera's view does: a fixed box over the page, not a dialog", sheet.first.box, sheet.first);
+  check("and covers the rail", sheet.first.overRail, sheet.first);
   check("several things on today take turns, a dot each", steps.first === "Durga Puja" && steps.dots === 3 && steps.timer, steps);
   check("the next one slides in", steps.second === "Maha Navami" && steps.slid && steps.lit === 1, steps);
+  check("the dots and the name sit in the same place on every one, scene or plain card, and the card keeps its height",
+    new Set(steps.spots).size === 1, steps.spots);
   check("a dot goes straight to its one, without opening it", steps.third === "Black History Month" && !steps.opened, steps);
   check("a swipe left goes to the next, round to the first", swiped.left.name === "Durga Puja" && !swiped.left.back && !swiped.left.opened, swiped);
   check("taking turns, the card keeps one height", heights.length === 3 && heights.every((h) => h === heights[0]) && heights[0] > 100, heights);
