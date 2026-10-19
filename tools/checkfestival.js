@@ -181,6 +181,23 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     return out;
   });
 
+  /* A swipe left goes to the next, wrapping round; a swipe right comes
+     back, sliding in from the left. Neither opens it full screen. */
+  const swipe = async (by) => {
+    const box = await page.evaluate(() => { window.CARDS.turns.scrollIntoView({ block: "center" }); const b = window.CARDS.turns.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + 60 }; });
+    await page.mouse.move(box.x, box.y); await page.mouse.down();
+    for (let i = 1; i <= 6; i++) await page.mouse.move(box.x + (by * i) / 6, box.y + 4);
+    await page.mouse.up();
+    await page.waitForTimeout(80);
+    return page.evaluate(() => {
+      const el = window.CARDS.turns;
+      const r = el.shadowRoot || el;
+      return { name: ((r.querySelector(".fsname") || r.querySelector(".fsquiet h4") || {}).textContent || "").trim(),
+        back: !!r.querySelector(".card.fsprev"), opened: !!r.querySelector(".fsfull") };
+    });
+  };
+  const swiped = { left: await swipe(-140), right: await swipe(140) };
+
   /* Open the lead full screen, follow its "Also today", close it. */
   const sheet = await page.evaluate(async () => {
     const el = window.CARDS.durga1;
@@ -274,6 +291,8 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("several things on today take turns, a dot each", steps.first === "Durga Puja" && steps.dots === 3 && steps.timer, steps);
   check("the next one slides in", steps.second === "Maha Navami" && steps.slid && steps.lit === 1, steps);
   check("a dot goes straight to its one, without opening it", steps.third === "Black History Month" && !steps.opened, steps);
+  check("a swipe left goes to the next, round to the first", swiped.left.name === "Durga Puja" && !swiped.left.back && !swiped.left.opened, swiped);
+  check("a swipe right goes back, in from the left", swiped.right.name === "Black History Month" && swiped.right.back && !swiped.right.opened, swiped);
   const lateWrapperHidden = await page.evaluate(() => window.LATE_WRAPPER.hasAttribute("hidden") || getComputedStyle(window.LATE_WRAPPER).display === "none");
   check("after a refresh with slow calendars it still appears, in Home Assistant's wrapper",
     r.late.name === "Durga Puja" && !r.late.hidden && !lateWrapperHidden, [r.late, lateWrapperHidden]);

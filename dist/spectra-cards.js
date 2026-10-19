@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.189.1";
+const VERSION = "0.190.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3728,8 +3728,15 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 /* The next one slides in from the right: the scene a little behind the words. */
 .card.fsnext .fsin, .card.fsnext .fsquiet { animation:fs-in .5s cubic-bezier(.2,.7,.2,1) both; }
 .card.fsnext .fscanvas { animation:fs-in-bg .7s cubic-bezier(.2,.7,.2,1) both; }
+/* Swiped back to the one before, it comes in from the left. */
+.card.fsprev .fsin, .card.fsprev .fsquiet { animation-name:fs-in-back; }
+.card.fsprev .fscanvas { animation-name:fs-in-bg-back; }
 @keyframes fs-in { from { opacity:0; transform:translateX(32px); } }
 @keyframes fs-in-bg { from { opacity:0; transform:translateX(48px); } }
+@keyframes fs-in-back { from { opacity:0; transform:translateX(-32px); } }
+@keyframes fs-in-bg-back { from { opacity:0; transform:translateX(-48px); } }
+/* A finger can swipe between today's; the page still scrolls up and down. */
+.fsin, .fsquiet { touch-action:pan-y; }
 @media (prefers-reduced-motion: reduce) {
   .card.fsnext .fsin, .card.fsnext .fsquiet, .card.fsnext .fscanvas { animation:none; }
 }
@@ -19052,6 +19059,8 @@ class SpectraCard extends HTMLElement {
     /* Taking turns: the next one slides in. Not on the first paint. */
     const fsSlide = Boolean(fsLead && this._fsShown && this._fsShown !== fsLead.key);
     if (fsLead) this._fsShown = fsLead.key;
+    const fsBack = fsSlide && this._festBack;
+    if (fsSlide) this._festBack = false;
     const fsEntry = fsLead ? festEntry(fsLead.key) : null;
     const fsGround = fsEntry && fsEntry.tier === "festive" ? cssColor(fsEntry.bg) || "#1A1426" : null;
     /* The wash lands in the card's style attribute and the palette in the
@@ -19077,7 +19086,7 @@ class SpectraCard extends HTMLElement {
       + (tappable ? " tappable" : "")
       + (festive ? " festive" : "")
       + (fsGround ? " festscene" : "")
-      + (fsSlide ? " fsnext" : "")
+      + (fsSlide ? (fsBack ? " fsnext fsprev" : " fsnext") : "")
       + (lit ? " lit" : "")
       + (swapped ? " swap" : "")
       + (type === "sky" || type === "day" || type === "ahead" ? " skycard" : "")
@@ -21403,7 +21412,29 @@ class SpectraCard extends HTMLElement {
     press("[data-aidismiss]", (el) => onPress(el, () => this._callAction({
       service: "home_signals.dismiss", data: { item_id: el.dataset.aidismiss } })));
     press("[data-frsummary]", (el) => { if (!el.disabled) this._frigateSummarise(); });
-    press("[data-festopen]", (el) => this._festSheet(el.dataset.festopen));
+    /* A swipe ends in a click too; that one does not open full screen. */
+    press("[data-festopen]", (el) => {
+      if (performance.now() - (this._festSwiped || 0) < 500) return;
+      this._festSheet(el.dataset.festopen);
+    });
+    /* Several on today: a swipe left goes to the next, right to the one
+       before, and the turns start their count again. */
+    if (this._holder.querySelector("[data-festat]")) {
+      this._holder.querySelectorAll("[data-festopen]").forEach((el) => {
+        let from = null;
+        el.addEventListener("pointerdown", (event) => { from = { x: event.clientX, y: event.clientY }; });
+        el.addEventListener("pointercancel", () => { from = null; });
+        el.addEventListener("pointerup", (event) => {
+          if (!from) return;
+          const dx = event.clientX - from.x;
+          const dy = event.clientY - from.y;
+          from = null;
+          if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+          this._festSwiped = performance.now();
+          this._festGo(dx < 0 ? 1 : -1);
+        });
+      });
+    }
     press("[data-festat]", (el) => {
       this._festIdx = Number(el.dataset.festat) || 0;
       this._festTurns((this._model && this._model.body) || {}, true);
@@ -26500,6 +26531,15 @@ class SpectraCard extends HTMLElement {
     festFont();
     if (!this._fest) this._fest = new FestPainter();
     this._fest.attach(canvas, entry.scene, festVariant(lead, entry));
+  }
+
+  /* One step through today's, forwards or back. */
+  _festGo(step) {
+    this._festIdx = (this._festIdx || 0) + step;
+    this._festBack = step < 0;
+    this._festTurns((this._model && this._model.body) || {}, true);
+    this._signature = null;
+    this._update();
   }
 
   /* Several things on today take turns on the card. The timer only runs
