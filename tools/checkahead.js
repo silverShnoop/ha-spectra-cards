@@ -65,7 +65,7 @@ const js = fs.readFileSync(file);
       const el = document.createElement("spectra-card");
       d.appendChild(el);
       document.getElementById("a").appendChild(d);
-      el.setConfig({ type: "custom:spectra-card", accent: 5, title: "Now", body: {
+      el.setConfig({ type: "custom:spectra-card", accent: 5, title: "Now", meta: "↑ 07:28   ↓ 17:55", body: {
         type: "ahead", hero: { entity: "sensor.outdoor", suffix: "°" }, condition: { entity: "weather.home" },
         cloud_cover: { entity: "weather.home", attribute: "cloud_coverage" },
         rising: { entity: "sun.sun", attribute: "next_rising" }, setting: { entity: "sun.sun", attribute: "next_setting" },
@@ -137,8 +137,21 @@ const js = fs.readFileSync(file);
   const still = await page.evaluate(() => ({ sc: window.CARDS.wide._ahead.laid.sc, open: Boolean(window.CARDS.wide._axSheet) }));
   check("the card does not scroll", still.sc === 0, still);
   if (still.open) await page.keyboard.press("Escape");
-  const expand = await page.evaluate(() => Boolean((window.CARDS.wide.shadowRoot || window.CARDS.wide).querySelector("[data-expand]")));
-  check("the title says it opens full screen", expand, expand);
+  /* The way to full screen is a button in the top right corner, clear of
+     the meta, which moves left for it, and of the readings below. */
+  const expand = await page.evaluate(() => {
+    const r = window.CARDS.wide.shadowRoot || window.CARDS.wide;
+    const b = r.querySelector("[data-expand]");
+    if (!b) return null;
+    const box = (el) => el.getBoundingClientRect();
+    const card = box(r.querySelector(".card"));
+    const x = box(b);
+    const meta = box(r.querySelector(".meta"));
+    const read = box(r.querySelector(".skyread"));
+    return { right: card.right - x.right, top: x.top - card.top, w: x.width, clearOfMeta: meta.right <= x.left, clearOfRead: read.right <= x.left || read.top >= x.bottom };
+  });
+  check("full screen is a button in the top right, clear of the meta and the readings",
+    expand && expand.right < 16 && expand.top < 16 && expand.w >= 24 && expand.clearOfMeta && expand.clearOfRead, expand);
   await page.mouse.click(box.x + box.w * .7, box.y + 140);
   await page.clock.runFor(500);
   const sheet = await page.evaluate(() => {
