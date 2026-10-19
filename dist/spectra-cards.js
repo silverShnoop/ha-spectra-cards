@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.190.0";
+const VERSION = "0.190.1";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -4237,6 +4237,15 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   position:absolute; top:9px; left:10px; right:10px; z-index:1; margin:0;
 }
 .card.skycard .skybox { margin:0; border-radius:4px; }
+/* On a picture card the way to full screen is a button in the top right
+   corner, on a shade of the paper, after the meta: as faint ink beside the
+   title it was lost against the sky. The meta moves left to make room. */
+.card.skycard .tbexpand { order:99; margin-left:8px; width:26px; height:26px; flex:none;
+  display:grid; place-items:center; border-radius:6px; border:1px solid var(--sp-edge);
+  background:color-mix(in srgb, var(--sp-paper) 62%, transparent); color:var(--sp-ink);
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+.card.skycard .titlebar .tbexpand ha-icon, .card.skycard .tbexpand .mdi { --mdc-icon-size:16px; width:16px; height:16px; color:var(--sp-ink); }
+.card.skycard > .titlebar { align-items:center; }
 .skycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
 /* day -- the same picture-is-the-card treatment as the sky, at a fixed
    height so the temperatures and icons read the same at any width. */
