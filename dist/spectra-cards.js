@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.195.0";
+const VERSION = "0.196.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -119,6 +119,15 @@ const TOKENS_LIGHT = `
      faces lit from one side, plus the pencil line that holds them together. */
   --sp-salt-top:#FFFFFF; --sp-salt-front:#ECE7DB; --sp-salt-side:#D8D1C0;
   --sp-salt-line:#A9A190;
+  /* Bins, on the bins card. A DEPICTION, like --sp-salt: a bin is the colour
+     the council painted it, and nobody here chose it. Matte and grey-leaning,
+     so the blue can never pass for the notice blue, and only ever a fill
+     inside the drawing -- never an edge, which is where levels live. Their
+     own tokens, so the brown is not Climate's and the purple is not plum:
+     repaint an accent and no bin changes colour. */
+  --sp-bin-blue:#3D6E9C; --sp-bin-brown:#6B4A2F; --sp-bin-purple:#6A4A7E;
+  --sp-bin-black:#2E2B28; --sp-bin-green:#4E7A3A; --sp-bin-grey:#8A8F93;
+  --sp-bin-line:rgba(0,0,0,.38);
   /* The temperature ramp. A DEPICTION, like --sp-sun and like a bulb's
      colour temperature: cold is blue because cold is blue, and nobody chose
      it. It holds yellow, orange and red, which are the three level colours,
@@ -198,6 +207,10 @@ const TOKENS_DARK = `
   --sp-sky-moon:#E6E0D2; --sp-sky-star:#E6E0D2; --sp-sky-snow:#F0EBE0;
   --sp-salt-top:#EDE8DC; --sp-salt-front:#CFC8B7; --sp-salt-side:#ADA591;
   --sp-salt-line:#6F695C;
+  /* Lifted, so a black bin is still a bin on a dark card. */
+  --sp-bin-blue:#5B86B3; --sp-bin-brown:#8A6545; --sp-bin-purple:#8A6AA0;
+  --sp-bin-black:#46423D; --sp-bin-green:#6E9A55; --sp-bin-grey:#9AA0A4;
+  --sp-bin-line:rgba(255,255,255,.34);
   --sp-ramp-0:#5A9CBF; --sp-ramp-1:#86BFAE; --sp-ramp-2:#DECB78;
   --sp-ramp-3:#E3A15C; --sp-ramp-4:#D0614B; --sp-ramp-5:#A63A3A;
   --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
@@ -2128,6 +2141,50 @@ ${TOKENS_DARK}
 .saltside .mlabel { margin:2px 0 0; }
 .saltside .hero { font-size:26px; margin-top:2px; }
 .saltside .sub { margin-top:3px; }
+/* bins -- the bins going out, drawn, and the day they go.
+
+   The drawing leads because the question at the door is "which ones",
+   and a shape answers it before a word is read. Each bin is drawn in the
+   colour the council painted it -- a depiction, see --sp-bin-blue -- so
+   the bin you are looking for on the card is the bin you are looking for
+   on the drive. A bin with no colour configured wears the card's accent.
+   The shape tells them apart as well: a caddy is small beside a wheelie
+   bin, as it is on the kerb. */
+.binsnext { display:flex; align-items:flex-end; gap:8px 16px; flex-wrap:wrap; }
+.binsout { display:flex; align-items:flex-end; gap:10px; }
+.binout { width:68px; text-align:center; min-width:0; }
+.binout svg { display:block; width:100%; height:auto; }
+.binname {
+  margin:3px 0 0; font-size:13px; color:var(--sp-ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.binswhen { min-width:0; padding-bottom:19px; }
+.binswhen .hero { margin:0; }
+.binbody { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; stroke-linejoin:round; }
+.binlid { fill:var(--accent); }
+.binhandle { fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linecap:round; }
+.binwheel { fill:var(--sp-surface); stroke:var(--accent); stroke-width:1.5; }
+/* The ones after are not going out, so they are drawn small, beside a
+   line of words. Painted, they keep their colour, which is how a bin is
+   recognised; unpainted, they are hollow and in ink. */
+.binslater {
+  display:grid; gap:5px; margin-top:10px; padding-top:8px;
+  border-top:2px solid var(--sp-sink); font-size:13px; color:var(--sp-ink-2);
+}
+.binlater { display:flex; align-items:center; gap:8px; min-width:0; }
+.binlater svg { flex:none; width:15px; height:20px; }
+.binlater .binbody { fill:none; stroke:var(--sp-ink-3); }
+.binlater .binlid { fill:var(--sp-ink-3); }
+.binlater .binhandle, .binlater .binwheel { stroke:var(--sp-ink-3); }
+.binlater .binwheel { fill:none; }
+/* Painted: the colour fills the bin and its lid, a pencil line holds the
+   two apart, and the wheels are black plastic whatever the bin is. */
+.painted .binbody, .painted .binlid { fill:var(--bin); stroke:var(--sp-bin-line); stroke-width:1; }
+.painted .binhandle { stroke:var(--bin); }
+.painted .binwheel { fill:var(--sp-bin-black); stroke:var(--sp-bin-line); stroke-width:1; }
+
+.binlater .name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.binlater .when { margin-left:auto; white-space:nowrap; font-variant-numeric:tabular-nums; }
 /* When the numbers were last read. A fact, not a level: a missed reading
    raises no Needs-you row, so it may not wear ochre. It goes hollow. */
 .saltread {
@@ -13535,6 +13592,41 @@ const BODIES = {
     return out;
   },
 
+  /* Which bins go out next, and when?
+
+     The bins going out are drawn, side by side, with their names under
+     them; the day sits beside them. The collections after are a line each,
+     drawn small. Nothing here is a job -- putting the bins out
+     is a Needs you row owned by the bin calendar -- so the card wears its
+     accent and no level, however close the day is. */
+  bins(b) {
+    const out = binList(b.out).map((x) => binPainted(x, b.colours));
+    let html = "";
+    if (out.length) {
+      const when = binWhen(b.days);
+      html += `<div class="binsnext"><div class="binsout">`
+        + out.map((x) => `<div class="binout">${binPicture(x)}`
+          + (isBlank(x.name) ? "" : `<p class="binname">${esc(x.name)}</p>`) + `</div>`).join("")
+        + `</div>`;
+      if (when) {
+        html += `<div class="binswhen"><p class="hero">${esc(when.word)}</p>`
+          + (when.note ? `<p class="sub">${esc(when.note)}</p>` : "") + `</div>`;
+      }
+      html += `</div>`;
+    }
+    const later = binList(b.later).filter((x) => !isBlank(x.name))
+      .map((x) => binPainted(x, b.colours));
+    if (later.length) {
+      html += `<div class="binslater">` + later.map((x) => {
+        const date = binDate(x.days);
+        return `<div class="binlater">${binPicture(x)}`
+          + `<span class="name">${esc(x.name)}</span>`
+          + (date ? `<span class="when">${esc(date.short)}</span>` : "") + `</div>`;
+      }).join("") + `</div>`;
+    }
+    return html;
+  },
+
   /* What is for dinner this week, and what to do about a day that has none.
 
      `plan` is Mealie's list of entries; the slots are drawn from `days`
@@ -15752,6 +15844,10 @@ function bodyIsEmpty(type, b) {
     case "softener":
       return !(Array.isArray(b.sides) && b.sides.some((x) => x && saltLevel(x.level) !== null))
         && isBlank(b.read_at);
+    /* No bin named going out and none after: the schedule has not loaded. */
+    case "bins":
+      return binList(b.out).length === 0
+        && binList(b.later).filter((x) => !isBlank(x.name)).length === 0;
     case "agenda":
       return !Array.isArray(b.events) || b.events.length === 0;
     /* An unplanned week is not empty: its empty days are what the card is
@@ -18391,6 +18487,91 @@ function mealFoot(b, picked, moving, dates, plan, types) {
         + `</span>` : "")
       + `</span>` : "")
     + `</div>` + moveBar;
+}
+
+/* ---- bins ---- */
+
+/* What shape each kind of bin is. A kind nobody has listed is a wheelie
+   bin, which is right more often than not. No glyph on the front: the
+   colour and the shape say which bin, and the name is under it. */
+const BIN_SHAPES = { glass: "box", food: "caddy" };
+
+/* The bins that read as something. A part whose name and kind both read as
+   nothing is a second type sensor on a day with one collection, and drops
+   out, so one bin going out draws one bin with no change to the config. */
+function binList(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((x) => (typeof x === "string" ? { name: x } : x))
+    .filter((x) => x && typeof x === "object" && !(isBlank(x.name) && isBlank(x.kind)));
+}
+
+function binShapeOf(x) {
+  if (["wheelie", "caddy", "box"].includes(x.shape)) return x.shape;
+  return BIN_SHAPES[String(firstOf(x.kind, "")).trim().toLowerCase()] || "wheelie";
+}
+
+/* Drawn front-on in one 60 x 80 box whatever the shape, so a caddy beside
+   a wheelie bin is as much smaller as it is on the pavement. */
+function binShape(shape) {
+  if (shape === "caddy") {
+    return `<path class="binhandle" d="M17 45 Q30 31 43 45"></path>`
+      + `<rect class="binlid" x="12" y="44" width="36" height="6" rx="2"></rect>`
+      + `<path class="binbody" d="M14 50 H46 L44 75 Q44 77 42 77 H18 Q16 77 16 75 Z"></path>`;
+  }
+  if (shape === "box") {
+    return `<path class="binbody" d="M8 46 H52 L50 75 Q50 77 48 77 H12 Q10 77 10 75 Z"></path>`
+      + `<rect class="binlid" x="6" y="42" width="48" height="5" rx="2"></rect>`;
+  }
+  return `<rect class="binhandle" x="13" y="8" width="34" height="2" rx="1"></rect>`
+    + `<circle class="binwheel" cx="17" cy="73" r="5"></circle>`
+    + `<circle class="binwheel" cx="43" cy="73" r="5"></circle>`
+    + `<path class="binbody" d="M9 19 H51 L47 69 Q47 71 45 71 H15 Q13 71 13 69 Z"></path>`
+    + `<rect class="binlid" x="6" y="12" width="48" height="8" rx="2.5"></rect>`;
+}
+
+/* The colours a bin can be painted, by name rather than by hex, so a
+   config cannot reach past the depictions into a level or an accent. */
+const BIN_COLOURS = ["blue", "brown", "purple", "black", "green", "grey"];
+
+/* A bin's own `colour` first, then the body's `colours` by kind. A name
+   that is not one of the depictions leaves the bin in the card's accent. */
+function binPainted(x, colours) {
+  const kind = String(firstOf(x.kind, "")).trim().toLowerCase();
+  const byKind = colours && typeof colours === "object" ? colours[kind] : null;
+  const colour = String(firstOf(x.colour, byKind, "")).trim().toLowerCase();
+  return Object.assign({}, x, { paint: BIN_COLOURS.includes(colour) ? colour : null });
+}
+
+function binPicture(x) {
+  const name = isBlank(x.name) ? "Bin" : String(x.name);
+  const paint = x.paint ? ` class="painted" style="--bin:var(--sp-bin-${x.paint})"` : "";
+  return `<svg viewBox="0 0 60 80" role="img" aria-label="${esc(name)}"${paint}>`
+    + `${binShape(binShapeOf(x))}</svg>`;
+}
+
+/* A collection some whole days from today, as the day it falls on. */
+function binDate(days) {
+  if (isBlank(days)) return null;
+  const n = Number(days);
+  if (!isFinite(n) || n < 0) return null;
+  const now = new Date();
+  const then = new Date(now.getFullYear(), now.getMonth(), now.getDate() + Math.round(n));
+  const day = DAY_NAMES[then.getDay()];
+  const date = `${ordinal(then.getDate())} ${MONTH_NAMES[then.getMonth()]}`;
+  return { n: Math.round(n), day, date, short: `${day.slice(0, 3)} ${date}` };
+}
+
+/* The day word answers "is it tonight"; the date under it answers "which
+   collection is this", and they stay two facts -- see dayDateLabel. A day
+   inside the week is named; one further out is a date, because "Friday"
+   ten days away is next week's Friday and reads as this one. */
+function binWhen(days) {
+  const d = binDate(days);
+  if (!d) return null;
+  if (d.n === 0) return { word: "Today", note: `${d.day} ${d.date}` };
+  if (d.n === 1) return { word: "Tomorrow", note: `${d.day} ${d.date}` };
+  if (d.n < 7) return { word: d.day, note: `${d.date} · in ${d.n} days` };
+  return { word: d.short, note: `in ${d.n} days` };
 }
 
 /* ---- softener ---- */
