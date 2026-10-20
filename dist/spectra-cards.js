@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.196.0";
+const VERSION = "0.197.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -6906,94 +6906,9 @@ const FEST_SCENES = (() => {
       };
     },
 
-    navaratri(st) {
-      const cols = ["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#BDBDBD","#F28A2E","#3FB6C9","#E84F9A"];
-      return (c, w, h, t) => {
-        c.fillStyle = grad(c, w, h, [[0, "#140F2C"], [.5, "#3D2160"], [1, "#9C2F6E"]]); c.fillRect(0, 0, w, h);
-        const cx = w * .78, cy = h * .58;
-        // glow + garbo lamp
-        const g = c.createRadialGradient(cx, cy, 0, cx, cy, h * .6);
-        g.addColorStop(0, "rgba(255,190,80,.45)"); g.addColorStop(1, "rgba(255,190,80,0)");
-        c.fillStyle = g; c.fillRect(0, 0, w, h);
-        c.fillStyle = "#B5651D"; c.beginPath(); c.ellipse(cx, cy + 6, 13, 11, 0, 0, TAU); c.fill();
-        c.fillStyle = "#3A1A0A"; for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(cx - 8 + i * 4, cy + 6, 1.4, 0, TAU); c.fill(); }
-        const fl = 1 + Math.sin(t * 13) * .1;
-        c.save(); c.shadowColor = "#FFB020"; c.shadowBlur = 16; c.fillStyle = "#FFD166";
-        c.beginPath(); c.ellipse(cx, cy - 10, 4, 8 * fl, 0, 0, TAU); c.fill(); c.restore();
-        // two rings of dancers
-        [[1, 9, .58, .26, .5], [-1, 14, .9, .38, .36]].forEach(([dir, n, rx, ry, sp]) => {
-          const ds = [];
-          for (let i = 0; i < n; i++) {
-            const a = dir * t * sp + i / n * TAU;
-            ds.push({ a, x: cx + Math.cos(a) * h * rx, y: cy + Math.sin(a) * h * ry, col: cols[i % 9] });
-          }
-          ds.sort((p, q) => p.y - q.y).forEach(d => {
-            const depth = .65 + (Math.sin(d.a) + 1) * .2, bob = Math.abs(Math.sin(t * 4 + d.a * 3)) * 4;
-            c.globalAlpha = .55 + depth * .4;
-            c.fillStyle = d.col;
-            c.beginPath(); c.moveTo(d.x - 7 * depth, d.y + 10 * depth - bob);
-            c.lineTo(d.x + 7 * depth, d.y + 10 * depth - bob); c.lineTo(d.x, d.y - 6 * depth - bob); c.fill();
-            c.beginPath(); c.arc(d.x, d.y - 9 * depth - bob, 3.2 * depth, 0, TAU); c.fill();
-          });
-          c.globalAlpha = 1;
-        });
-      };
-    },
 
-    holi(st) {
-      const cols = ["#FF3D7F", "#FFD000", "#21C27A", "#2D8CFF", "#FF7A1A", "#B44BFF"];
-      st.puffs = []; st.next = 0; st.dust = [];
-      return (c, w, h, t, dt) => {
-        c.fillStyle = grad(c, w, h, [[0, "#20163A"], [.45, "#1F5E63"], [.8, "#B03A6B"], [1, "#F2B705"]]); c.fillRect(0, 0, w, h);
-        st.dust.forEach(d => { c.beginPath(); c.arc(d.x * w, d.y * h, d.r, 0, TAU); c.fillStyle = d.col; c.globalAlpha = .18; c.fill(); });
-        c.globalAlpha = 1;
-        st.next -= dt;
-        if (st.next <= 0) { st.next = .5 + rnd() * .6;
-          const fromR = rnd() > .3, y = h * (.2 + rnd() * .7);
-          st.puffs.push({ x: fromR ? w + 10 : w * .45, y: fromR ? y : h + 10,
-            vx: fromR ? -w * (.35 + rnd() * .3) : w * (.1 + rnd() * .2), vy: fromR ? -h * .1 * rnd() : -h * (.6 + rnd() * .3),
-            col: cols[Math.floor(rnd() * cols.length)], life: 1, parts: Array.from({ length: 18 }, () => [rnd() * TAU, rnd()]) }); }
-        st.puffs = st.puffs.filter(p => {
-          p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .95; p.vy *= .95; p.life -= dt * .38;
-          const spread = (1 - p.life) * 60 + 8;
-          p.parts.forEach(([a, k]) => { c.beginPath();
-            c.arc(p.x + Math.cos(a) * spread * k, p.y + Math.sin(a) * spread * k, 8 + (1 - p.life) * 22 * k, 0, TAU);
-            c.fillStyle = p.col; c.globalAlpha = Math.max(0, p.life) * .32; c.fill(); });
-          if (p.life <= 0 && st.dust.length < 40) st.dust.push({ x: p.x / w, y: p.y / h, r: 30 + rnd() * 30, col: p.col });
-          return p.life > 0; });
-        c.globalAlpha = 1;
-      };
-    },
 
     /* `v` is today's door: the candle burns down one mark a day. */
-    advent(st, v) {
-      const door = Math.max(1, Math.min(24, Number(v) || 1)), left0 = 25 - door;
-      st.snow = Array.from({ length: 70 }, () => ({ x: rnd(), y: rnd(), r: .8 + rnd() * 2.2, s: .03 + rnd() * .06 }));
-      return (c, w, h, t, dt) => {
-        c.fillStyle = grad(c, w, h, [[0, "#0B1F17"], [.55, "#123526"], [1, "#4A1418"]]); c.fillRect(0, 0, w, h);
-        // advent candle
-        const cx = w * .86, base = h - 14, full = h * .62, left = full * (left0 / 24);
-        c.fillStyle = "#F4ECDD"; c.fillRect(cx - 12, base - left, 24, left);
-        c.fillStyle = "#B3202A";
-        for (let i = 0; i < left0; i++) { const y = base - left + i * (full / 24) + 4; if (y < base) c.fillRect(cx - 12, y, 24, 1.2); }
-        c.font = "600 8px ui-monospace,monospace"; c.fillStyle = "#7A1E22"; c.textAlign = "center";
-        for (let i = 0; i < left0; i++) { const y = base - left + i * (full / 24) + 11; if (y < base) c.fillText(door + i, cx, y); }
-        const f = 1 + Math.sin(t * 9) * .12;
-        const gl = c.createRadialGradient(cx, base - left - 12, 0, cx, base - left - 12, 60);
-        gl.addColorStop(0, "rgba(255,200,90,.45)"); gl.addColorStop(1, "rgba(255,200,90,0)");
-        c.fillStyle = gl; c.fillRect(cx - 60, base - left - 72, 120, 120);
-        c.save(); c.shadowColor = "#FFB020"; c.shadowBlur = 14; c.fillStyle = "#FFD166";
-        c.beginPath(); c.ellipse(cx, base - left - 10, 4, 9 * f, Math.sin(t * 2) * .1, 0, TAU); c.fill(); c.restore();
-        // holly sprig
-        c.fillStyle = "#1F6B3A"; [[-22, 0, -.5], [22, 0, .5]].forEach(([dx, dy, a]) => { c.save();
-          c.translate(cx + dx, base + dy - 2); c.rotate(a); c.beginPath(); c.ellipse(0, 0, 13, 5, 0, 0, TAU); c.fill(); c.restore(); });
-        c.fillStyle = "#D7263D"; [[-3, -4], [3, -3], [0, 2]].forEach(([dx, dy]) => { c.beginPath(); c.arc(cx + dx, base + dy, 3, 0, TAU); c.fill(); });
-        // snow
-        st.snow.forEach(s => { s.y += s.s * dt; if (s.y > 1) { s.y = 0; s.x = rnd(); }
-          c.beginPath(); c.arc((s.x + Math.sin(t * .6 + s.r * 9) * .01) * w, s.y * h, s.r, 0, TAU);
-          c.fillStyle = "rgba(255,255,255,.75)"; c.fill(); });
-      };
-    },
 
   };
 
@@ -7167,57 +7082,7 @@ const FEST_SCENES = (() => {
 
   /* ---------- the scenes ---------- */
   const MORE = {
-    christmas(st, v) {
-      st.snow = Array.from({ length: 80 }, () => ({ x: rnd(), y: rnd(), r: .8 + rnd() * 2.4, s: .03 + rnd() * .07 }));
-      st.tree = [];
-      for (let row = 0; row < 9; row++) for (let i = 0; i <= row * 2; i++)
-        st.tree.push({ row, i, n: row * 2, ph: rnd() * TAU, col: ["#FFD166", "#FF5A5F", "#7FD1FF", "#9BE38B", "#FFFFFF"][Math.floor(rnd() * 5)] });
-      const dim = v === "boxing" ? .55 : 1;
-      return (c, w, h, t, dt) => {
-        fill(c, w, h, [[0, "#06140F"], [.55, "#0E2A1E"], [1, "#3A1418"]]);
-        moonDisc(c, w * .58, h * .2, Math.min(h * .07, 16));
-        const cx = w * .82, top = h * .22, rows = 9, rh = (h * .64) / rows;
-        st.tree.forEach(b => { const y = top + (b.row + 1) * rh, span = (b.row + 1) * rh * .62;
-          const x = cx - span + (b.n ? b.i / b.n : .5) * span * 2, on = (.45 + .55 * Math.max(0, Math.sin(t * 2.4 + b.ph))) * dim;
-          c.globalAlpha = on; c.fillStyle = b.col; c.beginPath(); c.arc(x, y, 2.6, 0, TAU); c.fill();
-          c.globalAlpha = on * .18; c.beginPath(); c.arc(x, y, 7, 0, TAU); c.fill(); });
-        c.globalAlpha = 1; c.fillStyle = "#4A2E1A"; c.fillRect(cx - 6, top + (rows + 1) * rh - 4, 12, 12);
-        const flare = 1 + Math.max(0, Math.sin(t * 1.3)) * .35 * dim;
-        c.save(); c.translate(cx, top); c.scale(flare, flare); c.shadowColor = "#FFD166"; c.shadowBlur = 22;
-        c.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 4.5 : 11, a = i / 10 * TAU - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
-        c.closePath(); c.fillStyle = "#FFE08A"; c.fill(); c.restore();
-        // presents
-        [["#D7263D", -.09, 16], ["#2E6B4F", -.03, 12], ["#F4C04E", .05, 14]].forEach(([col, dx, sz]) => {
-          const x = cx + dx * w * .6, y = h - sz - 4; c.fillStyle = col; c.fillRect(x, y, sz * 1.3, sz);
-          c.fillStyle = "#fff"; c.fillRect(x + sz * .55, y, 2.5, sz); c.fillRect(x, y + sz * .4, sz * 1.3, 2.5); });
-        c.strokeStyle = "rgba(255,255,255,.3)"; c.lineWidth = 1; c.beginPath();
-        for (let x = 0; x <= w; x += 4) c.lineTo(x, 8 + Math.abs(Math.sin(x / w * Math.PI * 7)) * 7); c.stroke();
-        for (let i = 0; i < 14; i++) { const x = (i + .5) / 14 * w, y = 10 + Math.abs(Math.sin((x / w) * Math.PI * 7)) * 7;
-          c.globalAlpha = (.5 + .5 * Math.sin(t * 3 + i)) * dim; c.fillStyle = ["#FF5A5F", "#FFD166", "#7FD1FF", "#9BE38B"][i % 4];
-          c.beginPath(); c.arc(x, y + 3, 3.2, 0, TAU); c.fill(); }
-        c.globalAlpha = 1;
-        if (v !== "boxing") santaPass(st, c, w, h, t, dt, 12);
-        st.snow.forEach(s => { s.y += s.s * dt; if (s.y > 1) { s.y = 0; s.x = rnd(); }
-          c.beginPath(); c.arc(s.x * w, s.y * h, s.r, 0, TAU); c.fillStyle = "rgba(255,255,255,.8)"; c.fill(); });
-      };
-    },
 
-    fireworks(st) { const fw = mkFw(); st.wheel = 0;
-      return (c, w, h, t, dt) => {
-        fill(c, w, h, [[0, "#020418"], [.8, "#0B1440"], [1, "#1A1030"]]);
-        fireworks(fw, c, w, h * .78, dt, ["#FFD166", "#FF5A8A", "#7FD1FF", "#B48CFF", "#9BE38B"], 1.8, .05, .98);
-        const base = h * .8;
-        c.fillStyle = "#05060F"; let x = 0, k = 0;
-        while (x < w) { const bw = 14 + (k * 37 % 30), bh = 18 + (k * 53 % 46); c.fillRect(x, base - bh, bw, bh + 2); x += bw + 2; k++; }
-        const wx = w * .7, wy = base - h * .22, wr = h * .2;
-        c.strokeStyle = "#1B1F3A"; c.lineWidth = 2; c.beginPath(); c.arc(wx, wy, wr, 0, TAU); c.stroke();
-        for (let i = 0; i < 16; i++) { const a = i / 16 * TAU + t * .08;
-          c.beginPath(); c.moveTo(wx, wy); c.lineTo(wx + Math.cos(a) * wr, wy + Math.sin(a) * wr); c.stroke();
-          c.fillStyle = "#7FD1FF"; c.beginPath(); c.arc(wx + Math.cos(a) * wr, wy + Math.sin(a) * wr, 2.2, 0, TAU); c.fill(); }
-        c.fillStyle = "#0A0E24"; c.fillRect(0, base, w, h - base);
-        for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(255,210,140,${.06 + .06 * Math.sin(t * 2 + i)})`; c.fillRect((i * 53) % w, base + 4 + (i * 7) % (h - base - 4), 18, 1.5); }
-      };
-    },
 
     sankranti(st) {
       st.k = Array.from({ length: 7 }, (_, i) => ({ bx: .35 + i * .1, by: .2 + (i % 3) * .14, p: rnd() * TAU,
@@ -7331,35 +7196,6 @@ const FEST_SCENES = (() => {
       };
     },
 
-    newyear(st, v) {
-      const dots = []; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (Math.abs(i - 2) + Math.abs(j - 2) <= 3) dots.push([i - 2, j - 2]);
-      return (c, w, h, t) => {
-        fill(c, w, h, [[0, "#F7C873"], [.5, "#E9806A"], [1, "#6A2550"]]);
-        const kx = w * .78, ky = h * .58, g = Math.min(h * .085, 18), prog = (t % 12) / 9;
-        c.fillStyle = "rgba(255,255,255,.9)"; dots.forEach(([i, j]) => { c.beginPath(); c.arc(kx + i * g, ky + j * g, 1.8, 0, TAU); c.fill(); });
-        c.strokeStyle = "#FFFFFF"; c.lineWidth = 1.6;
-        dots.forEach(([i, j], n) => { const k = n / dots.length; if (k > prog) return;
-          c.beginPath(); c.arc(kx + i * g, ky + j * g, g * .7, 0, TAU * Math.min(1, (prog - k) * 6)); c.stroke(); });
-        if (v === "gudi") { const gx = w * .58, gy = h * .2;
-          c.strokeStyle = "#8B5A2B"; c.lineWidth = 3; c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx, h); c.stroke();
-          c.fillStyle = "#2FA84F"; c.beginPath(); c.moveTo(gx, gy + 8);
-          for (let y = 0; y <= h * .32; y += 4) c.lineTo(gx + 16 + Math.sin(y * .1 - t * 3) * 4, gy + 8 + y);
-          c.lineTo(gx, gy + 8 + h * .32); c.fill();
-          c.fillStyle = "#F2B33A"; c.fillRect(gx - 1, gy + 8, 3, h * .32);
-          c.fillStyle = "#B87333"; c.beginPath(); c.arc(gx, gy, 10, Math.PI, TAU); c.fill(); c.fillRect(gx - 4, gy, 8, 6); }
-        if (v === "bihu") { const beat = (t * 2) % 1; c.strokeStyle = `rgba(255,255,255,${(1 - beat) * .5})`; c.lineWidth = 2;
-          c.beginPath(); c.arc(w * .58, h * .7, 10 + beat * 40, 0, TAU); c.stroke();
-          c.fillStyle = "#8B3A1A"; c.beginPath(); c.ellipse(w * .58, h * .7, 14, 10, 0, 0, TAU); c.fill(); }
-        // toran
-        const tx0 = h > 260 ? 0 : w * .5, n = h > 260 ? 30 : 15;
-        c.strokeStyle = "#5A3A1A"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(tx0, 6); c.lineTo(w, 6); c.stroke();
-        for (let i = 0; i < n; i++) { const x = tx0 + (i + .5) / n * (w - tx0), sw = Math.sin(t * 1.6 + i * .6) * .12;
-          c.save(); c.translate(x, 6); c.rotate(sw);
-          if (i % 3 === 1) { c.fillStyle = "#F97316"; c.beginPath(); c.arc(0, 10, 5, 0, TAU); c.fill(); }
-          else { c.fillStyle = "#2F7A35"; c.beginPath(); c.ellipse(0, 12, 4, 11, 0, 0, TAU); c.fill(); }
-          c.restore(); }
-      };
-    },
 
     vaisakhi(st) { st.w = Array.from({ length: 70 }, () => ({ x: rnd(), hh: .35 + rnd() * .3, p: rnd() * TAU }));
       return (c, w, h, t) => {
@@ -7663,23 +7499,6 @@ const FEST_SCENES = (() => {
       };
     },
 
-    diwali(st, v) {
-      st.rockets = []; st.sparks = []; st.next = 0; const fw = mkFw();
-      st.c = Array.from({ length: 18 }, () => ({ x: .4 + rnd() * .6, y: rnd(), v: .08 + rnd() * .08, p: rnd() * TAU }));
-      return (c, w, h, t, dt) => {
-        fill(c, w, h, [[0, "#140A28"], [.5, "#3B1446"], [.85, "#7A2A3A"], [1, "#C96A1E"]]);
-        const rx = w * .8, ry = h * .5, R = Math.min(h * .34, w * .17), prog = v === "calm" ? 1 : (t % 14) / 10;
-        [["#E8343A", 8, 1], ["#F2D03A", 8, .72], ["#2FA84F", 16, .5], ["#E84F9A", 8, .3]].forEach(([col, n, f], li) => {
-          for (let i = 0; i < n; i++) { const k = (li * n + i) / 40; if (k > prog) continue; const a = i / n * TAU + li * .2;
-            c.save(); c.translate(rx, ry); c.rotate(a); c.beginPath(); c.ellipse(R * f * .55, 0, R * f * .45, R * f * .16, 0, 0, TAU);
-            c.fillStyle = col; c.globalAlpha = .85; c.fill(); c.restore(); } });
-        c.globalAlpha = 1; if (prog > .9) { c.beginPath(); c.arc(rx, ry, R * .12, 0, TAU); c.fillStyle = "#FFD166"; c.fill(); }
-        if (v !== "calm") fireworks(fw, c, w, h, dt, ["#FFD166", "#E84F9A", "#7FD1FF", "#F28A2E", "#B48CFF"], v === "coins" ? .4 : 1, .2, .95);
-        if (v === "coins") st.c.forEach(k => { k.y += k.v * dt; if (k.y > 1.1) k.y = -.1; coin(c, k.x * w, k.y * h, 6, t * 3 + k.p); });
-        const lit = v === "coins" ? 1 : v === "calm" ? 6 : 3;
-        for (let i = 0; i < 6; i++) lamp(c, w * (.08 + i * .085), h - 16, Math.min(11, h * .055), t, i, i < lit);
-      };
-    },
 
     chhath() {
       return (c, w, h, t) => {
@@ -9441,7 +9260,488 @@ const FEST_SCENES = (() => {
     },
 
   };
-  Object.assign(SCENES, MORE, UK);
+  /* ---------- Redrawn ----------
+     The older scenes, brought up to the UK days' level: painted
+     backgrounds cached by size, shaded subjects, depth and grain. */
+
+  /* The little pictures behind the doors, one for each day. */
+  const ADVENT_PICS = ["star", "tree", "bell", "bauble", "candle", "snowman", "gift", "holly", "star", "mitten", "tree", "robin", "bell", "gift", "candle", "bauble", "holly", "snowman", "star", "stocking", "tree", "gift", "bell", "manger"];
+  function adventPic(c, kind, x, y, s, t) {
+    c.save(); c.translate(x, y);
+    const fillStar = (r, col) => { c.fillStyle = col; c.beginPath(); for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * .45 : r, a = i / 10 * TAU - Math.PI / 2; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); c.fill(); };
+    if (kind === "star") fillStar(s * .4, "#FFD166");
+    if (kind === "tree") { c.fillStyle = "#2E8A4E"; c.beginPath(); c.moveTo(0, -s * .42); c.lineTo(-s * .3, s * .3); c.lineTo(s * .3, s * .3); c.fill(); c.fillStyle = "#6A3A1A"; c.fillRect(-s * .05, s * .3, s * .1, s * .1); }
+    if (kind === "bell") { c.fillStyle = "#F4C04E"; c.beginPath(); c.moveTo(-s * .3, s * .25); c.quadraticCurveTo(-s * .28, -s * .35, 0, -s * .35); c.quadraticCurveTo(s * .28, -s * .35, s * .3, s * .25); c.fill(); c.beginPath(); c.arc(0, s * .3, s * .07, 0, TAU); c.fill(); }
+    if (kind === "bauble") { const g = c.createRadialGradient(-s * .1, -s * .1, 0, 0, 0, s * .3); g.addColorStop(0, "#FFFFFF"); g.addColorStop(.3, "#D7263D"); g.addColorStop(1, "#5A0A14"); c.fillStyle = g; c.beginPath(); c.arc(0, s * .05, s * .28, 0, TAU); c.fill(); c.fillStyle = "#F4C04E"; c.fillRect(-s * .06, -s * .3, s * .12, s * .08); }
+    if (kind === "candle") { c.fillStyle = "#F4ECDD"; c.fillRect(-s * .08, -s * .1, s * .16, s * .45); c.fillStyle = "#FFD166"; c.beginPath(); c.ellipse(0, -s * .2, s * .05, s * .1 * (1 + Math.sin(t * 9) * .1), 0, 0, TAU); c.fill(); }
+    if (kind === "snowman") { c.fillStyle = "#FFFFFF"; c.beginPath(); c.arc(0, s * .15, s * .2, 0, TAU); c.arc(0, -s * .15, s * .14, 0, TAU); c.fill(); c.fillStyle = "#F28A2E"; c.beginPath(); c.moveTo(0, -s * .15); c.lineTo(s * .12, -s * .13); c.lineTo(0, -s * .12); c.fill(); }
+    if (kind === "gift") { c.fillStyle = "#2D5BD8"; c.fillRect(-s * .28, -s * .15, s * .56, s * .45); c.fillStyle = "#FFD166"; c.fillRect(-s * .04, -s * .15, s * .08, s * .45); c.fillRect(-s * .28, 0, s * .56, s * .07); c.beginPath(); c.ellipse(-s * .08, -s * .2, s * .1, s * .06, -.4, 0, TAU); c.ellipse(s * .08, -s * .2, s * .1, s * .06, .4, 0, TAU); c.fill(); }
+    if (kind === "holly") { c.fillStyle = "#1F6B3A"; c.beginPath(); c.ellipse(-s * .15, 0, s * .2, s * .09, -.4, 0, TAU); c.ellipse(s * .15, 0, s * .2, s * .09, .4, 0, TAU); c.fill(); c.fillStyle = "#D7263D"; [[-.04, -.06], [.05, -.05], [0, .04]].forEach(([dx, dy]) => { c.beginPath(); c.arc(dx * s, dy * s, s * .07, 0, TAU); c.fill(); }); }
+    if (kind === "mitten") { c.fillStyle = "#C8102E"; c.beginPath(); c.ellipse(0, 0, s * .2, s * .28, 0, 0, TAU); c.ellipse(-s * .2, -s * .02, s * .07, s * .12, -.5, 0, TAU); c.fill(); c.fillStyle = "#FFFFFF"; c.fillRect(-s * .2, s * .22, s * .4, s * .1); }
+    if (kind === "robin") { c.fillStyle = "#7A4A2A"; c.beginPath(); c.ellipse(0, 0, s * .26, s * .2, 0, 0, TAU); c.fill(); c.fillStyle = "#E8541A"; c.beginPath(); c.arc(-s * .1, s * .02, s * .13, 0, TAU); c.fill(); c.fillStyle = "#111"; c.beginPath(); c.arc(-s * .14, -s * .08, s * .03, 0, TAU); c.fill(); }
+    if (kind === "stocking") { c.fillStyle = "#C8102E"; c.beginPath(); c.moveTo(-s * .12, -s * .3); c.lineTo(s * .12, -s * .3); c.lineTo(s * .12, s * .1); c.quadraticCurveTo(s * .3, s * .1, s * .25, s * .3); c.lineTo(-s * .05, s * .3); c.quadraticCurveTo(-s * .15, s * .25, -s * .12, s * .1); c.fill(); c.fillStyle = "#FFFFFF"; c.fillRect(-s * .15, -s * .32, s * .3, s * .1); }
+    if (kind === "manger") { fillStar(s * .14, "#FFF4C0"); c.translate(0, s * .12); c.fillStyle = "#8A5A2A"; c.beginPath(); c.moveTo(-s * .3, -s * .02); c.lineTo(s * .3, -s * .02); c.lineTo(s * .2, s * .2); c.lineTo(-s * .2, s * .2); c.fill(); c.fillStyle = "#F2D8A0"; c.beginPath(); c.ellipse(0, -s * .04, s * .14, s * .07, 0, 0, TAU); c.fill(); }
+    c.restore(); }
+
+  /* A Christmas tree, painted once: tiers of needles, tinsel, baubles
+     that catch the light. The lights and the star are drawn live. */
+  function paintTree(x, cx, base, ht) {
+    const tiers = 6;
+    for (let k = 0; k < tiers; k++) { const ty = base - ht * .12 - k * ht * .14, tw = ht * (.42 - k * .06);
+      const g = x.createLinearGradient(cx - tw, 0, cx + tw, 0); g.addColorStop(0, "#0E3A24"); g.addColorStop(.45, "#1E6A3E"); g.addColorStop(1, "#0A2A1A");
+      x.fillStyle = g; x.beginPath(); x.moveTo(cx, ty - ht * .26);
+      for (let q = 0; q <= 10; q++) { const f = q / 10; x.lineTo(cx - tw + f * tw * 2, ty + (q % 2 ? ht * .03 : 0)); }
+      x.closePath(); x.fill();
+      x.strokeStyle = "rgba(120,200,140,.25)"; x.lineWidth = 1; for (let n = 0; n < 24; n++) { const f = rnd(), px = cx + (f - .5) * tw * 1.8, py = ty - rnd() * ht * .2;
+        if (Math.abs(px - cx) / tw > (1 - (ty - py) / (ht * .26))) continue; x.beginPath(); x.moveTo(px, py); x.lineTo(px + 3, py + 2); x.stroke(); } }
+    x.fillStyle = "#4A2A14"; x.fillRect(cx - ht * .04, base - ht * .12, ht * .08, ht * .12);
+    for (let k = 0; k < 4; k++) { x.strokeStyle = "rgba(255,215,120,.65)"; x.lineWidth = 1.5; x.beginPath();
+      const y0 = base - ht * (.2 + k * .17), wd = ht * (.36 - k * .07); x.moveTo(cx - wd, y0); x.quadraticCurveTo(cx, y0 + ht * .06, cx + wd, y0 - ht * .03); x.stroke(); }
+    const cols = ["#C8102E", "#F4C04E", "#2D5BD8", "#E8E8F0", "#B048C8"];
+    for (let i = 0; i < 26; i++) { const k = rnd(), py = base - ht * (.18 + k * .66), half = ht * (.4 - k * .36), px = cx + (rnd() - .5) * half * 1.7, r = ht * .022;
+      const g = x.createRadialGradient(px - r * .35, py - r * .35, r * .1, px, py, r); g.addColorStop(0, "#FFFFFF"); g.addColorStop(.3, cols[i % 5]); g.addColorStop(1, "#1A0A10");
+      x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, TAU); x.fill(); } }
+  function present(x, px, py, wd, ht, col, ribbon) {
+    const g = x.createLinearGradient(px, 0, px + wd, 0); g.addColorStop(0, col); g.addColorStop(1, "rgba(0,0,0,.35)");
+    x.fillStyle = col; x.fillRect(px, py, wd, ht); x.fillStyle = g; x.fillRect(px + wd * .6, py, wd * .4, ht);
+    x.fillStyle = ribbon; x.fillRect(px + wd * .44, py, wd * .12, ht); x.fillRect(px, py + ht * .35, wd, ht * .12);
+    x.beginPath(); x.ellipse(px + wd * .4, py - ht * .08, wd * .14, ht * .1, -.5, 0, TAU); x.ellipse(px + wd * .6, py - ht * .08, wd * .14, ht * .1, .5, 0, TAU); x.fill(); }
+
+  /* A clay diya: a shaped bowl with a painted rim, and a flame that leans
+     and flickers on its own beat. */
+  function diya(c, x, y, s, t, i, lit) {
+    shadow(c, x, y + s * .25, s * 1.3, s * .3, .35);
+    const g = c.createLinearGradient(0, y - s * .3, 0, y + s * .45); g.addColorStop(0, "#D9844A"); g.addColorStop(1, "#7A3A1A");
+    c.fillStyle = g; c.beginPath(); c.moveTo(x - s, y - s * .15); c.quadraticCurveTo(x - s * .9, y + s * .5, x, y + s * .5); c.quadraticCurveTo(x + s * .9, y + s * .5, x + s * 1.2, y - s * .3); c.quadraticCurveTo(x, y + s * .05, x - s, y - s * .15); c.fill();
+    c.strokeStyle = "#F4C04E"; c.lineWidth = Math.max(1, s * .1); c.beginPath(); c.moveTo(x - s * .85, y + s * .05); c.quadraticCurveTo(x, y + s * .3, x + s * .95, y - s * .05); c.stroke();
+    c.fillStyle = "#3A1A0A"; c.beginPath(); c.ellipse(x + s * .05, y - s * .05, s * .75, s * .18, -.05, 0, TAU); c.fill();
+    if (!lit) return;
+    const f = 1 + Math.sin(t * 11 + i * 2.1) * .12 + Math.sin(t * 23 + i) * .05, lean = Math.sin(t * 2.3 + i) * .18;
+    glow(c, x + s * .8, y - s * .9, s * 3.4, "#FFB020", .38);
+    c.save(); c.translate(x + s * .82, y - s * .25); c.rotate(lean);
+    const fg = c.createRadialGradient(0, -s * .45, 0, 0, -s * .45, s * .9); fg.addColorStop(0, "#FFFBE0"); fg.addColorStop(.4, "#FFD166"); fg.addColorStop(1, "rgba(255,120,20,0)");
+    c.fillStyle = fg; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-s * .38, -s * .35 * f, 0, -s * 1.15 * f); c.quadraticCurveTo(s * .38, -s * .35 * f, 0, 0); c.fill();
+    c.restore(); }
+  /* A star lantern of paper, lit from inside, on a string. */
+  function kandil(c, x, y, s, t, col) {
+    c.save(); c.translate(x, y); c.rotate(Math.sin(t * 1.1 + x) * .06);
+    c.strokeStyle = "rgba(255,230,180,.5)"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -s * 3); c.lineTo(0, -s); c.stroke();
+    glow(c, 0, 0, s * 2.6, col, .45);
+    c.beginPath(); for (let k = 0; k < 10; k++) { const r = k % 2 ? s * .45 : s, q = k / 10 * TAU - Math.PI / 2; c.lineTo(Math.cos(q) * r, Math.sin(q) * r); } c.closePath();
+    const g = c.createRadialGradient(0, 0, 0, 0, 0, s); g.addColorStop(0, "#FFF6D0"); g.addColorStop(.5, col); g.addColorStop(1, "rgba(120,20,40,.9)");
+    c.fillStyle = g; c.fill(); c.strokeStyle = "rgba(255,220,150,.8)"; c.lineWidth = Math.max(.8, s * .05); c.stroke();
+    for (let k = -2; k <= 2; k++) { c.strokeStyle = k % 2 ? "#F4C04E" : col; c.lineWidth = 1.2; c.beginPath(); c.moveTo(k * s * .1, s * .5); c.lineTo(k * s * .14 + Math.sin(t * 2 + k) * 2, s * 1.6); c.stroke(); }
+    c.restore(); }
+
+    /* New Year's Day: the first sunrise of the year over the river, the
+       last of the night's fireworks fading, and the new year's number
+       written in sparkler light. */
+  /* A cloud of coloured powder: many soft puffs that expand, drift and
+     thin, the colour densest at the heart. */
+  const holiCols = ["255,61,127", "255,208,0", "33,194,122", "45,140,255", "255,122,26", "180,75,255"];
+
+  /* A garba dancer, 40 units tall: a flared skirt that swings with the
+     turn, a choli, a dupatta, and two dandiya sticks. */
+  function dancer(c, x, y, s, t, col, ph, depth) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    const spin = Math.sin(t * 4 + ph), step = Math.abs(Math.sin(t * 4 + ph)) * 2, clack = Math.max(0, Math.sin(t * 8 + ph * 2)) ** 6;
+    c.translate(0, -step);
+    const sk = c.createLinearGradient(-12, 0, 12, 0); sk.addColorStop(0, col[1]); sk.addColorStop(.5, col[0]); sk.addColorStop(1, col[1]);
+    c.fillStyle = sk; c.beginPath(); c.moveTo(-4, -20); c.lineTo(4, -20); c.quadraticCurveTo(14 + spin * 3, -6, 13 + spin * 5, 0);
+    for (let k = 0; k <= 8; k++) c.lineTo(13 + spin * 5 - k * (26 + spin * 2) / 8, (k % 2) * 1.5); c.quadraticCurveTo(-14 + spin * 2, -6, -4, -20); c.fill();
+    c.strokeStyle = "#F4C04E"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(13 + spin * 5, -.5); c.lineTo(-13 + spin * 3, -.5); c.stroke();
+    for (let k = 0; k < 5; k++) { c.fillStyle = "rgba(255,240,200,.8)"; c.beginPath(); c.arc(-8 + k * 4 + spin * 4, -4 - (k % 2) * 3, .9, 0, TAU); c.fill(); }
+    c.fillStyle = col[1]; c.beginPath(); c.moveTo(-4.5, -21); c.lineTo(4.5, -21); c.lineTo(3.8, -29); c.lineTo(-3.8, -29); c.fill();
+    c.fillStyle = "#C88A60"; c.fillRect(-1.4, -32, 2.8, 3); c.beginPath(); c.arc(0, -35, 3.6, 0, TAU); c.fill();
+    c.fillStyle = "#1A0E0A"; c.beginPath(); c.arc(0, -36, 3.8, Math.PI, TAU); c.fill(); c.beginPath(); c.arc(2.5 * Math.sign(spin || 1), -34, 2, 0, TAU); c.fill();
+    c.strokeStyle = col[0]; c.globalAlpha = .7; c.lineWidth = 2; c.beginPath(); c.moveTo(-3.5, -29); c.quadraticCurveTo(-10 - spin * 4, -24, -8 - spin * 6, -14); c.stroke(); c.globalAlpha = 1;
+    // arms raised, sticks meeting on the beat
+    c.strokeStyle = "#C88A60"; c.lineWidth = 1.6; const a = .5 + clack * .4;
+    [-1, 1].forEach((d) => { const ex = d * (5 + 3 * (1 - clack)), ey = -33 - 4 * a; c.beginPath(); c.moveTo(d * 3.5, -28); c.lineTo(ex, ey); c.stroke();
+      c.strokeStyle = "#E8C25A"; c.lineWidth = 1.4; c.beginPath(); c.moveTo(ex, ey); c.lineTo(ex - d * 4, ey - 6); c.stroke(); c.strokeStyle = "#C88A60"; c.lineWidth = 1.6; });
+    if (clack > .6) { c.fillStyle = `rgba(255,240,180,${(clack - .6) * 2})`; c.beginPath(); c.arc(0, -43, 2.2, 0, TAU); c.fill(); }
+    c.restore(); }
+
+  /* A doorstep on new year's morning: the carved doorway hung with mango
+     leaves and marigolds, a brass lamp, and a kolam drawing itself in
+     rice flour, then filling with colour. */
+  const kolamDots = (() => { const d = []; for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) if (Math.abs(i - 3) + Math.abs(j - 3) <= 4) d.push([i - 3, j - 3]); return d; })();
+  function kuthuvilakku(c, x, foot, s, t) {
+    const g = c.createLinearGradient(x - s * .2, 0, x + s * .2, 0); g.addColorStop(0, "#9A6A1A"); g.addColorStop(.45, "#F4D27A"); g.addColorStop(1, "#7A4A0A");
+    c.fillStyle = g; c.beginPath(); c.ellipse(x, foot, s * .28, s * .07, 0, 0, TAU); c.fill();
+    c.fillRect(x - s * .03, foot - s * .8, s * .06, s * .8);
+    [.3, .55].forEach((k) => { c.beginPath(); c.ellipse(x, foot - s * k, s * .07, s * .03, 0, 0, TAU); c.fill(); });
+    c.beginPath(); c.ellipse(x, foot - s * .82, s * .3, s * .07, 0, 0, Math.PI); c.lineTo(x - s * .3, foot - s * .84); c.ellipse(x, foot - s * .84, s * .3, s * .05, 0, Math.PI, 0); c.fill();
+    c.beginPath(); c.moveTo(x - s * .05, foot - s * .88); c.lineTo(x, foot - s * 1.02); c.lineTo(x + s * .05, foot - s * .88); c.fill();
+    for (let k = 0; k < 5; k++) { const q = k / 5 * TAU, fx = x + Math.cos(q) * s * .26, fy = foot - s * .86 + Math.sin(q) * s * .05;
+      const f = 1 + Math.sin(t * 11 + k * 1.7) * .12; glow(c, fx, fy - s * .06, s * .22, "#FFB020", .4);
+      c.fillStyle = "#FFD166"; c.beginPath(); c.ellipse(fx, fy - s * .06 * f, s * .025, s * .07 * f, Math.sin(t * 2 + k) * .15, 0, TAU); c.fill(); } }
+  const REDRAWN = {
+    advent(st, v) {
+      const door = Math.max(1, Math.min(24, Number(v) || 1)), left0 = 25 - door;
+      st.snow = Array.from({ length: 70 }, () => ({ x: rnd(), y: rnd(), z: rnd() }));
+      const order = [7, 15, 2, 21, 11, 4, 18, 9, 23, 1, 13, 6, 20, 16, 3, 10, 24, 8, 14, 19, 5, 12, 22, 17];
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h, w * .42), bx = w * .54, by = h * .1, bw = Math.min(w * .3, u * 1.1), bh = h * .8, cols = 6, rows = 4;
+        const cw = bw / cols, ch = bh / rows;
+        still(st, "room", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#0A1E16"], [.6, "#12301F"], [1, "#2A1214"]]);
+          glow(x, w * .9, h * .7, u * .8, "#FFB860", .3);
+          // the calendar: a painted board, a snowy village across it, and the doors
+          const g = x.createLinearGradient(0, by, 0, by + bh); g.addColorStop(0, "#1A2A5A"); g.addColorStop(1, "#3A4A8A"); x.fillStyle = g; x.fillRect(bx, by, bw, bh);
+          for (let i = 0; i < 60; i++) { x.fillStyle = `rgba(255,255,255,${.3 + rnd() * .5})`; x.fillRect(bx + rnd() * bw, by + rnd() * bh * .5, 1.2, 1.2); }
+          x.fillStyle = "#E8EEF8"; x.beginPath(); x.moveTo(bx, by + bh); x.quadraticCurveTo(bx + bw * .4, by + bh * .7, bx + bw, by + bh * .78); x.lineTo(bx + bw, by + bh); x.fill();
+          for (let k = 0; k < 5; k++) { const hx = bx + bw * (.08 + k * .19), hy = by + bh * (.8 - (k % 2) * .04), hw = bw * .12;
+            x.fillStyle = "#6A3A3A"; x.fillRect(hx, hy - hw * .6, hw, hw * .6); x.fillStyle = "#FFFFFF"; x.beginPath(); x.moveTo(hx - hw * .1, hy - hw * .6); x.lineTo(hx + hw / 2, hy - hw * 1.05); x.lineTo(hx + hw * 1.1, hy - hw * .6); x.fill();
+            x.fillStyle = "#FFC870"; x.fillRect(hx + hw * .35, hy - hw * .4, hw * .3, hw * .25); }
+          x.strokeStyle = "#C8A040"; x.lineWidth = u * .012; x.strokeRect(bx, by, bw, bh);
+          grain(x, w, h, .03); vignette(x, w, h, .45, .7); });
+        // the doors: past ones open, today's swinging open, the rest shut
+        const swing = smooth(Math.min(1, Math.max(0, ((t % 9) - .5) / 1.6)));
+        for (let n = 1; n <= 24; n++) { const slot = order.indexOf(n), col = slot % cols, row = Math.floor(slot / cols);
+          const dx = bx + col * cw + cw * .1, dy = by + row * ch + ch * .1, dw = cw * .8, dh = ch * .8;
+          const open = n < door ? 1 : n === door ? swing : 0;
+          if (open > 0) { c.fillStyle = "#FFF1D6"; c.fillRect(dx, dy, dw, dh); glow(c, dx + dw / 2, dy + dh / 2, dw * .8, "#FFE0A0", n === door ? .5 : .15);
+            adventPic(c, ADVENT_PICS[n - 1], dx + dw / 2, dy + dh / 2, Math.min(dw, dh), t); }
+          // the door itself, hinged on its left, foreshortening as it opens
+          const fw = dw * Math.cos(open * Math.PI * .85);
+          if (open < 1) { const dg = c.createLinearGradient(dx, 0, dx + Math.abs(fw), 0); dg.addColorStop(0, fw > 0 ? "#B8202E" : "#7A1018"); dg.addColorStop(1, fw > 0 ? "#8A1420" : "#5A0A10");
+            c.fillStyle = dg; c.beginPath(); c.moveTo(dx, dy); c.lineTo(dx + fw, dy - open * dh * .06); c.lineTo(dx + fw, dy + dh + open * dh * .06); c.lineTo(dx, dy + dh); c.closePath(); c.fill();
+            c.strokeStyle = "#F4C04E"; c.lineWidth = 1; c.stroke();
+            if (fw > dw * .4) { c.fillStyle = "#F4E2B0"; c.font = `600 ${Math.max(8, Math.round(dh * .38))}px Georgia, serif`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(n), dx + fw / 2, dy + dh / 2); } }
+          else { c.strokeStyle = "rgba(200,160,64,.6)"; c.lineWidth = 1; c.strokeRect(dx, dy, dw, dh); } }
+        // the Advent candle, burnt down to today's number
+        const cx = w * .92, base = h * .92, full = h * .6, left = full * (left0 / 24), cwid = Math.min(u * .09, w * .05);
+        const cg = c.createLinearGradient(cx - cwid / 2, 0, cx + cwid / 2, 0); cg.addColorStop(0, "#E8DCC8"); cg.addColorStop(.4, "#FFF8EC"); cg.addColorStop(1, "#C8BCA8");
+        c.fillStyle = cg; c.fillRect(cx - cwid / 2, base - left, cwid, left);
+        c.fillStyle = "#B3202A"; c.font = `600 ${Math.max(7, Math.round(full / 24 * .55))}px Georgia, serif`; c.textAlign = "center"; c.textBaseline = "middle";
+        for (let i = 0; i < left0; i++) { const y = base - left + i * (full / 24); c.fillRect(cx - cwid / 2, y, cwid, 1); c.fillText(String(door + i), cx, y + full / 48); }
+        c.fillStyle = "rgba(255,250,240,.7)"; c.beginPath(); c.ellipse(cx, base - left, cwid / 2, cwid * .12, 0, 0, TAU); c.fill();
+        const f = 1 + Math.sin(t * 9) * .1 + Math.sin(t * 21) * .04; glow(c, cx, base - left - cwid * .6, cwid * 2.4, "#FFB020", .5);
+        c.fillStyle = "#FFD166"; c.beginPath(); c.ellipse(cx, base - left - cwid * .45, cwid * .14, cwid * .38 * f, Math.sin(t * 2) * .08, 0, TAU); c.fill();
+        c.fillStyle = "#FFFBE6"; c.beginPath(); c.ellipse(cx, base - left - cwid * .35, cwid * .06, cwid * .18 * f, 0, 0, TAU); c.fill();
+        c.fillStyle = "#1F6B3A"; [[-1, -.5], [1, .5]].forEach(([d, a]) => { c.save(); c.translate(cx + d * cwid * .9, base); c.rotate(a); c.beginPath(); c.ellipse(0, 0, cwid * .7, cwid * .26, 0, 0, TAU); c.fill(); c.restore(); });
+        c.fillStyle = "#D7263D"; [[-.15, -.2], [.15, -.15], [0, .1]].forEach(([dx, dy]) => { c.beginPath(); c.arc(cx + dx * cwid, base + dy * cwid, cwid * .14, 0, TAU); c.fill(); });
+        st.snow.forEach((s) => { s.y += (.025 + s.z * .05) * dt; if (s.y > 1) { s.y = 0; s.x = rnd(); } c.globalAlpha = .4 + s.z * .5; c.fillStyle = "#FFFFFF";
+          c.beginPath(); c.arc(s.x * w, s.y * h, .6 + s.z * 2, 0, TAU); c.fill(); });
+        c.globalAlpha = 1;
+      };
+    },
+
+    christmas(st, v) {
+      const boxing = v === "boxing";
+      st.bulbs = Array.from({ length: 46 }, () => ({ k: rnd(), s: rnd() - .5, p: rnd() * TAU, col: ["#FFD166", "#FF5A5F", "#7FD1FF", "#9BE38B", "#FFFFFF"][Math.floor(rnd() * 5)] }));
+      st.snow = Array.from({ length: 40 }, () => ({ x: rnd(), y: rnd(), z: rnd() }));
+      st.fire = [];
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h, w * .42), floor = h * .86, tcx = w * .82, tht = Math.min(h * .78, u * 1.05);
+        const winx = w * .42, winy = h * .14, winw = u * .42, winh = h * .42;
+        const fpx = w * .58, fpw = u * .36, fph = u * .34;
+        still(st, "room", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#3A1A1A"], [1, "#2A1010"]]);
+          // wallpaper: a quiet damask
+          x.fillStyle = "rgba(255,200,150,.05)"; for (let r = 0; r < h / (u * .1); r++) for (let k = 0; k < w / (u * .1); k++) { const px = k * u * .1 + (r % 2) * u * .05, py = r * u * .1;
+            x.beginPath(); x.ellipse(px, py, u * .02, u * .035, 0, 0, TAU); x.fill(); }
+          x.fillStyle = "#4A2418"; x.fillRect(0, h * .62, w, u * .012);
+          // the window, snowy night outside
+          const sky = x.createLinearGradient(0, winy, 0, winy + winh); sky.addColorStop(0, "#0A1430"); sky.addColorStop(1, "#2A3A6A"); x.fillStyle = sky; x.fillRect(winx, winy, winw, winh);
+          x.fillStyle = "#E8EEF8"; x.beginPath(); x.moveTo(winx, winy + winh); x.quadraticCurveTo(winx + winw * .5, winy + winh * .78, winx + winw, winy + winh * .85); x.lineTo(winx + winw, winy + winh); x.fill();
+          x.fillStyle = "#1A3A2A"; [[.25, .82], [.7, .86]].forEach(([fx, fy]) => { x.beginPath(); x.moveTo(winx + winw * fx, winy + winh * (fy - .25)); x.lineTo(winx + winw * (fx - .07), winy + winh * fy); x.lineTo(winx + winw * (fx + .07), winy + winh * fy); x.fill(); });
+          x.strokeStyle = "#F4ECE0"; x.lineWidth = u * .018; x.strokeRect(winx, winy, winw, winh); x.lineWidth = u * .01; x.beginPath(); x.moveTo(winx + winw / 2, winy); x.lineTo(winx + winw / 2, winy + winh); x.moveTo(winx, winy + winh / 2); x.lineTo(winx + winw, winy + winh / 2); x.stroke();
+          // the fireplace with its mantel and stockings
+          const fy = floor - fph; x.fillStyle = "#8A4A3A"; x.fillRect(fpx - fpw / 2, fy, fpw, fph);
+          for (let r = 0; r < 6; r++) for (let k = 0; k < 6; k++) { x.strokeStyle = "rgba(60,20,10,.35)"; x.strokeRect(fpx - fpw / 2 + (k + (r % 2) * .5) * fpw / 6, fy + r * fph / 6, fpw / 6, fph / 6); }
+          x.fillStyle = "#1A0A08"; x.beginPath(); x.moveTo(fpx - fpw * .3, floor); x.lineTo(fpx - fpw * .3, fy + fph * .45); x.arc(fpx, fy + fph * .45, fpw * .3, Math.PI, TAU); x.lineTo(fpx + fpw * .3, floor); x.fill();
+          x.fillStyle = "#E8DCC8"; x.fillRect(fpx - fpw * .6, fy - u * .025, fpw * 1.2, u * .03);
+          [[-.32, "#C8102E"], [0, "#1E6A3E"], [.32, "#C8102E"]].forEach(([dx, col]) => { const sx = fpx + dx * fpw, sy = fy;
+            x.fillStyle = col; x.beginPath(); x.moveTo(sx - u * .02, sy); x.lineTo(sx + u * .02, sy); x.lineTo(sx + u * .02, sy + u * .07); x.quadraticCurveTo(sx + u * .05, sy + u * .07, sx + u * .045, sy + u * .095); x.lineTo(sx - u * .01, sy + u * .095); x.quadraticCurveTo(sx - u * .025, sy + u * .09, sx - u * .02, sy + u * .07); x.fill();
+            x.fillStyle = "#FFFFFF"; x.fillRect(sx - u * .025, sy, u * .05, u * .018); });
+          x.fillStyle = "#2A5A2A"; for (let k = 0; k < 14; k++) { x.beginPath(); x.ellipse(fpx - fpw * .55 + k * fpw * .085, fy - u * .03, u * .02, u * .008, k, 0, TAU); x.fill(); }
+          // floorboards and a rug
+          const fg = x.createLinearGradient(0, floor, 0, h); fg.addColorStop(0, "#5A3420"); fg.addColorStop(1, "#3A2014"); x.fillStyle = fg; x.fillRect(0, floor, w, h - floor);
+          x.fillStyle = "rgba(160,30,40,.55)"; x.beginPath(); x.ellipse(w * .72, floor + (h - floor) * .55, u * .5, (h - floor) * .32, 0, 0, TAU); x.fill();
+          paintTree(x, tcx, floor, tht);
+          const pr = [[-.2, "#C8102E", "#F4C04E", .12, .09], [-.05, "#1E5AA8", "#FFFFFF", .1, .07], [.1, "#F4C04E", "#C8102E", .09, .1], [.22, "#2E7A4A", "#F2E6C8", .11, .06]];
+          pr.forEach(([dx, col, rib, ww, hh]) => { const pw = u * ww, ph = u * hh; if (boxing) { x.fillStyle = col; x.globalAlpha = .7; x.beginPath(); x.moveTo(tcx + dx * u * 1.6, floor); x.lineTo(tcx + dx * u * 1.6 + pw, floor - ph * .3); x.lineTo(tcx + dx * u * 1.6 + pw * 1.2, floor + 2); x.fill(); x.globalAlpha = 1; }
+            else present(x, tcx + dx * u * 1.6, floor - ph, pw, ph, col, rib); });
+          grain(x, w, h, .03); vignette(x, w, h, .5, .7); });
+        // the snow outside, and Santa crossing the window now and then
+        c.save(); c.beginPath(); c.rect(winx, winy, winw, winh); c.clip();
+        st.snow.forEach((s) => { s.y += (.04 + s.z * .06) * dt; if (s.y > 1) { s.y = 0; s.x = rnd(); } c.fillStyle = "rgba(255,255,255,.85)"; c.beginPath(); c.arc(winx + s.x * winw, winy + s.y * winh, .6 + s.z * 1.4, 0, TAU); c.fill(); });
+        if (!boxing) { const pc = (t % 13) / 4; if (pc < 1) { const sx2 = winx - u * .3 + pc * (winw + u * .6), sy2 = winy + winh * (.4 - Math.sin(pc * Math.PI) * .15); drawSleigh(c, sx2, sy2, Math.max(.35, u * .0028), t); } }
+        c.restore();
+        // the fire, crackling
+        const fy = floor - fph; glow(c, fpx, floor - fph * .15, fpw * .9, "#FF8A2A", (boxing ? .25 : .45) + .05 * Math.sin(t * 9));
+        c.save(); c.beginPath(); c.moveTo(fpx - fpw * .3, floor); c.lineTo(fpx - fpw * .3, fy + fph * .45); c.arc(fpx, fy + fph * .45, fpw * .3, Math.PI, TAU); c.lineTo(fpx + fpw * .3, floor); c.clip();
+        c.fillStyle = "#3A1E10"; c.fillRect(fpx - fpw * .22, floor - fph * .08, fpw * .44, fph * .06);
+        flames(c, fpx, floor - fph * .06, fpw * .4, fph * (boxing ? .25 : .42), t); c.restore();
+        // the tree's lights and its star
+        st.bulbs.forEach((b) => { const py = floor - tht * (.16 + b.k * .7), half = tht * (.4 - b.k * .36), px = tcx + b.s * half * 1.8;
+          const on = (.45 + .55 * Math.max(0, Math.sin(t * 2.2 + b.p))) * (boxing ? .6 : 1);
+          glow(c, px, py, tht * .03, b.col, on * .7); c.fillStyle = b.col; c.globalAlpha = on; c.beginPath(); c.arc(px, py, Math.max(1.4, tht * .008), 0, TAU); c.fill(); });
+        c.globalAlpha = 1;
+        const flare = 1 + Math.max(0, Math.sin(t * 1.3)) * .3 * (boxing ? .4 : 1), stx = tcx, sty = floor - tht * .97;
+        glow(c, stx, sty, tht * .12 * flare, "#FFE08A", .7);
+        c.save(); c.translate(stx, sty); c.scale(flare, flare); c.fillStyle = "#FFE08A"; c.beginPath();
+        for (let i = 0; i < 10; i++) { const r = i % 2 ? tht * .018 : tht * .045, a = i / 10 * TAU - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); c.restore();
+      };
+    },
+
+    diwali(st, v) {
+      st.sky = mkSky(); st.c = Array.from({ length: 22 }, () => ({ x: .45 + rnd() * .55, y: rnd(), v: .07 + rnd() * .07, p: rnd() * TAU }));
+      st.fairy = Array.from({ length: 60 }, (_, i) => ({ p: rnd() * TAU, col: ["#FFD166", "#FFB040", "#FFF0C0"][i % 3] }));
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h, w * .42), gnd = h * .78, hx = w * .5, hw = w * .5;
+        still(st, "haveli", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#0C0620"], [.5, "#2A0E3E"], [.78, "#5A1A3A"], [1, "#2A0E14"]]);
+          for (let i = 0; i < w * h / 1500; i++) { x.fillStyle = `rgba(255,255,255,${.1 + rnd() * .35})`; x.fillRect(rnd() * w, rnd() * h * .45, 1, 1); }
+          // the house front: arched windows, a carved parapet
+          const fy = h * .32; const fg = x.createLinearGradient(0, fy, 0, gnd); fg.addColorStop(0, "#5A2A3A"); fg.addColorStop(1, "#3A1622");
+          x.fillStyle = fg; x.fillRect(hx, fy, hw, gnd - fy);
+          x.fillStyle = "#6E3646"; x.fillRect(hx - u * .01, fy - u * .03, hw + u * .02, u * .03);
+          for (let px = hx; px < w; px += u * .04) { x.beginPath(); x.arc(px + u * .02, fy - u * .03, u * .015, Math.PI, TAU); x.fill(); }
+          for (let r = 0; r < 2; r++) for (let k = 0; k < 4; k++) { const ax = hx + hw * (.1 + k * .22), ay = fy + (gnd - fy) * (.12 + r * .45), aw = hw * .12, ah = (gnd - fy) * .3;
+            x.fillStyle = "#2A0E18"; x.beginPath(); x.moveTo(ax, ay + ah); x.lineTo(ax, ay + aw * .5); x.quadraticCurveTo(ax, ay - aw * .2, ax + aw / 2, ay - aw * .45); x.quadraticCurveTo(ax + aw, ay - aw * .2, ax + aw, ay + aw * .5); x.lineTo(ax + aw, ay + ah); x.fill();
+            const wg = x.createLinearGradient(0, ay, 0, ay + ah); wg.addColorStop(0, "rgba(255,190,90,.75)"); wg.addColorStop(1, "rgba(255,120,40,.5)");
+            x.fillStyle = wg; x.beginPath(); x.moveTo(ax + aw * .12, ay + ah * .95); x.lineTo(ax + aw * .12, ay + aw * .5); x.quadraticCurveTo(ax + aw * .12, ay, ax + aw / 2, ay - aw * .3); x.quadraticCurveTo(ax + aw * .88, ay, ax + aw * .88, ay + aw * .5); x.lineTo(ax + aw * .88, ay + ah * .95); x.fill();
+            x.strokeStyle = "#2A0E18"; x.lineWidth = Math.max(1, u * .006); x.beginPath(); x.moveTo(ax + aw / 2, ay - aw * .3); x.lineTo(ax + aw / 2, ay + ah); x.moveTo(ax, ay + ah * .55); x.lineTo(ax + aw, ay + ah * .55); x.stroke(); }
+          // steps and courtyard
+          const cg = x.createLinearGradient(0, gnd, 0, h); cg.addColorStop(0, "#4A2A2A"); cg.addColorStop(1, "#1E0E10"); x.fillStyle = cg; x.fillRect(0, gnd, w, h - gnd);
+          for (let k = 0; k < 3; k++) { x.fillStyle = `rgba(255,200,150,${.06 + k * .03})`; x.fillRect(hx, gnd + k * u * .025, hw, 1.5); }
+          grain(x, w, h, .03); vignette(x, w, h, .4, .7); });
+        // fairy lights draped along the parapet
+        const fy = h * .32;
+        st.fairy.forEach((f, i) => { const k = i / st.fairy.length, x = hx + k * hw, y = fy + u * .02 + Math.abs(Math.sin(k * Math.PI * 6)) * u * .05;
+          const a = .5 + .5 * Math.sin(t * 2.5 + f.p); glow(c, x, y, u * .02, f.col, .5 * a); c.fillStyle = f.col; c.globalAlpha = .6 + .4 * a; c.beginPath(); c.arc(x, y, Math.max(1.2, u * .005), 0, TAU); c.fill(); });
+        c.globalAlpha = 1;
+        skyFire(st.sky, c, w, fy * 1.05, dt, ["#FFD166", "#E84F9A", "#7FD1FF", "#F28A2E", "#B48CFF"], v === "calm" ? .25 : v === "coins" ? .45 : 1.1, .3, .98, .08, .5);
+        [[.58, .22, "#E8343A"], [.74, .2, "#F2A93A"], [.9, .23, "#E84F9A"]].forEach(([kx, ky, col]) => kandil(c, kx * w, ky * h, u * .05, t, col));
+        // the rangoli, drawing itself in coloured powder
+        const R = Math.min(u * .32, w * .2, (h - gnd) * .82), rx = w * .78, ry = gnd + (h - gnd) * .52, prog = v === "calm" ? 1 : Math.min(1, (t % 16) / 10);
+        const rgo = cache(st, "rangoli", R * 2.2, R * 1.1, c, (x, W, H) => { x.save(); x.translate(W / 2, H / 2); x.scale(1, .45);
+          const rings = [["#E8343A", 12, 1, .9], ["#F2D03A", 12, .78, .7], ["#2FA84F", 24, .58, .5], ["#E84F9A", 8, .38, .4], ["#2D5BD8", 8, .22, .3]];
+          rings.forEach(([col, n, f, wd]) => { for (let i = 0; i < n; i++) { x.save(); x.rotate(i / n * TAU); x.beginPath(); x.ellipse(R * f * .62, 0, R * f * .4 * wd + R * .04, R * f * .14, 0, 0, TAU);
+            x.fillStyle = col; x.fill(); for (let k = 0; k < 40; k++) { x.fillStyle = `rgba(${rnd() < .5 ? "255,255,255" : "0,0,0"},.15)`; x.fillRect(R * f * .62 + (rnd() - .5) * R * f * .6, (rnd() - .5) * R * f * .2, 1.4, 1.4); } x.restore(); } });
+          x.fillStyle = "#FFFFFF"; for (let i = 0; i < 48; i++) { const q = i / 48 * TAU; x.beginPath(); x.arc(Math.cos(q) * R * 1.02, Math.sin(q) * R * 1.02, R * .018, 0, TAU); x.fill(); }
+          x.fillStyle = "#FFD166"; x.beginPath(); x.arc(0, 0, R * .1, 0, TAU); x.fill(); x.restore(); });
+        if (rgo) { c.save(); c.beginPath(); c.moveTo(rx, ry); c.arc(rx, ry, R * 1.3, -Math.PI / 2, -Math.PI / 2 + prog * TAU); c.closePath(); c.clip(); c.drawImage(rgo, rx - R * 1.1, ry - R * .55, R * 2.2, R * 1.1); c.restore(); }
+        if (v === "coins") st.c.forEach((k) => { k.y += k.v * dt; if (k.y > 1.1) { k.y = -.1; k.x = .45 + rnd() * .55; } glow(c, k.x * w, k.y * h, u * .03, "#FFD166", .3); coin(c, k.x * w, k.y * h, u * .022, t * 3 + k.p); });
+        const lit = v === "coins" ? 1 : v === "calm" ? 9 : 4;
+        for (let i = 0; i < 9; i++) diya(c, w * (.53 + i * .054), gnd - u * .005, u * .036, t, i, i < lit);
+      };
+    },
+
+    fireworks(st) {
+      st.sky = mkSky(); st.trail = []; st.birds = Array.from({ length: 5 }, (_, i) => ({ dx: i * .028, dy: Math.abs(i - 2) * .018, p: rnd() * TAU }));
+      const year = String(new Date().getMonth() === 11 ? new Date().getFullYear() + 1 : new Date().getFullYear());
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h, w * .42), river = h * .78, sx = w * .7, sy = river;
+        still(st, "dawn", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#1A2A5A"], [.35, "#6A5A8A"], [.6, "#E89A8A"], [.78, "#FFD2A0"], [1, "#3A3050"]]);
+          glow(x, sx, sy, u * 1.2, "#FFD8A0", .65); glow(x, sx, sy, u * .3, "#FFF2D0", .9);
+          x.fillStyle = "#FFF4D8"; x.beginPath(); x.arc(sx, sy, u * .11, Math.PI, TAU); x.fill();
+          [[.2, .3, .5], [.55, .22, .6], [.8, .35, .45]].forEach(([cx, cy, k]) => { for (let j = 0; j < 4; j++) { const g = x.createLinearGradient(0, cy * h - u * .02, 0, cy * h + u * .02); g.addColorStop(0, "rgba(140,100,150,.5)"); g.addColorStop(1, "rgba(255,170,140,.8)");
+            x.fillStyle = g; x.beginPath(); x.ellipse(cx * w + (j - 1.5) * u * .25 * k, cy * h + (j % 2) * u * .01, u * .4 * k, u * .02, 0, 0, TAU); x.fill(); } });
+          // the city, its windows still lit from the night
+          for (let px = 0; px < w; px += u * (.04 + rnd() * .05)) { const bh = u * (.06 + rnd() * .2), bw = u * (.03 + rnd() * .04);
+            x.fillStyle = "#2A2440"; x.fillRect(px, river - bh, bw, bh);
+            for (let wy = river - bh + 3; wy < river - 3; wy += 4) for (let wx = px + 2; wx < px + bw - 2; wx += 4) if (rnd() < .2) { x.fillStyle = "rgba(255,210,150,.5)"; x.fillRect(wx, wy, 1.5, 1.5); } }
+          const wg = x.createLinearGradient(0, river, 0, h); wg.addColorStop(0, "#C88A8A"); wg.addColorStop(.3, "#5A4A6A"); wg.addColorStop(1, "#1A1A30"); x.fillStyle = wg; x.fillRect(0, river, w, h - river);
+          for (let i = 0; i < 40; i++) { const yy = river + 2 + i * (h - river) / 42, wd = u * (.06 + .1 * Math.abs(Math.sin(i * 1.7))); x.fillStyle = `rgba(255,225,180,${.4 - i * .008})`; x.fillRect(sx - wd / 2 + Math.sin(i * 2.3) * u * .02, yy, wd, 1.3); }
+          grain(x, w, h, .025); vignette(x, w, h, .3, .7); });
+        skyFire(st.sky, c, w, river * .95, dt, ["#FFD166", "#FF8AB0", "#B48CFF"], .35, .1, .95, .1, .35);
+        const bp = (t * .02) % 1.3 - .15;
+        st.birds.forEach((b) => { const x = (bp - b.dx) * w, y = h * (.42 + b.dy), f = Math.sin(t * 6 + b.p) * u * .01;
+          c.strokeStyle = "rgba(40,30,50,.7)"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - u * .02, y - f); c.quadraticCurveTo(x - u * .008, y - u * .008, x, y); c.quadraticCurveTo(x + u * .008, y - u * .008, x + u * .02, y - f); c.stroke(); });
+        // the year, written in sparkler light, one figure after another
+        const cyc = 11, k = (t % cyc) / 6.5, gx = w * .6, gy = h * .2, fs = u * .2;
+        c.save(); c.font = `700 ${Math.round(fs)}px Georgia, serif`; c.textBaseline = "middle"; c.textAlign = "left";
+        const widths = [...year].map((d) => c.measureText(d).width), total = widths.reduce((a, b) => a + b, 0);
+        let px = Math.min(gx, w - total - u * .05);
+        const fade = (t % cyc) > 9 ? Math.max(0, 1 - ((t % cyc) - 9) / 1.5) : 1;
+        [...year].forEach((d, i) => { const f = Math.max(0, Math.min(1, k * year.length - i));
+          if (f > 0) { c.save(); c.beginPath(); c.rect(px - 2, gy - fs, widths[i] * f + 2, fs * 2); c.clip();
+            c.globalAlpha = fade; c.shadowColor = "#FFB020"; c.shadowBlur = 16; c.fillStyle = "#FFF1C8"; c.fillText(d, px, gy); c.restore();
+            if (f < 1) { const hx = px + widths[i] * f, hy = gy + Math.sin(t * 30) * fs * .2; glow(c, hx, hy, u * .07, "#FFF4C2", .95);
+              for (let s = 0; s < 6; s++) { const a = rnd() * TAU, r = u * (.02 + rnd() * .04); c.strokeStyle = "rgba(255,250,220,.8)"; c.lineWidth = 1; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx + Math.cos(a) * r, hy + Math.sin(a) * r); c.stroke(); } } }
+          px += widths[i]; });
+        c.restore();
+      };
+    },
+
+    holi(st) {
+      st.puffs = []; st.next = .1; st.jet = { t: 0 }; st.dust = [];
+      st.palash = Array.from({ length: 70 }, () => ({ a: rnd() * TAU, d: Math.sqrt(rnd()), s: .6 + rnd() * .6 }));
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h, w * .42), gnd = h * .82;
+        still(st, "yard", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#6FB8F2"], [.55, "#CDE6F6"], [.82, "#F6E2C0"], [1, "#E8C89A"]]);
+          glow(x, w * .7, h * .1, u * .9, "#FFF6D8", .6);
+          // a sandstone haveli wall with jharokha windows
+          const wy = h * .38; const wg = x.createLinearGradient(0, wy, 0, gnd); wg.addColorStop(0, "#E8B07A"); wg.addColorStop(1, "#C8885A");
+          x.fillStyle = wg; x.fillRect(0, wy, w * .62, gnd - wy);
+          for (let k = 0; k < 5; k++) { const jx = w * (.04 + k * .12), jy = wy + (gnd - wy) * .18, jw = u * .1, jh = (gnd - wy) * .4;
+            x.fillStyle = "#B87A4A"; x.fillRect(jx - jw * .1, jy + jh, jw * 1.2, u * .015);
+            x.fillStyle = "#6A3A20"; x.beginPath(); x.moveTo(jx, jy + jh); x.lineTo(jx, jy + jw * .4); x.quadraticCurveTo(jx + jw / 2, jy - jw * .4, jx + jw, jy + jw * .4); x.lineTo(jx + jw, jy + jh); x.fill();
+            x.strokeStyle = "#E8C08A"; x.lineWidth = 1; x.stroke(); x.fillStyle = "#3A8A8A"; x.fillRect(jx + jw * .15, jy + jw * .45, jw * .7, jh - jw * .5); }
+          x.fillStyle = "#D89A64"; x.fillRect(0, wy - u * .03, w * .62, u * .03);
+          // the courtyard floor, already splashed with colour
+          const fg = x.createLinearGradient(0, gnd, 0, h); fg.addColorStop(0, "#E8CFA8"); fg.addColorStop(1, "#C8A878"); x.fillStyle = fg; x.fillRect(0, gnd, w, h - gnd);
+          for (let i = 0; i < 26; i++) { const sx = rnd() * w, sy = gnd + rnd() * (h - gnd), r = u * (.02 + rnd() * .06);
+            const g = x.createRadialGradient(sx, sy, 0, sx, sy, r); g.addColorStop(0, `rgba(${holiCols[i % 6]},.55)`); g.addColorStop(1, `rgba(${holiCols[i % 6]},0)`);
+            x.fillStyle = g; x.save(); x.translate(sx, sy); x.scale(1, .4); x.translate(-sx, -sy); x.beginPath(); x.arc(sx, sy, r, 0, TAU); x.fill(); x.restore(); }
+          // a palash tree in flame-orange flower
+          const tx = w * .9, ty = gnd; x.strokeStyle = "#5A3A2A"; x.lineCap = "round";
+          [[0, -.42, .05], [-.12, -.3, .025], [.1, -.34, .022]].forEach(([dx, dy, wd]) => { x.lineWidth = u * wd; x.beginPath(); x.moveTo(tx, ty); x.quadraticCurveTo(tx + dx * u * .5, ty + dy * u * .6, tx + dx * u, ty + dy * u); x.stroke(); });
+          for (let i = 0; i < 140; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()); x.fillStyle = ["#F2551A", "#FF7A1A", "#E8401A", "#4E7A3A"][i % 4];
+            x.beginPath(); x.ellipse(tx + Math.cos(a) * d * u * .22, ty - u * .5 + Math.sin(a) * d * u * .14, u * .014, u * .008, a, 0, TAU); x.fill(); }
+          grain(x, w, h, .02); vignette(x, w, h, .25, .7); });
+        // a brass thali heaped with gulal
+        const tx = w * .72, ty = gnd + (h - gnd) * .55, tr = u * .14;
+        shadow(c, tx, ty + tr * .12, tr * 1.2, tr * .2, .35);
+        const bg = c.createLinearGradient(tx - tr, 0, tx + tr, 0); bg.addColorStop(0, "#B8862A"); bg.addColorStop(.4, "#F4D27A"); bg.addColorStop(1, "#8A5A14");
+        c.fillStyle = bg; c.beginPath(); c.ellipse(tx, ty, tr, tr * .28, 0, 0, TAU); c.fill();
+        c.fillStyle = "#D8A84A"; c.beginPath(); c.ellipse(tx, ty - tr * .02, tr * .86, tr * .22, 0, 0, TAU); c.fill();
+        holiCols.forEach((col, i) => { const a = i / 6 * TAU, px = tx + Math.cos(a) * tr * .5, py = ty - tr * .04 + Math.sin(a) * tr * .12;
+          const g = c.createRadialGradient(px - tr * .05, py - tr * .1, 0, px, py, tr * .2); g.addColorStop(0, `rgba(${col},1)`); g.addColorStop(1, `rgba(${col},.85)`);
+          c.fillStyle = g; c.beginPath(); c.moveTo(px - tr * .2, py + tr * .04); c.quadraticCurveTo(px, py - tr * .22, px + tr * .2, py + tr * .04); c.fill(); });
+        // the puffs: thrown from the edges, they bloom and drift
+        st.next -= dt;
+        if (st.next <= 0) { st.next = .3 + rnd() * .4; const fromR = rnd() > .35, y = h * (.25 + rnd() * .5), ci = Math.floor(rnd() * 6);
+          st.puffs.push({ x: fromR ? w * 1.02 : tx, y: fromR ? y : ty - tr * .3, vx: fromR ? -w * (.25 + rnd() * .25) : (rnd() - .3) * w * .15, vy: fromR ? -h * .08 * rnd() : -h * (.55 + rnd() * .3),
+            ci, life: 1, parts: Array.from({ length: 22 }, () => ({ a: rnd() * TAU, k: Math.sqrt(rnd()), r: .5 + rnd() * .8 })) }); }
+        st.puffs = st.puffs.filter((p) => { const drag = Math.pow(.15, dt); p.vx *= drag; p.vy *= drag; p.vy += u * .02 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * .3;
+          const age = 1 - p.life, spread = u * (.04 + age * .32), L = Math.max(0, p.life);
+          p.parts.forEach((q) => { const px = p.x + Math.cos(q.a + age) * spread * q.k, py = p.y + Math.sin(q.a + age) * spread * q.k * .8, r = u * (.03 + age * .11) * q.r;
+            const g = c.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, `rgba(${holiCols[p.ci]},${(L * .42).toFixed(3)})`); g.addColorStop(1, `rgba(${holiCols[p.ci]},0)`);
+            c.fillStyle = g; c.fillRect(px - r, py - r, r * 2, r * 2); });
+          return p.life > 0; });
+        // a pichkari's jet of coloured water arcing across now and then
+        const jc = t % 7;
+        if (jc < 2.2) { const k = jc / 2.2, col = holiCols[Math.floor(t / 7) % 6], x0 = w * .58, y0 = h * .72;
+          c.strokeStyle = `rgba(${col},.6)`; c.lineCap = "round";
+          for (let s = 0; s < 3; s++) { c.lineWidth = Math.max(1.2, u * (.008 - s * .002)); c.beginPath();
+            for (let q = 0; q <= 24; q++) { const f = q / 24 * Math.min(1, k * 2.2); c.lineTo(x0 + f * u * .55 + s * 2, y0 - Math.sin(f * Math.PI) * u * .32 + f * f * u * .2 + s); } c.stroke(); }
+          for (let q = 0; q < 8; q++) { const f = Math.min(1, k * 2.2) - q * .02; if (f < 0) break; c.fillStyle = `rgba(${col},.6)`; c.beginPath();
+            c.arc(x0 + f * u * .55 + Math.sin(t * 20 + q) * 3, y0 - Math.sin(f * Math.PI) * u * .32 + f * f * u * .2 + Math.cos(t * 17 + q) * 3, 1.5, 0, TAU); c.fill(); } }
+      };
+    },
+
+    navaratri(st) {
+      const NIGHTS = [["#F7F2E8", "#C8C0B0"], ["#E8343A", "#9A1A20"], ["#2D5BD8", "#1A3A8A"], ["#F2D03A", "#C29A1A"], ["#2FA84F", "#1A6A30"], ["#BDBDBD", "#7A7A80"], ["#F28A2E", "#B85A10"], ["#3FB6C9", "#1A7A8A"], ["#E84F9A", "#A82A6A"]];
+      st.sp = Array.from({ length: 40 }, () => ({ x: rnd(), y: rnd(), v: .02 + rnd() * .03, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h, w * .42), cx = w * .76, cy = h * .66;
+        still(st, "pandal", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#12082A"], [.5, "#34124E"], [.8, "#6A1E5A"], [1, "#2A0E2A"]]);
+          // canopy of light strings radiating from the centre pole
+          for (let k = 0; k < 18; k++) { const ex = w * (.35 + k * .04), sag = u * .08;
+            for (let j = 0; j <= 16; j++) { const f = j / 16, px = cx + (ex - cx) * f, py = h * .06 + f * h * .12 + Math.sin(f * Math.PI) * sag;
+              glow(x, px, py, u * .012, ["#FFD166", "#FF7AB0", "#7FD1FF"][(k + j) % 3], .5); x.fillStyle = "#FFF4D0"; x.fillRect(px - .8, py - .8, 1.6, 1.6); } }
+          // marigold torans at the top edge
+          for (let px = w * .4; px < w; px += u * .03) { const py = h * .02 + Math.abs(Math.sin(px * .02)) * u * .02;
+            x.fillStyle = (Math.floor(px / (u * .03)) % 3) ? "#F59A0B" : "#E8541A"; x.beginPath(); x.arc(px, py, u * .014, 0, TAU); x.fill(); }
+          const fg = x.createLinearGradient(0, h * .55, 0, h); fg.addColorStop(0, "#3A1A30"); fg.addColorStop(1, "#1A0A16"); x.fillStyle = fg; x.fillRect(0, h * .55, w, h * .45);
+          // the rangoli under the dancers
+          x.save(); x.translate(cx, cy + u * .02); x.scale(1, .32);
+          for (let r = 4; r >= 1; r--) { x.fillStyle = ["#E8343A", "#F2D03A", "#2FA84F", "#E84F9A"][r - 1]; x.globalAlpha = .55; x.beginPath(); x.arc(0, 0, u * r * .12, 0, TAU); x.fill(); }
+          x.globalAlpha = 1; x.restore();
+          grain(x, w, h, .03); vignette(x, w, h, .45, .7); });
+        glow(c, cx, cy - u * .1, u * .7, "#FFB040", .35 + .05 * Math.sin(t * 9));
+        // two rings of dancers in opposite directions, nearer ones drawn last
+        const all = [];
+        [[1, 9, .42, .14, .45], [-1, 13, .7, .22, .32]].forEach(([dir, n, rx, ry, sp], ring) => {
+          for (let i = 0; i < n; i++) { const a = dir * t * sp + i / n * TAU; all.push({ a, ring, i, x: cx + Math.cos(a) * u * rx, y: cy + Math.sin(a) * u * ry, col: NIGHTS[(i + ring * 4) % 9] }); } });
+        const lamp = { y: cy, lamp: true };
+        [...all, lamp].sort((p, q) => p.y - q.y).forEach((d) => {
+          if (d.lamp) { // the garbo: a perforated pot with the flame inside
+            const lx = cx, ly = cy, r = u * .06;
+            c.fillStyle = "#5A3A20"; c.fillRect(lx - r * .15, ly - r * .2, r * .3, r * 1.2);
+            const pg = c.createRadialGradient(lx - r * .3, ly - r * 1.1, r * .1, lx, ly - r, r * 1.1); pg.addColorStop(0, "#E8A050"); pg.addColorStop(1, "#7A3A14");
+            c.fillStyle = pg; c.beginPath(); c.arc(lx, ly - r, r, 0, TAU); c.fill();
+            for (let k = 0; k < 18; k++) { const q = k / 18 * TAU, dx = Math.cos(q) * r * .7, dy = Math.sin(q * 2) * r * .5;
+              if (Math.cos(q) < -.2) continue; c.fillStyle = `rgba(255,${200 + 40 * Math.sin(t * 13 + k)},120,.95)`; c.beginPath(); c.arc(lx + dx * .9, ly - r + dy, r * .07, 0, TAU); c.fill(); }
+            const f = 1 + Math.sin(t * 13) * .1; glow(c, lx, ly - r * 2.3, r * 2, "#FFB020", .5);
+            c.fillStyle = "#FFD166"; c.beginPath(); c.ellipse(lx, ly - r * 2.25, r * .18, r * .45 * f, Math.sin(t * 3) * .1, 0, TAU); c.fill(); return; }
+          const depth = .7 + (Math.sin(d.a) + 1) * .18;
+          shadow(c, d.x, d.y + 1, u * .03 * depth, u * .008, .4);
+          dancer(c, d.x, d.y, u * .0036 * depth * (d.ring ? 1.05 : .95), t, d.col, d.i * 1.3 + d.ring, depth); });
+        st.sp.forEach((q) => { q.y -= q.v * dt; if (q.y < 0) q.y = 1; const x = w * (.45 + q.x * .55), y = h * (.1 + q.y * .7);
+          c.globalAlpha = (.5 + .5 * Math.sin(t * 2 + q.p)) * .6; c.fillStyle = "#FFE0A0"; c.fillRect(x, y, 1.4, 1.4); });
+        c.globalAlpha = 1;
+      };
+    },
+
+    newyear(st, v) {
+      st.B = mkBlades(60);
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h, w * .42), sill = h * .66, dx0 = w * .56, dx1 = w * .98, dtop = h * .08;
+        still(st, "door", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#F7D8A8"], [.5, "#EAA878"], [1, "#9A4A3A"]]);
+          // the house wall, lime-washed, the morning sun on it
+          const wg = x.createLinearGradient(0, 0, w, 0); wg.addColorStop(0, "#C88A6A"); wg.addColorStop(1, "#F2D8B8"); x.fillStyle = wg; x.fillRect(0, 0, w, sill);
+          x.fillStyle = "rgba(255,240,200,.25)"; x.beginPath(); x.moveTo(w * .2, 0); x.lineTo(w * .55, 0); x.lineTo(w * .35, sill); x.lineTo(0, sill); x.closePath(); x.fill();
+          // the doorway: a carved teak frame and a pair of studded doors, ajar
+          const fw = (dx1 - dx0) * .62, fx = dx0 + (dx1 - dx0) * .19;
+          const tg = x.createLinearGradient(fx, 0, fx + fw, 0); tg.addColorStop(0, "#5A2E14"); tg.addColorStop(.5, "#8A4A20"); tg.addColorStop(1, "#4A2410");
+          x.fillStyle = tg; x.fillRect(fx - u * .04, dtop, fw + u * .08, sill - dtop);
+          x.fillStyle = "#2A1408"; x.fillRect(fx, dtop + u * .06, fw, sill - dtop - u * .06);
+          x.fillStyle = "#FFD8A0"; x.globalAlpha = .35; x.fillRect(fx + fw * .48, dtop + u * .06, fw * .04, sill - dtop - u * .06); x.globalAlpha = 1;
+          [0, 1].forEach((k) => { const px = fx + k * fw * .52, pw = fw * .48; const dg = x.createLinearGradient(px, 0, px + pw, 0); dg.addColorStop(0, "#7A3A18"); dg.addColorStop(1, "#5A2A10");
+            x.fillStyle = dg; x.fillRect(px, dtop + u * .06, pw, sill - dtop - u * .06);
+            for (let r = 0; r < 4; r++) for (let q = 0; q < 2; q++) { x.fillStyle = "#E8B84A"; x.beginPath(); x.arc(px + pw * (.3 + q * .4), dtop + u * .1 + r * (sill - dtop) * .23, u * .008, 0, TAU); x.fill(); } });
+          // the carved lintel: a band of lotus and bead
+          x.fillStyle = "#6A3418"; x.fillRect(fx - u * .04, dtop, fw + u * .08, u * .06);
+          for (let px = fx - u * .03; px < fx + fw + u * .04; px += u * .03) { x.fillStyle = "#9A5A28"; x.beginPath(); x.moveTo(px, dtop + u * .05); x.quadraticCurveTo(px + u * .015, dtop + u * .01, px + u * .03, dtop + u * .05); x.fill();
+            x.fillStyle = "#3A1A08"; x.beginPath(); x.arc(px + u * .015, dtop + u * .055, u * .004, 0, TAU); x.fill(); }
+          // the threshold, swept and washed, and the floor where the kolam goes
+          const fg = x.createLinearGradient(0, sill, 0, h); fg.addColorStop(0, "#8A4A3A"); fg.addColorStop(1, "#5A2A22"); x.fillStyle = fg; x.fillRect(0, sill, w, h - sill);
+          x.fillStyle = "#B86A4A"; x.fillRect(fx - u * .06, sill - u * .01, fw + u * .12, u * .025);
+          x.fillStyle = "#E8A020"; x.fillRect(fx - u * .06, sill - u * .01, fw + u * .12, u * .006);
+          grain(x, w, h, .025); vignette(x, w, h, .3, .7); });
+        // toran of mango leaves and marigolds across the top of the door
+        const n = 16, tx0 = dx0, tx1 = dx1;
+        c.strokeStyle = "#5A3A1A"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(tx0, dtop + u * .02); c.lineTo(tx1, dtop + u * .02); c.stroke();
+        for (let i = 0; i < n; i++) { const x = tx0 + (i + .5) / n * (tx1 - tx0), sw = Math.sin(t * 1.6 + i * .6) * .12;
+          c.save(); c.translate(x, dtop + u * .02); c.rotate(sw);
+          if (i % 3 === 1) { [0, 1, 2].forEach((k) => { c.fillStyle = k % 2 ? "#F97316" : "#F59E0B"; c.beginPath(); c.arc(0, u * (.02 + k * .03), u * .016, 0, TAU); c.fill(); }); }
+          else { const g = c.createLinearGradient(-u * .01, 0, u * .01, 0); g.addColorStop(0, "#2F7A35"); g.addColorStop(1, "#4E9E44");
+            c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-u * .022, u * .04, 0, u * .09); c.quadraticCurveTo(u * .022, u * .04, 0, 0); c.fill();
+            c.strokeStyle = "rgba(200,240,180,.5)"; c.lineWidth = .7; c.beginPath(); c.moveTo(0, u * .005); c.lineTo(0, u * .08); c.stroke(); }
+          c.restore(); }
+        kuthuvilakku(c, dx0 + (dx1 - dx0) * .08, sill + u * .02, u * .3, t);
+        // the kolam on the floor, in perspective: dots, then loops, then colour
+        const kx = w * .78, ky = sill + (h - sill) * .52, g = Math.min(u * .075, (h - sill) * .26), prog = (t % 14) / 9;
+        c.save(); c.translate(kx, ky); c.scale(1, .42);
+        if (prog > 1) { const a = Math.min(1, (prog - 1) * 2.5); kolamDots.forEach(([i, j], k) => { c.fillStyle = ["rgba(232,52,58,", "rgba(242,208,58,", "rgba(47,168,79,", "rgba(232,79,154,"][(Math.abs(i) + Math.abs(j)) % 4] + (a * .7) + ")";
+          c.beginPath(); c.arc(i * g, j * g, g * .55, 0, TAU); c.fill(); }); }
+        c.fillStyle = "rgba(255,250,240,.95)"; kolamDots.forEach(([i, j]) => { c.beginPath(); c.arc(i * g, j * g, Math.max(1.2, g * .07), 0, TAU); c.fill(); });
+        c.strokeStyle = "rgba(255,250,240,.95)"; c.lineWidth = Math.max(1.2, g * .08); c.lineCap = "round";
+        kolamDots.forEach(([i, j], k) => { const f = k / kolamDots.length; if (f > prog) return; c.beginPath(); c.arc(i * g, j * g, g * .62, 0, TAU * Math.min(1, (prog - f) * 6)); c.stroke(); });
+        c.restore();
+        if (v === "gudi") { // the gudi: bright silk on a bamboo pole, neem and sugar crystals, an upturned pot
+          const gx = w * .6, gy = h * .1, gh = sill - gy;
+          c.strokeStyle = "#A87A40"; c.lineWidth = Math.max(2.5, u * .014); c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx, sill); c.stroke();
+          const sg = c.createLinearGradient(gx, 0, gx + u * .12, 0); sg.addColorStop(0, "#2FA84F"); sg.addColorStop(1, "#1A7A3A");
+          c.fillStyle = sg; c.beginPath(); c.moveTo(gx, gy + u * .03); for (let y = 0; y <= gh * .45; y += 3) c.lineTo(gx + u * .1 + Math.sin(y * .08 - t * 3) * u * .02, gy + u * .03 + y); c.lineTo(gx, gy + u * .03 + gh * .45); c.fill();
+          c.strokeStyle = "#F2B33A"; c.lineWidth = 2; c.beginPath(); for (let y = 0; y <= gh * .45; y += 3) c.lineTo(gx + u * .1 + Math.sin(y * .08 - t * 3) * u * .02, gy + u * .03 + y); c.stroke();
+          c.fillStyle = "#4E8A36"; for (let k = 0; k < 6; k++) { c.beginPath(); c.ellipse(gx - u * .02 + k * u * .008, gy + u * .03 + k * u * .006, u * .006, u * .02, k - 3, 0, TAU); c.fill(); }
+          c.fillStyle = "#FFFFFF"; for (let k = 0; k < 7; k++) { c.beginPath(); c.arc(gx - u * .015 + (k % 4) * u * .01, gy + u * .06 + Math.floor(k / 4) * u * .012, u * .006, 0, TAU); c.fill(); }
+          const pg = c.createRadialGradient(gx - u * .02, gy - u * .02, u * .005, gx, gy, u * .05); pg.addColorStop(0, "#F4C88A"); pg.addColorStop(1, "#A0602A");
+          c.fillStyle = pg; c.beginPath(); c.arc(gx, gy, u * .045, Math.PI, TAU); c.fill(); c.fillRect(gx - u * .02, gy, u * .04, u * .015); }
+        if (v === "bihu") { // a dhol, struck, and a gamosa over the doorway
+          const bx = w * .62, by = sill + u * .02, beat = (t * 2) % 1;
+          c.strokeStyle = `rgba(255,255,255,${(1 - beat) * .5})`; c.lineWidth = 2; c.beginPath(); c.ellipse(bx, by - u * .08, u * (.08 + beat * .2), u * (.04 + beat * .1), 0, 0, TAU); c.stroke();
+          const dg = c.createLinearGradient(bx - u * .09, 0, bx + u * .09, 0); dg.addColorStop(0, "#6A2A10"); dg.addColorStop(.5, "#B8602A"); dg.addColorStop(1, "#5A2008");
+          c.fillStyle = dg; c.beginPath(); c.ellipse(bx, by - u * .08, u * .09, u * .065, 0, 0, TAU); c.fill();
+          c.strokeStyle = "#E8D2A0"; c.lineWidth = 1; for (let k = -4; k <= 4; k++) { c.beginPath(); c.moveTo(bx + k * u * .02, by - u * .14); c.lineTo(bx + k * u * .02 + u * .01, by - u * .02); c.stroke(); }
+          c.fillStyle = "#F2E6C8"; c.beginPath(); c.ellipse(bx - u * .09, by - u * .08, u * .018, u * .062, 0, 0, TAU); c.fill();
+          c.fillStyle = "#FFFFFF"; c.fillRect(dx0, dtop - u * .01, dx1 - dx0, u * .025); c.fillStyle = "#C8102E"; for (let px = dx0; px < dx1; px += u * .03) c.fillRect(px, dtop - u * .005, u * .015, u * .012); }
+      };
+    },
+
+  };
+  Object.assign(SCENES, MORE, UK, REDRAWN);
 
   return SCENES;
 })();
@@ -9449,7 +9749,7 @@ const FEST_SCENES = (() => {
 /* Every celebration the card knows: its scene or motif, its short line
    for Home and its full explanation, in the words a child can read. */
 const FEST_TABLE = {
-  "New Year’s Day": {"src":"UK","tier":"festive","scene":"fireworks","bg":"#0A0F2E","eyebrow":"Bank holiday","short":"The first day of the year. Fireworks at midnight, Auld Lang Syne, and resolutions that last until February.","full":[["What is it?","1 January is the first day of the year in the calendar most of the world uses. It has not always been: in England, until 1752, the new year officially began on 25 March. In Scotland, Hogmanay on New Year’s Eve was for centuries a bigger celebration than Christmas."],["What happens","At midnight people count down the last ten seconds, cheer, hug and sing Auld Lang Syne, a Scottish song about old friends, usually without knowing most of the words. London sets off fireworks over the Thames as Big Ben strikes twelve. The next morning is the traditional time for resolutions, promises to yourself about the year ahead, which most people have forgotten by February."]],"art":"Fireworks over a city skyline and a turning wheel, reflected in the river."},
+  "New Year’s Day": {"src":"UK","tier":"festive","scene":"fireworks","bg":"#0A0F2E","eyebrow":"Bank holiday","short":"The first day of the year. Fireworks at midnight, Auld Lang Syne, and resolutions that last until February.","full":[["What is it?","1 January is the first day of the year in the calendar most of the world uses. It has not always been: in England, until 1752, the new year officially began on 25 March. In Scotland, Hogmanay on New Year’s Eve was for centuries a bigger celebration than Christmas."],["What happens","At midnight people count down the last ten seconds, cheer, hug and sing Auld Lang Syne, a Scottish song about old friends, usually without knowing most of the words. London sets off fireworks over the Thames as Big Ben strikes twelve. The next morning is the traditional time for resolutions, promises to yourself about the year ahead, which most people have forgotten by February."]],"art":"The first sunrise of the year over the river, the last fireworks fading and the new year written in sparkler light."},
   "Makar Sankranti / Pongal": {"src":"Hindu","tier":"festive","scene":"sankranti","bg":"#2B3F6E","eyebrow":"Celebrating","short":"The harvest is in and the days start getting longer. Kites fill the sky, and Pongal rice is boiled until it bubbles over for luck.","full":[["What is it?","Makar Sankranti marks the day the sun starts its journey north, so the days begin to get longer. It is also harvest time, the moment to say thank you for the crops. Different parts of India celebrate it in their own way and under their own names."],["What happens","In Gujarat the sky fills with thousands of kites, and people try to cut each other’s strings. In Tamil Nadu it is Pongal, which lasts four days: rice is boiled with milk and sugar in a new pot until it bubbles over, and everyone shouts “Pongalo Pongal!”, because overflowing means plenty for the year ahead. Cows are washed and decorated too."]],"art":"Kites bob on their strings while a pot of Pongal rice bubbles over."},
   "Vasant Panchami": {"src":"Hindu","tier":"festive","scene":"mustard","bg":"#5A4210","eyebrow":"Celebrating","short":"Spring is welcomed in yellow, and Saraswati, goddess of learning and music, is thanked. Some children write their first letters today.","full":[["What is it?","Vasant means spring, and this day welcomes it, even though it comes in January or February. It belongs to Saraswati, the goddess of learning, music and art, who is usually shown dressed in white, sitting on a lotus and playing a stringed instrument called a veena."],["What happens","Yellow is everywhere: yellow clothes, yellow flowers and yellow sweet rice, the colour of the mustard fields that bloom at this time. Books, pens and instruments are placed in front of Saraswati to be blessed, and some little children write their very first letters today. In parts of north India, people fly kites."]],"art":"A field of yellow mustard flowers sways while petals and one kite drift past."},
   "Burns Night": {"src":"UK","tier":"festive","scene":"burns","bg":"#0B1030","eyebrow":"Tonight","short":"Scotland remembers its favourite poet, Robert Burns, with bagpipes, haggis and a poem read to the pudding.","full":[["Who was Robert Burns?","Robert Burns was born in a small cottage in Ayrshire, Scotland, on 25 January 1759. He grew up on a farm and wrote poems and songs in the Scots language about ordinary life: mice, friends, love and the countryside. He became so loved that Scotland calls him its national poet, and Auld Lang Syne, a song he wrote down, is sung all over the world at New Year."],["What happens","People hold a Burns Supper. A piper plays the bagpipes as the haggis is carried in, and someone reads Burns’s poem Address to a Haggis to it, cutting it open with a knife at just the right line. Haggis is a savoury pudding of oats, onion and spices, eaten with neeps and tatties: turnips and potatoes. Then come more poems, songs and speeches, and the night ends with everyone holding hands to sing Auld Lang Syne."]],"art":"A piper plays on a hill against the moon, music rising from his pipes, thistles swaying below."},
@@ -9462,13 +9762,13 @@ const FEST_TABLE = {
   "St David’s Day": {"src":"UK","tier":"festive","scene":"daffodil","bg":"#2E6B3A","eyebrow":"Dydd Gŵyl Dewi","short":"Wales celebrates its patron saint, David, with daffodils, leeks and red dragons everywhere.","full":[["Who was David?","Saint David, Dewi Sant in Welsh, was a monk who lived in Wales about 1,500 years ago. He started churches and monasteries and lived very simply, eating mostly bread, vegetables and water. His most famous words were “Do the little things”: be kind in small ways every day. He died on 1 March, and he became the patron saint of Wales, its special protector."],["What happens","Welsh people wear a daffodil or a leek, the two symbols of Wales. The story goes that Welsh soldiers once wore leeks in their hats so they could tell friend from enemy in a battle. Many children dress in traditional Welsh costume, with a tall black hat, and schools hold an eisteddfod, a festival of singing, poems and dancing. The red dragon flag flies everywhere."]],"art":"Daffodils nod in the wind on green hills, and the red dragon flag of Wales ripples above."},
   "Maha Shivaratri": {"src":"Hindu","tier":"festive","scene":"shiva","bg":"#0B1030","eyebrow":"Celebrating","short":"The great night of Shiva. Many people fast and stay awake all night, singing until sunrise.","full":[["What is it?","Maha Shivaratri means “the great night of Shiva”. Shiva is one of the most important Hindu gods: the destroyer, who clears away the old so that new things can begin. He is shown with a crescent moon in his hair, a snake around his neck and a trident in his hand, living high in the Himalayas."],["What happens","Many people fast all day and stay awake all night, singing and praying. At temples, milk, water and leaves from the bael tree are poured over a stone symbol of Shiva called a lingam. The chant “Om Namah Shivaya” can go on until sunrise."]],"art":"A crescent moon over snowy Himalayan peaks, with a row of lamps that burn all night."},
   "Holika Dahan": {"src":"Hindu","tier":"festive","scene":"bonfire","bg":"#1A0A0C","eyebrow":"Tonight","short":"The bonfire on the night before Holi, remembering a prince who walked out of the flames unharmed.","full":[["The story","Prince Prahlad prayed to the god Vishnu, which made his father, a proud demon king, furious. The king’s sister Holika could not be hurt by fire, so she sat in a bonfire holding Prahlad to get rid of him. Instead Holika burned, and Prahlad walked out without a scratch."],["What happens","On the night before Holi, people build a big bonfire in the street or square and walk around it, throwing in grains, coconuts and popcorn. It stands for good beating harm. Some take a little of the ash home for luck, and then everyone goes to bed ready for the colours in the morning."]],"art":"A bonfire roars and throws sparks into the night."},
-  "Holi": {"src":"Hindu","tier":"festive","scene":"holi","bg":"#1C1830","eyebrow":"Celebrating","w":2,"short":"The festival of colours. Everyone throws coloured powder at everyone else, and by lunchtime nobody is clean.","full":[["The story","Holi marks the end of winter and the start of spring. A favourite story is about the god Krishna, who had blue skin as a boy and worried that Radha, the girl he liked, would think it strange. His mother told him to colour Radha’s face any colour he liked. He did, and a tradition was born."],["What happens","Everyone goes outside to throw coloured powder, called gulal, and squirt coloured water at each other: friends, neighbours, grandparents, even strangers. By lunchtime nobody is clean and nobody minds. It is also a day for making up with people you have argued with, and for eating gujiya, sweet pastries filled with nuts."]],"art":"Handfuls of coloured powder are flung in from the edges and drift, overlap and settle."},
+  "Holi": {"src":"Hindu","tier":"festive","scene":"holi","bg":"#1C1830","eyebrow":"Celebrating","w":2,"short":"The festival of colours. Everyone throws coloured powder at everyone else, and by lunchtime nobody is clean.","full":[["The story","Holi marks the end of winter and the start of spring. A favourite story is about the god Krishna, who had blue skin as a boy and worried that Radha, the girl he liked, would think it strange. His mother told him to colour Radha’s face any colour he liked. He did, and a tradition was born."],["What happens","Everyone goes outside to throw coloured powder, called gulal, and squirt coloured water at each other: friends, neighbours, grandparents, even strangers. By lunchtime nobody is clean and nobody minds. It is also a day for making up with people you have argued with, and for eating gujiya, sweet pastries filled with nuts."]],"art":"Clouds of coloured powder burst and drift over a sandstone courtyard, a pichkari arcs coloured water, and the palash tree is in flower."},
   "Mother’s Day": {"src":"UK","tier":"festive","scene":"mothers","bg":"#6B2D4E","eyebrow":"Mothering Sunday","short":"A day to say thank you to mums, and anyone like a mum to you: cards, flowers and breakfast in bed.","full":[["Where it comes from","Mothering Sunday in Britain is much older than the American Mother’s Day. Hundreds of years ago, on the fourth Sunday of Lent, people went back to their “mother church”, the big church where they were baptised. Young people working away from home as servants were given the day off to go, and on the way they picked wild flowers to give to their mothers."],["What happens","Now it is a day to thank mums, and anyone who cares for you like a mum: grandmas, stepmums, aunts and carers. People give cards and flowers, make breakfast in bed, and do the jobs at home so she can rest. A traditional treat is simnel cake, a fruit cake with marzipan. It moves every year, because it is always three weeks before Easter."]],"art":"A bunch of tulips sways in a vase, and a homemade card opens and closes beside it."},
   "British Science Week": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"Starts today","short":"Ten days of experiments, talks and competitions in schools and museums across the UK.","full":[["","Ten days of science events in schools, museums and towns across the UK, run by the British Science Association, with experiments, talks and competitions. It started in 1994 as National Science Week, and each year has a theme. Anyone can take part, and a lot of the best experiments need nothing more than a kitchen."]]},
   "International Women’s Day": {"src":"Observance","tier":"quiet","motif":"star","eyebrow":"Observance","short":"A day since 1911 for what women have won, from the vote to equal pay laws, and for what is still unfinished.","full":[["","Marked since 1911. A day for what women have won, like the vote, equal pay laws and the right to their own bank account, and for how much is still unfinished. Its colours, purple, green and white, come from the suffragettes, who campaigned for women’s votes in Britain. Women over 30 first voted here in 1918, and women got the same voting rights as men in 1928."]]},
   "St Patrick’s Day": {"src":"UK","tier":"festive","scene":"shamrock","bg":"#0B4027","eyebrow":"Celebrating","short":"Ireland’s patron saint, remembered with shamrocks, parades and a great deal of green.","full":[["Who was Patrick?","Saint Patrick was born in Britain about 1,600 years ago. At sixteen he was captured by pirates and taken to Ireland, where he looked after sheep for six years before escaping home. Later he chose to go back, as a Christian teacher. A famous story says he used the shamrock, a little plant with three leaves on one stem, to explain the Christian idea of one God in three parts."],["What happens","Irish people all over the world celebrate with parades, music and dancing, and everyone wears green, the colour of Ireland. Some pin a real shamrock to their coat, and rivers and buildings are lit up green. The rainbow and the pot of gold come from old Irish stories about leprechauns, little shoemakers who are said to hide their gold at the end of the rainbow."]],"art":"Shamrocks tumble down, and a rainbow ends in a pot of gold whose coins glint and jump."},
-  "Hindi New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in the Hindu calendar, which follows the moon. Homes are cleaned and doorways hung with mango leaves.","full":[["What is it?","The Hindu calendar follows the moon, so its new year does not fall on 1 January. In much of north India the year starts in spring, on the first day of the month of Chaitra, which is also the start of Chaitra Navratri, nine more nights for the goddess Durga."],["What happens","Homes are swept and washed from top to bottom, doorways are hung with mango leaves and marigolds, and patterns are drawn at the entrance to welcome good luck. Families visit the temple, wear new clothes and share sweets, and many look up the new year’s almanac, called a panchang, to see what the year might bring."]],"art":"A string of mango leaves and marigolds sways over the door while a kolam draws itself."},
-  "Ugadi / Gudi Padwa": {"src":"Hindu","tier":"festive","scene":"newyear","v":"gudi","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in several Indian states. A dish is eaten that is sweet, sour, salty and bitter at once, like the year ahead.","full":[["What is it?","This is new year in several states at once: Ugadi in Andhra Pradesh, Telangana and Karnataka, and Gudi Padwa in Maharashtra. The name Ugadi comes from words meaning “the start of a new age”."],["What happens","In Maharashtra families raise a gudi outside the window: a tall pole topped with bright silk, a garland and an upside-down pot, like a flag of victory. In the south people eat ugadi pachadi, a dish that is sweet, sour, salty, bitter, spicy and tangy all at once, because the year ahead will hold all of those, and it is best to taste them together."]],"art":"A gudi, a pole flying bright silk under an upturned pot, stands beside the door."},
+  "Hindi New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in the Hindu calendar, which follows the moon. Homes are cleaned and doorways hung with mango leaves.","full":[["What is it?","The Hindu calendar follows the moon, so its new year does not fall on 1 January. In much of north India the year starts in spring, on the first day of the month of Chaitra, which is also the start of Chaitra Navratri, nine more nights for the goddess Durga."],["What happens","Homes are swept and washed from top to bottom, doorways are hung with mango leaves and marigolds, and patterns are drawn at the entrance to welcome good luck. Families visit the temple, wear new clothes and share sweets, and many look up the new year’s almanac, called a panchang, to see what the year might bring."]],"art":"A carved doorway hung with mango leaves and marigolds, a brass lamp lit beside it, and a kolam drawing itself on the floor."},
+  "Ugadi / Gudi Padwa": {"src":"Hindu","tier":"festive","scene":"newyear","v":"gudi","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in several Indian states. A dish is eaten that is sweet, sour, salty and bitter at once, like the year ahead.","full":[["What is it?","This is new year in several states at once: Ugadi in Andhra Pradesh, Telangana and Karnataka, and Gudi Padwa in Maharashtra. The name Ugadi comes from words meaning “the start of a new age”."],["What happens","In Maharashtra families raise a gudi outside the window: a tall pole topped with bright silk, a garland and an upside-down pot, like a flag of victory. In the south people eat ugadi pachadi, a dish that is sweet, sour, salty, bitter, spicy and tangy all at once, because the year ahead will hold all of those, and it is best to taste them together."]],"art":"A gudi, bright silk under an upturned pot with neem and sugar, stands beside the decorated door."},
   "International Day for the Elimination of Racial Discrimination": {"src":"Observance","tier":"quiet","motif":"globe","eyebrow":"United Nations day","short":"Remembers 21 March 1960, when police shot at a peaceful protest against apartheid in Sharpeville, South Africa.","full":[["","On 21 March 1960, in Sharpeville, South Africa, police opened fire on a peaceful protest against apartheid, the laws that kept Black and white people apart and unequal. Sixty-nine people were killed. The United Nations chose the date so that it would not be forgotten. In South Africa it is now a public holiday, Human Rights Day."]]},
   "Ramanavami": {"src":"Hindu","tier":"festive","scene":"rama","bg":"#6A2A12","eyebrow":"Celebrating","short":"The birthday of Rama, hero of the Ramayana, celebrated at noon, the hour he was born.","full":[["Who is Rama?","Ramanavami is the birthday of Rama, hero of the Ramayana, one of the oldest and longest stories in the world. Rama is a prince famous for always doing the right thing, even when it cost him his throne, and for rescuing his wife Sita from the demon king Ravana."],["What happens","Rama is said to have been born at midday, so the biggest prayers happen at noon. His story is read aloud in temples, sometimes over the nine days before, and statues of baby Rama are placed in little cradles and rocked. People share a cooling drink called panakam, made from jaggery, pepper and cardamom."]],"art":"The midday sun turns, a bow stands ready and an arrow flies across."},
   "Transgender Day of Visibility": {"src":"Observance","tier":"festive","scene":"pride","v":"trans","bg":"#1E2A3A","eyebrow":"Observance","short":"A day for trans people living their lives openly, and for celebrating them rather than only remembering.","full":[["What is it?","A day for trans people living their lives openly. It was started in 2009 by Rachel Crandall, a trans woman in the United States, who noticed that the only well-known day for trans people was about those who had died."],["The flag","The trans flag was designed by Monica Helms in 1999: light blue for boys, pink for girls, and white in the middle for people who are in between or neither. She made it read the same whichever way up it is flown, so it is never upside down."]],"art":"The trans flag waves: light blue, pink and white."},
@@ -9479,8 +9779,8 @@ const FEST_TABLE = {
   "Easter Monday": {"src":"UK","tier":"quiet","motif":"egg","eyebrow":"Bank holiday","short":"The day after Easter Sunday, which celebrates Jesus coming back to life. Eggs stand for new life.","full":[["","Easter Sunday is the most important day of the Christian year, celebrating the belief that Jesus came back to life three days after he died. Eggs, a sign of new life, became part of it, which is why there are chocolate eggs and egg hunts. Easter Monday is the day after, with traditions like rolling eggs down hills. Easter moves every year because it follows the moon: it is the first Sunday after the first full moon after 21 March."]]},
   "International Day of Human Space Flight": {"src":"Observance","tier":"quiet","motif":"rocket","eyebrow":"United Nations day","short":"On this day in 1961 Yuri Gagarin became the first person to travel into space.","full":[["","On 12 April 1961 Yuri Gagarin, a Soviet pilot, became the first person in space. He went once around the Earth in a spacecraft called Vostok 1, in 108 minutes, then parachuted into a field in Russia, where a farmer and her granddaughter were the first people to meet him. Twenty years later to the day, in 1981, the first space shuttle launched."]]},
   "Vaisakhi / Vishu": {"src":"Hindu","tier":"festive","scene":"vaisakhi","bg":"#4A2E08","eyebrow":"Celebrating","short":"The spring harvest in Punjab and a big day for Sikhs, who mark the founding of the Khalsa in 1699.","full":[["What is it?","In Punjab this is the spring harvest, when the wheat is golden and ready to cut. For Sikhs it is one of the most important days of the year: in 1699 Guru Gobind Singh founded the Khalsa, the community of baptised Sikhs, on this day, after asking for five volunteers who became known as the Panj Pyare, the five beloved ones."],["What happens","Sikhs go to the gurdwara, and there are processions called Nagar Kirtan with singing and music, including big ones in Southall and Birmingham. In Punjab people dance bhangra to the dhol drum. In Kerala it is Vishu, the new year, when children are woken with their eyes covered and shown a tray of lucky things first: rice, fruit, gold, a mirror and yellow flowers."]],"art":"Golden wheat sways under the sun while a dhol drum beats."},
-  "Tamil New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"Puthandu, the Tamil new year. Kolam patterns are drawn at the door before sunrise.","full":[["What is it?","Puthandu is the Tamil new year, on the first day of the Tamil month of Chithirai, usually 14 April. The sun moves into Aries in the zodiac on this day, which is why several other new years land around now too."],["What happens","Before sunrise, women draw kolam at the doorstep: patterns of white rice-flour lines looping around rows of dots, a little invitation to good luck. A tray of fruit, flowers, gold and a mirror is the first thing many families look at. Lunch includes mango pachadi, sweet, sour and bitter together, and the new year’s almanac is read aloud."]],"art":"A kolam draws itself loop by loop around its dots under a string of mango leaves."},
-  "Bengali New Year / Bihu": {"src":"Hindu","tier":"festive","scene":"newyear","v":"bihu","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in Bengal and Assam. New account books, parades with giant masks, and Bihu dancing.","full":[["What is it?","Pohela Boishakh is new year in Bengal, and Bohag Bihu is new year in Assam, both in mid-April. In Bangladesh the new year is a national holiday celebrated by everyone, whatever their religion."],["What happens","In Bengal shopkeepers close their old account books and open fresh red ones called haal khata, and customers are offered sweets. In Dhaka there is a huge, colourful parade with giant masks and puppets. In Assam, Bihu lasts several days: young people dance the fast Bihu dance to drums and buffalo-horn pipes, and cattle are washed and garlanded on the first day."]],"art":"Mango leaves and marigolds sway, a kolam draws itself and a drum beats."},
+  "Tamil New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"Puthandu, the Tamil new year. Kolam patterns are drawn at the door before sunrise.","full":[["What is it?","Puthandu is the Tamil new year, on the first day of the Tamil month of Chithirai, usually 14 April. The sun moves into Aries in the zodiac on this day, which is why several other new years land around now too."],["What happens","Before sunrise, women draw kolam at the doorstep: patterns of white rice-flour lines looping around rows of dots, a little invitation to good luck. A tray of fruit, flowers, gold and a mirror is the first thing many families look at. Lunch includes mango pachadi, sweet, sour and bitter together, and the new year’s almanac is read aloud."]],"art":"A kolam draws itself loop by loop on the doorstep, then fills with colour, under a string of mango leaves."},
+  "Bengali New Year / Bihu": {"src":"Hindu","tier":"festive","scene":"newyear","v":"bihu","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in Bengal and Assam. New account books, parades with giant masks, and Bihu dancing.","full":[["What is it?","Pohela Boishakh is new year in Bengal, and Bohag Bihu is new year in Assam, both in mid-April. In Bangladesh the new year is a national holiday celebrated by everyone, whatever their religion."],["What happens","In Bengal shopkeepers close their old account books and open fresh red ones called haal khata, and customers are offered sweets. In Dhaka there is a huge, colourful parade with giant masks and puppets. In Assam, Bihu lasts several days: young people dance the fast Bihu dance to drums and buffalo-horn pipes, and cattle are washed and garlanded on the first day."]],"art":"A doorway hung with a gamosa, mango leaves and marigolds, a kolam on the floor, and a dhol that beats."},
   "St George’s Day": {"src":"UK","tier":"festive","scene":"stgeorge","bg":"#3C7BD0","eyebrow":"Celebrating","short":"England’s patron saint, famous for a story about a dragon. Look out for the red cross flag.","full":[["Who was George?","Saint George was a soldier in the Roman army about 1,700 years ago, in what is now Turkey. He was killed for refusing to give up his Christian faith, and people admired his courage. He never came to England, but English soldiers took him as their protector, and about 700 years ago he became England’s patron saint. His red cross on white is England’s flag."],["The dragon","The most famous story says a dragon was terrifying a town until George rode up, fought it and rescued a princess. It is a legend, not history, but it is why dragons appear on St George’s Day. People fly the flag, wear a red rose, England’s flower, and some towns hold parades. It is also said to be the birthday of William Shakespeare."]],"art":"The flag of St George flies over a castle, red roses bloom, and a friendly dragon flies past."},
   "Akshaya Tritiya": {"src":"Hindu","tier":"festive","scene":"gold","bg":"#3A2205","eyebrow":"Celebrating","short":"The luckiest day of the year, when whatever you start is said to keep growing. Many people buy a little gold.","full":[["What is it?","Akshaya means “never-ending”, and this is thought to be the luckiest day of the whole year: whatever you begin today is said to keep growing. Stories say it is the day the river Ganga came down to Earth, and the day the sage Vyasa began the Mahabharata, with Ganesha writing it down for him."],["What happens","Lots of people buy gold today, even a tiny coin, so jewellery shops are packed. It is a popular day to start a business, move house, get married or begin learning something. Many also give food, water or clothes to people who need them, since a kindness done today is said to keep giving too."]],"art":"Gold coins spin as they fall, catching the light."},
   "Early May bank holiday": {"src":"UK","tier":"quiet","motif":"flower","eyebrow":"Bank holiday","short":"A day off that grew out of May Day, with maypoles, May Queens and Morris dancers.","full":[["","The first Monday in May is a bank holiday that grew out of May Day, an ancient spring festival. Villages would crown a May Queen and dance round a maypole, weaving its coloured ribbons together, while Morris dancers with bells on their legs waved hankies and clashed sticks. 1 May is also International Workers’ Day in many countries. The UK holiday was first added in 1978."]]},
@@ -9505,7 +9805,7 @@ const FEST_TABLE = {
   "Vishwakarma Puja": {"src":"Hindu","tier":"festive","scene":"tools","bg":"#1D1F2A","eyebrow":"Celebrating","short":"The day tools get thanked. Machines are cleaned and garlanded for Vishwakarma, engineer of the gods.","full":[["Who is Vishwakarma?","Vishwakarma is the architect and engineer of the gods. In the stories he built their palaces, their flying chariots and their weapons, and even whole cities, including the golden city of Lanka and Krishna’s city of Dwarka."],["What happens","This is the day tools get a thank you. In factories, workshops and garages across eastern India, workers clean their machines, decorate them with marigold garlands and stop work to pray. Cars, rickshaws and even computers get a garland. In Bengal and Bihar people fly kites, and the sky can be full of them."]],"art":"Gears turn under marigold garlands while kites fly overhead."},
   "Black History Month": {"src":"Observance","tier":"quiet","motif":"book","eyebrow":"This month","short":"A month for Black British history, held every October in the UK since 1987.","full":[["","Held every October in the UK since 1987. A month to learn about the Black people who helped shape Britain. Their stories are often missing from history lessons, where Black history is usually told as the American story. It is a chance to learn about people like Mary Seacole, a Jamaican nurse who cared for soldiers in the Crimean War, and Walter Tull, one of Britain’s first Black professional footballers and its first Black army officer to lead troops in battle."]]},
   "Mahalaya Amavasya": {"src":"Hindu","tier":"festive","scene":"dawn","bg":"#141A3A","eyebrow":"Today","short":"Ancestors are remembered, and before dawn Bengal listens to the radio programme that says Durga is on her way.","full":[["What is it?","Mahalaya is the new moon that ends a two-week time called Pitru Paksha, when Hindus remember family members who have died. On the river banks people offer water, sesame seeds and rice in their memory. It also marks the start of the goddess season: Durga is said to set off on her journey home."],["What happens","In Bengal, before dawn, millions of people switch on the radio to hear Mahishasura Mardini, a programme of songs and Sanskrit verses first broadcast in the 1930s and repeated every year since, at four in the morning. Many say Durga Puja has not really begun until they have heard it. Artists paint the eyes on the clay Durga statues today."]],"art":"The sky lightens towards dawn over the river while a radio plays."},
-  "Navaratri": {"src":"Hindu","tier":"festive","scene":"navaratri","bg":"#1E1430","eyebrow":"Celebrating","pal":["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#8A8A8A","#F28A2E","#3FB6C9","#E84F9A"],"w":2,"short":"Nine nights of dancing in wide circles for the goddess Durga, with a different colour each night.","full":[["What is it?","Navaratri means “nine nights”. It honours the goddess Durga, and many people say each night belongs to a different one of her nine forms, some gentle and some fierce. The nine nights remember the nine days she fought the demon Mahishasura, and the tenth day, Dusshera, celebrates her win."],["What happens","In Gujarat, and in halls all over Britain, people dance garba every night: big circles of dancers clapping and spinning around a lamp in the middle. Later comes dandiya, where partners clack painted wooden sticks together in time with the drums. Many people wear a different colour each night, and some fast, eating only simple food until the festival ends."]],"art":"Two rings of dancers circle the lamp in opposite directions; each pip is a night’s colour."},
+  "Navaratri": {"src":"Hindu","tier":"festive","scene":"navaratri","bg":"#1E1430","eyebrow":"Celebrating","pal":["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#8A8A8A","#F28A2E","#3FB6C9","#E84F9A"],"w":2,"short":"Nine nights of dancing in wide circles for the goddess Durga, with a different colour each night.","full":[["What is it?","Navaratri means “nine nights”. It honours the goddess Durga, and many people say each night belongs to a different one of her nine forms, some gentle and some fierce. The nine nights remember the nine days she fought the demon Mahishasura, and the tenth day, Dusshera, celebrates her win."],["What happens","In Gujarat, and in halls all over Britain, people dance garba every night: big circles of dancers clapping and spinning around a lamp in the middle. Later comes dandiya, where partners clack painted wooden sticks together in time with the drums. Many people wear a different colour each night, and some fast, eating only simple food until the festival ends."]],"art":"Dancers in swirling skirts circle the garbo lamp in two rings, dandiya sticks clicking, under a canopy of lights."},
   "Ada Lovelace Day": {"src":"Observance","tier":"quiet","motif":"gear","eyebrow":"Observance","short":"Ada Lovelace wrote the first computer program in the 1840s, a century before there was a computer to run it.","full":[["","Ada Lovelace worked out, in the 1840s, that a machine could follow a written set of steps: the first computer program, written a century before there was a computer to run it. She was the daughter of the poet Lord Byron and worked with Charles Babbage on his Analytical Engine, a mechanical computer that was never finished. The day, the second Tuesday of October, celebrates women in science, technology, engineering and maths."]]},
   "Durga Puja": {"src":"Hindu","tier":"festive","scene":"durga","bg":"#2A0610","eyebrow":"Celebrating","pal":["#E8343A","#F7F2E8","#E8343A","#F7F2E8","#F2B33A"],"w":3,"short":"Bengal celebrates the warrior goddess Durga, who beat a demon no god could defeat, with spectacular temporary temples called pandals.","full":[["Who is Durga?","Durga is a Hindu goddess: a warrior and a mother who protects the world from harm. In the old story, a buffalo demon called Mahishasura was promised that no man or god could ever beat him, so he took over the heavens. The gods joined all their powers together, and out of that light came Durga. Each god gave her a weapon, which is why she has ten arms to hold them all, and the mountain king gave her a lion to ride. She fought the demon for nine days and won on the tenth."],["What happens","Durga Puja is the biggest festival in Bengal, in eastern India, and it is also a homecoming. Every autumn Durga is said to visit her parents’ home for a few days, bringing her four children: Ganesha, Lakshmi, Saraswati and Kartik. Whole neighbourhoods build huge temporary temples called pandals, some shaped like palaces or ships, each with a clay Durga inside, and people go pandal-hopping late into the night. On the last day the statues are carried to the river and let go into the water, and everyone calls out “Asche bochor abar hobe”: it will happen again next year."]],"art":"Durga with ten arms in front of her halo, her lion at her feet. Shown full size at the top of this page."},
   "Maha Navami": {"src":"Hindu","tier":"festive","scene":"navaratri","bg":"#1E1430","eyebrow":"Last night","pal":["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#8A8A8A","#F28A2E","#3FB6C9","#E84F9A"],"short":"The ninth and biggest night of Navaratri, the last day of Durga’s battle.","full":[["What is it?","Maha Navami is the ninth and last night of Navaratri, and the biggest. In the story it is the final day of Durga’s battle with the demon Mahishasura, the day before her victory. In Bengal it falls in the middle of Durga Puja."],["What happens","The garba circles are fullest and last longest tonight. In many homes in the south, books, musical instruments and tools are placed before the goddess and left untouched for the day, called Ayudha Puja. In the north, families invite nine young girls into their home, wash their feet and feed them, honouring them as forms of the goddess."]],"art":"The garba scene again, with all nine pips lit."},
@@ -9515,24 +9815,24 @@ const FEST_TABLE = {
   "National Engineering Day": {"src":"Observance","tier":"quiet","motif":"gear","eyebrow":"Observance","short":"A day to show what engineers actually do, from bridges and wind turbines to games consoles.","full":[["","Run by the Royal Academy of Engineering since 2021, a day to show what engineers actually do: design the bridges, phones, wind turbines, games consoles and medical machines people use every day. Engineers solve problems, and a lot of them started out by taking things apart to see how they worked."]]},
   "Halloween": {"src":"UK","tier":"festive","scene":"halloween","bg":"#2A0B3A","eyebrow":"Tonight","w":1.5,"short":"Pumpkins, costumes and trick or treat: the spooky night before All Saints’ Day.","full":[["Where it comes from","Halloween comes from an old Celtic festival called Samhain, at the end of the harvest when winter began. People believed that on that night the world of the living and the world of spirits came close together, so they lit bonfires and wore disguises. Later the church made 1 November All Saints’ Day, or All Hallows, and the night before became All Hallows’ Eve: Halloween."],["What happens","Children dress up as witches, ghosts and monsters and go trick or treating, knocking on doors for sweets. In Scotland and Ireland this was called guising, and you were meant to tell a joke or sing a song for your treat. Lanterns were once carved from turnips. In America they used pumpkins, which are much easier to carve, and now we do too."]],"art":"Bats cross a big orange moon, a ghost drifts in and out, and two jack-o’-lanterns flicker."},
   "Bonfire Night": {"src":"UK","tier":"festive","scene":"guyfawkes","bg":"#141030","eyebrow":"Tonight","w":1.5,"short":"Remember, remember the fifth of November: bonfires and fireworks for a plot that failed.","full":[["The story","In 1605 a group of men planned to blow up the Houses of Parliament in London, with King James I inside, because they were angry at how Catholics were being treated. They hid 36 barrels of gunpowder in a cellar under the building. Late on 4 November, Guy Fawkes was caught guarding the gunpowder, and the plot failed. It is called the Gunpowder Plot."],["What happens","When the people of London heard the king was safe, they lit bonfires to celebrate, and we still do, over four hundred years later. Families go to bonfires and firework displays, wrap up warm, and write their names in the air with sparklers. Some bonfires still have a guy on top, a stuffed figure of Guy Fawkes. Fireworks are loud, so remember to look after pets."]],"art":"A bonfire crackles, a sparkler writes loops in the dark, and fireworks burst over Parliament."},
-  "Dhan Teras": {"src":"Hindu","tier":"festive","scene":"diwali","v":"coins","bg":"#231028","eyebrow":"Diwali begins","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"short":"The first day of Diwali, and the day for buying something metal, which is meant to bring luck for the year.","full":[["What is it?","Dhan Teras is the first day of Diwali. Dhan means wealth, and teras the thirteenth day of the moon’s cycle. It honours Dhanvantari, the doctor of the gods, who rose out of the ocean holding a pot of the nectar of life, and Lakshmi, the goddess of good fortune."],["What happens","It is the day for buying something metal, gold, silver or even a new steel pot or spoon, which is meant to bring luck for the year, so the markets are packed. Houses are cleaned and the first lamps of Diwali are lit. One lamp is set facing south, the direction of Yama, the god of death, asking him to keep the family safe."]],"art":"The first lamp of Diwali is lit while gold coins fall."},
-  "Diwali": {"src":"Hindu","tier":"festive","scene":"diwali","bg":"#231028","eyebrow":"Celebrating","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"w":3,"short":"The festival of lights. Rows of little clay lamps, rangoli at the door, sweets for everyone and fireworks.","full":[["What is it?","Diwali is the festival of lights, celebrated by over a billion people: Hindus, Sikhs and Jains. For many Hindus it remembers Prince Rama coming home after fourteen years away, having rescued his wife Sita from the demon king Ravana. It was a night with no moon, so people lit rows of lamps to show him the way. Sikhs mark Bandi Chhor Divas at the same time, remembering Guru Hargobind being freed from prison."],["What happens","Houses are cleaned from top to bottom, and patterns called rangoli are made at the front door with coloured powder, rice or petals. After dark, little clay lamps called diyas go on every step and windowsill. Families visit each other with boxes of sweets, welcome Lakshmi, the goddess of good fortune, into the home, and finish with fireworks."]],"art":"A rangoli draws itself, one more lamp is lit each day, and rockets burst overhead."},
+  "Dhan Teras": {"src":"Hindu","tier":"festive","scene":"diwali","v":"coins","bg":"#231028","eyebrow":"Diwali begins","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"short":"The first day of Diwali, and the day for buying something metal, which is meant to bring luck for the year.","full":[["What is it?","Dhan Teras is the first day of Diwali. Dhan means wealth, and teras the thirteenth day of the moon’s cycle. It honours Dhanvantari, the doctor of the gods, who rose out of the ocean holding a pot of the nectar of life, and Lakshmi, the goddess of good fortune."],["What happens","It is the day for buying something metal, gold, silver or even a new steel pot or spoon, which is meant to bring luck for the year, so the markets are packed. Houses are cleaned and the first lamps of Diwali are lit. One lamp is set facing south, the direction of Yama, the god of death, asking him to keep the family safe."]],"art":"The first diya of Diwali is lit outside the house of lights while gold coins fall."},
+  "Diwali": {"src":"Hindu","tier":"festive","scene":"diwali","bg":"#231028","eyebrow":"Celebrating","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"w":3,"short":"The festival of lights. Rows of little clay lamps, rangoli at the door, sweets for everyone and fireworks.","full":[["What is it?","Diwali is the festival of lights, celebrated by over a billion people: Hindus, Sikhs and Jains. For many Hindus it remembers Prince Rama coming home after fourteen years away, having rescued his wife Sita from the demon king Ravana. It was a night with no moon, so people lit rows of lamps to show him the way. Sikhs mark Bandi Chhor Divas at the same time, remembering Guru Hargobind being freed from prison."],["What happens","Houses are cleaned from top to bottom, and patterns called rangoli are made at the front door with coloured powder, rice or petals. After dark, little clay lamps called diyas go on every step and windowsill. Families visit each other with boxes of sweets, welcome Lakshmi, the goddess of good fortune, into the home, and finish with fireworks."]],"art":"A rangoli draws itself in coloured powder before a house hung with lights and star lanterns, a row of diyas lit, and rockets overhead."},
   "Remembrance Sunday": {"src":"UK","tier":"festive","scene":"poppies","bg":"#2A2830","eyebrow":"Remembering","short":"The country remembers everyone who has died in wars, with poppies and two minutes’ silence.","full":[["What is it?","The First World War ended at 11 o’clock on 11 November 1918: the eleventh hour of the eleventh day of the eleventh month. Millions of people had died. Every year since, Britain has stopped to remember them, and everyone who has died in wars since. Remembrance Sunday is the second Sunday in November, the Sunday nearest that day."],["Why poppies?","On the battlefields of Flanders, in Belgium, red poppies grew in the churned-up earth. A Canadian doctor, John McCrae, wrote a poem about them called In Flanders Fields. People wear paper poppies to show they remember, and the money helps people who have served and their families. At 11 o’clock everyone keeps two minutes’ silence, and the King lays a wreath at the Cenotaph in London."]],"art":"Red poppies sway quietly in a field at dawn, and a petal drifts down now and then."},
   "Armistice Day": {"src":"UK","tier":"festive","scene":"poppies","bg":"#2A2830","eyebrow":"Remembering","short":"The day the First World War ended, in 1918. At 11 o’clock the country keeps two minutes’ silence.","full":[["What is it?","An armistice is an agreement to stop fighting. At 11 o’clock on 11 November 1918, the eleventh hour of the eleventh day of the eleventh month, the guns of the First World War fell silent. Today many people, wherever they are, stop at 11 o’clock for two minutes of silence to remember everyone who has died in wars."],["The poppy","Red poppies grew on the battlefields of Flanders, in Belgium, and became the sign of remembering. People wear them in the weeks before, and the money from them helps people who have served in the armed forces, and their families."]],"art":"Red poppies sway quietly in a field at dawn, and a petal drifts down now and then."},
   "World Science Day for Peace and Development": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"United Nations day","short":"A UNESCO day for science that is shared openly and used to make life better.","full":[["","A day started by UNESCO, the United Nations body for education, science and culture, in 2001. It is for science done in the open and shared across borders, and used for things like clean water, vaccines and warning of earthquakes, rather than for winning."]]},
-  "Bhai Dooj": {"src":"Hindu","tier":"festive","scene":"diwali","v":"calm","bg":"#231028","eyebrow":"Last day of Diwali","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"short":"The last day of Diwali, when sisters mark their brothers’ foreheads and feed them, and brothers bring gifts.","full":[["The story","Bhai Dooj comes two days after Diwali and celebrates brothers and sisters, a little like Raksha Bandhan. In the story Yama, the god of death, visited his sister Yamuna on this day. She welcomed him, marked his forehead and fed him so well that he promised any brother who visits his sister today will be blessed with a long life."],["What happens","Sisters invite their brothers home, put a tilak, a mark of red powder and rice, on their foreheads, say a small prayer with a lamp and feed them their favourite food. Brothers bring presents. In Bengal it is called Bhai Phonta, and in Nepal Bhai Tika, where the tika is made in seven colours."]],"art":"Every lamp lit, the rangoli finished, and a quieter sky."},
+  "Bhai Dooj": {"src":"Hindu","tier":"festive","scene":"diwali","v":"calm","bg":"#231028","eyebrow":"Last day of Diwali","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"short":"The last day of Diwali, when sisters mark their brothers’ foreheads and feed them, and brothers bring gifts.","full":[["The story","Bhai Dooj comes two days after Diwali and celebrates brothers and sisters, a little like Raksha Bandhan. In the story Yama, the god of death, visited his sister Yamuna on this day. She welcomed him, marked his forehead and fed him so well that he promised any brother who visits his sister today will be blessed with a long life."],["What happens","Sisters invite their brothers home, put a tilak, a mark of red powder and rice, on their foreheads, say a small prayer with a lamp and feed them their favourite food. Brothers bring presents. In Bengal it is called Bhai Phonta, and in Nepal Bhai Tika, where the tika is made in seven colours."]],"art":"Every diya lit, the rangoli finished, and a quieter sky."},
   "Chhath Puja": {"src":"Hindu","tier":"festive","scene":"chhath","bg":"#2A0F2E","eyebrow":"Celebrating","short":"Families stand in rivers at sunset and again at sunrise to thank the sun.","full":[["What is it?","Chhath is a festival for Surya, the sun god, mostly in Bihar, Jharkhand and eastern Uttar Pradesh, and among Bihari families around the world. It thanks the sun for life on Earth and asks for health for the family. It lasts four days."],["What happens","People fast for about 36 hours, without even water. At sunset on the third day, families walk to a river or pond, stand waist-deep in the water and offer the setting sun fruit and sweets in bamboo baskets. They come back before dawn to do the same for the rising sun. It is one of the few festivals that thanks the setting sun first."]],"art":"The sun sets into the river, where families stand in the water holding up baskets."},
   "Transgender Day of Remembrance": {"src":"Observance","tier":"quiet","motif":"candle","solemn":true,"eyebrow":"Remembrance","short":"Names of trans people killed in the past year are read aloud and candles are lit.","full":[["","Every year on 20 November, people gather to remember trans people around the world who were killed in the past year because of who they were. Their names are read out and candles are lit. It started in 1999, a year after a woman called Rita Hester was killed in Boston, and is now held in towns and cities all over the world."]]},
   "Kartik Poornima": {"src":"Hindu","tier":"festive","scene":"riverlamps","bg":"#08102A","eyebrow":"Tonight","short":"Thousands of tiny lamps float down the river at Varanasi, so the water looks full of stars.","full":[["What is it?","Kartik Poornima is the full moon of the month of Kartik, about two weeks after Diwali. It is said to be the day Shiva defeated the demon Tripurasura, and the day the gods themselves come down to bathe in the river Ganga. Sikhs celebrate Guru Nanak’s birthday on this full moon too."],["What happens","In Varanasi it is Dev Deepawali, the Diwali of the gods: lamps are lit all along the stone steps leading down to the river, and thousands more float on it, so the water looks full of stars. People bathe in the river at dawn, and in Odisha families float little boats to remember the sailors among their ancestors."]],"art":"Lamps float down the river past steps lined with flames."},
   "International Day for the Elimination of Violence against Women": {"src":"Observance","tier":"quiet","motif":"ribbonorange","eyebrow":"United Nations day","short":"A United Nations day, and the start of sixteen days of action against violence towards women and girls.","full":[["","A United Nations day for ending violence against women and girls, which around one in three women around the world face at some point in their lives. The date remembers the Mirabal sisters, killed in 1960 for standing up to a dictator in the Dominican Republic. It starts sixteen days of action that end on Human Rights Day, 10 December. Its colour is orange."]]},
   "St Andrew’s Day": {"src":"UK","tier":"festive","scene":"saltire","bg":"#1D3366","eyebrow":"Latha Naomh Anndrais","short":"Scotland’s patron saint, whose X-shaped cross is the blue and white flag of Scotland.","full":[["Who was Andrew?","Saint Andrew was a fisherman from Galilee and one of the twelve disciples, the closest friends of Jesus; his brother was Saint Peter. The story says he was put to death on an X-shaped cross, because he felt he did not deserve to die on the same shape of cross as Jesus. That X, white on a blue sky, is the saltire, Scotland’s flag."],["Why Scotland?","A legend says that more than a thousand years ago, before a battle, a Scottish king saw a white X of clouds across the blue sky and took it as a sign that Andrew was on his side. The Scots won, and Andrew became Scotland’s patron saint. On 30 November people celebrate with ceilidh dancing, music and Scottish food, and in Scotland it is a bank holiday."]],"art":"The saltire flies above a loch, mist drifts across the mountains, and an eagle circles high above."},
-  "Advent": {"src":"Advent","tier":"festive","scene":"advent","bg":"#0F241B","eyebrow":"Counting down","w":1.5,"short":"The countdown to Christmas: one door a day from 1 December, and the last one on Christmas Eve.","full":[["What is it?","Advent means “coming”. It is the time before Christmas when Christians get ready to celebrate the birth of Jesus. Advent calendars began in Germany in the 1800s, when families chalked a line on the door for every day left until Christmas Eve. Calendars with little doors to open came about a hundred years ago."],["What happens","Every morning from 1 December you open one door, and the last one, number 24, is Christmas Eve. Some homes burn an Advent candle down one mark a day, and many churches light one more candle on an Advent wreath each Sunday, with one in the middle for Christmas Day."]],"art":"Today’s door swings open, snow falls and the Advent candle burns down one mark a day."},
+  "Advent": {"src":"Advent","tier":"festive","scene":"advent","bg":"#0F241B","eyebrow":"Counting down","w":1.5,"short":"The countdown to Christmas: one door a day from 1 December, and the last one on Christmas Eve.","full":[["What is it?","Advent means “coming”. It is the time before Christmas when Christians get ready to celebrate the birth of Jesus. Advent calendars began in Germany in the 1800s, when families chalked a line on the door for every day left until Christmas Eve. Calendars with little doors to open came about a hundred years ago."],["What happens","Every morning from 1 December you open one door, and the last one, number 24, is Christmas Eve. Some homes burn an Advent candle down one mark a day, and many churches light one more candle on an Advent wreath each Sunday, with one in the middle for Christmas Day."]],"art":"A calendar of 24 doors: today’s swings open on its picture, snow falls, and the Advent candle burns down to today’s number."},
   "World AIDS Day": {"src":"Observance","tier":"quiet","motif":"ribbon","solemn":true,"eyebrow":"Observance","short":"Support for people living with HIV, and remembrance of the many who died. Marked with a red ribbon.","full":[["","HIV is a virus that attacks the body’s defences. In the 1980s and 90s it killed millions of people, partly because many governments were slow to act and people living with it were treated badly. Today medicine means people with HIV can live long, healthy lives and cannot pass it on. The red ribbon, worn since 1991, shows support for people living with HIV and remembers those who died."]]},
   "Dhanu Sankranti": {"src":"Hindu","tier":"festive","scene":"dhanu","bg":"#0A0F26","eyebrow":"Today","short":"The sun moves into Sagittarius, the archer, starting a month thought especially good for prayer.","full":[["What is it?","Sankranti is the day the sun moves into a new sign of the zodiac, which happens twelve times a year. Dhanu Sankranti is when it moves into Dhanu, the archer, which is Sagittarius. It starts a month called Dhanurmasa, thought especially good for prayer."],["What happens","In Odisha the god Jagannath is offered special sweet rice cakes. Around this time the town of Bargarh puts on Dhanu Jatra, said to be the world’s biggest open-air theatre: for eleven days the whole town becomes the set for a play about Krishna and his wicked uncle, King Kansa. In Tamil Nadu, women draw extra-large kolams every morning of this month."]],"art":"The sun drifts into the stars of Sagittarius, the archer, as they join up."},
   "Geeta Jayanti": {"src":"Hindu","tier":"festive","scene":"gita","bg":"#2A1206","eyebrow":"Today","short":"Marks the day the Bhagavad Gita was spoken: a conversation about doing the right thing when it is hard.","full":[["What is it?","The Bhagavad Gita, “the song of God”, is a conversation in the middle of the Mahabharata. Just before a great battle, the warrior Arjuna looks across the field, sees his cousins, teachers and friends on the other side, and puts down his bow. His charioteer, the god Krishna, talks to him about duty, courage and how to do the right thing when it is hard."],["What happens","Geeta Jayanti marks the day Krishna is said to have spoken it. People read it aloud, sometimes all 700 verses at once, and in Kurukshetra, the town said to stand on the old battlefield, there is a big festival with lamps on the lake. It is one of the most read books in the world, and its ideas are still argued about today."]],"art":"A book’s pages turn and glow in front of a slowly turning chariot wheel."},
   "Christmas Eve": {"src":"UK","tier":"festive","scene":"christmaseve","bg":"#14224A","eyebrow":"Tonight","w":2,"short":"The night before Christmas: stockings up, a mince pie for Santa and a carrot for the reindeer.","full":[["What is it?","Christmas Eve is the day before Christmas. In many countries, like Germany and Poland, it is the main celebration, with presents opened that evening. In Britain it is the night of getting ready: the last presents wrapped, carols sung, and for many Christians a midnight service, to welcome Christmas Day as the clock strikes twelve."],["Before bed","Children hang up a stocking and leave out a mince pie, or a glass of milk, for Father Christmas, and a carrot for his reindeer. Then it is early to bed, because he only comes when everyone is asleep. Every year a defence centre in North America tracks his sleigh by radar, and you can follow his journey around the world online."]],"art":"Snow falls on a cottage with lit windows and smoke from the chimney, while Santa’s sleigh flies over."},
-  "Christmas Day": {"src":"UK","tier":"festive","scene":"christmas","bg":"#0C2219","eyebrow":"Celebrating","w":3,"short":"Christians celebrate the birth of Jesus. Family, food, presents, and Santa somewhere overhead.","full":[["The story","Christians celebrate the birth of Jesus, who they believe is the son of God, born in a stable in Bethlehem about 2,000 years ago. The story tells of shepherds visited by angels, and wise men who followed a bright star to find him, which is why there is often a star on top of the tree."],["Where our traditions come from","Decorated trees became popular in Britain in Victorian times, after Queen Victoria and Prince Albert, who was German, put one up. Crackers were invented by a London sweet-maker called Tom Smith in the 1840s. Father Christmas is a mix of an old English winter figure and Saint Nicholas, a bishop famous for giving presents in secret."]],"art":"A tree of twinkling lights, a star that flares, a strand of bulbs and snow."},
-  "Boxing Day": {"src":"UK","tier":"festive","scene":"christmas","v":"boxing","bg":"#0C2219","eyebrow":"Bank holiday","short":"The day after Christmas, named after the Christmas boxes once given to workers. Leftovers and long walks.","full":[["Why “Boxing”?","The name probably comes from Christmas boxes: money or presents given to servants, delivery people and workers, many of whom had to work on Christmas Day itself. Churches also opened their alms boxes and shared the money out among the poor. It is St Stephen’s Day too."],["What happens","These days it is a day for leftovers, long walks, visiting the relatives you did not see yesterday, football matches and a lot of sitting down."]],"art":"The Christmas scene, with the tree’s lights a little dimmer."},
+  "Christmas Day": {"src":"UK","tier":"festive","scene":"christmas","bg":"#0C2219","eyebrow":"Celebrating","w":3,"short":"Christians celebrate the birth of Jesus. Family, food, presents, and Santa somewhere overhead.","full":[["The story","Christians celebrate the birth of Jesus, who they believe is the son of God, born in a stable in Bethlehem about 2,000 years ago. The story tells of shepherds visited by angels, and wise men who followed a bright star to find him, which is why there is often a star on top of the tree."],["Where our traditions come from","Decorated trees became popular in Britain in Victorian times, after Queen Victoria and Prince Albert, who was German, put one up. Crackers were invented by a London sweet-maker called Tom Smith in the 1840s. Father Christmas is a mix of an old English winter figure and Saint Nicholas, a bishop famous for giving presents in secret."]],"art":"A tree of twinkling lights and baubles beside a crackling fire, stockings on the mantel, and Santa passing the snowy window."},
+  "Boxing Day": {"src":"UK","tier":"festive","scene":"christmas","v":"boxing","bg":"#0C2219","eyebrow":"Bank holiday","short":"The day after Christmas, named after the Christmas boxes once given to workers. Leftovers and long walks.","full":[["Why “Boxing”?","The name probably comes from Christmas boxes: money or presents given to servants, delivery people and workers, many of whom had to work on Christmas Day itself. Churches also opened their alms boxes and shared the money out among the poor. It is St Stephen’s Day too."],["What happens","These days it is a day for leftovers, long walks, visiting the relatives you did not see yesterday, football matches and a lot of sitting down."]],"art":"The morning after: the presents opened, the fire low and the tree’s lights a little dimmer."},
   "Boxing Day (observed)": {"src":"UK","tier":"quiet","motif":"sun","eyebrow":"Bank holiday","short":"Boxing Day fell on a Saturday, so the bank holiday moves to today.","full":[["","When Boxing Day falls on a weekend, the bank holiday moves to the next weekday so everyone still gets a day off. In 2026 Boxing Day is a Saturday, so the holiday is on Monday 28 December."]]},
   "New Year’s Eve": {"src":"UK","tier":"festive","scene":"nye","bg":"#10153A","eyebrow":"Tonight","w":2,"short":"The last night of the year: counting down to midnight, Big Ben’s bongs, and fireworks over the Thames.","full":[["What happens","On 31 December people stay up late to see the new year in. In the last minute everyone counts down the seconds, and at midnight Big Ben strikes twelve and London’s fireworks burst over the river Thames. People cheer, hug, and link arms to sing Auld Lang Syne, a Scottish song about not forgetting old friends, written down by Robert Burns."],["Hogmanay","In Scotland New Year’s Eve is called Hogmanay, and for a long time it was a bigger celebration than Christmas. One tradition is first-footing: the first person to step into your home after midnight brings luck for the year, especially if they carry a gift like coal, shortbread or salt."]],"art":"Big Ben counts down the last seconds of the year, then fireworks and confetti fill the sky."},
 };
