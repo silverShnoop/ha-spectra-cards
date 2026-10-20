@@ -6983,71 +6983,6 @@ const FEST_SCENES = (() => {
     c.globalAlpha = 1; drawSleigh(c, x, y, s, t);
   }
 
-  /* ---------- Ganesha ---------- */
-  function drawGanesha(c, cx, foot, s, t) {
-    const Y = f => foot - s + f * s, X = f => cx + f * s;
-    const SKIN = "#F08A5D", SKIN_D = "#B8553A", GOLD = "#F4C04E";
-    glow(c, cx, Y(.4), s * .7, "#FFD27A", .55);
-    c.strokeStyle = GOLD; c.lineWidth = 3; c.beginPath(); c.arc(cx, Y(.38), s * .44, Math.PI * .9, Math.PI * 2.1); c.stroke();
-    // lotus seat
-    for (let k = -4; k <= 4; k++) { c.fillStyle = k % 2 ? "#F59BC0" : "#E8679C";
-      c.beginPath(); c.ellipse(X(k * .05), Y(.95), s * .05, s * .035, 0, 0, TAU); c.fill(); }
-    // arms (four)
-    const arms = [[-1, -40, "axe"], [1, -40, "noose"], [-1, 25, "modak"], [1, 25, "bless"]];
-    arms.forEach(([side, deg, item], i) => {
-      const sw = Math.sin(t * 1.4 + i) * 3, a = (side > 0 ? deg + sw : 180 - deg - sw) * Math.PI / 180;
-      const sx = X(.1 * side), sy = Y(.5), hx = sx + Math.cos(a) * s * .2, hy = sy + Math.sin(a) * s * .2;
-      c.lineCap = "round"; c.strokeStyle = SKIN_D; c.lineWidth = s * .05; c.beginPath(); c.moveTo(sx, sy); c.lineTo(hx, hy); c.stroke();
-      c.strokeStyle = SKIN; c.lineWidth = s * .04; c.beginPath(); c.moveTo(sx, sy); c.lineTo(hx, hy); c.stroke();
-      c.fillStyle = SKIN; c.beginPath(); c.arc(hx, hy, s * .03, 0, TAU); c.fill();
-      c.save(); c.translate(hx, hy);
-      if (item === "axe") { c.strokeStyle = "#8B5A2B"; c.lineWidth = s * .015; c.beginPath(); c.moveTo(0, s * .05); c.lineTo(0, -s * .14); c.stroke();
-        c.fillStyle = "#D9DEE6"; c.beginPath(); c.moveTo(0, -s * .14); c.quadraticCurveTo(-s * .08, -s * .12, -s * .07, -s * .06); c.lineTo(0, -s * .09); c.fill(); }
-      if (item === "noose") { c.strokeStyle = GOLD; c.lineWidth = s * .01; c.beginPath(); c.ellipse(0, -s * .07, s * .04, s * .05, 0, 0, TAU); c.stroke(); }
-      if (item === "modak") { c.fillStyle = "#FFF1D6"; c.beginPath(); c.moveTo(-s * .03, s * .0); c.quadraticCurveTo(0, -s * .09, s * .03, 0); c.closePath(); c.fill(); }
-      if (item === "bless") { c.fillStyle = SKIN; c.beginPath(); c.ellipse(0, -s * .03, s * .025, s * .04, 0, 0, TAU); c.fill(); }
-      c.restore();
-    });
-    // belly
-    c.fillStyle = SKIN; c.beginPath(); c.ellipse(cx, Y(.66), s * .17, s * .2, 0, 0, TAU); c.fill();
-    c.fillStyle = "#F6C24A"; c.beginPath(); c.ellipse(cx, Y(.85), s * .19, s * .08, 0, 0, TAU); c.fill(); // dhoti
-    c.strokeStyle = GOLD; c.lineWidth = s * .012; c.beginPath(); c.ellipse(cx, Y(.66), s * .15, s * .03, 0, 0, Math.PI); c.stroke();
-    c.strokeStyle = "#F59E0B"; c.lineWidth = s * .02; c.beginPath(); c.arc(cx, Y(.4), s * .12, .3, Math.PI - .3); c.stroke(); // garland
-    // ears, flapping
-    const flap = 1 + Math.sin(t * 2.2) * .12;
-    [-1, 1].forEach(d => { c.save(); c.translate(X(.11 * d), Y(.3)); c.scale(flap, 1);
-      c.fillStyle = SKIN_D; c.beginPath(); c.ellipse(d * s * .08, 0, s * .11, s * .13, 0, 0, TAU); c.fill();
-      c.fillStyle = "#F7A98A"; c.beginPath(); c.ellipse(d * s * .085, 0, s * .08, s * .1, 0, 0, TAU); c.fill(); c.restore(); });
-    // head
-    c.fillStyle = SKIN; c.beginPath(); c.ellipse(cx, Y(.3), s * .12, s * .13, 0, 0, TAU); c.fill();
-    // trunk curling
-    const curl = Math.sin(t * 1.2) * .03;
-    c.lineCap = "round";
-    const trunk = () => { c.beginPath(); c.moveTo(cx, Y(.32)); c.bezierCurveTo(X(.015), Y(.47), X(.0), Y(.58), X(-.07 + curl), Y(.56));
-      c.quadraticCurveTo(X(-.12 + curl), Y(.54), X(-.1 + curl), Y(.48)); };
-    trunk(); c.strokeStyle = SKIN_D; c.lineWidth = s * .068; c.stroke();
-    trunk(); c.strokeStyle = SKIN; c.lineWidth = s * .052; c.stroke();
-    c.strokeStyle = "rgba(150,70,40,.5)"; c.lineWidth = 1;
-    for (let k = 1; k < 6; k++) { const yy = Y(.34 + k * .035); c.beginPath(); c.moveTo(X(-.012), yy); c.lineTo(X(.018), yy); c.stroke(); }
-    // tusk (one, the other broken)
-    c.fillStyle = "#FFF8EC"; c.beginPath(); c.moveTo(X(.03), Y(.36)); c.quadraticCurveTo(X(.07), Y(.4), X(.075), Y(.43)); c.lineTo(X(.045), Y(.37)); c.fill();
-    // eyes, tilak
-    [-1, 1].forEach(d => { c.fillStyle = "#fff"; c.beginPath(); c.ellipse(X(.045 * d), Y(.28), s * .018, s * .012, 0, 0, TAU); c.fill();
-      c.fillStyle = "#140A0A"; c.beginPath(); c.arc(X(.045 * d), Y(.28), s * .008, 0, TAU); c.fill(); });
-    c.fillStyle = "#C8102E"; c.fillRect(X(-.006), Y(.2), s * .012, s * .05);
-    // crown
-    c.fillStyle = GOLD; c.beginPath(); c.moveTo(X(-.09), Y(.2)); c.lineTo(X(-.07), Y(.08)); c.lineTo(X(-.03), Y(.12));
-    c.lineTo(cx, Y(.02)); c.lineTo(X(.03), Y(.12)); c.lineTo(X(.07), Y(.08)); c.lineTo(X(.09), Y(.2)); c.closePath(); c.fill();
-    c.fillStyle = "#2FA84F"; c.beginPath(); c.arc(cx, Y(.13), s * .015, 0, TAU); c.fill();
-    // mouse with a modak
-    const mx = X(.26), my = foot - s * .03, nib = Math.sin(t * 6) * 1.5;
-    c.fillStyle = "#8C8C96"; c.beginPath(); c.ellipse(mx, my, s * .05, s * .03, 0, 0, TAU); c.fill();
-    c.beginPath(); c.ellipse(mx - s * .05, my - s * .01 + nib * .3, s * .025, s * .02, 0, 0, TAU); c.fill();
-    c.fillStyle = "#B9B9C4"; c.beginPath(); c.arc(mx - s * .045, my - s * .03, s * .012, 0, TAU); c.fill();
-    c.strokeStyle = "#8C8C96"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(mx + s * .05, my); c.quadraticCurveTo(mx + s * .1, my - s * .05, mx + s * .12, my); c.stroke();
-    c.fillStyle = "#FFF1D6"; c.beginPath(); c.moveTo(mx - s * .1, my + s * .02); c.quadraticCurveTo(mx - s * .085, my - s * .04, mx - s * .07, my + s * .02); c.fill();
-  }
-
   /* ---------- the scenes ---------- */
   const MORE = {
 
@@ -7056,154 +6991,24 @@ const FEST_SCENES = (() => {
 
 
 
-    shiva(st) { st.s = mkStars(70);
-      return (c, w, h, t) => {
-        fill(c, w, h, [[0, "#070B24"], [.7, "#1B2556"], [1, "#2B2050"]]);
-        stars(c, w, h, t, st.s);
-        const mx = w * .8, my = h * .26, r = Math.min(h * .12, 26);
-        glow(c, mx, my, r * 3.5, "#E8F0FF", .3);
-        c.fillStyle = "#F4F1E0"; c.beginPath(); c.arc(mx, my, r, 0, TAU); c.fill();
-        c.fillStyle = "#0B1032"; c.beginPath(); c.arc(mx + r * .45, my - r * .2, r * .92, 0, TAU); c.fill();
-        c.fillStyle = "#121A40"; c.beginPath(); c.moveTo(0, h * .8);
-        [[.1, .55], [.22, .7], [.38, .42], [.52, .66], [.66, .38], [.82, .62], [1, .5]].forEach(([x, y]) => c.lineTo(x * w, y * h)); c.lineTo(w, h); c.lineTo(0, h); c.fill();
-        c.fillStyle = "#E6ECF8"; [[.38, .42], [.66, .38]].forEach(([x, y]) => { c.beginPath(); c.moveTo(x * w, y * h); c.lineTo(x * w - 16, y * h + 14); c.lineTo(x * w + 14, y * h + 12); c.fill(); });
-        for (let i = 0; i < 9; i++) lamp(c, w * (.3 + i * .075), h * .93, Math.min(8, h * .04), t, i);
-      };
-    },
-
-
-
-
-    rama(st) { st.arrow = 0;
-      return (c, w, h, t) => {
-        fill(c, w, h, [[0, "#FFD06B"], [.6, "#F29440"], [1, "#B5461F"]]);
-        const sx = w * .8, sy = h * .38, r = Math.min(h * .14, 30);
-        c.save(); c.translate(sx, sy); c.rotate(t * .25); c.fillStyle = "rgba(255,240,180,.55)";
-        for (let i = 0; i < 16; i++) { c.rotate(TAU / 16); c.beginPath(); c.moveTo(-4, r * 1.2); c.lineTo(0, r * 2.4 + (i % 2) * r * .5); c.lineTo(4, r * 1.2); c.fill(); }
-        c.restore(); glow(c, sx, sy, r * 3, "#FFF6C8", .8);
-        c.fillStyle = "#FFF3B0"; c.beginPath(); c.arc(sx, sy, r, 0, TAU); c.fill();
-        const p = (t % 5) / 1.2; if (p < 1) { const ax = -40 + p * (w + 80), ay = h * .62 - Math.sin(p * Math.PI) * h * .12;
-          c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = 2; c.beginPath(); c.moveTo(ax - 60, ay + 4); c.lineTo(ax, ay); c.stroke();
-          c.strokeStyle = "#5A2A0A"; c.lineWidth = 2; c.beginPath(); c.moveTo(ax - 26, ay + 2); c.lineTo(ax, ay); c.stroke();
-          c.fillStyle = "#5A2A0A"; c.beginPath(); c.moveTo(ax + 6, ay); c.lineTo(ax - 2, ay - 4); c.lineTo(ax - 2, ay + 4); c.fill(); }
-        c.strokeStyle = "#5A2A0A"; c.lineWidth = 4; c.beginPath(); c.moveTo(w * .62, h * .55); c.quadraticCurveTo(w * .55, h * .8, w * .62, h * 1.05); c.stroke();
-        c.strokeStyle = "rgba(255,255,255,.6)"; c.lineWidth = 1; c.beginPath(); c.moveTo(w * .62, h * .55); c.lineTo(w * .62, h * 1.05); c.stroke();
-      };
-    },
-
-    hanuman(st) { st.s = mkStars(50); st.trail = [];
-      return (c, w, h, t, dt) => {
-        fill(c, w, h, [[0, "#140E36"], [.55, "#4A2466"], [1, "#E07A45"]]);
-        stars(c, w, h * .6, t, st.s);
-        const p = (t * .07) % 1, x0 = h > 260 ? -.1 : .45, x = x0 * w + p * w * (1.12 - x0), y = h * (.72 - Math.sin(p * Math.PI) * .5), s = Math.min(h * .22, 46);
-        st.trail.push({ x, y: y + s * .3, life: 1 });
-        st.trail = st.trail.filter(q => { q.life -= dt * .6; c.globalAlpha = Math.max(0, q.life) * .5; c.fillStyle = "#FF9933";
-          c.beginPath(); c.arc(q.x, q.y, 3 + (1 - q.life) * 8, 0, TAU); c.fill(); return q.life > 0; }); c.globalAlpha = 1;
-        c.save(); c.translate(x, y); c.rotate(Math.sin(t) * .06);
-        c.fillStyle = "#4A5A3A"; c.beginPath(); c.moveTo(-s, s * .3); c.lineTo(-s * .3, -s * .6); c.lineTo(0, -s * .3); c.lineTo(s * .4, -s * .8); c.lineTo(s, s * .3);
-        c.quadraticCurveTo(0, s * .7, -s, s * .3); c.fill();
-        c.fillStyle = "#E6ECF8"; c.beginPath(); c.moveTo(s * .4, -s * .8); c.lineTo(s * .25, -s * .55); c.lineTo(s * .55, -s * .55); c.fill();
-        for (let i = 0; i < 9; i++) { const hx = ((i * 37 % 100) / 100) * s * 1.4 - s * .7, hy = -s * .1 + (i * 13 % 30) / 100 * s;
-          glow(c, hx, hy, 8, "#7CFF9A", .55 + .45 * Math.sin(t * 3 + i)); c.fillStyle = "#B8FFC8"; c.beginPath(); c.arc(hx, hy, 1.5, 0, TAU); c.fill(); }
-        c.restore();
-        c.fillStyle = "#1A1236"; c.beginPath(); c.moveTo(0, h);
-        for (let xx = 0; xx <= w; xx += 10) c.lineTo(xx, h * .9 + Math.sin(xx * .03 + t) * 3); c.lineTo(w, h); c.fill();
-      };
-    },
 
 
 
 
 
-    snake(st) { st.rain = Array.from({ length: 60 }, () => ({ x: rnd(), y: rnd(), v: .6 + rnd() * .5 }));
-      return (c, w, h, t, dt) => {
-        fill(c, w, h, [[0, "#0F2A1E"], [.7, "#2F5D3A"], [1, "#4E6E2A"]]);
-        c.strokeStyle = "rgba(200,230,255,.35)"; c.lineWidth = 1;
-        st.rain.forEach(r => { r.y += r.v * dt; if (r.y > 1) { r.y = 0; r.x = rnd(); } c.beginPath(); c.moveTo(r.x * w, r.y * h); c.lineTo(r.x * w - 2, r.y * h + 8); c.stroke(); });
-        const cx = w * .76, base = h * .9, s = Math.min(h * .75, 150), sway = Math.sin(t * 1.1) * s * .06;
-        c.fillStyle = "#2B3A1A"; c.beginPath(); c.ellipse(cx, base, s * .32, s * .08, 0, 0, TAU); c.fill();
-        c.strokeStyle = "#3A2A12"; c.lineWidth = s * .09; c.lineCap = "round";
-        c.beginPath(); c.moveTo(cx - s * .2, base - s * .02); c.bezierCurveTo(cx + s * .25, base - s * .02, cx - s * .25, base - s * .45, cx + sway, base - s * .6); c.stroke();
-        c.strokeStyle = "#C9A55A"; c.lineWidth = s * .03; c.stroke();
-        c.fillStyle = "#3A2A12"; c.beginPath(); c.ellipse(cx + sway, base - s * .64, s * .1, s * .13, 0, 0, TAU); c.fill();
-        c.fillStyle = "#C9A55A"; c.beginPath(); c.ellipse(cx + sway, base - s * .62, s * .05, s * .08, 0, 0, TAU); c.fill();
-        c.fillStyle = "#3A2A12"; c.beginPath(); c.ellipse(cx + sway, base - s * .75, s * .045, s * .035, 0, 0, TAU); c.fill();
-        c.fillStyle = "#FFD166"; [-1, 1].forEach(d => { c.beginPath(); c.arc(cx + sway + d * s * .018, base - s * .76, 1.6, 0, TAU); c.fill(); });
-        if (Math.sin(t * 2) > .6) { c.strokeStyle = "#D7263D"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(cx + sway, base - s * .72); c.lineTo(cx + sway, base - s * .68); c.stroke(); }
-        for (let i = 0; i < 9; i++) { c.fillStyle = i % 2 ? "#F59E0B" : "#F97316"; c.beginPath(); c.arc(cx + (i - 4) * s * .09, base + s * .03 + (i % 2) * 3, 4.5, 0, TAU); c.fill(); }
-      };
-    },
 
 
 
 
-    janmashtami(st) { st.s = mkStars(60); st.splash = [];
-      return (c, w, h, t, dt) => {
-        fill(c, w, h, [[0, "#060A24"], [.7, "#18235A"], [1, "#2D1F5E"]]);
-        stars(c, w, h, t, st.s);
-        const cyc = t % 12, tiers = Math.min(4, Math.floor(cyc / 2) + 1), px = w * .76;
-        const sw = Math.sin(t * 1.4) * .15, py = h * .2, ropeTop = 0;
-        c.strokeStyle = "#C9A27A"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(w * .5, ropeTop); c.lineTo(w, ropeTop); c.stroke();
-        const potX = px + Math.sin(sw) * h * .2, potY = py;
-        c.beginPath(); c.moveTo(px, 0); c.lineTo(potX, potY - 12); c.stroke();
-        const broken = cyc > 9.2;
-        if (!broken) { c.fillStyle = "#A0522D"; c.beginPath(); c.arc(potX, potY, 12, 0, TAU); c.fill(); c.fillStyle = "#FFF4DE"; c.beginPath(); c.ellipse(potX, potY - 10, 7, 3, 0, 0, TAU); c.fill();
-          c.strokeStyle = "#F4C04E"; c.lineWidth = 2; c.beginPath(); c.arc(potX, potY, 12, .2, Math.PI - .2); c.stroke(); }
-        else if (st.splash.length === 0 && cyc < 9.4) for (let i = 0; i < 40; i++) st.splash.push({ x: potX, y: potY, vx: (rnd() - .5) * 120, vy: -rnd() * 80, life: 1 });
-        st.splash = st.splash.filter(p => { p.vy += 200 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * .9;
-          c.globalAlpha = Math.max(0, p.life); c.fillStyle = "#FFF4DE"; c.beginPath(); c.arc(p.x, p.y, 2.2, 0, TAU); c.fill(); return p.life > 0; }); c.globalAlpha = 1;
-        const unit = Math.min(h * .16, 30), base = h * .97;
-        for (let r = 0; r < tiers; r++) { const n = 4 - r, y = base - r * unit;
-          for (let k = 0; k < n; k++) { const x = px + (k - (n - 1) / 2) * unit * .7;
-            c.fillStyle = r % 2 ? "#F97316" : "#FFF8EC"; c.fillRect(x - unit * .2, y - unit * .7, unit * .4, unit * .55);
-            c.fillStyle = "#7A4A2A"; c.beginPath(); c.arc(x, y - unit * .82, unit * .14, 0, TAU); c.fill(); } }
-        if (tiers === 4 && cyc > 8) { c.strokeStyle = "#7A4A2A"; c.lineWidth = 3; c.beginPath(); c.moveTo(px, base - 3.8 * unit); c.lineTo(potX, potY + 10 + (9.2 - Math.min(9.2, cyc)) * 10); c.stroke(); }
-        if (cyc > 10.5) { c.fillStyle = "rgba(255,255,255,.08)"; c.fillRect(0, 0, w, h); }
-        // peacock feather
-        c.save(); c.translate(w * .55, h); c.rotate(-.4 + Math.sin(t) * .05);
-        c.strokeStyle = "#7FB069"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -h * .5); c.stroke();
-        for (let k = 0; k < 14; k++) { c.strokeStyle = "rgba(60,160,120,.6)"; c.beginPath(); c.moveTo(0, -h * .1 - k * h * .025); c.lineTo(-10, -h * .14 - k * h * .025); c.moveTo(0, -h * .1 - k * h * .025); c.lineTo(10, -h * .14 - k * h * .025); c.stroke(); }
-        c.fillStyle = "#1F8A70"; c.beginPath(); c.ellipse(0, -h * .5, 9, 12, 0, 0, TAU); c.fill();
-        c.fillStyle = "#F2C230"; c.beginPath(); c.ellipse(0, -h * .5, 6, 8, 0, 0, TAU); c.fill();
-        c.fillStyle = "#1E3A8A"; c.beginPath(); c.ellipse(0, -h * .49, 3.5, 5, 0, 0, TAU); c.fill(); c.restore();
-      };
-    },
-
-    ganesha() {
-      return (c, w, h, t) => {
-        fill(c, w, h, [[0, "#4A0E0E"], [.6, "#A8321C"], [1, "#E8932E"]]);
-        const portrait = w / h < 1.4;
-        marigolds(c, w, 2, t, portrait ? 14 : 8, portrait || h > 260 ? 0 : w * .5);
-        const s = portrait ? Math.min(h * .82, w * .8) : Math.min(h * .85, w * .38);
-        drawGanesha(c, portrait ? w / 2 : w * .76, h - 6, s, t);
-      };
-    },
 
 
 
-    ravana(st) { const fw = mkFw(); st.f = [];
-      return (c, w, h, t, dt) => {
-        fill(c, w, h, [[0, "#0B0612"], [.7, "#2A0E1E"], [1, "#4A1A10"]]);
-        const cyc = t % 12, ex = w * .78, s = Math.min(h * .85, 170), base = h * .98;
-        if (cyc > 3.5) fireworks(fw, c, w, h, dt, ["#FFD166", "#FF5A5F", "#7FD1FF", "#F28A2E"], 1.6, .45, .98);
-        c.fillStyle = "#6B1E2E"; c.fillRect(ex - s * .12, base - s * .62, s * .24, s * .62);
-        c.fillStyle = "#F2B33A"; for (let k = 0; k < 6; k++) c.fillRect(ex - s * .12, base - s * .6 + k * s * .1, s * .24, 3);
-        c.fillStyle = "#2A5A8A"; c.fillRect(ex - s * .2, base - s * .62, s * .08, s * .3); c.fillRect(ex + s * .12, base - s * .62, s * .08, s * .3);
-        for (let k = 0; k < 10; k++) { const hx = ex + (k - 4.5) * s * .085, hy = base - s * .72 - Math.abs(k - 4.5) * -1;
-          c.fillStyle = "#E8A87C"; c.beginPath(); c.arc(hx, hy, s * .045, 0, TAU); c.fill();
-          c.fillStyle = "#F2B33A"; c.beginPath(); c.moveTo(hx - s * .04, hy - s * .03); c.lineTo(hx, hy - s * .1); c.lineTo(hx + s * .04, hy - s * .03); c.fill();
-          c.fillStyle = "#140A0A"; c.fillRect(hx - s * .02, hy - 2, 2, 2); c.fillRect(hx + s * .012, hy - 2, 2, 2); }
-        if (cyc < 2) { const p = cyc / 2, ax = p * ex, ay = h * .6 - Math.sin(p * Math.PI) * h * .3;
-          glow(c, ax, ay, 14, "#FF9A2A", .9); c.strokeStyle = "#5A2A0A"; c.lineWidth = 2; c.beginPath(); c.moveTo(ax - 22, ay + 6); c.lineTo(ax, ay); c.stroke(); }
-        if (cyc > 2) { const burn = Math.min(1, (cyc - 2) / 3);
-          for (let i = 0; i < 5; i++) st.f.push({ x: ex + (rnd() - .5) * s * .4 * burn, y: base - rnd() * s * .7 * burn, vy: -40 - rnd() * 60, life: 1, r: 4 + rnd() * 8 });
-          c.globalCompositeOperation = "lighter";
-          st.f = st.f.filter(p => { p.y += p.vy * dt; p.life -= dt * 1.5; const L = Math.max(0, p.life);
-            c.fillStyle = L > .5 ? `rgba(255,200,80,${L * .4})` : `rgba(255,90,20,${L * .4})`; c.beginPath(); c.arc(p.x, p.y, p.r, 0, TAU); c.fill(); return p.life > 0; });
-          c.globalCompositeOperation = "source-over"; }
-        else st.f.length = 0;
-      };
-    },
+
+
+
+
+
+
 
 
 
@@ -8746,6 +8551,457 @@ const FEST_SCENES = (() => {
       x.fillStyle = col[0]; x.beginPath(); x.arc(px, py, fs * .56, 0, TAU); x.fill();
       for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + i; x.fillStyle = col[1]; x.beginPath(); x.arc(px + Math.cos(a) * fs * .3, py + Math.sin(a) * fs * .3 - fs * .05, fs * .17, 0, TAU); x.fill(); }
       x.fillStyle = "rgba(90,40,0,.6)"; x.beginPath(); x.arc(px, py - fs * .05, fs * .12, 0, TAU); x.fill(); } }
+
+  /* Ganesha as the pandal idol: seated on a lotus, four arms holding the
+     axe, a lotus, a bowl of modak and a hand raised in blessing, his right
+     tusk broken. The body is painted once; the ears, the trunk and his
+     mouse move. Units are fractions of s, the figure's height, with
+     (cx, foot) the base of the lotus seat. */
+  const GANESHA_SKIN = "#F2A27E", GANESHA_SKIN_D = "#B8604A", GANESHA_SKIN_L = "#FFD3BC", GANESHA_GOLD = "#F4C04E", GANESHA_GOLD_D = "#A8741A";
+  function ganeshaLimb(x, pts, wd, col, dark) {
+    x.lineCap = "round"; x.lineJoin = "round";
+    x.strokeStyle = dark; x.lineWidth = wd * 1.25; x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.stroke();
+    x.strokeStyle = col; x.lineWidth = wd; x.stroke(); }
+  function ganeshaModak(x, mx, my, r) {
+    const g = x.createLinearGradient(mx - r, my - r, mx + r, my + r); g.addColorStop(0, "#FFFBF0"); g.addColorStop(1, "#E8D2A8");
+    x.fillStyle = g; x.beginPath(); x.moveTo(mx, my - r * 1.3); x.bezierCurveTo(mx + r * .5, my - r * .6, mx + r * 1.05, my, mx + r * .8, my + r * .6);
+    x.quadraticCurveTo(mx, my + r * .95, mx - r * .8, my + r * .6); x.bezierCurveTo(mx - r * 1.05, my, mx - r * .5, my - r * .6, mx, my - r * 1.3); x.fill();
+    x.strokeStyle = "rgba(160,120,70,.55)"; x.lineWidth = Math.max(.6, r * .1);
+    for (let k = -2; k <= 2; k++) { x.beginPath(); x.moveTo(mx, my - r * 1.2); x.quadraticCurveTo(mx + k * r * .35, my - r * .2, mx + k * r * .38, my + r * .7); x.stroke(); } }
+  function ganeshaBody(x, cx, foot, s) {
+    const Y = (f) => foot - s + f * s, X = (f) => cx + f * s, SK = GANESHA_SKIN, SD = GANESHA_SKIN_D, GO = GANESHA_GOLD;
+    // the lotus seat, two rings of petals
+    [[.36, .955, "#C8457A", "#8A1E4E"], [.3, .915, "#F28AB0", "#C8457A"]].forEach(([rw, py, c1, c2]) => {
+      for (let i = 0; i <= 12; i++) { const px = X(-rw + i / 12 * rw * 2), g = x.createLinearGradient(0, Y(py) - s * .06, 0, Y(py) + s * .03);
+        g.addColorStop(0, c1); g.addColorStop(1, c2); x.fillStyle = g; x.beginPath(); x.moveTo(px - s * .035, Y(py) + s * .03);
+        x.quadraticCurveTo(px - s * .035, Y(py) - s * .03, px, Y(py) - s * .07); x.quadraticCurveTo(px + s * .035, Y(py) - s * .03, px + s * .035, Y(py) + s * .03); x.fill(); } });
+    x.fillStyle = GO; x.fillRect(X(-.37), Y(.975), s * .74, s * .025);
+    // the folded leg and lap, in a yellow silk dhoti with a red border
+    const dg = x.createLinearGradient(X(-.3), 0, X(.3), 0); dg.addColorStop(0, "#C88A10"); dg.addColorStop(.45, "#FFD24A"); dg.addColorStop(1, "#B87A0A");
+    x.fillStyle = dg; x.beginPath(); x.moveTo(X(-.14), Y(.64)); x.quadraticCurveTo(X(-.32), Y(.7), X(-.31), Y(.86));
+    x.quadraticCurveTo(X(0), Y(.9), X(.31), Y(.86)); x.quadraticCurveTo(X(.32), Y(.7), X(.14), Y(.64)); x.closePath(); x.fill();
+    x.strokeStyle = "#C8102E"; x.lineWidth = s * .014; x.beginPath(); x.moveTo(X(-.31), Y(.855)); x.quadraticCurveTo(X(0), Y(.895), X(.31), Y(.855)); x.stroke();
+    x.strokeStyle = "rgba(120,70,0,.45)"; x.lineWidth = Math.max(1, s * .004);
+    for (let k = -3; k <= 3; k++) { x.beginPath(); x.moveTo(X(k * .03), Y(.68)); x.quadraticCurveTo(X(k * .07), Y(.78), X(k * .09), Y(.87)); x.stroke(); }
+    // the folded foot, its sole turned up on the lap
+    // both feet crossed on the lap, soles turned up
+    [[-1, .79], [1, .815]].forEach(([d, py]) => { x.save(); x.translate(X(-.01 * d), Y(py)); x.scale(d, 1);
+      const fg = x.createLinearGradient(0, -s * .03, 0, s * .025); fg.addColorStop(0, GANESHA_SKIN_L); fg.addColorStop(1, SD); x.fillStyle = fg;
+      x.beginPath(); x.moveTo(-s * .1, s * .01); x.quadraticCurveTo(-s * .06, -s * .03, s * .03, -s * .022); x.quadraticCurveTo(s * .075, -s * .02, s * .08, 0); x.quadraticCurveTo(s * .075, s * .022, s * .03, s * .02); x.quadraticCurveTo(-s * .05, s * .025, -s * .1, s * .01); x.fill();
+      for (let k = 0; k < 4; k++) { x.beginPath(); x.arc(s * (.078 + (k === 0 ? .004 : 0)), -s * .014 + k * s * .009, s * (.008 - k * .001), 0, TAU); x.fill(); }
+      x.fillStyle = "rgba(216,60,60,.45)"; x.beginPath(); x.ellipse(s * .02, 0, s * .035, s * .011, 0, 0, TAU); x.fill();
+      x.strokeStyle = GO; x.lineWidth = s * .007; x.beginPath(); x.moveTo(-s * .085, -s * .01); x.lineTo(-s * .08, s * .02); x.stroke(); x.restore(); });
+    // torso and the great belly, with a snake for a belt
+    const tg = x.createRadialGradient(X(-.05), Y(.5), s * .02, X(0), Y(.55), s * .24); tg.addColorStop(0, GANESHA_SKIN_L); tg.addColorStop(.55, SK); tg.addColorStop(1, SD);
+    x.fillStyle = tg; x.beginPath(); x.moveTo(X(-.15), Y(.39)); x.quadraticCurveTo(X(-.2), Y(.5), X(-.17), Y(.6));
+    x.quadraticCurveTo(X(-.1), Y(.72), X(0), Y(.72)); x.quadraticCurveTo(X(.1), Y(.72), X(.17), Y(.6)); x.quadraticCurveTo(X(.2), Y(.5), X(.15), Y(.39)); x.closePath(); x.fill();
+    x.fillStyle = SD; x.beginPath(); x.ellipse(X(0), Y(.6), s * .01, s * .014, 0, 0, TAU); x.fill();
+    x.strokeStyle = "#2F7A3A"; x.lineWidth = s * .018; x.beginPath(); x.ellipse(X(0), Y(.645), s * .165, s * .035, 0, .1, Math.PI - .1); x.stroke();
+    x.strokeStyle = "#7CC25A"; x.lineWidth = s * .006; x.stroke();
+    x.fillStyle = "#2F7A3A"; x.beginPath(); x.ellipse(X(.04), Y(.675), s * .018, s * .012, .3, 0, TAU); x.fill();
+    // the sacred thread and the necklaces
+    x.strokeStyle = "#FFF4DC"; x.lineWidth = Math.max(1, s * .005); x.beginPath(); x.moveTo(X(-.12), Y(.4)); x.quadraticCurveTo(X(0), Y(.56), X(.14), Y(.64)); x.stroke();
+    [[.09, .07, GO], [.12, .11, "#E8343A"], [.14, .15, GO]].forEach(([r, d, col]) => { x.strokeStyle = col; x.lineWidth = s * .012; x.beginPath(); x.ellipse(X(0), Y(.38), s * r, s * d, 0, .2, Math.PI - .2); x.stroke(); });
+    // the red shawl over the shoulders, falling behind the arms
+    x.fillStyle = "#B01030"; [-1, 1].forEach((d) => { x.beginPath(); x.moveTo(X(.1 * d), Y(.37)); x.quadraticCurveTo(X(.21 * d), Y(.38), X(.22 * d), Y(.5));
+      x.quadraticCurveTo(X(.24 * d), Y(.62), X(.2 * d), Y(.7)); x.lineTo(X(.17 * d), Y(.62)); x.quadraticCurveTo(X(.17 * d), Y(.45), X(.08 * d), Y(.4)); x.fill();
+      x.strokeStyle = GO; x.lineWidth = s * .008; x.stroke(); });
+    // four arms: the axe and the lotus raised, the blessing and the modak bowl below
+    const arm = (sh, el, hd, wd) => { ganeshaLimb(x, [sh, el, hd], wd, SK, SD);
+      const bx = el[0] + (hd[0] - el[0]) * .75, by = el[1] + (hd[1] - el[1]) * .75; x.strokeStyle = GO; x.lineWidth = s * .012; x.beginPath(); x.arc(bx, by, s * .02, 0, TAU); x.stroke();
+      x.fillStyle = GO; x.beginPath(); x.arc(sh[0] + (el[0] - sh[0]) * .5, sh[1] + (el[1] - sh[1]) * .5, s * .018, 0, TAU); x.fill(); };
+    const shL = [X(-.15), Y(.41)], shR = [X(.15), Y(.41)];
+    // the axe in the upper right hand (the viewer's left)
+    x.strokeStyle = "#6A3A1A"; x.lineWidth = s * .014; x.lineCap = "round"; x.beginPath(); x.moveTo(X(-.24), Y(.38)); x.lineTo(X(-.34), Y(.13)); x.stroke();
+    const ax = x.createLinearGradient(X(-.42), 0, X(-.3), 0); ax.addColorStop(0, "#9AA4B0"); ax.addColorStop(.6, "#EEF2F6"); ax.addColorStop(1, "#7A8490");
+    x.fillStyle = ax; x.beginPath(); x.moveTo(X(-.33), Y(.15)); x.quadraticCurveTo(X(-.44), Y(.13), X(-.42), Y(.24)); x.quadraticCurveTo(X(-.38), Y(.2), X(-.31), Y(.21)); x.closePath(); x.fill();
+    arm(shL, [X(-.27), Y(.44)], [X(-.28), Y(.29)], s * .052);
+    x.fillStyle = SK; x.beginPath(); x.arc(X(-.28), Y(.29), s * .036, 0, TAU); x.fill();
+    // a pink lotus in the upper left hand
+    arm(shR, [X(.27), Y(.44)], [X(.28), Y(.29)], s * .052);
+    x.fillStyle = SK; x.beginPath(); x.arc(X(.28), Y(.29), s * .036, 0, TAU); x.fill();
+    [[-.6, "#E86A9A"], [.6, "#E86A9A"], [-.3, "#F7A8C6"], [.3, "#F7A8C6"], [0, "#FFD0E2"]].forEach(([a, col]) => { x.save(); x.translate(X(.29), Y(.25)); x.rotate(a);
+      x.fillStyle = col; x.beginPath(); x.moveTo(0, 0); x.quadraticCurveTo(-s * .03, -s * .04, 0, -s * .085); x.quadraticCurveTo(s * .03, -s * .04, 0, 0); x.fill(); x.restore(); });
+    // the lower right hand raised in blessing, palm out
+    arm(shL, [X(-.25), Y(.58)], [X(-.22), Y(.47)], s * .056);
+    x.fillStyle = SK; x.strokeStyle = SD; x.lineWidth = Math.max(.8, s * .004); x.beginPath(); x.moveTo(X(-.265), Y(.5)); x.lineTo(X(-.265), Y(.42));
+    for (let k = 0; k < 4; k++) { const fx = -.265 + k * .0225, top = .375 + Math.abs(k - 1.4) * .008; x.lineTo(X(fx), Y(top + .01)); x.arc(X(fx + .01125), Y(top + .01), s * .01125, Math.PI, TAU); }
+    x.lineTo(X(-.175), Y(.5)); x.closePath(); x.fill(); x.stroke();
+    x.beginPath(); x.ellipse(X(-.272), Y(.465), s * .012, s * .03, -.5, 0, TAU); x.fill();
+    x.fillStyle = "#D8263A"; x.beginPath(); x.arc(X(-.22), Y(.455), s * .014, 0, TAU); x.fill();
+    // the lower left hand holding a bowl of modak
+    arm(shR, [X(.25), Y(.6)], [X(.19), Y(.6)], s * .056);
+    const bg = x.createLinearGradient(X(.1), 0, X(.28), 0); bg.addColorStop(0, "#A8741A"); bg.addColorStop(.45, "#FFE08A"); bg.addColorStop(1, "#8A5A10");
+    [[.17, .565, .026], [.21, .565, .026], [.19, .54, .026]].forEach(([mx, my, r]) => ganeshaModak(x, X(mx), Y(my), s * r));
+    x.fillStyle = bg; x.beginPath(); x.moveTo(X(.11), Y(.57)); x.quadraticCurveTo(X(.19), Y(.64), X(.27), Y(.57)); x.closePath(); x.fill();
+    x.fillStyle = GANESHA_GOLD_D; x.fillRect(X(.11), Y(.565), s * .16, s * .01);
+    // the head: a broad dome, full cheeks, small kind eyes
+    const hg = x.createRadialGradient(X(-.03), Y(.21), s * .02, X(0), Y(.26), s * .16); hg.addColorStop(0, GANESHA_SKIN_L); hg.addColorStop(.6, SK); hg.addColorStop(1, SD);
+    x.fillStyle = hg; x.beginPath(); x.ellipse(X(0), Y(.25), s * .12, s * .105, 0, 0, TAU); x.fill();
+    [-1, 1].forEach((d) => { x.beginPath(); x.ellipse(X(.065 * d), Y(.31), s * .07, s * .06, 0, 0, TAU); x.fill(); });
+    // the tusks: his right one broken
+    x.fillStyle = "#FFF8EA"; x.strokeStyle = "rgba(150,120,90,.6)"; x.lineWidth = Math.max(.6, s * .003);
+    x.beginPath(); x.moveTo(X(.05), Y(.335)); x.quadraticCurveTo(X(.1), Y(.38), X(.12), Y(.43)); x.quadraticCurveTo(X(.08), Y(.39), X(.035), Y(.35)); x.closePath(); x.fill(); x.stroke();
+    x.beginPath(); x.moveTo(X(-.05), Y(.335)); x.lineTo(X(-.075), Y(.365)); x.lineTo(X(-.055), Y(.37)); x.lineTo(X(-.035), Y(.35)); x.closePath(); x.fill(); x.stroke();
+    [-1, 1].forEach((d) => { const ex = X(.05 * d), ey = Y(.27); x.fillStyle = "#FFF8EC"; x.beginPath(); x.ellipse(ex, ey, s * .018, s * .01, d * .15, 0, TAU); x.fill();
+      x.strokeStyle = "#1A0A0A"; x.lineWidth = Math.max(.8, s * .004); x.stroke(); x.fillStyle = "#1A0A0A"; x.beginPath(); x.arc(ex, ey, s * .006, 0, TAU); x.fill(); });
+    // the tilak and the jewelled band below the crown
+    x.fillStyle = "#D8263A"; x.beginPath(); x.ellipse(X(0), Y(.21), s * .009, s * .025, 0, 0, TAU); x.fill();
+    x.fillStyle = GO; x.beginPath(); x.ellipse(X(0), Y(.17), s * .11, s * .022, 0, Math.PI, TAU); x.fill(); x.fillRect(X(-.11), Y(.165), s * .22, s * .015);
+    // the crown, tier on tier
+    const cg = x.createLinearGradient(X(-.1), 0, X(.1), 0); cg.addColorStop(0, GANESHA_GOLD_D); cg.addColorStop(.45, "#FFE69A"); cg.addColorStop(1, GANESHA_GOLD_D);
+    x.fillStyle = cg; x.beginPath(); x.moveTo(X(-.1), Y(.165)); x.lineTo(X(-.075), Y(.09)); x.lineTo(X(-.045), Y(.04)); x.lineTo(X(-.012), Y(.0)); x.lineTo(X(.012), Y(.0)); x.lineTo(X(.045), Y(.04)); x.lineTo(X(.075), Y(.09)); x.lineTo(X(.1), Y(.165)); x.closePath(); x.fill();
+    x.strokeStyle = GANESHA_GOLD_D; x.lineWidth = Math.max(1, s * .006); [[.12, .085], [.07, .06], [.035, .04]].forEach(([py, hw]) => { x.beginPath(); x.moveTo(X(-hw), Y(py)); x.lineTo(X(hw), Y(py)); x.stroke(); });
+    [[0, .135, "#E8343A", .016], [-.05, .14, "#2FA84F", .01], [.05, .14, "#2FA84F", .01], [0, .085, "#2D5BD8", .011], [0, .045, "#E8343A", .009]].forEach(([dx, py, col, r]) => { x.fillStyle = col; x.beginPath(); x.arc(X(dx), Y(py), s * r, 0, TAU); x.fill(); });
+    x.fillStyle = "#FFE69A"; x.beginPath(); x.arc(X(0), Y(-.005), s * .012, 0, TAU); x.fill(); }
+  /* The ears, behind the head, fanning slowly. */
+  function ganeshaEars(c, cx, foot, s, t) {
+    const Y = (f) => foot - s + f * s, X = (f) => cx + f * s;
+    [-1, 1].forEach((d) => { const fan = 1 + Math.sin(t * 1.6 + (d > 0 ? .5 : 0)) * .08;
+      c.save(); c.translate(X(.08 * d), Y(.24)); c.scale(fan * d, 1);
+      const g = c.createLinearGradient(0, 0, s * .22, 0); g.addColorStop(0, GANESHA_SKIN_D); g.addColorStop(.35, GANESHA_SKIN); g.addColorStop(1, GANESHA_SKIN_L);
+      c.fillStyle = g; c.beginPath(); c.moveTo(0, -s * .07); c.bezierCurveTo(s * .12, -s * .15, s * .24, -s * .08, s * .22, s * .04);
+      c.bezierCurveTo(s * .21, s * .13, s * .14, s * .18, s * .06, s * .17); c.quadraticCurveTo(s * .02, s * .1, 0, s * .06); c.closePath(); c.fill();
+      c.fillStyle = "rgba(216,90,110,.55)"; c.beginPath(); c.moveTo(s * .03, -s * .04); c.bezierCurveTo(s * .11, -s * .1, s * .19, -s * .05, s * .18, s * .03);
+      c.bezierCurveTo(s * .17, s * .1, s * .12, s * .13, s * .07, s * .12); c.quadraticCurveTo(s * .04, s * .06, s * .03, -s * .04); c.fill();
+      c.strokeStyle = GANESHA_GOLD; c.lineWidth = Math.max(1, s * .007); c.beginPath(); c.moveTo(s * .02, -s * .085); c.bezierCurveTo(s * .12, -s * .16, s * .25, -s * .09, s * .23, s * .04);
+      c.bezierCurveTo(s * .22, s * .14, s * .14, s * .19, s * .06, s * .18); c.stroke();
+      c.restore(); }); }
+  /* The trunk, curling towards the modak in his left hand. Drawn as a run
+     of discs along a curve, so it tapers and bends without seams. */
+  function ganeshaTrunk(c, cx, foot, s, t) {
+    const Y = (f) => foot - s + f * s, X = (f) => cx + f * s, sw = Math.sin(t * .9) * .012, curl = Math.sin(t * .9 + .6) * .015;
+    const P = [[X(0), Y(.29)], [X(-.01), Y(.4)], [X(.03 + sw), Y(.52)], [X(.11 + sw), Y(.5 - curl)], [X(.12 + sw), Y(.45 - curl)]];
+    const at = (k) => { const n = P.length - 1, i = Math.min(n - 1, Math.floor(k * n)), f = k * n - i, a = P[Math.max(0, i - 1)], b = P[i], d = P[i + 1], e = P[Math.min(n, i + 2)];
+      const cr = (p, q, r, v) => .5 * ((2 * q) + (-p + r) * f + (2 * p - 5 * q + 4 * r - v) * f * f + (-p + 3 * q - 3 * r + v) * f * f * f);
+      return [cr(a[0], b[0], d[0], e[0]), cr(a[1], b[1], d[1], e[1])]; };
+    const N = 34, rad = (k) => s * (.05 - k * .032);
+    c.fillStyle = GANESHA_SKIN_D; for (let i = 0; i <= N; i++) { const k = i / N, [px, py] = at(k); c.beginPath(); c.arc(px, py, rad(k) + Math.max(.8, s * .004), 0, TAU); c.fill(); }
+    for (let i = 0; i <= N; i++) { const k = i / N, [px, py] = at(k), g = .5 + .5 * Math.sin(k * 2.2);
+      c.fillStyle = GANESHA_SKIN; c.beginPath(); c.arc(px, py, rad(k), 0, TAU); c.fill(); }
+    for (let i = 0; i <= N; i++) { const k = i / N, [px, py] = at(k); c.fillStyle = "rgba(255,220,200,.5)"; c.beginPath(); c.arc(px - rad(k) * .35, py - rad(k) * .1, rad(k) * .4, 0, TAU); c.fill(); }
+    c.strokeStyle = "rgba(150,70,50,.5)"; c.lineWidth = Math.max(.6, s * .003);
+    for (let i = 3; i < N - 6; i += 3) { const k = i / N, [px, py] = at(k), r = rad(k); c.beginPath(); c.moveTo(px - r * .8, py - r * .2); c.quadraticCurveTo(px, py + r * .35, px + r * .8, py - r * .2); c.stroke(); }
+    // a gold band on the trunk
+    const [bx, by] = at(.18); c.strokeStyle = GANESHA_GOLD; c.lineWidth = s * .01; c.beginPath(); c.moveTo(bx - rad(.18), by); c.quadraticCurveTo(bx, by + s * .015, bx + rad(.18), by); c.stroke(); }
+  /* His mouse, the mushak, nibbling a modak at the foot of the seat. */
+  function ganeshaMouse(c, x, y, s, t) {
+    const nib = Math.max(0, Math.sin(t * 6)) * .5 * (Math.sin(t * .7) > 0 ? 1 : 0), tw = Math.sin(t * 2.3) * .2;
+    shadow(c, x, y + s * .02, s * .9, s * .12, .4);
+    c.strokeStyle = "#6A5A5A"; c.lineWidth = Math.max(1, s * .05); c.lineCap = "round"; c.beginPath(); c.moveTo(x + s * .5, y - s * .1); c.quadraticCurveTo(x + s * 1.1, y - s * (.1 + tw), x + s * 1.2, y - s * .5); c.stroke();
+    const g = c.createRadialGradient(x, y - s * .35, s * .05, x, y - s * .2, s * .7); g.addColorStop(0, "#B8A8A8"); g.addColorStop(1, "#5A4A4E");
+    c.fillStyle = g; c.beginPath(); c.ellipse(x + s * .1, y - s * .25, s * .5, s * .3, 0, 0, TAU); c.fill();
+    c.save(); c.translate(x - s * .35, y - s * .35 + nib * s * .06); c.rotate(.15 + nib * .1);
+    c.fillStyle = "#8A7A7E"; c.beginPath(); c.moveTo(s * .15, -s * .2); c.quadraticCurveTo(-s * .2, -s * .15, -s * .4, s * .08); c.quadraticCurveTo(-s * .1, s * .15, s * .15, s * .15); c.closePath(); c.fill();
+    c.fillStyle = "#E8A0A8"; c.beginPath(); c.arc(-s * .4, s * .07, s * .05, 0, TAU); c.fill();
+    c.fillStyle = "#8A7A7E"; c.beginPath(); c.arc(s * .08, -s * .2, s * .13, 0, TAU); c.fill(); c.fillStyle = "#E8A0A8"; c.beginPath(); c.arc(s * .08, -s * .2, s * .07, 0, TAU); c.fill();
+    c.fillStyle = "#1A0A0A"; c.beginPath(); c.arc(-s * .15, -s * .05, s * .035, 0, TAU); c.fill(); c.restore();
+    ganeshaModak(c, x - s * .75, y - s * .12, s * .13); }
+
+  /* Hanuman in flight, facing right: one leg trailing, one bent, the mace
+     over his shoulder, and his raised right hand under the mountain he
+     carried back from the Himalayas. Drawn about his waist, in units of s;
+     the hand that holds the mountain is at HANUMAN_HAND. */
+  const HANUMAN_SKIN = "#E8823A", HANUMAN_SKIN_D = "#A84A1A", HANUMAN_SKIN_L = "#FFB878", HANUMAN_GOLD = "#F4C04E", HANUMAN_HAND = [.16, -.43];
+  function hanumanLimb(x, pts, wd, s) {
+    x.lineCap = "round"; x.lineJoin = "round"; x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(a * s, b * s) : x.moveTo(a * s, b * s));
+    x.strokeStyle = HANUMAN_SKIN_D; x.lineWidth = wd * s * 1.25; x.stroke(); x.strokeStyle = HANUMAN_SKIN; x.lineWidth = wd * s; x.stroke(); }
+  function hanumanBody(x, s) {
+    const P = (a, b) => [a * s, b * s], GO = HANUMAN_GOLD;
+    // the far leg, bent at the knee
+    hanumanLimb(x, [[-.1, .02], [-.22, .11], [-.36, .15]], .055, s);
+    x.fillStyle = HANUMAN_SKIN_D; x.beginPath(); x.ellipse(...P(-.39, .155), s * .04, s * .016, .1, 0, TAU); x.fill();
+    // the far arm, raised under the mountain
+    hanumanLimb(x, [[.13, -.07], [.21, -.24], [.17, -.4]], .05, s);
+    x.strokeStyle = GO; x.lineWidth = s * .014; x.beginPath(); x.arc(...P(.19, -.33), s * .026, 0, TAU); x.stroke();
+    x.fillStyle = HANUMAN_SKIN; x.beginPath(); x.ellipse(...P(.165, -.42), s * .05, s * .022, 0, 0, TAU); x.fill();
+    // the mace, its shaft over his shoulder
+    x.strokeStyle = "#8A5A1A"; x.lineWidth = s * .022; x.lineCap = "round"; x.beginPath(); x.moveTo(...P(.27, .08)); x.lineTo(...P(.02, -.16)); x.stroke();
+    x.strokeStyle = GO; x.lineWidth = s * .01; for (let k = 0; k < 4; k++) { const f = .2 + k * .2, px = .27 - .25 * f, py = .08 - .24 * f; x.beginPath(); x.moveTo(...P(px - .012, py + .012)); x.lineTo(...P(px + .012, py - .012)); x.stroke(); }
+    const mg = x.createRadialGradient(...P(-.01, -.21), s * .01, ...P(0, -.19), s * .08); mg.addColorStop(0, "#FFF0B0"); mg.addColorStop(.5, "#E8B030"); mg.addColorStop(1, "#8A5A0A");
+    x.fillStyle = mg; x.beginPath(); x.arc(...P(0, -.19), s * .072, 0, TAU); x.fill();
+    x.strokeStyle = "rgba(120,70,0,.6)"; x.lineWidth = Math.max(1, s * .005); for (let k = -2; k <= 2; k++) { x.beginPath(); x.ellipse(...P(0, -.19), s * .072 * Math.cos(k * .5), s * .072, 0, 0, TAU); x.stroke(); }
+    x.fillStyle = "#E8B030"; x.beginPath(); x.arc(...P(-.06, -.25), s * .018, 0, TAU); x.fill();
+    // the near leg, trailing straight back
+    hanumanLimb(x, [[-.1, 0], [-.3, .03], [-.5, .02]], .06, s);
+    x.fillStyle = HANUMAN_SKIN; x.beginPath(); x.ellipse(...P(-.535, .015), s * .045, s * .018, -.05, 0, TAU); x.fill();
+    x.strokeStyle = GO; x.lineWidth = s * .01; x.beginPath(); x.ellipse(...P(-.49, .02), s * .008, s * .028, 0, 0, TAU); x.stroke();
+    // the dhoti, saffron with a gold border, wrapped to the knee
+    const dg = x.createLinearGradient(0, -.08 * s, 0, .12 * s); dg.addColorStop(0, "#F2A030"); dg.addColorStop(.5, "#E8641A"); dg.addColorStop(1, "#A83A0A");
+    x.fillStyle = dg; x.beginPath(); x.moveTo(...P(-.02, -.06)); x.quadraticCurveTo(...P(-.15, -.08), ...P(-.3, -.03)); x.lineTo(...P(-.31, .08)); x.quadraticCurveTo(...P(-.24, .16), ...P(-.2, .14)); x.quadraticCurveTo(...P(-.1, .1), ...P(-.02, .07)); x.closePath(); x.fill();
+    x.strokeStyle = GO; x.lineWidth = s * .012; x.beginPath(); x.moveTo(...P(-.3, -.03)); x.lineTo(...P(-.31, .08)); x.stroke();
+    x.strokeStyle = "rgba(120,40,0,.4)"; x.lineWidth = Math.max(1, s * .004); [[-.06, -.24, .0], [-.08, -.27, .05]].forEach(([a, b, d]) => { x.beginPath(); x.moveTo(...P(a, -.04 + d)); x.quadraticCurveTo(...P((a + b) / 2, .02 + d), ...P(b, .02 + d)); x.stroke(); });
+    x.fillStyle = GO; x.beginPath(); x.moveTo(...P(-.02, -.065)); x.lineTo(...P(-.02, .075)); x.lineTo(...P(-.045, .07)); x.lineTo(...P(-.045, -.065)); x.fill();
+    // the torso: broad back above, chest below
+    const tg = x.createLinearGradient(0, -.1 * s, 0, .08 * s); tg.addColorStop(0, HANUMAN_SKIN_L); tg.addColorStop(.45, HANUMAN_SKIN); tg.addColorStop(1, HANUMAN_SKIN_D);
+    x.fillStyle = tg; x.beginPath(); x.moveTo(...P(-.04, -.065)); x.quadraticCurveTo(...P(.08, -.1), ...P(.2, -.1)); x.quadraticCurveTo(...P(.27, -.08), ...P(.26, -.02));
+    x.quadraticCurveTo(...P(.22, .07), ...P(.1, .07)); x.quadraticCurveTo(...P(.03, .07), ...P(-.04, .07)); x.closePath(); x.fill();
+    x.strokeStyle = "rgba(140,60,20,.45)"; x.lineWidth = Math.max(1, s * .004); x.beginPath(); x.moveTo(...P(.14, .065)); x.quadraticCurveTo(...P(.17, .02), ...P(.22, .03)); x.stroke();
+    x.beginPath(); x.moveTo(...P(.05, .06)); x.lineTo(...P(.05, .0)); x.moveTo(.09 * s, .06 * s); x.lineTo(.09 * s, .0); x.stroke();
+    // necklaces and the sacred thread
+    x.strokeStyle = GO; x.lineWidth = s * .01; x.beginPath(); x.moveTo(...P(.24, -.08)); x.quadraticCurveTo(...P(.2, 0), ...P(.25, .03)); x.stroke();
+    x.strokeStyle = "#E8343A"; x.beginPath(); x.moveTo(...P(.22, -.09)); x.quadraticCurveTo(...P(.16, .02), ...P(.22, .06)); x.stroke();
+    x.strokeStyle = "#FFF4DC"; x.lineWidth = Math.max(1, s * .004); x.beginPath(); x.moveTo(...P(.2, -.1)); x.quadraticCurveTo(...P(.08, -.02), ...P(-.02, .06)); x.stroke();
+    // the near arm, forward and down, holding the mace's foot
+    hanumanLimb(x, [[.17, -.04], [.23, .06], [.27, .08]], .055, s);
+    x.strokeStyle = GO; x.lineWidth = s * .014; x.beginPath(); x.arc(...P(.25, .07), s * .028, 0, TAU); x.stroke();
+    x.fillStyle = GO; x.beginPath(); x.ellipse(...P(.19, .0), s * .03, s * .018, 1, 0, TAU); x.fill();
+    x.fillStyle = HANUMAN_SKIN; x.beginPath(); x.arc(...P(.28, .085), s * .03, 0, TAU); x.fill();
+    // the head: a monkey's face in profile, with a lighter muzzle and a crown
+    x.fillStyle = HANUMAN_SKIN; x.beginPath(); x.ellipse(...P(.3, -.11), s * .07, s * .062, -.2, 0, TAU); x.fill();
+    x.fillStyle = HANUMAN_SKIN_D; x.beginPath(); x.ellipse(...P(.27, -.1), s * .022, s * .028, 0, 0, TAU); x.fill();
+    x.fillStyle = "#F2C08A"; x.beginPath(); x.ellipse(...P(.27, -.1), s * .012, s * .017, 0, 0, TAU); x.fill();
+    const fg = x.createLinearGradient(...P(.32, -.14), ...P(.4, -.06)); fg.addColorStop(0, "#FFD8B0"); fg.addColorStop(1, "#E8A070");
+    x.fillStyle = fg; x.beginPath(); x.moveTo(...P(.31, -.135)); x.quadraticCurveTo(...P(.4, -.14), ...P(.41, -.1)); x.quadraticCurveTo(...P(.42, -.065), ...P(.38, -.055)); x.quadraticCurveTo(...P(.33, -.05), ...P(.3, -.07)); x.closePath(); x.fill();
+    x.strokeStyle = "#7A2A0A"; x.lineWidth = Math.max(1, s * .005); x.beginPath(); x.moveTo(...P(.36, -.075)); x.quadraticCurveTo(...P(.39, -.07), ...P(.41, -.08)); x.stroke();
+    x.fillStyle = "#3A1A0A"; x.beginPath(); x.arc(...P(.405, -.11), s * .005, 0, TAU); x.fill();
+    x.fillStyle = HANUMAN_SKIN_D; x.beginPath(); x.ellipse(...P(.34, -.145), s * .03, s * .009, -.1, 0, TAU); x.fill();
+    x.fillStyle = "#FFF8EC"; x.beginPath(); x.ellipse(...P(.345, -.125), s * .012, s * .008, -.1, 0, TAU); x.fill();
+    x.fillStyle = "#1A0A0A"; x.beginPath(); x.arc(...P(.35, -.125), s * .005, 0, TAU); x.fill();
+    x.fillStyle = "#E8343A"; x.beginPath(); x.ellipse(...P(.335, -.16), s * .004, s * .01, -.2, 0, TAU); x.fill();
+    const cg = x.createLinearGradient(...P(.22, -.2), ...P(.36, -.2)); cg.addColorStop(0, "#A8741A"); cg.addColorStop(.5, "#FFE69A"); cg.addColorStop(1, "#A8741A");
+    x.fillStyle = cg; x.beginPath(); x.moveTo(...P(.24, -.15)); x.quadraticCurveTo(...P(.3, -.185), ...P(.35, -.16)); x.lineTo(...P(.33, -.21)); x.lineTo(...P(.3, -.27)); x.lineTo(...P(.26, -.21)); x.closePath(); x.fill();
+    x.fillStyle = "#E8343A"; x.beginPath(); x.arc(...P(.3, -.19), s * .01, 0, TAU); x.fill();
+    x.fillStyle = GO; x.beginPath(); x.arc(...P(.27, -.075), s * .012, 0, TAU); x.fill(); }
+  /* Dronagiri, torn out by the roots: peaks, trees, and earth trailing
+     beneath. Painted once, about its base. */
+  function hanumanMountain(x, cx, cy, s) {
+    const P = (a, b) => [cx + a * s, cy + b * s];
+    // the torn earth underneath
+    x.fillStyle = "#4A2E1E"; x.beginPath(); x.moveTo(...P(-.24, 0)); for (let k = 0; k <= 12; k++) { const f = k / 12; x.lineTo(...P(-.24 + f * .48, .03 + .05 * Math.sin(f * Math.PI) + .02 * Math.sin(k * 2.7))); } x.lineTo(...P(.24, 0)); x.fill();
+    x.strokeStyle = "#6A4A2A"; x.lineWidth = Math.max(1, s * .005); for (let k = 0; k < 7; k++) { const rx = -.18 + k * .06; x.beginPath(); x.moveTo(...P(rx, .04)); x.quadraticCurveTo(...P(rx + .02, .08), ...P(rx - .01, .11 + (k % 3) * .02)); x.stroke(); }
+    // the rock, three peaks
+    const rg = x.createLinearGradient(...P(-.25, 0), ...P(.25, 0)); rg.addColorStop(0, "#6A6880"); rg.addColorStop(.45, "#A8A4B8"); rg.addColorStop(1, "#4A4860");
+    x.fillStyle = rg; x.beginPath(); x.moveTo(...P(-.26, .01)); x.lineTo(...P(-.18, -.17)); x.lineTo(...P(-.11, -.13)); x.lineTo(...P(-.02, -.36)); x.lineTo(...P(.06, -.24)); x.lineTo(...P(.12, -.29)); x.lineTo(...P(.26, .01)); x.closePath(); x.fill();
+    x.fillStyle = "rgba(40,36,60,.35)"; x.beginPath(); x.moveTo(...P(-.02, -.36)); x.lineTo(...P(.06, -.24)); x.lineTo(...P(.12, -.29)); x.lineTo(...P(.26, .01)); x.lineTo(...P(.02, .01)); x.closePath(); x.fill();
+    x.fillStyle = "#EEF2FA"; x.beginPath(); x.moveTo(...P(-.02, -.36)); x.lineTo(...P(.025, -.29)); x.lineTo(...P(0, -.3)); x.lineTo(...P(-.03, -.27)); x.lineTo(...P(-.06, -.29)); x.closePath(); x.fill();
+    // green slopes and trees
+    const gg = x.createLinearGradient(...P(0, -.2), ...P(0, .02)); gg.addColorStop(0, "#5A9A3A"); gg.addColorStop(1, "#2A5A2A");
+    x.fillStyle = gg; x.beginPath(); x.moveTo(...P(-.26, .01)); x.quadraticCurveTo(...P(-.15, -.12), ...P(-.04, -.1)); x.quadraticCurveTo(...P(.08, -.16), ...P(.2, -.08)); x.lineTo(...P(.26, .01)); x.closePath(); x.fill();
+    for (let k = 0; k < 16; k++) { const f = k / 15, tx = -.22 + f * .44, ty = -.02 - .09 * Math.sin(f * Math.PI) - (k % 3) * .015;
+      x.fillStyle = k % 2 ? "#1E4A24" : "#2A5E2A"; x.beginPath(); x.moveTo(...P(tx - .016, ty + .015)); x.lineTo(...P(tx, ty - .045)); x.lineTo(...P(tx + .016, ty + .015)); x.fill(); } }
+
+  /* A govinda of a dahi handi team, seen from behind, P tall, feet at
+     (x, y): team T-shirt, white shorts, arms linked or raised. */
+  function janmashtamiPerson(c, x, y, P, shirt, arms, helmet, gap) {
+    const sw = P * .12, SK = "#7A4428", SKD = "#4A2412";
+    // legs, a little apart, bare from the knee, with dark shoes
+    c.lineCap = "round"; c.strokeStyle = SKD; c.lineWidth = P * .075;
+    [-1, 1].forEach((d) => { c.beginPath(); c.moveTo(x + d * sw * .45, y - P * .34); c.lineTo(x + d * sw * .7, y - P * .04); c.stroke(); });
+    c.strokeStyle = SK; c.lineWidth = P * .055; [-1, 1].forEach((d) => { c.beginPath(); c.moveTo(x + d * sw * .45, y - P * .3); c.lineTo(x + d * sw * .7, y - P * .05); c.stroke(); });
+    c.fillStyle = "#1A1416"; [-1, 1].forEach((d) => { c.beginPath(); c.ellipse(x + d * sw * .75, y - P * .02, P * .04, P * .022, 0, 0, TAU); c.fill(); });
+    // white shorts
+    c.fillStyle = "#EDEDED"; c.beginPath(); c.moveTo(x - sw * .9, y - P * .46); c.lineTo(x + sw * .9, y - P * .46); c.lineTo(x + sw * 1.0, y - P * .3); c.lineTo(x + sw * .05, y - P * .29); c.lineTo(x, y - P * .33); c.lineTo(x - sw * .05, y - P * .29); c.lineTo(x - sw, y - P * .3); c.closePath(); c.fill();
+    // the team T-shirt, rounded at the shoulders, short sleeves
+    const g = c.createLinearGradient(x - sw * 1.3, 0, x + sw * 1.3, 0); g.addColorStop(0, shirt[1]); g.addColorStop(.45, shirt[0]); g.addColorStop(1, shirt[1]);
+    c.fillStyle = g; c.beginPath(); c.moveTo(x - sw * .9, y - P * .45); c.lineTo(x - sw, y - P * .66); c.quadraticCurveTo(x - sw * 1.35, y - P * .7, x - sw * 1.3, y - P * .62); c.lineTo(x - sw * 1.45, y - P * .7);
+    c.quadraticCurveTo(x - sw * 1.3, y - P * .79, x - sw * .4, y - P * .79); c.lineTo(x + sw * .4, y - P * .79); c.quadraticCurveTo(x + sw * 1.3, y - P * .79, x + sw * 1.45, y - P * .7); c.lineTo(x + sw * 1.3, y - P * .62);
+    c.quadraticCurveTo(x + sw * 1.35, y - P * .7, x + sw, y - P * .66); c.lineTo(x + sw * .9, y - P * .45); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(0,0,0,.35)"; c.lineWidth = Math.max(.6, P * .008); c.stroke();
+    c.fillStyle = "rgba(255,255,255,.85)"; c.fillRect(x - sw * .9, y - P * .52, sw * 1.8, P * .025);
+    // arms: over the neighbours' shoulders, raised, or reaching for the pot
+    c.strokeStyle = SK; c.lineWidth = P * .055; c.lineJoin = "round";
+    const arm = (pts) => { c.beginPath(); pts.forEach(([a, b], i) => i ? c.lineTo(a, b) : c.moveTo(a, b)); c.stroke(); };
+    if (arms === "up") [-1, 1].forEach((d) => arm([[x + d * sw * 1.35, y - P * .7], [x + d * sw * 1.9, y - P * .92], [x + d * sw * 1.5, y - P * 1.16]]));
+    else if (arms === "reach") { arm([[x + sw * 1.35, y - P * .7], [x + sw * 1.1, y - P * .98], [x + sw * .3, y - P * 1.24]]); arm([[x - sw * 1.35, y - P * .7], [x - sw * 2.1, y - P * .78], [x - sw * 2.4, y - P * .66]]); }
+    else [-1, 1].forEach((d) => arm([[x + d * sw * 1.35, y - P * .69], [x + d * (gap || sw * 2.2) * .62, y - P * .66], [x + d * (gap || sw * 2.2) * .82, y - P * .74]]));
+    // neck, head from behind, and the headband or helmet
+    c.fillStyle = SK; c.fillRect(x - P * .03, y - P * .84, P * .06, P * .07);
+    c.fillStyle = "#140A08"; c.beginPath(); c.arc(x, y - P * .9, P * .08, 0, TAU); c.fill();
+    c.fillStyle = SK; [-1, 1].forEach((d) => { c.beginPath(); c.ellipse(x + d * P * .08, y - P * .89, P * .016, P * .025, 0, 0, TAU); c.fill(); });
+    c.fillStyle = "rgba(255,255,255,.12)"; c.beginPath(); c.arc(x - P * .02, y - P * .93, P * .04, 0, TAU); c.fill();
+    if (helmet) { c.fillStyle = helmet; c.beginPath(); c.arc(x, y - P * .91, P * .09, Math.PI, TAU); c.fill(); c.fillRect(x - P * .1, y - P * .915, P * .2, P * .022); c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(x - P * .05, y - P * .97, P * .03, P * .04); }
+    else { c.fillStyle = "#F2C21A"; c.fillRect(x - P * .082, y - P * .92, P * .164, P * .028); c.beginPath(); c.moveTo(x, y - P * .91); c.lineTo(x - P * .03, y - P * .82); c.lineTo(x + P * .01, y - P * .82); c.fill(); } }
+  /* The clay handi, its rim painted white, a garland round its neck. */
+  function janmashtamiPot(c, x, y, r) {
+    const g = c.createRadialGradient(x - r * .35, y - r * .3, r * .1, x, y, r); g.addColorStop(0, "#D8784A"); g.addColorStop(.7, "#9A3A1A"); g.addColorStop(1, "#5A1E0A");
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    c.fillStyle = "#7A2A10"; c.fillRect(x - r * .45, y - r * 1.12, r * .9, r * .25);
+    c.fillStyle = "#F8F2E0"; c.beginPath(); c.ellipse(x, y - r * 1.12, r * .5, r * .12, 0, 0, TAU); c.fill();
+    c.save(); c.beginPath(); c.arc(x, y, r, 0, TAU); c.clip(); c.fillStyle = "#F8F2E0"; c.fillRect(x - r, y - r * .02, r * 2, r * .07); c.fillRect(x - r, y + r * .3, r * 2, r * .05);
+    c.fillStyle = "#F2C21A"; for (let k = -4; k <= 4; k++) { c.beginPath(); c.moveTo(x + k * r * .24 - r * .1, y + r * .05); c.lineTo(x + k * r * .24, y + r * .27); c.lineTo(x + k * r * .24 + r * .1, y + r * .05); c.fill(); }
+    c.fillStyle = "rgba(255,230,200,.25)"; c.beginPath(); c.ellipse(x - r * .4, y - r * .35, r * .18, r * .3, -.4, 0, TAU); c.fill(); c.restore();
+    for (let k = 0; k <= 10; k++) { const a = Math.PI * 1.1 + k / 10 * Math.PI * .8; c.fillStyle = k % 2 ? "#F59E0B" : "#E8541A"; c.beginPath(); c.arc(x + Math.cos(a) * r * .95, y - r * .55 + Math.sin(a) * -r * .1 + r * .02, r * .12, 0, TAU); c.fill(); } }
+
+  /* Ramanavami at noon: baby Rama in a painted palna, rocked under a
+     carved frame, his bow and quiver leaning against the post, and the
+     temple's saffron flag flying in the midday sun. */
+  function ramaTemple(x, cx, foot, s) {
+    // a curved sandstone shikhara on a stepped base, ribbed and capped
+    const bw = s * .3, top = foot - s * .95, H = foot - s * .3 - top;
+    const sg = x.createLinearGradient(cx - bw, 0, cx + bw, 0); sg.addColorStop(0, "#C8885A"); sg.addColorStop(.42, "#F8D8A8"); sg.addColorStop(.6, "#E0A870"); sg.addColorStop(1, "#9A5A30");
+    x.fillStyle = sg; x.fillRect(cx - bw * 1.25, foot - s * .3, bw * 2.5, s * .3);
+    x.fillStyle = "#B8784A"; for (let k = 0; k < 3; k++) x.fillRect(cx - bw * (1.3 - k * .05), foot - s * (.3 - k * .1), bw * (2.6 - k * .1), s * .015);
+    // the doorway, dark, with a lamp inside
+    x.fillStyle = "#3A1A0E"; x.beginPath(); x.moveTo(cx - bw * .3, foot); x.lineTo(cx - bw * .3, foot - s * .16); x.quadraticCurveTo(cx, foot - s * .25, cx + bw * .3, foot - s * .16); x.lineTo(cx + bw * .3, foot); x.fill();
+    const lg = x.createRadialGradient(cx, foot - s * .08, 0, cx, foot - s * .08, bw * .3); lg.addColorStop(0, "rgba(255,200,100,.8)"); lg.addColorStop(1, "rgba(255,150,50,0)"); x.fillStyle = lg; x.fillRect(cx - bw * .3, foot - s * .2, bw * .6, s * .2);
+    x.fillStyle = sg; x.beginPath(); x.moveTo(cx - bw, foot - s * .3); x.bezierCurveTo(cx - bw, top + H * .5, cx - bw * .55, top + H * .1, cx - bw * .25, top); x.lineTo(cx + bw * .25, top);
+    x.bezierCurveTo(cx + bw * .55, top + H * .1, cx + bw, top + H * .5, cx + bw, foot - s * .3); x.closePath(); x.fill();
+    x.save(); x.clip(); for (let k = 0; k < 11; k++) { const yy = top + H * (k + .5) / 11; x.fillStyle = "rgba(120,60,20,.28)"; x.fillRect(cx - bw * 1.1, yy, bw * 2.2, Math.max(1, s * .008)); x.fillStyle = "rgba(255,240,210,.3)"; x.fillRect(cx - bw * 1.1, yy + Math.max(1, s * .008), bw * 2.2, Math.max(1, s * .004)); }
+    x.fillStyle = "rgba(120,60,20,.25)"; [-.5, 0, .5].forEach((k) => x.fillRect(cx + k * bw - s * .008, top, s * .016, H)); x.restore();
+    // the amalaka and the gold kalasha on top
+    x.fillStyle = "#D8A06A"; x.beginPath(); x.ellipse(cx, top - s * .02, bw * .36, s * .028, 0, 0, TAU); x.fill();
+    x.strokeStyle = "rgba(120,60,20,.5)"; x.lineWidth = 1; for (let k = -3; k <= 3; k++) { x.beginPath(); x.moveTo(cx + k * bw * .1, top - s * .045); x.lineTo(cx + k * bw * .1, top + s * .005); x.stroke(); }
+    x.fillStyle = "#F4C04E"; x.beginPath(); x.arc(cx, top - s * .07, s * .025, 0, TAU); x.fill(); x.beginPath(); x.moveTo(cx - s * .012, top - s * .09); x.lineTo(cx, top - s * .13); x.lineTo(cx + s * .012, top - s * .09); x.fill(); }
+  /* The palna: a boat-shaped cradle, lacquered red and green, with the
+     baby swaddled in yellow, his face blue, a little crown on his head. */
+  function ramaCradle(x, s) {
+    // hung from (0, 0); the cradle body sits s * .38 below
+    const by = s * .38, hw = s * .26;
+    x.strokeStyle = "#C8A040"; x.lineWidth = Math.max(1, s * .008); [-1, 1].forEach((d) => { x.beginPath(); x.moveTo(0, 0); x.lineTo(d * hw * .85, by - s * .04); x.stroke(); });
+    x.fillStyle = "#F4C04E"; x.beginPath(); x.arc(0, s * .01, s * .018, 0, TAU); x.fill();
+    // the baby, swaddled in yellow, his head on the left, face turned up
+    const yg = x.createLinearGradient(0, by - s * .12, 0, by); yg.addColorStop(0, "#FFE680"); yg.addColorStop(1, "#E8A80A");
+    x.fillStyle = yg; x.beginPath(); x.moveTo(-hw * .3, by - s * .02); x.quadraticCurveTo(-hw * .2, by - s * .12, hw * .3, by - s * .1); x.quadraticCurveTo(hw * .75, by - s * .08, hw * .8, by - s * .02); x.closePath(); x.fill();
+    x.strokeStyle = "#D8263A"; x.lineWidth = Math.max(1, s * .008); x.beginPath(); x.moveTo(-hw * .22, by - s * .085); x.quadraticCurveTo(hw * .2, by - s * .115, hw * .55, by - s * .08); x.stroke();
+    x.fillStyle = "#4A7AC8"; x.beginPath(); x.arc(-hw * .05, by - s * .105, s * .018, 0, TAU); x.fill();
+    const hx = -hw * .48, hy = by - s * .085, hr = s * .058;
+    const fg = x.createRadialGradient(hx + hr * .3, hy - hr * .3, hr * .1, hx, hy, hr); fg.addColorStop(0, "#7AA8E8"); fg.addColorStop(1, "#3A62B0");
+    x.fillStyle = fg; x.beginPath(); x.arc(hx, hy, hr, 0, TAU); x.fill();
+    x.fillStyle = "#1A1020"; x.beginPath(); x.arc(hx, hy, hr * 1.02, Math.PI * .75, Math.PI * 1.45); x.lineTo(hx, hy); x.fill();
+    x.fillStyle = "#F4C04E"; x.beginPath(); x.moveTo(hx - hr * .9, hy - hr * .5); x.lineTo(hx - hr * .75, hy - hr * 1.35); x.lineTo(hx - hr * .45, hy - hr * .95); x.lineTo(hx - hr * .2, hy - hr * 1.5); x.lineTo(hx + hr * .02, hy - hr * .95); x.lineTo(hx - hr * .3, hy - hr * .7); x.closePath(); x.fill();
+    x.fillStyle = "#E8343A"; x.beginPath(); x.arc(hx - hr * .45, hy - hr * .95, hr * .1, 0, TAU); x.fill();
+    x.strokeStyle = "#14102A"; x.lineWidth = Math.max(.8, s * .004); x.beginPath(); x.arc(hx + hr * .38, hy - hr * .1, hr * .18, .2, Math.PI - .2); x.stroke();
+    x.beginPath(); x.arc(hx + hr * .55, hy + hr * .42, hr * .14, .3, Math.PI - .3); x.stroke();
+    x.fillStyle = "#F2F0E0"; x.fillRect(hx + hr * .1, hy - hr * .7, hr * .08, hr * .3); x.fillStyle = "#E8343A"; x.fillRect(hx + hr * .12, hy - hr * .55, hr * .05, hr * .15);
+    // the cradle itself, with curled ends
+    const cg = x.createLinearGradient(0, by - s * .05, 0, by + s * .1); cg.addColorStop(0, "#D8263A"); cg.addColorStop(1, "#7A0A1A");
+    x.fillStyle = cg; x.beginPath(); x.moveTo(-hw, by - s * .07); x.quadraticCurveTo(-hw * 1.05, by - s * .12, -hw * 1.15, by - s * .1); x.quadraticCurveTo(-hw * 1.05, by + s * .1, 0, by + s * .1);
+    x.quadraticCurveTo(hw * 1.05, by + s * .1, hw * 1.15, by - s * .1); x.quadraticCurveTo(hw * 1.05, by - s * .12, hw, by - s * .07); x.quadraticCurveTo(0, by - s * .02, -hw, by - s * .07); x.fill();
+    x.strokeStyle = "#F4C04E"; x.lineWidth = Math.max(1, s * .01); x.beginPath(); x.moveTo(-hw * 1.05, by - s * .06); x.quadraticCurveTo(0, by - s * .01, hw * 1.05, by - s * .06); x.stroke();
+    x.fillStyle = "#2F8A4A"; x.fillRect(-hw * .9, by + s * .025, hw * 1.8, s * .02);
+    for (let k = 0; k < 9; k++) { x.fillStyle = "#F4C04E"; x.beginPath(); x.arc(-hw * .8 + k * hw * .2, by + s * .035, s * .007, 0, TAU); x.fill(); }
+    [-1, 1].forEach((d) => { x.fillStyle = "#F4C04E"; x.beginPath(); x.arc(d * hw * 1.15, by - s * .11, s * .018, 0, TAU); x.fill(); }); }
+
+  /* The Ravana effigy of a Dusshera ground: bamboo and painted paper, a
+     flared robe, sword and shield, and ten crowned heads in two rows.
+     Units are fractions of s, its height; (cx, foot) is its base. */
+  function ravanaHead(x, hx, hy, r, back) {
+    x.fillStyle = back ? "#C8804A" : "#F2B07A"; x.beginPath(); x.ellipse(hx, hy, r, r * 1.12, 0, 0, TAU); x.fill();
+    x.fillStyle = "#1A0A0A"; x.beginPath(); x.ellipse(hx, hy - r * .82, r * .95, r * .4, 0, Math.PI, TAU); x.fill();
+    [-1, 1].forEach((d) => { x.fillStyle = "#FFF8EC"; x.beginPath(); x.ellipse(hx + d * r * .38, hy - r * .15, r * .26, r * .17, d * .2, 0, TAU); x.fill();
+      x.fillStyle = "#1A0A0A"; x.beginPath(); x.arc(hx + d * r * .34, hy - r * .15, r * .1, 0, TAU); x.fill();
+      x.strokeStyle = "#1A0A0A"; x.lineWidth = Math.max(1, r * .1); x.beginPath(); x.moveTo(hx + d * r * .12, hy - r * .32); x.lineTo(hx + d * r * .65, hy - r * .5); x.stroke(); });
+    x.strokeStyle = "#1A0A0A"; x.lineWidth = Math.max(1.2, r * .16); x.lineCap = "round"; x.beginPath(); x.moveTo(hx - r * .7, hy + r * .2);
+    x.quadraticCurveTo(hx - r * .3, hy + r * .5, hx, hy + r * .28); x.quadraticCurveTo(hx + r * .3, hy + r * .5, hx + r * .7, hy + r * .2); x.stroke();
+    x.fillStyle = "#B01020"; x.beginPath(); x.ellipse(hx, hy + r * .55, r * .22, r * .09, 0, 0, TAU); x.fill();
+    x.fillStyle = "#D8263A"; x.beginPath(); x.ellipse(hx, hy - r * .55, r * .06, r * .14, 0, 0, TAU); x.fill();
+    const cg = x.createLinearGradient(hx - r, 0, hx + r, 0); cg.addColorStop(0, "#A8741A"); cg.addColorStop(.5, "#FFE69A"); cg.addColorStop(1, "#A8741A");
+    x.fillStyle = cg; x.beginPath(); x.moveTo(hx - r * .95, hy - r * .85); for (let k = 0; k <= 6; k++) { const f = k / 6; x.lineTo(hx - r * .95 + f * r * 1.9, hy - r * (k % 2 ? 1.25 : 1.75) - (k === 3 ? r * .35 : 0)); } x.lineTo(hx + r * .95, hy - r * .85); x.closePath(); x.fill();
+    x.fillStyle = "#2FA84F"; x.beginPath(); x.arc(hx, hy - r * 1.15, r * .14, 0, TAU); x.fill(); }
+  function ravanaEffigy(x, cx, foot, s) {
+    const Y = (f) => foot - s + f * s, X = (f) => cx + f * s;
+    // the bamboo legs and frame it stands on
+    x.strokeStyle = "#8A6A3A"; x.lineWidth = s * .018; [-1, 1].forEach((d) => { x.beginPath(); x.moveTo(X(.06 * d), Y(.88)); x.lineTo(X(.1 * d), Y(1)); x.stroke(); });
+    x.beginPath(); x.moveTo(X(-.14), Y(1)); x.lineTo(X(.14), Y(1)); x.stroke();
+    // the robe: a tall flared skirt in painted panels with silver trim
+    const cols = ["#C8102E", "#2F8A4A", "#F2B705", "#2D5BD8", "#C8102E", "#2F8A4A", "#F2B705"];
+    cols.forEach((col, i) => { const f0 = i / cols.length, f1 = (i + 1) / cols.length, tl = -.09 + f0 * .18, tr = -.09 + f1 * .18, bl = -.2 + f0 * .4, br = -.2 + f1 * .4;
+      x.fillStyle = col; x.beginPath(); x.moveTo(X(tl), Y(.46)); x.lineTo(X(tr), Y(.46)); x.lineTo(X(br), Y(.9)); x.lineTo(X(bl), Y(.9)); x.closePath(); x.fill(); });
+    const sh = x.createLinearGradient(X(-.2), 0, X(.2), 0); sh.addColorStop(0, "rgba(0,0,0,.35)"); sh.addColorStop(.4, "rgba(255,255,255,.1)"); sh.addColorStop(1, "rgba(0,0,0,.4)");
+    x.fillStyle = sh; x.beginPath(); x.moveTo(X(-.09), Y(.46)); x.lineTo(X(.09), Y(.46)); x.lineTo(X(.2), Y(.9)); x.lineTo(X(-.2), Y(.9)); x.closePath(); x.fill();
+    x.fillStyle = "#DDE2EA"; [.6, .74, .88].forEach((f) => { const hw = .09 + (f - .46) / .44 * .11; x.fillRect(X(-hw), Y(f), s * hw * 2, s * .012); });
+    for (let k = 0; k < 14; k++) { x.fillStyle = k % 2 ? "#FFE69A" : "#F2F4F8"; x.beginPath(); x.arc(X(-.19 + k * .029), Y(.895), s * .006, 0, TAU); x.fill(); }
+    // the chest: gold armour, a belt, garlands
+    const ag = x.createLinearGradient(X(-.1), 0, X(.1), 0); ag.addColorStop(0, "#8A5A0A"); ag.addColorStop(.5, "#F4C04E"); ag.addColorStop(1, "#7A4A08");
+    x.fillStyle = ag; x.beginPath(); x.moveTo(X(-.12), Y(.25)); x.lineTo(X(.12), Y(.25)); x.lineTo(X(.09), Y(.47)); x.lineTo(X(-.09), Y(.47)); x.closePath(); x.fill();
+    x.strokeStyle = "rgba(90,40,0,.5)"; x.lineWidth = Math.max(1, s * .004); for (let k = 0; k < 4; k++) { x.beginPath(); x.moveTo(X(-.11 + k * .003), Y(.29 + k * .045)); x.lineTo(X(.11 - k * .003), Y(.29 + k * .045)); x.stroke(); }
+    x.fillStyle = "#C8102E"; x.fillRect(X(-.095), Y(.44), s * .19, s * .03);
+    x.fillStyle = "#2D5BD8"; x.beginPath(); x.arc(X(0), Y(.36), s * .03, 0, TAU); x.fill(); x.strokeStyle = "#FFE69A"; x.lineWidth = s * .006; x.stroke();
+    [[.14, "#F59E0B"], [.18, "#F2F4F8"]].forEach(([r, col]) => { x.strokeStyle = col; x.lineWidth = s * .01; x.setLineDash([s * .008, s * .008]); x.beginPath(); x.ellipse(X(0), Y(.25), s * r * .7, s * r, 0, .3, Math.PI - .3); x.stroke(); }); x.setLineDash([]);
+    // shoulders and arms: a sword raised in one hand, a shield in the other
+    x.fillStyle = "#2F8A4A"; [-1, 1].forEach((d) => { x.beginPath(); x.ellipse(X(.13 * d), Y(.27), s * .055, s * .035, 0, 0, TAU); x.fill(); });
+    x.strokeStyle = "#F2B07A"; x.lineWidth = s * .035; x.lineCap = "round";
+    x.beginPath(); x.moveTo(X(-.15), Y(.28)); x.lineTo(X(-.27), Y(.36)); x.lineTo(X(-.3), Y(.22)); x.stroke();
+    x.beginPath(); x.moveTo(X(.15), Y(.28)); x.lineTo(X(.27), Y(.36)); x.lineTo(X(.3), Y(.46)); x.stroke();
+    x.strokeStyle = "#F4C04E"; x.lineWidth = s * .01; [[-.27, .34], [.27, .38]].forEach(([a, b]) => { x.beginPath(); x.arc(X(a), Y(b), s * .02, 0, TAU); x.stroke(); });
+    const bl = x.createLinearGradient(X(-.36), 0, X(-.28), 0); bl.addColorStop(0, "#9AA4B0"); bl.addColorStop(.5, "#F2F6FA"); bl.addColorStop(1, "#8A94A0");
+    x.fillStyle = bl; x.beginPath(); x.moveTo(X(-.3), Y(.21)); x.quadraticCurveTo(X(-.37), Y(.1), X(-.33), Y(-.02)); x.quadraticCurveTo(X(-.31), Y(.1), X(-.28), Y(.21)); x.closePath(); x.fill();
+    x.fillStyle = "#F4C04E"; x.fillRect(X(-.33), Y(.21), s * .06, s * .015);
+    const sg = x.createRadialGradient(X(.3), Y(.47), s * .01, X(.3), Y(.48), s * .09); sg.addColorStop(0, "#F4C04E"); sg.addColorStop(.3, "#C8102E"); sg.addColorStop(1, "#5A0A10");
+    x.fillStyle = sg; x.beginPath(); x.arc(X(.3), Y(.48), s * .085, 0, TAU); x.fill(); x.strokeStyle = "#F4C04E"; x.lineWidth = s * .01; x.stroke();
+    for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + .4; x.fillStyle = "#FFE69A"; x.beginPath(); x.arc(X(.3) + Math.cos(a) * s * .05, Y(.48) + Math.sin(a) * s * .05, s * .01, 0, TAU); x.fill(); }
+    // ten heads: five behind, five in front, the middle one the largest
+    for (let k = 0; k < 5; k++) ravanaHead(x, X((k - 2) * .1 + (k < 2 ? -.04 : k > 2 ? .04 : 0)), Y(.13), s * .04, true);
+    [[-2, .036], [-1, .042], [1, .042], [2, .036]].forEach(([k, r]) => ravanaHead(x, X(k * .075), Y(.19), s * r, false));
+    ravanaHead(x, X(0), Y(.18), s * .052, false); }
+  /* The silhouettes of the crowd watching, painted once. */
+  function ravanaCrowd(x, x0, x1, foot, s) {
+    for (let px = x0, i = 0; px < x1; i++) { const hh = s * (.07 + .03 * Math.abs(Math.sin(i * 2.3))), wd = s * (.035 + .01 * Math.abs(Math.sin(i * 1.7)));
+      x.fillStyle = i % 2 ? "#120808" : "#1A0C0A"; x.beginPath(); x.moveTo(px - wd, foot); x.quadraticCurveTo(px - wd, foot - hh * .7, px, foot - hh * .72); x.quadraticCurveTo(px + wd, foot - hh * .7, px + wd, foot); x.fill();
+      x.beginPath(); x.arc(px, foot - hh * .85, wd * .45, 0, TAU); x.fill(); if (i % 5 === 2) { x.beginPath(); x.arc(px - wd * .3, foot - hh * 1.05, wd * .32, 0, TAU); x.fill(); }
+      px += wd * 1.3; } }
+
+  /* A Shiva lingam on its pitha, marked with three lines of ash and
+     crowned with bael leaves, under a copper pot that drips milk on it
+     all night, as it is bathed at every watch of Shivaratri. */
+  function shivaLingam(x, cx, foot, s) {
+    // the pitha: a round stone basin with its spout to the right
+    const pg = x.createLinearGradient(cx - s * .5, 0, cx + s * .5, 0); pg.addColorStop(0, "#1E2230"); pg.addColorStop(.45, "#4A5064"); pg.addColorStop(1, "#1A1E2A");
+    x.fillStyle = pg; x.beginPath(); x.moveTo(cx + s * .32, foot - s * .2); x.lineTo(cx + s * .62, foot - s * .17); x.quadraticCurveTo(cx + s * .68, foot - s * .15, cx + s * .62, foot - s * .12); x.lineTo(cx + s * .3, foot - s * .1); x.fill();
+    x.fillRect(cx - s * .36, foot - s * .17, s * .72, s * .17);
+    x.beginPath(); x.ellipse(cx, foot, s * .36, s * .06, 0, 0, Math.PI); x.fill();
+    x.fillStyle = "#5A6278"; x.beginPath(); x.ellipse(cx, foot - s * .17, s * .38, s * .075, 0, 0, TAU); x.fill();
+    x.fillStyle = "#2A2E3E"; x.beginPath(); x.ellipse(cx, foot - s * .17, s * .3, s * .055, 0, 0, TAU); x.fill();
+    // the milk pooled in the basin and running off the spout
+    x.fillStyle = "rgba(250,248,240,.9)"; x.beginPath(); x.ellipse(cx + s * .04, foot - s * .168, s * .26, s * .045, 0, 0, TAU); x.fill();
+    x.beginPath(); x.moveTo(cx + s * .3, foot - s * .18); x.lineTo(cx + s * .6, foot - s * .17); x.lineTo(cx + s * .6, foot - s * .158); x.lineTo(cx + s * .3, foot - s * .165); x.fill();
+    x.fillStyle = "rgba(250,248,240,.6)"; x.fillRect(cx + s * .6, foot - s * .16, Math.max(1, s * .008), s * .16);
+    [.08, .13].forEach((k) => { x.strokeStyle = "rgba(244,192,78,.55)"; x.lineWidth = Math.max(1, s * .008); x.beginPath(); x.moveTo(cx - s * .36, foot - s * k); x.lineTo(cx + s * .36, foot - s * k); x.stroke(); });
+    // the lingam: dark, polished stone, rounded at the top
+    const lg = x.createLinearGradient(cx - s * .14, 0, cx + s * .14, 0); lg.addColorStop(0, "#14161E"); lg.addColorStop(.32, "#5A6070"); lg.addColorStop(.5, "#3A3E4C"); lg.addColorStop(1, "#0E1016");
+    x.fillStyle = lg; x.beginPath(); x.moveTo(cx - s * .14, foot - s * .19); x.lineTo(cx - s * .14, foot - s * .5); x.arc(cx, foot - s * .5, s * .14, Math.PI, TAU); x.lineTo(cx + s * .14, foot - s * .19); x.closePath(); x.fill();
+    x.fillStyle = "rgba(255,255,255,.12)"; x.beginPath(); x.ellipse(cx - s * .05, foot - s * .5, s * .025, s * .12, 0, 0, TAU); x.fill();
+    // three lines of ash and a dot of kumkum
+    x.strokeStyle = "rgba(245,240,230,.95)"; x.lineWidth = Math.max(1.2, s * .016); x.lineCap = "round";
+    for (let k = 0; k < 3; k++) { const yy = foot - s * (.43 - k * .045); x.beginPath(); x.moveTo(cx - s * .11, yy); x.quadraticCurveTo(cx, yy + s * .02, cx + s * .11, yy); x.stroke(); }
+    x.fillStyle = "#D8263A"; x.beginPath(); x.arc(cx, foot - s * .37, s * .018, 0, TAU); x.fill();
+    // a garland of white flowers round the base
+    for (let i = 0; i <= 18; i++) { const a = Math.PI * .05 + i / 18 * Math.PI * .9, px = cx + Math.cos(a) * s * .15, py = foot - s * .22 + Math.sin(a) * s * .03;
+      x.fillStyle = i % 2 ? "#FFF8EA" : "#F2E2B8"; x.beginPath(); x.arc(px, py, s * .018, 0, TAU); x.fill(); }
+    // bael leaves on the crown, three to a stem
+    [[-.4, .02], [.5, -.01], [0, -.04]].forEach(([a, dy]) => { x.save(); x.translate(cx, foot - s * (.63 + dy)); x.rotate(a);
+      [-.7, 0, .7].forEach((b) => { x.save(); x.rotate(b); const g = x.createLinearGradient(0, 0, 0, -s * .1); g.addColorStop(0, "#2F6A2A"); g.addColorStop(1, "#7AB84A");
+        x.fillStyle = g; x.beginPath(); x.moveTo(0, 0); x.quadraticCurveTo(-s * .035, -s * .05, 0, -s * .1); x.quadraticCurveTo(s * .035, -s * .05, 0, 0); x.fill();
+        x.strokeStyle = "rgba(20,50,20,.6)"; x.lineWidth = Math.max(.6, s * .003); x.beginPath(); x.moveTo(0, 0); x.lineTo(0, -s * .09); x.stroke(); x.restore(); });
+      x.restore(); }); }
+  /* The trishul, with a damaru tied below the prongs and a strip of cloth. */
+  function shivaTrident(x, px, foot, s) {
+    const top = foot - s * 1.05;
+    const sg = x.createLinearGradient(px - s * .012, 0, px + s * .012, 0); sg.addColorStop(0, "#6A6A72"); sg.addColorStop(.5, "#E8E8EE"); sg.addColorStop(1, "#5A5A62");
+    x.fillStyle = sg; x.fillRect(px - s * .009, top + s * .16, s * .018, foot - top - s * .16);
+    x.strokeStyle = "#D8D8E0"; x.lineWidth = s * .016; x.lineCap = "round"; x.lineJoin = "round";
+    x.beginPath(); x.moveTo(px, top + s * .17); x.lineTo(px, top); x.stroke();
+    [-1, 1].forEach((d) => { x.beginPath(); x.moveTo(px, top + s * .17); x.quadraticCurveTo(px + d * s * .1, top + s * .16, px + d * s * .09, top + s * .03); x.stroke(); });
+    x.fillStyle = "#E8E8F0"; [[0, 0], [-.09, .03], [.09, .03]].forEach(([dx, dy]) => { x.beginPath(); x.moveTo(px + dx * s - s * .016, top + dy * s + s * .01); x.lineTo(px + dx * s, top + dy * s - s * .04); x.lineTo(px + dx * s + s * .016, top + dy * s + s * .01); x.fill(); });
+    // the damaru, a little hourglass drum
+    const dy = top + s * .24; x.fillStyle = "#8A4A2A"; x.beginPath(); x.moveTo(px - s * .05, dy - s * .045); x.lineTo(px + s * .05, dy - s * .045); x.lineTo(px + s * .008, dy); x.lineTo(px + s * .05, dy + s * .045); x.lineTo(px - s * .05, dy + s * .045); x.lineTo(px - s * .008, dy); x.closePath(); x.fill();
+    x.fillStyle = "#E8D8B8"; [-1, 1].forEach((d) => { x.beginPath(); x.ellipse(px, dy + d * s * .045, s * .05, s * .01, 0, 0, TAU); x.fill(); });
+    x.strokeStyle = "#E8C45A"; x.lineWidth = Math.max(1, s * .006); x.beginPath(); x.moveTo(px, dy); x.quadraticCurveTo(px + s * .05, dy + s * .03, px + s * .045, dy + s * .09); x.stroke();
+    x.fillStyle = "#E8C45A"; x.beginPath(); x.arc(px + s * .045, dy + s * .095, s * .012, 0, TAU); x.fill(); }
+
+  /* A cobra's spread hood, seen from the front: the pale belly scales
+     banded dark at the throat, the head bowed slightly over it. Drawn
+     about the hood's base, s across. */
+  function snakeHood(x, s) {
+    const g = x.createLinearGradient(-s * .5, 0, s * .5, 0); g.addColorStop(0, "#3A3A1E"); g.addColorStop(.2, "#7A6A3A"); g.addColorStop(.5, "#9A8650"); g.addColorStop(.8, "#7A6A3A"); g.addColorStop(1, "#2E2E16");
+    x.fillStyle = g; x.beginPath(); x.moveTo(-s * .09, 0); x.bezierCurveTo(-s * .3, -s * .1, -s * .55, -s * .45, -s * .38, -s * .85); x.quadraticCurveTo(-s * .25, -s * 1.08, 0, -s * 1.1);
+    x.quadraticCurveTo(s * .25, -s * 1.08, s * .38, -s * .85); x.bezierCurveTo(s * .55, -s * .45, s * .3, -s * .1, s * .09, 0); x.closePath(); x.fill();
+    // the belly, pale, in rows of scales, with the dark throat bands
+    x.save(); x.beginPath(); x.moveTo(-s * .05, 0); x.bezierCurveTo(-s * .16, -s * .1, -s * .26, -s * .5, -s * .17, -s * .9); x.quadraticCurveTo(0, -s * 1.02, s * .17, -s * .9); x.bezierCurveTo(s * .26, -s * .5, s * .16, -s * .1, s * .05, 0); x.closePath(); x.clip();
+    const b = x.createLinearGradient(-s * .2, 0, s * .2, 0); b.addColorStop(0, "#B8A878"); b.addColorStop(.5, "#F2E6C0"); b.addColorStop(1, "#B8A878"); x.fillStyle = b; x.fillRect(-s * .3, -s * 1.1, s * .6, s * 1.1);
+    x.strokeStyle = "rgba(120,100,60,.45)"; x.lineWidth = Math.max(.6, s * .006); for (let yy = -s * .05; yy > -s; yy -= s * .045) { x.beginPath(); x.moveTo(-s * .3, yy); x.quadraticCurveTo(0, yy + s * .015, s * .3, yy); x.stroke(); }
+    x.fillStyle = "rgba(40,30,16,.75)"; [[.42, .06], [.56, .045], [.68, .03]].forEach(([f, th]) => { x.beginPath(); x.moveTo(-s * .3, -s * f); x.quadraticCurveTo(0, -s * f + s * .02, s * .3, -s * f); x.lineTo(s * .3, -s * (f - th)); x.quadraticCurveTo(0, -s * (f - th) + s * .02, -s * .3, -s * (f - th)); x.fill(); });
+    x.restore();
+    // the edge of the hood catching the light
+    x.strokeStyle = "rgba(230,220,170,.35)"; x.lineWidth = Math.max(1, s * .012); x.beginPath(); x.moveTo(-s * .05, -s * .02); x.bezierCurveTo(-s * .3, -s * .1, -s * .5, -s * .45, -s * .37, -s * .84); x.stroke();
+    // the head, bowed forward over the hood
+    const hg = x.createRadialGradient(-s * .03, -s * 1.12, s * .02, 0, -s * 1.08, s * .16); hg.addColorStop(0, "#8A7A48"); hg.addColorStop(1, "#3A3418");
+    x.fillStyle = hg; x.beginPath(); x.ellipse(0, -s * 1.06, s * .13, s * .1, 0, 0, TAU); x.fill();
+    x.fillStyle = "#4A4220"; x.beginPath(); x.ellipse(0, -s * 1.0, s * .09, s * .05, 0, 0, Math.PI); x.fill();
+    [-1, 1].forEach((d) => { x.fillStyle = "#14100A"; x.beginPath(); x.ellipse(d * s * .07, -s * 1.08, s * .022, s * .018, 0, 0, TAU); x.fill();
+      x.fillStyle = "#FFD866"; x.beginPath(); x.arc(d * s * .066, -s * 1.085, s * .007, 0, TAU); x.fill(); });
+    x.fillStyle = "rgba(20,16,8,.6)"; [-1, 1].forEach((d) => { x.beginPath(); x.arc(d * s * .025, -s * .99, s * .008, 0, TAU); x.fill(); }); }
   const REDRAWN = {
     advent(st, v) {
       const door = Math.max(1, Math.min(24, Number(v) || 1)), left0 = 25 - door;
@@ -11562,6 +11818,425 @@ const FEST_SCENES = (() => {
       };
     },
 
+    ganesha(st, v) {
+      st.pet = Array.from({ length: 16 }, () => ({ x: rnd(), y: rnd(), v: .03 + rnd() * .03, p: rnd() * TAU, col: rnd() < .5 ? "#F59E0B" : "#E8541A" }));
+      st.smoke = Array.from({ length: 10 }, (_, i) => ({ life: i / 10 }));
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h * .92, w * .34), s = u * .8, cx = w * .805, foot = h * .93, Y = (f) => foot - s + f * s;
+        still(st, "pandal", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#1E0608"], [.5, "#3A0C10"], [1, "#1A0606"]]);
+          // pleated velvet drapes, low-contrast, the width of the pandal
+          for (let px = 0; px < w; px += u * .05) { const g = x.createLinearGradient(px, 0, px + u * .05, 0); g.addColorStop(0, "rgba(0,0,0,.18)"); g.addColorStop(.5, "rgba(255,120,120,.05)"); g.addColorStop(1, "rgba(0,0,0,.18)"); x.fillStyle = g; x.fillRect(px, 0, u * .05, h); }
+          // the backcloth behind the idol: deep red with gold zari, inside a carved arch
+          const ax = cx, ay = Y(.42), ar = s * .5;
+          x.save(); x.beginPath(); x.moveTo(ax - ar, foot); x.lineTo(ax - ar, ay); x.arc(ax, ay, ar, Math.PI, TAU); x.lineTo(ax + ar, foot); x.closePath(); x.clip();
+          const bg = x.createRadialGradient(ax, ay, s * .05, ax, ay, ar * 1.3); bg.addColorStop(0, "#C8302A"); bg.addColorStop(.6, "#8A1420"); bg.addColorStop(1, "#4A0A12"); x.fillStyle = bg; x.fillRect(ax - ar, ay - ar, ar * 2, foot - ay + ar);
+          x.fillStyle = "rgba(244,192,78,.22)"; for (let gy = ay - ar; gy < foot; gy += s * .045) for (let gx = ax - ar + ((gy / (s * .045)) % 2) * s * .0225; gx < ax + ar; gx += s * .045) { x.beginPath(); x.arc(gx, gy, s * .006, 0, TAU); x.fill(); }
+          x.restore();
+          // the gold arch (prabhavali), with a frieze of flames
+          [[.53, s * .03, "#A8741A"], [.53, s * .018, "#F4C04E"], [.47, s * .008, "#FFE69A"]].forEach(([r, lw, col]) => { x.strokeStyle = col; x.lineWidth = lw; x.beginPath(); x.moveTo(ax - s * r, foot); x.lineTo(ax - s * r, ay); x.arc(ax, ay, s * r, Math.PI, TAU); x.lineTo(ax + s * r, foot); x.stroke(); });
+          for (let i = 0; i <= 16; i++) { const a = Math.PI + i / 16 * Math.PI, px = ax + Math.cos(a) * s * .56, py = ay + Math.sin(a) * s * .56;
+            x.save(); x.translate(px, py); x.rotate(a + Math.PI / 2); x.fillStyle = "#E8A82A"; x.beginPath(); x.moveTo(-s * .015, 0); x.quadraticCurveTo(-s * .01, -s * .03, 0, -s * .05); x.quadraticCurveTo(s * .01, -s * .03, s * .015, 0); x.fill(); x.restore(); }
+          // the stage: white cloth, a gold edge, a little rangoli
+          const sg = x.createLinearGradient(0, foot, 0, h); sg.addColorStop(0, "#E8D8C0"); sg.addColorStop(1, "#8A7A68"); x.fillStyle = "#2A0E0C"; x.fillRect(0, foot, w, h - foot); const sx0 = ax - s * .58;
+          x.fillStyle = sg; x.fillRect(sx0, foot, w - sx0, h - foot); x.fillStyle = "#F4C04E"; x.fillRect(sx0, foot, w - sx0, Math.max(1.5, u * .006));
+          // marigold strings falling down either side of the arch
+          [ax - s * .56, ax + s * .56].forEach((mx) => { for (let my = 0; my < foot - s * .05; my += s * .028) { x.fillStyle = (Math.round(my / (s * .028)) % 2) ? "#F59E0B" : "#E8641A"; x.beginPath(); x.arc(mx, my, s * .016, 0, TAU); x.fill(); }
+            x.fillStyle = "#2F7A35"; x.beginPath(); x.ellipse(mx, foot - s * .03, s * .012, s * .03, 0, 0, TAU); x.fill(); });
+          // the toran across the top
+          for (let px = ax - s * .56; px < w; px += s * .03) { const py = s * .02 + Math.abs(Math.sin((px - ax + s * .56) / (w - ax + s * .56) * Math.PI * 3)) * s * .05;
+            x.fillStyle = (Math.round(px / (s * .03)) % 3) ? "#F59E0B" : "#E8541A"; x.beginPath(); x.arc(px, py, s * .016, 0, TAU); x.fill(); }
+          grain(x, w, h, .03); vignette(x, w, h, .45, .8); });
+        // the chaser lights around the arch, as pandals have
+        const ay = Y(.42), N = 26;
+        for (let i = 0; i <= N; i++) { const a = Math.PI + i / N * Math.PI, px = cx + Math.cos(a) * s * .5, py = ay + Math.sin(a) * s * .5, on = .35 + .65 * Math.max(0, Math.sin(t * 3 - i * .55)) ** 2;
+          c.fillStyle = `rgba(255,${200 + (i % 3) * 20},120,${on.toFixed(3)})`; c.beginPath(); c.arc(px, py, Math.max(1.2, s * .008), 0, TAU); c.fill(); }
+        glowFlat(c, cx, Y(.45), s * .45, 1, "#FFB84A", .12 + .03 * Math.sin(t * 1.3));
+        ganeshaEars(c, cx, foot, s, t);
+        const fig = cache(st, "ganesha", s * .9, s * 1.06, c, (x) => ganeshaBody(x, s * .45, s * 1.04, s));
+        if (fig) c.drawImage(fig, cx - s * .45, foot - s * 1.04, s * .9, s * 1.06); else ganeshaBody(c, cx, foot, s);
+        ganeshaTrunk(c, cx, foot, s, t);
+        ganeshaMouse(c, cx + s * .3, foot + (h - foot) * .55, s * .09, t);
+        // two brass lamps on the stage, and incense smoke rising between them
+        [cx - s * .44, cx + s * .44].forEach((lx, i) => { const ly = foot + (h - foot) * .3;
+          c.fillStyle = "#C8922A"; c.fillRect(lx - s * .006, ly - s * .1, s * .012, s * .1); c.beginPath(); c.ellipse(lx, ly - s * .1, s * .035, s * .01, 0, 0, TAU); c.fill();
+          flame(c, lx, ly - s * .105, s * .018, t, i); });
+        c.strokeStyle = "rgba(230,220,210,.13)"; c.lineWidth = Math.max(1, s * .006); c.lineCap = "round";
+        st.smoke.forEach((p, i) => { p.life = (p.life + dt * .12) % 1; const L = p.life, sx = cx - s * .36, sy = foot - L * s * .7;
+          c.globalAlpha = Math.sin(L * Math.PI); c.beginPath(); c.moveTo(sx + Math.sin(L * 9 + i) * s * .03, sy); c.quadraticCurveTo(sx + Math.sin(L * 9 + i + 1) * s * .05, sy - s * .04, sx + Math.sin(L * 9 + i + 2) * s * .03, sy - s * .08); c.stroke(); });
+        c.globalAlpha = 1;
+        // marigold petals drifting down over him
+        st.pet.forEach((p) => { p.y += p.v * dt; if (p.y > 1.05) { p.y = -.05; p.x = rnd(); } const px = w * (.66 + p.x * .31) + Math.sin(t * 1.2 + p.p) * s * .03, py = p.y * h;
+          c.save(); c.translate(px, py); c.rotate(t * 1.5 + p.p); c.fillStyle = p.col; c.beginPath(); c.ellipse(0, 0, s * .012, s * .006, 0, 0, TAU); c.fill(); c.restore(); });
+      };
+    },
+
+    hanuman(st, v) {
+      st.cl = Array.from({ length: 9 }, (_, i) => ({ x: i / 9 * 1.6 - .3, y: .74 + (i % 3) * .07, s: .7 + rnd() * .6, v: .09 + (i % 3) * .05 }));
+      st.crumb = []; st.herbs = Array.from({ length: 9 }, () => ({ a: -.2 + rnd() * .4, b: -.05 - rnd() * .12, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h * .92, w * .34), s = u * .78, bob = Math.sin(t * 1.1) * s * .025;
+        const ox = w * .83, oy = h * .66 + bob, rot = -.14;
+        still(st, "night", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#080A26"], [.5, "#1E1A4E"], [.78, "#4A2E66"], [1, "#7A4A6A"]]);
+          for (let i = 0; i < w * h / 700; i++) { const sx = rnd() * w; x.fillStyle = `rgba(255,255,255,${(rnd() * (sx < w * .62 ? .3 : .75)).toFixed(2)})`; x.fillRect(sx, rnd() * h * .7, 1, 1); }
+          moonDisc(x, w * .7, h * .2, u * .07);
+          // a sea of cloud far below, lit by the moon
+          land(x, w, h, [[0, .86], [.15, .82], [.3, .85], [.5, .8], [.7, .84], [.85, .8], [1, .83]], "#5A4A7A", "rgba(220,200,240,.25)");
+          land(x, w, h, [[0, .93], [.2, .9], [.4, .94], [.6, .89], [.8, .93], [1, .9]], "#3A2E5A", null);
+          grain(x, w, h, .025); vignette(x, w, h, .4, .8); });
+        // the clouds streaming past beneath him, so he is the one moving
+        st.cl.forEach((k, i) => { k.x -= k.v * dt; if (k.x < -.35) k.x = 1.3; const cs = u * .11 * k.s, cv = cloudSprite(st, `h${i % 3}`, cs, "#B8A8D8", "#5A4A80", "rgba(255,240,255,.6)", c);
+          const fx = Math.max(.3, Math.min(1, (k.x - .5) / .2)); if (cv) { c.globalAlpha = (.55 + (i % 3) * .15) * fx; c.drawImage(cv, k.x * w - cs * 2.2, k.y * h - cs * 1.6, cs * 4.4, cs * 2.2); c.globalAlpha = 1; } });
+        // the saffron streak of his flight, fading out before the words
+        c.save(); c.translate(ox, oy); c.rotate(rot);
+        const tl = Math.min(s * .78, (ox - w * .67) / Math.cos(rot)), tr = c.createLinearGradient(-s * .5, 0, -tl, 0); tr.addColorStop(0, "rgba(255,150,50,.4)"); tr.addColorStop(1, "rgba(255,150,50,0)");
+        c.fillStyle = tr; c.beginPath(); c.moveTo(-s * .45, -s * .06); c.quadraticCurveTo(-tl * .85, -s * .04 + Math.sin(t * 3) * s * .01, -tl, 0); c.quadraticCurveTo(-tl * .85, s * .05, -s * .45, s * .05); c.fill();
+        // his tail, curling up behind
+        const sw = Math.sin(t * 1.7) * .05; c.strokeStyle = HANUMAN_SKIN_D; c.lineCap = "round"; c.lineWidth = s * .03;
+        c.beginPath(); c.moveTo(-s * .12, -s * .04); c.bezierCurveTo(-s * .3, -s * .06, -s * (.42 + sw), -s * .2, -s * (.32 + sw), -s * .32); c.bezierCurveTo(-s * (.26 + sw), -s * .4, -s * (.18 + sw * .5), -s * .36, -s * (.21 + sw * .5), -s * .3); c.stroke();
+        c.strokeStyle = HANUMAN_SKIN; c.lineWidth = s * .02; c.stroke();
+        // the scarf, streaming back off his shoulders
+        c.fillStyle = "#C8102E"; c.beginPath(); c.moveTo(s * .18, -s * .09);
+        for (let k = 0; k <= 10; k++) { const f = k / 10; c.lineTo(s * (.18 - f * .62), -s * (.1 + f * .06) + Math.sin(t * 5 - f * 6) * s * .03 * f); }
+        for (let k = 10; k >= 0; k--) { const f = k / 10; c.lineTo(s * (.18 - f * .62), -s * (.06 + f * .02) + Math.sin(t * 5 - f * 6 + .4) * s * .03 * f); } c.fill();
+        c.strokeStyle = HANUMAN_GOLD; c.lineWidth = Math.max(1, s * .005); c.stroke();
+        const body = cache(st, "hanuman", s * 1.05, s * .6, c, (x) => { x.translate(s * .58, s * .32); hanumanBody(x, s); });
+        if (body) c.drawImage(body, -s * .58, -s * .32, s * 1.05, s * .6); else hanumanBody(c, s);
+        c.restore();
+        // the mountain on his palm, upright as he flies
+        const hx = ox + (HANUMAN_HAND[0] * Math.cos(rot) - HANUMAN_HAND[1] * Math.sin(rot)) * s, hy = oy + (HANUMAN_HAND[0] * Math.sin(rot) + HANUMAN_HAND[1] * Math.cos(rot)) * s, ms = s * .95;
+        const mt = cache(st, "dronagiri", ms * .6, ms * .52, c, (x) => hanumanMountain(x, ms * .3, ms * .38, ms));
+        if (mt) c.drawImage(mt, hx - ms * .3, hy - ms * .38 + s * .01, ms * .6, ms * .52); else hanumanMountain(c, hx, hy, ms);
+        // the healing herbs glowing on its slopes
+        st.herbs.forEach((p, i) => { const a = .5 + .5 * Math.sin(t * 2.4 + p.p), px = hx + p.a * ms, py = hy + p.b * ms;
+          glow(c, px, py, ms * .045, "#9CFFB0", .5 * a); c.fillStyle = `rgba(220,255,225,${(.5 + .5 * a).toFixed(2)})`; c.beginPath(); c.arc(px, py, Math.max(1, ms * .007), 0, TAU); c.fill(); });
+        // earth crumbling from the torn roots and falling behind
+        if (rnd() < dt * 6) st.crumb.push({ x: hx + (rnd() - .5) * ms * .4, y: hy + ms * .06, vx: -s * .3, vy: 0, life: 1 });
+        c.fillStyle = "#6A4A2A"; st.crumb = st.crumb.filter((p) => { p.vy += s * .8 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * .9;
+          c.globalAlpha = Math.max(0, p.life); c.fillRect(p.x, p.y, Math.max(1.2, s * .008), Math.max(1.2, s * .008)); return p.life > 0 && p.x > w * .66; }); c.globalAlpha = 1;
+      };
+    },
+
+    janmashtami(st, v) {
+      st.bits = []; st.broke = false;
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h * .92, w * .34), base = h * .95, P = Math.min(h * .19, u * .24), px = w * .8, ropeY = h * .07;
+        const cyc = t % 15, tier = (k) => smooth(Math.max(0, Math.min(1, (cyc - (1 + k * 1.4)) / 1.1))), down = smooth(Math.max(0, Math.min(1, (cyc - 11.2) / 1.6)));
+        still(st, "street", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#060A26"], [.6, "#18205A"], [1, "#2A1E4E"]]);
+          for (let i = 0; i < w * h / 1100; i++) { const sx = rnd() * w; x.fillStyle = `rgba(255,255,255,${(rnd() * (sx < w * .62 ? .2 : .6)).toFixed(2)})`; x.fillRect(sx, rnd() * h * .6, 1, 1); }
+          // the street's buildings, low-contrast under the words, lit on the right
+          for (let bx = 0, i = 0; bx < w; i++) { const bw = u * (.2 + .1 * Math.abs(Math.sin(i * 1.7))), bh = h * (.45 + .25 * Math.abs(Math.sin(i * 2.3))), right = bx > w * .64;
+            x.fillStyle = right ? "#1E1838" : "#141030"; x.fillRect(bx, base - bh, bw - 2, bh);
+            for (let wy = base - bh + u * .04; wy < base - u * .06; wy += u * .07) for (let wx = bx + u * .03; wx < bx + bw - u * .05; wx += u * .06) {
+              const on = Math.sin(wx * 3.1 + wy * 1.7) > .1; x.fillStyle = on ? (right ? "rgba(255,200,120,.55)" : "rgba(255,200,120,.12)") : "rgba(0,0,0,.25)"; x.fillRect(wx, wy, u * .025, u * .035); }
+            bx += bw; }
+          // the road, wet and shining
+          const rg = x.createLinearGradient(0, base, 0, h); rg.addColorStop(0, "#2A2440"); rg.addColorStop(1, "#120E1E"); x.fillStyle = rg; x.fillRect(0, base, w, h - base);
+          // the rope across the street, hung with little flags
+          x.strokeStyle = "#C9A27A"; x.lineWidth = Math.max(1, u * .005); x.beginPath(); x.moveTo(w * .66, ropeY + h * .02); x.quadraticCurveTo(px, ropeY + h * .06, w, ropeY); x.stroke();
+          for (let k = 0; k < 14; k++) { const f = k / 13, fx = w * .66 + f * (w * .34), fy = (1 - f) * (1 - f) * (ropeY + h * .02) + 2 * f * (1 - f) * (ropeY + h * .06) + f * f * ropeY;
+            x.fillStyle = ["#F28A1A", "#F2F2F2", "#2FA84F", "#E8343A"][k % 4]; x.beginPath(); x.moveTo(fx - u * .012, fy); x.lineTo(fx + u * .012, fy); x.lineTo(fx, fy + u * .035); x.fill(); }
+          x.fillStyle = "#5A4A3A"; x.fillRect(w * .66 - u * .006, ropeY, u * .012, base - ropeY);
+          x.fillRect(w * .66, h * .3, u * .06, u * .008); glow(x, w * .66 + u * .06, h * .3 + u * .02, u * .3, "#FFB860", .3); x.fillStyle = "#FFE8B0"; x.beginPath(); x.ellipse(w * .66 + u * .06, h * .3 + u * .014, u * .018, u * .008, 0, 0, TAU); x.fill();
+          const lg = x.createLinearGradient(0, h * .3, 0, base); lg.addColorStop(0, "rgba(255,190,110,.12)"); lg.addColorStop(1, "rgba(255,190,110,0)"); x.fillStyle = lg; x.beginPath(); x.moveTo(w * .66 + u * .045, h * .3); x.lineTo(w * .66 + u * .075, h * .3); x.lineTo(w * .66 + u * .2, base); x.lineTo(w * .66 - u * .02, base); x.fill();
+          // the crowd round the base
+          for (let k = 0; k < 22; k++) { const cx = w * .65 + k * (w * .34) / 21, ch = P * (.5 + .15 * Math.abs(Math.sin(k * 2.1)));
+            x.fillStyle = k % 2 ? "#0E0A1A" : "#16102A"; x.beginPath(); x.ellipse(cx, base + P * .05, P * .14, ch * .5, 0, Math.PI, TAU); x.fill(); x.beginPath(); x.arc(cx, base - ch * .48, P * .07, 0, TAU); x.fill(); }
+          grain(x, w, h, .03); vignette(x, w, h, .4, .8); });
+        // the pot swinging on its rope, until the climber holds it
+        const potR = P * .18, reachY = base - 3 * P * .78 - P * .82 * 1.25, potY = reachY - potR * .7, hold = Math.max(0, Math.min(1, (cyc - 6.6) / .8));
+        const sway = Math.sin(t * 1.4) * .12 * (1 - hold), hangY = ropeY + h * .055, pxp = px + Math.sin(sway) * (potY - hangY), pyp = hangY + Math.cos(sway) * (potY - hangY);
+        const broke = cyc > 7.6 && cyc < 14.5;
+        c.strokeStyle = "#C9A27A"; c.lineWidth = Math.max(1, u * .004); c.beginPath(); c.moveTo(px, hangY); c.lineTo(pxp, broke ? hangY + (pyp - hangY) * .7 : pyp - potR * 1.1); c.stroke();
+        if (!broke) { glowFlat(c, pxp, pyp, potR * 3, 1, "#FFC870", .18); janmashtamiPot(c, pxp, pyp, potR); st.broke = false; }
+        else if (!st.broke) { st.broke = true;
+          for (let i = 0; i < 60; i++) { const a = rnd() * TAU, sp = P * (.6 + rnd() * 1.6); st.bits.push({ x: pxp, y: pyp, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - P * .8, life: 1.4 + rnd() * .6, k: i < 40 ? "curd" : i < 52 ? "petal" : "shard", r: rnd() * TAU, col: rnd() < .5 ? "#F59E0B" : "#E8541A" }); } }
+        st.bits = st.bits.filter((b) => { b.vy += P * 3 * dt; b.vx *= Math.pow(.5, dt); b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; b.r += dt * 6;
+          c.globalAlpha = Math.max(0, Math.min(1, b.life));
+          if (b.k === "curd") { c.fillStyle = "#FFF8E8"; c.beginPath(); c.arc(b.x, b.y, Math.max(1.2, P * .022), 0, TAU); c.fill(); }
+          else if (b.k === "petal") { c.save(); c.translate(b.x, b.y); c.rotate(b.r); c.fillStyle = b.col; c.beginPath(); c.ellipse(0, 0, P * .03, P * .015, 0, 0, TAU); c.fill(); c.restore(); }
+          else { c.save(); c.translate(b.x, b.y); c.rotate(b.r); c.fillStyle = "#9A3A1A"; c.beginPath(); c.moveTo(-P * .04, 0); c.lineTo(P * .03, -P * .03); c.lineTo(P * .02, P * .03); c.fill(); c.restore(); }
+          return b.life > 0 && b.y < h && b.x > w * .64; });
+        c.globalAlpha = 1;
+        // the pyramid: three tiers climbing on to the shoulders below, then the child to the top
+        const team = ["#F28A1A", "#B85A08"], tops = [4, 3, 2], cheer = cyc > 7.6 && cyc < 11.2;
+        for (let k = 0; k < 3; k++) { const rise = k === 0 ? 1 : tier(k - 1);
+          const lift = k === 0 ? 0 : (1 - rise) * P * .7 + down * k * P * .78, fy = base - k * P * .78 + lift, wob = Math.sin(t * 1.3) * P * .03 * k;
+          c.globalAlpha = k === 0 ? 1 : Math.min(1, rise * 1.5) * (1 - down);
+          for (let j = 0; j < tops[k]; j++) janmashtamiPerson(c, px + (j - (tops[k] - 1) / 2) * P * .3 + wob, fy, P, team, k === 2 && cheer ? "up" : "link", null, P * .3); }
+        const climb = tier(2), cy = base - 3 * P * .78 + (1 - climb) * P * .9 + down * 3 * P * .78;
+        c.globalAlpha = Math.min(1, climb * 1.5) * (1 - down);
+        if (climb > 0) janmashtamiPerson(c, px + Math.sin(t * 1.3) * P * .1, cy, P * .82, ["#F2D03A", "#C8A010"], cyc > 6.4 && cyc < 7.7 ? "reach" : cheer ? "up" : "link", "#D8263A");
+        c.globalAlpha = 1;
+        // a hose of water arcing in from the right on to the climbers
+        if (cyc > 1.5 && cyc < 11) { if (!st.jet) st.jet = []; for (let i = 0; i < 4; i++) st.jet.push({ x: w * 1.01, y: base - P * .5, vx: -P * (2.3 + rnd() * .5) * Math.min(1.4, w * .2 / P / 1.2), vy: -P * (4 + rnd() * .5), life: 1 }); }
+        if (st.jet) { c.fillStyle = "rgba(200,225,255,.7)"; st.jet = st.jet.filter((d) => { d.vy += P * 6 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.life -= dt * .75;
+          c.globalAlpha = Math.max(0, d.life) * .8; c.fillRect(d.x, d.y, Math.max(1.2, P * .018), Math.max(1.2, P * .018)); return d.life > 0 && d.x > w * .64 && d.y < h; }); c.globalAlpha = 1; }
+        // a flash as the pot breaks
+        if (cyc > 7.6 && cyc < 8.1) glow(c, pxp, pyp, P * .8, "#FFF8E0", (8.1 - cyc) * 1.6);
+      };
+    },
+
+    rama(st, v) {
+      st.pet = Array.from({ length: 18 }, () => ({ x: rnd(), y: rnd(), v: .03 + rnd() * .03, p: rnd() * TAU, col: ["#F59E0B", "#E8541A", "#F2D03A", "#E86A9A"][Math.floor(rnd() * 4)] }));
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h * .92, w * .34), s = u, cx = w * .8, foot = h * .93, tx = w * .84, fx = w * .79;
+        still(st, "noon", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#2E72C8"], [.55, "#8CC0EA"], [.8, "#F2E0B8"], [1, "#E8C890"]]);
+          const dk = x.createLinearGradient(0, 0, w * .75, 0); dk.addColorStop(0, "rgba(10,30,70,.3)"); dk.addColorStop(1, "rgba(10,30,70,0)"); x.fillStyle = dk; x.fillRect(0, 0, w, h);
+          // a low courtyard wall across the back, quiet under the words
+          const wy = foot - u * .2; const wg = x.createLinearGradient(0, wy, 0, foot); wg.addColorStop(0, "#D8A87A"); wg.addColorStop(1, "#B8845A");
+          x.fillStyle = wg; x.fillRect(0, wy, w, foot - wy); x.fillStyle = "#C8946A"; x.fillRect(0, wy - u * .015, w, u * .015);
+          for (let px = 0; px < w; px += u * .12) { x.fillStyle = "rgba(120,60,30,.2)"; x.fillRect(px, wy, 1, foot - wy); }
+          ramaTemple(x, tx, foot - u * .2, s * .56);
+          const fg = x.createLinearGradient(0, foot, 0, h); fg.addColorStop(0, "#E8CFA0"); fg.addColorStop(1, "#C8A070"); x.fillStyle = fg; x.fillRect(0, foot - u * .01, w, h);
+          // the cradle frame: two turned posts and a beam
+          const pw = s * .3, top = foot - s * .62;
+          [-1, 1].forEach((d) => { const px = fx + d * pw; shadow(x, px, foot, s * .05, s * .012, .35);
+            const g = x.createLinearGradient(px - s * .02, 0, px + s * .02, 0); g.addColorStop(0, "#5A2A10"); g.addColorStop(.5, "#B8743A"); g.addColorStop(1, "#4A2008");
+            x.fillStyle = g; x.fillRect(px - s * .014, top, s * .028, foot - top);
+            for (let k = 0; k < 4; k++) { x.beginPath(); x.ellipse(px, top + (foot - top) * (.2 + k * .22), s * .024, s * .012, 0, 0, TAU); x.fill(); }
+            x.fillStyle = "#F4C04E"; x.beginPath(); x.arc(px, top - s * .03, s * .025, 0, TAU); x.fill(); x.beginPath(); x.moveTo(px - s * .01, top - s * .05); x.lineTo(px, top - s * .08); x.lineTo(px + s * .01, top - s * .05); x.fill(); });
+          const bg = x.createLinearGradient(0, top - s * .02, 0, top + s * .03); bg.addColorStop(0, "#C8844A"); bg.addColorStop(1, "#5A2A10");
+          x.fillStyle = bg; x.fillRect(fx - pw - s * .03, top - s * .01, pw * 2 + s * .06, s * .035);
+          // a marigold garland swagged along the beam
+          for (let k = 0; k <= 28; k++) { const f = k / 28, px = fx - pw + f * pw * 2, py = top + s * .04 + Math.abs(Math.sin(f * Math.PI * 2)) * s * .05;
+            x.fillStyle = k % 3 === 0 ? "#E8541A" : "#F59E0B"; x.beginPath(); x.arc(px, py, s * .012, 0, TAU); x.fill(); }
+          // the bow and quiver leaning on the right-hand post
+          const bx = fx + pw + s * .05;
+          x.strokeStyle = "#7A3A10"; x.lineWidth = s * .014; x.lineCap = "round"; x.beginPath(); x.moveTo(bx - s * .02, foot - s * .01); x.bezierCurveTo(bx + s * .1, foot - s * .2, bx + s * .1, foot - s * .45, bx - s * .03, foot - s * .62); x.stroke();
+          x.strokeStyle = "#F4C04E"; x.lineWidth = s * .006; [.15, .3, .45].forEach((k) => { x.beginPath(); x.arc(bx + s * .06, foot - s * k, s * .012, 0, TAU); x.stroke(); });
+          x.strokeStyle = "rgba(255,250,230,.8)"; x.lineWidth = 1; x.beginPath(); x.moveTo(bx - s * .02, foot - s * .01); x.lineTo(bx - s * .03, foot - s * .62); x.stroke();
+          const qx = bx + s * .085; x.save(); x.translate(qx, foot); x.rotate(.12);
+          [-.02, 0, .02].forEach((dx, i) => { x.strokeStyle = "#8A6A3A"; x.lineWidth = Math.max(1, s * .005); x.beginPath(); x.moveTo(dx * s, -s * .2); x.lineTo(dx * s, -s * .32); x.stroke();
+            x.fillStyle = i % 2 ? "#E8343A" : "#F2F2F2"; x.beginPath(); x.moveTo(dx * s - s * .008, -s * .3); x.lineTo(dx * s, -s * .36); x.lineTo(dx * s + s * .008, -s * .3); x.fill(); });
+          const qg = x.createLinearGradient(-s * .035, 0, s * .035, 0); qg.addColorStop(0, "#5A2A10"); qg.addColorStop(.5, "#A8642A"); qg.addColorStop(1, "#4A1A08");
+          x.fillStyle = qg; x.fillRect(-s * .032, -s * .24, s * .064, s * .24); x.fillStyle = "#F4C04E"; x.fillRect(-s * .032, -s * .24, s * .064, s * .012); x.fillRect(-s * .032, -s * .08, s * .064, s * .01); x.restore();
+          // a rangoli under the cradle
+          x.save(); x.translate(fx, foot + (h - foot) * .5); x.scale(1, .3);
+          [["#E8343A", .2], ["#F2D03A", .15], ["#2FA84F", .1], ["#FFFFFF", .04]].forEach(([col, r]) => { x.fillStyle = col; x.beginPath(); for (let k = 0; k <= 16; k++) { const a = k / 16 * TAU, rr = s * r * (k % 2 ? .82 : 1); x.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } x.fill(); }); x.restore();
+          grain(x, w, h, .025); vignette(x, w, h, .3, .8); });
+        // the noon sun, high, its rays turning slowly
+        const sx = w * .93, sy = h * .1, sr = u * .07;
+        const rays = cache(st, "rays", sr * 7, sr * 7, c, (x) => { x.translate(sr * 3.5, sr * 3.5); for (let i = 0; i < 24; i++) { x.rotate(TAU / 24); const g = x.createLinearGradient(0, sr, 0, sr * 3.4); g.addColorStop(0, "rgba(255,248,210,.55)"); g.addColorStop(1, "rgba(255,248,210,0)");
+          x.fillStyle = g; x.beginPath(); x.moveTo(-sr * .12, sr); x.lineTo(0, sr * (i % 2 ? 2.6 : 3.4)); x.lineTo(sr * .12, sr); x.fill(); } });
+        if (rays) { c.save(); c.translate(sx, sy); c.rotate(t * .06); c.drawImage(rays, -sr * 3.5, -sr * 3.5, sr * 7, sr * 7); c.restore(); }
+        glow(c, sx, sy, sr * 2.4, "#FFF8D8", .9); c.fillStyle = "#FFFDF0"; c.beginPath(); c.arc(sx, sy, sr, 0, TAU); c.fill();
+        // the temple's flag, flying from the finial
+        const ts = s * .56, ttop = foot - u * .2 - ts * .95 - ts * .13, flag = flagImg("ramaPennant", (x, W, H) => { x.fillStyle = "#F28A1A"; x.beginPath(); x.moveTo(0, 0); x.lineTo(W, H * .3); x.lineTo(W * .55, H * .5); x.lineTo(W, H * .7); x.lineTo(0, H); x.fill();
+          x.fillStyle = "#FFE066"; x.beginPath(); x.arc(W * .28, H * .5, H * .14, 0, TAU); x.fill(); x.strokeStyle = "#FFE066"; x.lineWidth = 8; for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; x.beginPath(); x.moveTo(W * .28 + Math.cos(a) * H * .19, H * .5 + Math.sin(a) * H * .19); x.lineTo(W * .28 + Math.cos(a) * H * .26, H * .5 + Math.sin(a) * H * .26); x.stroke(); } });
+        c.strokeStyle = "#7A5A3A"; c.lineWidth = Math.max(1.2, s * .007); c.beginPath(); c.moveTo(tx, ttop + ts * .02); c.lineTo(tx, ttop - ts * .22); c.stroke();
+        waveFlag(c, flag, tx, ttop - ts * .22, ts * .2, ts * .12, t, .12, 3.6);
+        // the cradle, rocking gently
+        const top = foot - s * .62, sw = Math.sin(t * 1.9) * .07;
+        c.save(); c.translate(fx, top + s * .03); c.rotate(sw);
+        const cr = cache(st, "palna", s * .7, s * .52, c, (x) => { x.translate(s * .35, s * .02); ramaCradle(x, s); });
+        if (cr) c.drawImage(cr, -s * .35, -s * .02, s * .7, s * .52); else ramaCradle(c, s);
+        c.restore();
+        // petals drifting down
+        st.pet.forEach((p) => { p.y += p.v * dt; if (p.y > 1.05) { p.y = -.05; p.x = rnd(); } const px = w * (.66 + p.x * .31) + Math.sin(t * 1.2 + p.p) * u * .03, py = p.y * h;
+          c.save(); c.translate(px, py); c.rotate(t * 1.5 + p.p); c.fillStyle = p.col; c.beginPath(); c.ellipse(0, 0, u * .011, u * .006, 0, 0, TAU); c.fill(); c.restore(); });
+      };
+    },
+
+    ravana(st, v) {
+      st.sky = mkSky(); st.sp = []; st.smoke = [];
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h * .92, w * .34), s = u * .93, cx = w * .8, foot = h * .9;
+        const cyc = t % 15, burn = smooth(Math.max(0, Math.min(1, (cyc - 3.2) / 5))), fire = cyc < 3.2 ? 0 : cyc < 9 ? 1 : Math.max(0, 1 - (cyc - 9) / 2.5);
+        const gone = Math.max(0, Math.min(1, (cyc - 9.5) / 1.5)), back = Math.max(0, Math.min(1, (cyc - 11.8) / 1.4));
+        still(st, "ground", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#06040E"], [.5, "#1A0C22"], [.8, "#3A1420"], [1, "#1A0A0A"]]);
+          for (let i = 0; i < w * h / 1200; i++) { const sx = rnd() * w; x.fillStyle = `rgba(255,255,255,${(rnd() * (sx < w * .62 ? .2 : .5)).toFixed(2)})`; x.fillRect(sx, rnd() * h * .5, 1, 1); }
+          // the far city, low and quiet
+          for (let px = 0; px < w; px += u * .05) { const bh = u * (.03 + .06 * Math.abs(Math.sin(px * .013))); x.fillStyle = "#140A14"; x.fillRect(px, foot - bh, u * .045, bh);
+            for (let k = 0; k < 3; k++) if (Math.sin(px * 7.1 + k * 3) > .3) { x.fillStyle = `rgba(255,190,120,${px < w * .62 ? .2 : .45})`; x.fillRect(px + u * .01 + k * u * .012, foot - bh + u * .012, 1.5, 1.5); } }
+          const fg = x.createLinearGradient(0, foot, 0, h); fg.addColorStop(0, "#2A1410"); fg.addColorStop(1, "#0E0606"); x.fillStyle = fg; x.fillRect(0, foot, w, h - foot);
+          grain(x, w, h, .03); vignette(x, w, h, .45, .8); });
+        // the crowd in front, drawn over the fire's glow
+        const crowd = cache(st, "crowd", w * .36, u * .2, c, (x) => ravanaCrowd(x, u * .02, w * .36, u * .2, u));
+        // the firelight on the ground and the smoke above
+        if (fire > 0) glowFlat(c, cx, foot, u * .62, .5, "#FF7A1A", .4 * fire);
+        if (fire > 0 && st.smoke.length < 8 && rnd() < dt * 2.5) st.smoke.push({ x: cx + (rnd() - .5) * s * .3, y: foot - burn * s, r: s * .06, life: 1 });
+        const puff = cache(st, "puff", 32, 32, { getTransform: () => ({ a: 1 }) }, (x) => glow(x, 16, 16, 16, "rgba(110,90,90,1)"));
+        st.smoke = st.smoke.filter((p) => { p.y -= s * .18 * dt; p.x -= s * .04 * dt; p.r += s * .035 * dt; p.life -= dt * .3;
+          if (puff) { c.globalAlpha = .22 * Math.max(0, p.life) * Math.min(1, (1 - p.life) * 5); c.drawImage(puff, p.x - p.r * 1.6, p.y - p.r * 1.6, p.r * 3.2, p.r * 3.2); c.globalAlpha = 1; } return p.life > 0 && p.x > w * .62; });
+        skyFire(st.sky, c, w, h * .95, dt, ["#FFD166", "#FF5A5F", "#7FD1FF", "#F28A2E", "#B48CFF"], cyc > 4 && cyc < 10 ? 1.1 : 0, .72, .95, .08, .3);
+        // the effigy: fresh above the flames, charred below them
+        const fresh = cache(st, "ravana", s * .8, s * 1.08, c, (x) => ravanaEffigy(x, s * .4, s * 1.06, s));
+        const ash = cache(st, "ravanaAsh", s * .8, s * 1.08, c, (x) => { ravanaEffigy(x, s * .4, s * 1.06, s); x.globalCompositeOperation = "source-atop";
+          x.fillStyle = "rgba(24,12,10,.92)"; x.fillRect(0, 0, s * .8, s * 1.08); for (let i = 0; i < 260; i++) { x.fillStyle = `rgba(255,${100 + Math.floor(rnd() * 80)},30,${(rnd() * .8).toFixed(2)})`; x.fillRect(rnd() * s * .8, rnd() * s * 1.08, 1.5, 1.5); } });
+        const lit = cache(st, "ravanaLit", s * .8, s * 1.08, c, (x) => { ravanaEffigy(x, s * .4, s * 1.06, s); x.globalCompositeOperation = "source-atop";
+          const g = x.createLinearGradient(0, 0, 0, s * 1.08); g.addColorStop(0, "rgba(255,90,20,.9)"); g.addColorStop(1, "rgba(255,200,80,.9)"); x.fillStyle = g; x.fillRect(0, 0, s * .8, s * 1.08);
+          for (let i = 0; i < 400; i++) { x.fillStyle = `rgba(255,${200 + Math.floor(rnd() * 55)},${Math.floor(rnd() * 120)},${(rnd()).toFixed(2)})`; x.fillRect(rnd() * s * .8, rnd() * s * 1.08, 2, 2); } });
+        const ex = cx - s * .4, ey = foot - s * 1.06, line = foot - burn * s * 1.08;
+        if (fresh && ash) {
+          const a = cyc > 11.8 ? back : 1 - gone;
+          c.globalAlpha = a;
+          if (cyc > 11.8 || burn <= 0) c.drawImage(fresh, ex, ey, s * .8, s * 1.08);
+          else { c.save(); c.beginPath(); c.rect(ex, ey - s, s * .8, line - ey + s); c.clip(); c.drawImage(fresh, ex, ey, s * .8, s * 1.08); c.restore();
+            c.save(); c.beginPath(); c.rect(ex, line, s * .8, foot - line + s); c.clip(); c.drawImage(ash, ex, ey, s * .8, s * 1.08);
+            if (lit && fire > 0) { const fl = .55 + .2 * Math.sin(t * 9) + .15 * Math.sin(t * 23);
+              c.globalAlpha = a * fire * fl * .6; c.drawImage(lit, ex, ey, s * .8, s * 1.08); }
+            c.restore(); }
+          c.globalAlpha = 1; }
+        // the fire climbing it, and crackers bursting out of it as it goes
+        if (fire > 0 && cyc < 11.8) {
+          const lf = (foot - line) / s, wd = s * (lf > .55 ? .22 : .34) * (.6 + .4 * fire), ht = s * .26 * (.5 + .5 * fire);
+          flames(c, cx, Math.min(foot, Math.max(line + s * .06, foot - s * .9)), wd * (line < foot - s * .85 ? fire : 1), ht * (line < foot - s * .85 ? fire : 1), t);
+          if (burn > .05) flames(c, cx, foot, s * .36 * fire, s * .2 * fire, t + 3);
+          if (cyc < 9 && rnd() < dt * 30) st.sp.push({ x: cx + (rnd() - .5) * s * .3, y: line, vx: (rnd() - .5) * s * 1.2, vy: -s * (.6 + rnd() * 1.1), life: .8 + rnd() * .5, col: ["#FFE08A", "#FF9A3A", "#FFFFFF"][Math.floor(rnd() * 3)] }); }
+        c.globalCompositeOperation = "lighter";
+        st.sp = st.sp.filter((p) => { const ox = p.x, oy = p.y; p.vy += s * 1.4 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+          c.strokeStyle = p.col; c.globalAlpha = Math.max(0, Math.min(1, p.life)); c.lineWidth = Math.max(1.2, s * .006); c.beginPath(); c.moveTo(ox, oy); c.lineTo(p.x, p.y); c.stroke(); return p.life > 0 && p.x > w * .64; });
+        c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+        // the flaming arrow that lights it, from the right
+        if (cyc > 1.4 && cyc < 3.3) { const k = smooth((cyc - 1.4) / 1.9), x0 = w * 1.03, y0 = foot - s * .1, x1 = cx + s * .05, y1 = foot - s * .55;
+          const ax = x0 + (x1 - x0) * k, ay = y0 + (y1 - y0) * k - Math.sin(k * Math.PI) * s * .35, ang = Math.atan2((y1 - y0) - Math.cos(k * Math.PI) * Math.PI * s * .35, x1 - x0);
+          c.save(); c.translate(ax, ay); c.rotate(ang); glow(c, 0, 0, s * .07, "#FF9A2A", .9);
+          c.strokeStyle = "#F2E0C0"; c.lineWidth = Math.max(1.2, s * .007); c.beginPath(); c.moveTo(-s * .16, 0); c.lineTo(0, 0); c.stroke();
+          c.fillStyle = "#FFE08A"; c.beginPath(); c.ellipse(0, 0, s * .03, s * .014, 0, 0, TAU); c.fill();
+          c.fillStyle = "#C8102E"; c.beginPath(); c.moveTo(-s * .16, 0); c.lineTo(-s * .19, -s * .015); c.lineTo(-s * .14, 0); c.lineTo(-s * .19, s * .015); c.fill(); c.restore(); }
+        if (crowd) c.drawImage(crowd, w * .64, h - u * .18, w * .36, u * .2);
+      };
+    },
+
+    shiva(st, v) {
+      st.drift = mkDrift(4, .3, .5); st.drops = []; st.next = 0; st.tw = Array.from({ length: 24 }, () => ({ x: .64 + rnd() * .34, y: rnd() * .45, p: rnd() * TAU }));
+      st.smoke = Array.from({ length: 8 }, (_, i) => ({ life: i / 8 }));
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h * .92, w * .34), cx = w * .79, foot = h * .9, s = u * .62, kx = w * .81;
+        still(st, "kailash", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#050818"], [.45, "#141C44"], [.72, "#2E2C5A"], [1, "#120E22"]]);
+          for (let i = 0; i < w * h / 900; i++) { const sx = rnd() * w, a = sx < w * .62 ? .25 : .7; x.fillStyle = `rgba(255,255,255,${(rnd() * a).toFixed(2)})`; x.fillRect(sx, rnd() * h * .6, 1, 1); }
+          // the far range, quiet behind the words
+          land(x, w, h, [[0, .62], [.1, .54], [.2, .6], [.32, .5], [.44, .58], [.56, .52], [.66, .6], [.8, .55], [1, .6]], "#1E2444", "rgba(150,170,220,.18)");
+          // Kailash: a dark pyramid of rock, snow lying on its ledges, a gully down the face
+          const top = h * .2, base = h * .72, hw = u * .44, H = base - top;
+          const kpath = () => { x.beginPath(); x.moveTo(kx - hw, base); x.quadraticCurveTo(kx - hw * .6, top + H * .3, kx - hw * .14, top + H * .05); x.quadraticCurveTo(kx, top - H * .02, kx + hw * .14, top + H * .05); x.quadraticCurveTo(kx + hw * .6, top + H * .3, kx + hw, base); x.closePath(); };
+          const kg = x.createLinearGradient(kx - hw, 0, kx + hw, 0); kg.addColorStop(0, "#3A4468"); kg.addColorStop(.5, "#5A668E"); kg.addColorStop(.52, "#2E3658"); kg.addColorStop(1, "#1C223E");
+          kpath(); x.fillStyle = kg; x.fill(); x.save(); kpath(); x.clip();
+          // the cap of snow
+          const cg = x.createLinearGradient(kx - hw * .3, 0, kx + hw * .3, 0); cg.addColorStop(0, "#C8D2EC"); cg.addColorStop(.5, "#F2F6FF"); cg.addColorStop(.53, "#A8B4D8"); cg.addColorStop(1, "#8090BC");
+          x.fillStyle = cg; x.beginPath(); x.moveTo(kx - hw, top + H * .28); for (let k = 0; k <= 20; k++) { const f = k / 20; x.lineTo(kx - hw + f * hw * 2, top + H * (.24 + .06 * Math.sin(f * 17) + .04 * Math.sin(f * 41))); } x.lineTo(kx + hw, top - H * .1); x.lineTo(kx - hw, top - H * .1); x.fill();
+          // ledges of snow on the rock below
+          for (let k = 0; k < 10; k++) { const yy = top + H * (.33 + k * .068), lit = 1 - k * .07, M = 30;
+            x.fillStyle = `rgba(220,228,248,${(.6 * lit).toFixed(2)})`;
+            for (let j = 0; j < M; j++) { if (Math.sin(j * 1.9 + k * 4.1) + Math.sin(j * .7 + k) < -.4) continue;
+              const f0 = j / M, f1 = (j + 1) / M, y0 = yy - Math.abs(f0 - .5) * H * .05 + Math.sin(f0 * 23 + k * 3) * H * .006, y1 = yy - Math.abs(f1 - .5) * H * .05 + Math.sin(f1 * 23 + k * 3) * H * .006, th = H * (.008 + .012 * Math.abs(Math.sin(j * 2.3 + k)));
+              x.beginPath(); x.moveTo(kx - hw + f0 * hw * 2, y0); x.lineTo(kx - hw + f1 * hw * 2 + .5, y1); x.lineTo(kx - hw + f1 * hw * 2 + .5, y1 + th * .7); x.lineTo(kx - hw + f0 * hw * 2, y0 + th); x.fill(); } }
+          x.fillStyle = "rgba(10,14,34,.5)"; x.beginPath(); x.moveTo(kx - u * .008, top + H * .12); x.quadraticCurveTo(kx + u * .01, top + H * .5, kx - u * .02, base); x.lineTo(kx + u * .03, base); x.quadraticCurveTo(kx + u * .02, top + H * .5, kx + u * .008, top + H * .12); x.fill();
+          x.fillStyle = "rgba(0,0,20,.35)"; x.fillRect(kx + hw * .02, top, hw, H); x.restore();
+          glowFlat(x, kx - hw * .2, top + H * .3, hw, .7, "#C8D8FF", .1);
+          // nearer foothills, then the temple floor
+          land(x, w, h, [[0, .72], [.2, .66], [.45, .72], [.64, .65], [.8, .7], [1, .64]], "#141830", "rgba(140,160,210,.2)");
+          const fg = x.createLinearGradient(0, foot - u * .05, 0, h); fg.addColorStop(0, "#2A2A3C"); fg.addColorStop(1, "#0E0E18"); x.fillStyle = fg; x.fillRect(0, foot - u * .02, w, h);
+          for (let px = 0; px < w; px += u * .16) { x.fillStyle = "rgba(255,255,255,.04)"; x.fillRect(px, foot - u * .02, 1, h); }
+          // the crescent moon over the peak
+          const mx = w * .92, my = h * .13, mr = u * .05; glow(x, mx, my, mr * 4, "#E8F0FF", .25);
+          x.fillStyle = "#F6F2E2"; x.beginPath(); x.arc(mx, my, mr, 0, TAU); x.arc(mx + mr * .45, my - mr * .25, mr * .9, 0, TAU, true); x.fill("evenodd");
+          shivaTrident(x, cx + s * .78, foot, s);
+          const px = cx, py = foot - s * 1.05;
+          x.strokeStyle = "#8A6A3A"; x.lineWidth = Math.max(1.2, s * .014); x.lineCap = "round"; x.beginPath(); x.moveTo(px - s * .36, foot - s * .1); x.lineTo(px, py - s * .2); x.lineTo(px + s * .36, foot - s * .1); x.moveTo(px, py - s * .2); x.lineTo(px, py - s * .08); x.stroke();
+          x.fillStyle = "#C8922A"; x.beginPath(); x.arc(px, py - s * .2, s * .018, 0, TAU); x.fill();
+          const pg = x.createLinearGradient(px - s * .1, 0, px + s * .1, 0); pg.addColorStop(0, "#7A3A1A"); pg.addColorStop(.4, "#E8925A"); pg.addColorStop(1, "#6A2A10");
+          x.fillStyle = pg; x.beginPath(); x.moveTo(px - s * .05, py - s * .08); x.lineTo(px + s * .05, py - s * .08); x.quadraticCurveTo(px + s * .12, py, px + s * .07, py + s * .07); x.quadraticCurveTo(px, py + s * .1, px - s * .07, py + s * .07); x.quadraticCurveTo(px - s * .12, py, px - s * .05, py - s * .08); x.fill();
+          x.fillStyle = "#C8723A"; x.fillRect(px - s * .06, py - s * .09, s * .12, s * .015); x.fillStyle = "rgba(255,220,180,.35)"; x.beginPath(); x.ellipse(px - s * .04, py, s * .015, s * .04, 0, 0, TAU); x.fill();
+          shadow(x, cx, foot, s * .6, s * .08, .5); shivaLingam(x, cx, foot, s);
+          grain(x, w, h, .03); vignette(x, w, h, .45, .8); });
+        st.tw.forEach((p) => { const a = .5 + .5 * Math.sin(t * 1.7 + p.p); c.fillStyle = `rgba(255,255,255,${(a * .8).toFixed(2)})`; c.fillRect(p.x * w, p.y * h, 1.5, 1.5); });
+        drift(st, c, w, h, u, dt * .5, st.drift, "rgba(150,160,200,.5)", "rgba(40,44,80,.5)", null, .22);
+        // milk dripping from the pot on to the stone
+        const px = cx, py = foot - s * 1.05;
+        st.next -= dt; if (st.next <= 0) { st.next = .55; st.drops.push({ y: py + s * .09, v: 0 }); }
+        const stoneTop = foot - s * .64;
+        c.fillStyle = "rgba(250,248,240,.95)";
+        st.drops = st.drops.filter((d) => { d.v += s * 3 * dt; d.y += d.v * dt; if (d.y >= stoneTop) { st.splash = 1; return false; }
+          c.beginPath(); c.ellipse(px, d.y, s * .008, s * .014, 0, 0, TAU); c.fill(); return true; });
+        if (st.splash > 0) { st.splash -= dt * 3; const k = 1 - st.splash; c.strokeStyle = `rgba(250,248,240,${(st.splash * .8).toFixed(2)})`; c.lineWidth = 1; c.beginPath(); c.ellipse(px, stoneTop + s * .01, s * .03 * k + s * .01, s * .008 * k + 1, 0, Math.PI, TAU); c.stroke(); }
+        // a sheen of milk running down the stone
+        c.fillStyle = "rgba(250,248,240,.22)"; c.beginPath(); c.moveTo(px - s * .02, stoneTop); c.quadraticCurveTo(px - s * .05, foot - s * .4, px - s * .03, foot - s * .2); c.lineTo(px + s * .02, foot - s * .2); c.quadraticCurveTo(px + s * .04, foot - s * .4, px + s * .02, stoneTop); c.fill();
+        // lamps along the front of the shrine, burning all night
+        for (let i = 0; i < 5; i++) { const lx = cx - s * .52 + i * s * .26, ly = foot + (h - foot) * .45; if (i === 2) continue; lamp(c, lx, ly, s * .045, t, i); }
+        // incense curling up past the trident
+        c.strokeStyle = "rgba(220,220,240,.14)"; c.lineWidth = Math.max(1, s * .008); c.lineCap = "round";
+        st.smoke.forEach((p, i) => { p.life = (p.life + dt * .1) % 1; const L = p.life, sx = cx + s * .55, sy = foot - L * s * 1.1;
+          c.globalAlpha = Math.sin(L * Math.PI); c.beginPath(); c.moveTo(sx + Math.sin(L * 8 + i) * s * .04, sy); c.quadraticCurveTo(sx + Math.sin(L * 8 + i + 1) * s * .06, sy - s * .05, sx + Math.sin(L * 8 + i + 2) * s * .04, sy - s * .1); c.stroke(); });
+        c.globalAlpha = 1;
+      };
+    },
+
+    snake(st, v) {
+      st.rain = Array.from({ length: 140 }, () => ({ x: rnd() * 1.2, y: rnd(), v: .9 + rnd() * .5, l: .5 + rnd() * .5 }));
+      st.rip = Array.from({ length: 10 }, () => ({ x: .66 + rnd() * .32, y: rnd(), p: rnd() }));
+      st.cl = mkDrift(5, .05, .25);
+      return (c, w, h, t, dt) => {
+        const u = Math.min(h * .92, w * .34), cx = w * .8, gnd = h * .86, mh = u * .26, s = u * .34;
+        still(st, "monsoon", c, w, h, (x) => {
+          fill(x, w, h, [[0, "#1A2420"], [.45, "#3A4A40"], [.7, "#5A6A4E"], [1, "#2A3A22"]]);
+          // a line of trees on the far bund, then the flooded paddy
+          land(x, w, h, [[0, .64], [.12, .6], [.25, .63], [.4, .58], [.55, .62], [.7, .57], [.85, .61], [1, .58]], "#1E2E1E", null);
+          const pg = x.createLinearGradient(0, h * .62, 0, gnd); pg.addColorStop(0, "#5A6A5A"); pg.addColorStop(1, "#2E4A2A"); x.fillStyle = pg; x.fillRect(0, h * .62, w, gnd - h * .62);
+          for (let k = 0; k < 9; k++) { const yy = h * .64 + k * (gnd - h * .64) / 9; x.fillStyle = `rgba(160,190,150,${(.12 + k * .015).toFixed(3)})`; x.fillRect(0, yy, w, 1); }
+          for (let i = 0; i < w * .6; i++) { const px = rnd() * w, py = h * .64 + rnd() * (gnd - h * .64); x.strokeStyle = `rgba(110,170,80,${px < w * .62 ? .25 : .55})`; x.lineWidth = 1; x.beginPath(); x.moveTo(px, py); x.lineTo(px + (rnd() - .5) * 3, py - u * (.02 + rnd() * .03)); x.stroke(); }
+          // a tree at the right-hand edge, dark in the rain
+          x.fillStyle = "#16241A"; x.fillRect(w * .96, h * .3, u * .03, gnd - h * .3);
+          for (let i = 0; i < 46; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()); x.fillStyle = ["#16241A", "#1E3022", "#22382A"][i % 3]; x.beginPath(); x.arc(w * .99 + Math.cos(a) * d * u * .2, h * .27 + Math.sin(a) * d * u * .13, u * (.03 + rnd() * .04), 0, TAU); x.fill(); }
+          // the near ground, muddy and wet
+          const gg = x.createLinearGradient(0, gnd, 0, h); gg.addColorStop(0, "#3A3220"); gg.addColorStop(1, "#1E1A10"); x.fillStyle = gg; x.fillRect(0, gnd, w, h - gnd);
+          x.fillStyle = "rgba(150,170,180,.25)"; x.beginPath(); x.ellipse(cx - u * .28, gnd + (h - gnd) * .55, u * .16, (h - gnd) * .18, 0, 0, TAU); x.fill();
+          // the anthill the cobra lives in, marked with turmeric and kumkum and wound with thread
+          const mg = x.createLinearGradient(cx - u * .25, 0, cx + u * .25, 0); mg.addColorStop(0, "#5A3E22"); mg.addColorStop(.45, "#A8784A"); mg.addColorStop(1, "#4A3018");
+          x.fillStyle = mg; x.beginPath(); x.moveTo(cx - u * .27, gnd + u * .01); x.quadraticCurveTo(cx - u * .22, gnd - mh * .7, cx - u * .1, gnd - mh * .9); x.lineTo(cx - u * .07, gnd - mh * 1.15); x.quadraticCurveTo(cx - u * .02, gnd - mh * .95, cx + u * .04, gnd - mh * 1.0);
+          x.lineTo(cx + u * .08, gnd - mh * 1.2); x.quadraticCurveTo(cx + u * .14, gnd - mh * .8, cx + u * .2, gnd - mh * .55); x.quadraticCurveTo(cx + u * .25, gnd - mh * .2, cx + u * .28, gnd + u * .01); x.closePath(); x.fill();
+          for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(${rnd() < .5 ? "40,24,10" : "200,160,110"},.25)`; x.beginPath(); x.arc(cx + (rnd() - .5) * u * .4, gnd - rnd() * mh * .9, u * .006, 0, TAU); x.fill(); }
+          x.fillStyle = "#2A1A0C"; x.beginPath(); x.ellipse(cx + u * .02, gnd - mh * .55, u * .045, u * .03, 0, 0, TAU); x.fill();
+          [[-.12, .5], [.1, .45], [-.02, .3], [.16, .25], [-.18, .22]].forEach(([dx, dy], i) => { x.fillStyle = i % 2 ? "#E8B020" : "#D8263A"; x.beginPath(); x.ellipse(cx + dx * u, gnd - dy * mh, u * .018, u * .012, 0, 0, TAU); x.fill(); });
+          x.strokeStyle = "rgba(250,248,240,.8)"; x.lineWidth = Math.max(1, u * .004); [.25, .32].forEach((f) => { x.beginPath(); x.ellipse(cx, gnd - mh * f, u * .22, u * .03, 0, .1, Math.PI - .1); x.stroke(); });
+          // the coils resting on top of the mound
+          [[0, .96, .13, .04, -.2, 1.8], [.015, 1.05, .09, .028, .25, 2.2]].forEach(([dx, dy, rx, ry, a0, a1]) => {
+            const ex = cx + dx * u, ey = gnd - mh * dy, A0 = Math.PI * a0, A1 = Math.PI * a1;
+            x.lineCap = "round"; x.strokeStyle = "#2A2410"; x.lineWidth = s * .2; x.beginPath(); x.ellipse(ex, ey, u * rx, u * ry, 0, A0, A1); x.stroke();
+            x.strokeStyle = "#6A5E30"; x.lineWidth = s * .15; x.stroke();
+            x.strokeStyle = "rgba(200,184,120,.55)"; x.lineWidth = s * .04; x.beginPath(); x.ellipse(ex, ey - s * .035, u * rx, u * ry, 0, A0, A1); x.stroke();
+            x.strokeStyle = "rgba(20,16,8,.4)"; x.lineWidth = Math.max(1, s * .025); x.setLineDash([s * .03, s * .05]); x.beginPath(); x.ellipse(ex, ey + s * .02, u * rx, u * ry, 0, A0, A1); x.stroke(); x.setLineDash([]); });
+          // offerings at its foot: marigolds, a bowl of milk, a sheltered lamp
+          for (let i = 0; i < 12; i++) { const a = Math.PI * (.05 + i / 11 * .9), fx = cx + Math.cos(a) * u * .3, fy = gnd + Math.sin(a) * u * .04;
+            x.fillStyle = i % 2 ? "#F59E0B" : "#F97316"; x.beginPath(); x.arc(fx, fy, u * .018, 0, TAU); x.fill(); x.fillStyle = "rgba(120,50,0,.4)"; x.beginPath(); x.arc(fx, fy, u * .007, 0, TAU); x.fill(); }
+          x.fillStyle = "#C8A060"; x.beginPath(); x.ellipse(cx + u * .2, gnd + u * .02, u * .045, u * .015, 0, 0, Math.PI); x.fill(); x.fillStyle = "#F8F4EA"; x.beginPath(); x.ellipse(cx + u * .2, gnd + u * .005, u * .04, u * .01, 0, 0, TAU); x.fill();
+          grain(x, w, h, .03); vignette(x, w, h, .4, .8); });
+        drift(st, c, w, h, u, dt, st.cl, "#6A7A70", "#2A3430", null, .45);
+        // lightning, now and then, far off over the fields
+        const lc = t % 11; if (lc < .45) { const a = lc < .08 ? 1 : lc < .14 ? .3 : lc < .22 ? .8 : Math.max(0, 1 - (lc - .22) / .23);
+          c.fillStyle = `rgba(220,235,255,${(a * .16).toFixed(3)})`; c.fillRect(w * .62, 0, w * .38, h);
+          c.strokeStyle = `rgba(240,248,255,${(a * .9).toFixed(2)})`; c.lineWidth = Math.max(1, u * .005); c.beginPath(); let bx = w * .9, by = 0; c.moveTo(bx, by);
+          for (let k = 0; k < 6; k++) { bx += Math.sin(k * 3.7 + Math.floor(t / 11)) * u * .04; by += h * .09; c.lineTo(bx, by); } c.stroke(); }
+        // the cobra: neck rising from the coils, hood swaying
+        const sway = Math.sin(t * 1.1) * .09 + Math.sin(t * .43) * .04, bx = cx + u * .01, by = gnd - mh * 1.02, nx = bx + Math.sin(sway) * s * .5, ny = by - s * .55;
+        const ng = c.createLinearGradient(bx - s * .1, 0, bx + s * .1, 0); ng.addColorStop(0, "#3A3418"); ng.addColorStop(.5, "#E8DCB0"); ng.addColorStop(1, "#3A3418");
+        c.strokeStyle = "#3A3418"; c.lineWidth = s * .21; c.lineCap = "round"; c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(bx - s * .14, by - s * .3, nx, ny + s * .06); c.stroke();
+        c.strokeStyle = ng; c.lineWidth = s * .12; c.stroke();
+        c.strokeStyle = "rgba(120,100,60,.35)"; c.lineWidth = Math.max(.6, s * .008); for (let k = 1; k < 8; k++) { const f = k / 8, qx = (1 - f) * (1 - f) * bx + 2 * f * (1 - f) * (bx - s * .14) + f * f * nx, qy = (1 - f) * (1 - f) * by + 2 * f * (1 - f) * (by - s * .3) + f * f * (ny + s * .06); c.beginPath(); c.moveTo(qx - s * .055, qy); c.lineTo(qx + s * .055, qy); c.stroke(); }
+        const hood = cache(st, "hood", s * 1.2, s * 1.25, c, (x) => { x.translate(s * .6, s * 1.15); snakeHood(x, s); });
+        c.save(); c.translate(nx, ny + s * .04); c.rotate(sway * .8 + Math.sin(t * 2.1) * .02); c.scale(1 + Math.sin(t * .8) * .03, 1);
+        if (hood) c.drawImage(hood, -s * .6, -s * 1.15, s * 1.2, s * 1.25); else snakeHood(c, s);
+        // its tongue, flicking
+        const fk = (t * 1.3) % 2.2; if (fk < .35) { const k = Math.sin(fk / .35 * Math.PI); c.strokeStyle = "#B01020"; c.lineWidth = Math.max(1, s * .012); c.beginPath(); c.moveTo(0, -s * .96); c.lineTo(0, -s * (.96 - .09 * k)); c.lineTo(-s * .025 * k, -s * (.96 - .13 * k)); c.moveTo(0, -s * (.96 - .09 * k)); c.lineTo(s * .025 * k, -s * (.96 - .13 * k)); c.stroke(); }
+        c.restore();
+        // the lamp under a leaf, guttering in the wet
+        const lx = cx - u * .2, ly = gnd + u * .02; lamp(c, lx, ly, u * .025, t, 0);
+        c.fillStyle = "#2F6A2A"; c.beginPath(); c.moveTo(lx - u * .05, ly - u * .05); c.quadraticCurveTo(lx, ly - u * .1, lx + u * .05, ly - u * .05); c.quadraticCurveTo(lx, ly - u * .075, lx - u * .05, ly - u * .05); c.fill();
+        // rain, slanting, with rings where it lands
+        c.lineWidth = 1;
+        st.rain.forEach((r) => { r.y += r.v * dt; r.x -= r.v * dt * .12; if (r.y > 1) { r.y = -.05; r.x = rnd() * 1.2; } const rx = r.x * w, ry = r.y * h;
+          c.strokeStyle = rx < w * .62 ? "rgba(210,225,235,.12)" : "rgba(210,225,235,.4)"; c.beginPath(); c.moveTo(rx, ry); c.lineTo(rx + u * .012 * r.l, ry - u * .07 * r.l); c.stroke(); });
+        st.rip.forEach((p) => { p.p += dt * .9; if (p.p > 1) { p.p = 0; p.x = .66 + rnd() * .32; p.y = rnd(); } const rx = p.x * w, ry = gnd + p.y * (h - gnd);
+          c.strokeStyle = `rgba(210,225,235,${((1 - p.p) * .45).toFixed(2)})`; c.beginPath(); c.ellipse(rx, ry, u * .04 * p.p + 1, u * .01 * p.p + .5, 0, 0, TAU); c.stroke(); });
+      };
+    },
+
   };
   Object.assign(SCENES, MORE, UK, REDRAWN);
 
@@ -11582,7 +12257,7 @@ const FEST_TABLE = {
   "Valentine’s Day": {"src":"UK","tier":"festive","scene":"valentine","bg":"#5A0E2A","eyebrow":"Celebrating","short":"A day for love and friendship: cards, flowers, and sometimes a secret admirer who doesn’t sign their name.","full":[["Who was Valentine?","Saint Valentine was a Christian priest in Rome about 1,700 years ago. Very little is known for certain about him, though there are stories that he helped couples marry in secret. About 600 years ago the English poet Geoffrey Chaucer wrote that birds choose their partners on Saint Valentine’s Day, and from then on the day was linked with love."],["What happens","People send cards, flowers and chocolates to someone they love. In Victorian times millions of cards were sent, often with no name inside, so the person had to guess who it was from. Lots of people send them to friends and family too. Hearts stand for love, and Cupid, the Roman god of love, is said to make people fall in love with a shot from his bow."]],"art":"A big heart beats, Cupid’s arrow flies through it, and little hearts float up."},
   "Pancake Day": {"src":"UK","tier":"festive","scene":"pancake","bg":"#4A2810","eyebrow":"Shrove Tuesday","short":"The last treat before Lent: pancakes for tea, lemon and sugar, and races with frying pans.","full":[["Why pancakes?","Pancake Day is the Tuesday before Lent, the forty days when many Christians give something up to get ready for Easter. Long ago that meant no eggs, butter or rich food, so on the last day before Lent people used them all up, and pancakes were the perfect way. It is called Shrove Tuesday because people went to church to be “shriven”: to say sorry and be forgiven."],["What happens","Everyone makes pancakes and tries to flip them, with lemon and sugar the British favourite. In Olney, in Buckinghamshire, people have run a pancake race since 1445, tossing pancakes in frying pans as they run. The story is that a woman heard the church bell while cooking and ran there still holding her pan. Pancake Day moves every year, because it is always 47 days before Easter."]],"art":"A pancake is flipped high out of the pan and lands the other side up, beside a stack with lemon and sugar."},
   "St David’s Day": {"src":"UK","tier":"festive","scene":"daffodil","bg":"#2E6B3A","eyebrow":"Dydd Gŵyl Dewi","short":"Wales celebrates its patron saint, David, with daffodils, leeks and red dragons everywhere.","full":[["Who was David?","Saint David, Dewi Sant in Welsh, was a monk who lived in Wales about 1,500 years ago. He started churches and monasteries and lived very simply, eating mostly bread, vegetables and water. His most famous words were “Do the little things”: be kind in small ways every day. He died on 1 March, and he became the patron saint of Wales, its special protector."],["What happens","Welsh people wear a daffodil or a leek, the two symbols of Wales. The story goes that Welsh soldiers once wore leeks in their hats so they could tell friend from enemy in a battle. Many children dress in traditional Welsh costume, with a tall black hat, and schools hold an eisteddfod, a festival of singing, poems and dancing. The red dragon flag flies everywhere."]],"art":"Daffodils nod in the wind on green hills, and the red dragon flag of Wales ripples above."},
-  "Maha Shivaratri": {"src":"Hindu","tier":"festive","scene":"shiva","bg":"#0B1030","eyebrow":"Celebrating","short":"The great night of Shiva. Many people fast and stay awake all night, singing until sunrise.","full":[["What is it?","Maha Shivaratri means “the great night of Shiva”. Shiva is one of the most important Hindu gods: the destroyer, who clears away the old so that new things can begin. He is shown with a crescent moon in his hair, a snake around his neck and a trident in his hand, living high in the Himalayas."],["What happens","Many people fast all day and stay awake all night, singing and praying. At temples, milk, water and leaves from the bael tree are poured over a stone symbol of Shiva called a lingam. The chant “Om Namah Shivaya” can go on until sunrise."]],"art":"A crescent moon over snowy Himalayan peaks, with a row of lamps that burn all night."},
+  "Maha Shivaratri": {"src":"Hindu","tier":"festive","scene":"shiva","bg":"#0B1030","eyebrow":"Celebrating","short":"The great night of Shiva. Many people fast and stay awake all night, singing until sunrise.","full":[["What is it?","Maha Shivaratri means “the great night of Shiva”. Shiva is one of the most important Hindu gods: the destroyer, who clears away the old so that new things can begin. He is shown with a crescent moon in his hair, a snake around his neck and a trident in his hand, living high in the Himalayas."],["What happens","Many people fast all day and stay awake all night, singing and praying. At temples, milk, water and leaves from the bael tree are poured over a stone symbol of Shiva called a lingam. The chant “Om Namah Shivaya” can go on until sunrise."]],"art":"Under a crescent moon and snowy Kailash, milk drips all night onto a Shiva lingam crowned with bael leaves, beside his trident and a row of lamps."},
   "Holika Dahan": {"src":"Hindu","tier":"festive","scene":"bonfire","bg":"#1A0A0C","eyebrow":"Tonight","short":"The bonfire on the night before Holi, remembering a prince who walked out of the flames unharmed.","full":[["The story","Prince Prahlad prayed to the god Vishnu, which made his father, a proud demon king, furious. The king’s sister Holika could not be hurt by fire, so she sat in a bonfire holding Prahlad to get rid of him. Instead Holika burned, and Prahlad walked out without a scratch."],["What happens","On the night before Holi, people build a big bonfire in the street or square and walk around it, throwing in grains, coconuts and popcorn. It stands for good beating harm. Some take a little of the ash home for luck, and then everyone goes to bed ready for the colours in the morning."]],"art":"Under the full moon the pyre burns and throws sparks, as women walk round it carrying lamps."},
   "Holi": {"src":"Hindu","tier":"festive","scene":"holi","bg":"#1C1830","eyebrow":"Celebrating","w":2,"short":"The festival of colours. Everyone throws coloured powder at everyone else, and by lunchtime nobody is clean.","full":[["The story","Holi marks the end of winter and the start of spring. A favourite story is about the god Krishna, who had blue skin as a boy and worried that Radha, the girl he liked, would think it strange. His mother told him to colour Radha’s face any colour he liked. He did, and a tradition was born."],["What happens","Everyone goes outside to throw coloured powder, called gulal, and squirt coloured water at each other: friends, neighbours, grandparents, even strangers. By lunchtime nobody is clean and nobody minds. It is also a day for making up with people you have argued with, and for eating gujiya, sweet pastries filled with nuts."]],"art":"Clouds of coloured powder burst and drift over a sandstone courtyard, a pichkari arcs coloured water, and the palash tree is in flower."},
   "Mother’s Day": {"src":"UK","tier":"festive","scene":"mothers","bg":"#6B2D4E","eyebrow":"Mothering Sunday","short":"A day to say thank you to mums, and anyone like a mum to you: cards, flowers and breakfast in bed.","full":[["Where it comes from","Mothering Sunday in Britain is much older than the American Mother’s Day. Hundreds of years ago, on the fourth Sunday of Lent, people went back to their “mother church”, the big church where they were baptised. Young people working away from home as servants were given the day off to go, and on the way they picked wild flowers to give to their mothers."],["What happens","Now it is a day to thank mums, and anyone who cares for you like a mum: grandmas, stepmums, aunts and carers. People give cards and flowers, make breakfast in bed, and do the jobs at home so she can rest. A traditional treat is simnel cake, a fruit cake with marzipan. It moves every year, because it is always three weeks before Easter."]],"art":"A bunch of tulips sways in a vase, and a homemade card opens and closes beside it."},
@@ -11592,9 +12267,9 @@ const FEST_TABLE = {
   "Hindi New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in the Hindu calendar, which follows the moon. Homes are cleaned and doorways hung with mango leaves.","full":[["What is it?","The Hindu calendar follows the moon, so its new year does not fall on 1 January. In much of north India the year starts in spring, on the first day of the month of Chaitra, which is also the start of Chaitra Navratri, nine more nights for the goddess Durga."],["What happens","Homes are swept and washed from top to bottom, doorways are hung with mango leaves and marigolds, and patterns are drawn at the entrance to welcome good luck. Families visit the temple, wear new clothes and share sweets, and many look up the new year’s almanac, called a panchang, to see what the year might bring."]],"art":"A carved doorway hung with mango leaves and marigolds, a brass lamp lit beside it, and a kolam drawing itself on the floor."},
   "Ugadi / Gudi Padwa": {"src":"Hindu","tier":"festive","scene":"newyear","v":"gudi","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in several Indian states. A dish is eaten that is sweet, sour, salty and bitter at once, like the year ahead.","full":[["What is it?","This is new year in several states at once: Ugadi in Andhra Pradesh, Telangana and Karnataka, and Gudi Padwa in Maharashtra. The name Ugadi comes from words meaning “the start of a new age”."],["What happens","In Maharashtra families raise a gudi outside the window: a tall pole topped with bright silk, a garland and an upside-down pot, like a flag of victory. In the south people eat ugadi pachadi, a dish that is sweet, sour, salty, bitter, spicy and tangy all at once, because the year ahead will hold all of those, and it is best to taste them together."]],"art":"A gudi, bright silk under an upturned pot with neem and sugar, stands beside the decorated door."},
   "International Day for the Elimination of Racial Discrimination": {"src":"Observance","tier":"quiet","motif":"globe","eyebrow":"United Nations day","short":"Remembers 21 March 1960, when police shot at a peaceful protest against apartheid in Sharpeville, South Africa.","full":[["","On 21 March 1960, in Sharpeville, South Africa, police opened fire on a peaceful protest against apartheid, the laws that kept Black and white people apart and unequal. Sixty-nine people were killed. The United Nations chose the date so that it would not be forgotten. In South Africa it is now a public holiday, Human Rights Day."]]},
-  "Ramanavami": {"src":"Hindu","tier":"festive","scene":"rama","bg":"#6A2A12","eyebrow":"Celebrating","short":"The birthday of Rama, hero of the Ramayana, celebrated at noon, the hour he was born.","full":[["Who is Rama?","Ramanavami is the birthday of Rama, hero of the Ramayana, one of the oldest and longest stories in the world. Rama is a prince famous for always doing the right thing, even when it cost him his throne, and for rescuing his wife Sita from the demon king Ravana."],["What happens","Rama is said to have been born at midday, so the biggest prayers happen at noon. His story is read aloud in temples, sometimes over the nine days before, and statues of baby Rama are placed in little cradles and rocked. People share a cooling drink called panakam, made from jaggery, pepper and cardamom."]],"art":"The midday sun turns, a bow stands ready and an arrow flies across."},
+  "Ramanavami": {"src":"Hindu","tier":"festive","scene":"rama","bg":"#6A2A12","eyebrow":"Celebrating","short":"The birthday of Rama, hero of the Ramayana, celebrated at noon, the hour he was born.","full":[["Who is Rama?","Ramanavami is the birthday of Rama, hero of the Ramayana, one of the oldest and longest stories in the world. Rama is a prince famous for always doing the right thing, even when it cost him his throne, and for rescuing his wife Sita from the demon king Ravana."],["What happens","Rama is said to have been born at midday, so the biggest prayers happen at noon. His story is read aloud in temples, sometimes over the nine days before, and statues of baby Rama are placed in little cradles and rocked. People share a cooling drink called panakam, made from jaggery, pepper and cardamom."]],"art":"At noon, under a turning sun and the temple’s saffron flag, baby Rama rocks in his cradle, his bow and quiver leaning beside him."},
   "Transgender Day of Visibility": {"src":"Observance","tier":"festive","scene":"pride","v":"trans","bg":"#1E2A3A","eyebrow":"Observance","short":"A day for trans people living their lives openly, and for celebrating them rather than only remembering.","full":[["What is it?","A day for trans people living their lives openly. It was started in 2009 by Rachel Crandall, a trans woman in the United States, who noticed that the only well-known day for trans people was about those who had died."],["The flag","The trans flag was designed by Monica Helms in 1999: light blue for boys, pink for girls, and white in the middle for people who are in between or neither. She made it read the same whichever way up it is flown, so it is never upside down."]],"art":"The trans flag flies over a street on a pastel morning, with bunting and a crossing in its colours."},
-  "Hanuman Jayanti": {"src":"Hindu","tier":"festive","scene":"hanuman","bg":"#2A1240","eyebrow":"Celebrating","short":"The birthday of Hanuman, the monkey god so strong he once carried a whole mountain across India.","full":[["Who is Hanuman?","This is the birthday of Hanuman, the monkey god and Rama’s most loyal friend. In the Ramayana he can leap across the sea, grow as big as a mountain and shrink as small as a cat. He stands for strength, courage and loyalty."],["The mountain","When Rama’s brother was badly hurt in battle, Hanuman flew to the Himalayas to fetch a healing herb. He could not tell which plant it was, so he picked up the whole mountain and flew back with it. Today people visit his temples, often painted bright orange, and sing the Hanuman Chalisa, a prayer of forty verses."]],"art":"A whole mountain, its healing herbs glowing, flies across the sky in a saffron streak."},
+  "Hanuman Jayanti": {"src":"Hindu","tier":"festive","scene":"hanuman","bg":"#2A1240","eyebrow":"Celebrating","short":"The birthday of Hanuman, the monkey god so strong he once carried a whole mountain across India.","full":[["Who is Hanuman?","This is the birthday of Hanuman, the monkey god and Rama’s most loyal friend. In the Ramayana he can leap across the sea, grow as big as a mountain and shrink as small as a cat. He stands for strength, courage and loyalty."],["The mountain","When Rama’s brother was badly hurt in battle, Hanuman flew to the Himalayas to fetch a healing herb. He could not tell which plant it was, so he picked up the whole mountain and flew back with it. Today people visit his temples, often painted bright orange, and sing the Hanuman Chalisa, a prayer of forty verses."]],"art":"Hanuman flies through the night over a sea of cloud, the whole mountain on his palm, its healing herbs glowing as earth crumbles from its roots."},
   "April Fools’ Day": {"src":"UK","tier":"festive","scene":"fools","bg":"#2D6FB0","eyebrow":"Until midday","short":"Tricks and jokes all morning. Fall for one and you are an April Fool.","full":[["What is it?","On 1 April people play harmless tricks and jokes on each other, and shout “April Fool!” when someone falls for one. In Britain the rule is that tricks stop at midday: play one in the afternoon and the joke is on you. Nobody knows for sure how it started, but people have been fooling each other on this day for hundreds of years."],["Famous tricks","In 1957 the BBC showed a film of farmers in Switzerland picking spaghetti from spaghetti trees, and lots of people believed it, because spaghetti was still unusual in Britain then. Some even asked how to grow their own. In 2008 the BBC showed penguins flying off to the rainforest for the winter. Both were April Fool’s jokes, and both are in this picture."]],"art":"Spaghetti hangs from a tree ready for picking, and penguins fly past now and then: two famous BBC jokes."},
   "Good Friday": {"src":"UK","tier":"quiet","motif":"candle","eyebrow":"Bank holiday","short":"Christians remember the day Jesus died on the cross. A quiet day, and a bank holiday.","full":[["","The Friday before Easter, when Christians remember the day Jesus was put to death on a cross in Jerusalem. It is a sad and serious day in church, often with quiet services at three in the afternoon, the time Jesus is said to have died. The “Good” probably comes from an old meaning of the word: holy. Hot cross buns are traditional today, and in the UK it is a bank holiday."]]},
   "Easter Sunday": {"src":"UK","tier":"festive","scene":"easter","bg":"#3E6FB8","eyebrow":"Celebrating","w":2,"short":"Christians celebrate Jesus coming back to life. Eggs, chicks and bunnies stand for new life.","full":[["The story","Easter is the most important festival of the Christian year. On Good Friday Jesus was put to death on a cross. Christians believe that on the Sunday morning, when his friends came to his tomb, it was empty: he had risen from the dead. Easter Sunday celebrates that, and the hope that death is not the end."],["Eggs, bunnies and chicks","Eggs are a sign of new life, which is why they are given at Easter: painted, rolled down hills or, now, made of chocolate and hidden for egg hunts. The Easter bunny comes from German stories of a hare that brought eggs to good children. Easter moves every year: it is the first Sunday after the first full moon after 21 March, so it can fall anywhere from late March to late April."]],"art":"The sun rises over a spring hill, an egg wobbles and cracks and a chick pops out, and a bunny hops by."},
@@ -11617,13 +12292,13 @@ const FEST_TABLE = {
   "South Asian Heritage Month": {"src":"Observance","tier":"quiet","motif":"book","eyebrow":"Starts today","short":"A month celebrating people with roots in South Asia and their place in Britain.","full":[["","A month celebrating the history and culture of people with roots in India, Pakistan, Bangladesh, Sri Lanka, Nepal, Bhutan, the Maldives and Afghanistan, and their place in Britain. The dates are deliberate: on 18 July 1947 the law ending British rule in India was signed, and on 17 August the new border between India and Pakistan was announced."]]},
   "Guru Purnima": {"src":"Hindu","tier":"festive","scene":"moon","v":"guru","bg":"#0E1430","eyebrow":"Celebrating","short":"A full moon for thanking your teachers, and anyone else who taught you something that stuck.","full":[["What is it?","Guru means teacher, and on this full moon people thank their teachers. It is also the birthday of Vyasa, the sage said to have written the Mahabharata. Buddhists mark the same full moon as the day the Buddha gave his first teaching."],["What happens","Students visit their teachers with flowers, fruit or a small gift, and touch their feet as a sign of respect. Music and dance schools hold special performances. It is a good day to think of anyone who taught you something that stuck: a parent, a coach, a friend, not only someone at school."]],"art":"A full moon shines on an open book on its stand, a lamp, and a teacher’s sandals laid with marigolds."},
   "Indian Independence Day": {"src":"Observance","tier":"festive","scene":"tricolour","v":"kites","bg":"#1D3557","eyebrow":"India","short":"India became independent in 1947. The flag is raised at the Red Fort and the sky over Delhi fills with kites.","full":[["What is it?","On 15 August 1947 India became independent after nearly two hundred years of British rule. The same week the country was split in two, into India and Pakistan, and millions of people had to leave their homes, a time called Partition that many families still remember."],["What happens","The prime minister raises the flag at the Red Fort in Delhi and gives a speech to the nation. Schools hold flag ceremonies and sing the national anthem, and the sky over Delhi fills with kites, many in orange, white and green."]],"art":"The flag flies above red sandstone ramparts while kites dance on their strings around it."},
-  "Nag Panchami": {"src":"Hindu","tier":"festive","scene":"snake","bg":"#12291C","eyebrow":"Celebrating","short":"Snakes are honoured rather than feared, in the monsoon, when they are seen most.","full":[["What is it?","Nag means snake, and on this day snakes are honoured instead of feared. It falls in the monsoon, when heavy rain floods snakes out of their holes and they are seen more than at any other time of year. In Hindu stories snakes are powerful: Shiva wears one round his neck, and Vishnu rests on a giant many-headed snake called Shesha."],["What happens","People draw snakes on their walls with turmeric or sandalwood paste and pray to images of cobras, offering flowers and sweets. Many avoid digging the ground today, in case they hurt a snake below. Real snakes cannot digest milk, though, so many people now offer it only to images."]],"art":"A cobra rises and sways in the monsoon rain among marigolds."},
+  "Nag Panchami": {"src":"Hindu","tier":"festive","scene":"snake","bg":"#12291C","eyebrow":"Celebrating","short":"Snakes are honoured rather than feared, in the monsoon, when they are seen most.","full":[["What is it?","Nag means snake, and on this day snakes are honoured instead of feared. It falls in the monsoon, when heavy rain floods snakes out of their holes and they are seen more than at any other time of year. In Hindu stories snakes are powerful: Shiva wears one round his neck, and Vishnu rests on a giant many-headed snake called Shesha."],["What happens","People draw snakes on their walls with turmeric or sandalwood paste and pray to images of cobras, offering flowers and sweets. Many avoid digging the ground today, in case they hurt a snake below. Real snakes cannot digest milk, though, so many people now offer it only to images."]],"art":"A cobra rises and sways from its anthill in the monsoon rain, among marigolds, a bowl of milk and a sheltered lamp."},
   "Onam": {"src":"Hindu","tier":"festive","scene":"onam","bg":"#103424","eyebrow":"Celebrating","w":2,"short":"Kerala’s harvest festival, welcoming back the kind King Mahabali with flower carpets, boat races and a huge feast.","full":[["The story","Onam is Kerala’s harvest festival, and it welcomes home King Mahabali, whose rule was so fair that nobody was poor. The gods worried he was too powerful, so Vishnu came as a small boy called Vamana and asked for just three steps of land. Mahabali agreed. Vamana grew enormous and covered everything in three steps, and Mahabali was sent below the earth, but he is allowed to visit his people once a year."],["What happens","For ten days families make a pookalam, a carpet of flower petals at the front door, adding a ring each day. There are snake-boat races with around a hundred rowers in each long, narrow boat, tiger dancers with painted bellies, and the onasadya: a feast of more than twenty dishes eaten off a banana leaf."]],"art":"Seen from a veranda, a flower carpet is laid ring by ring beside a brass lamp while a snake boat races across the backwater."},
   "Raksha Bandhan": {"src":"Hindu","tier":"festive","scene":"rakhi","bg":"#3A0B3A","eyebrow":"Celebrating","short":"Sisters tie a rakhi thread round their brothers’ wrists, and the brothers promise to look out for them.","full":[["What is it?","Raksha means protection and bandhan means bond. The day celebrates brothers and sisters, and the promise to look out for each other. In one old story Draupadi tore a strip from her sari to bandage Krishna’s cut finger, and he promised to protect her whenever she needed him, which he later did."],["What happens","Sisters tie a rakhi, a decorated thread, round their brothers’ wrists, mark their foreheads and feed them a sweet. Brothers give a present and a promise in return. Cousins and close friends join in too, and these days sisters often tie rakhis on each other, since anyone can promise to look after someone."]],"art":"A rakhi turns slowly on its silk cords above a thali with a lamp burning."},
   "Varalakshmi Vrat": {"src":"Hindu","tier":"festive","scene":"kalash","bg":"#3B0E2E","eyebrow":"Celebrating","short":"Women in southern India invite Lakshmi, goddess of good fortune, into the home for the year ahead.","full":[["What is it?","Lakshmi is the goddess of wealth and good fortune, and vara means a gift or blessing. On this Friday, women in southern India, especially in Karnataka, Tamil Nadu and Andhra Pradesh, invite her into their homes for the year ahead."],["What happens","A kalash, a pot filled with rice or water, is topped with mango leaves and a coconut, then dressed with a sari and jewellery and given a face, so Lakshmi seems to be visiting in person. Women pray for their families, tie a yellow thread on their wrists, and share sweets and small gifts with friends."]],"art":"A kalash dressed in silk and jasmine, crowned with a coconut and mango leaves, glows between brass lamps as lotus petals drift."},
   "Summer bank holiday": {"src":"UK","tier":"quiet","motif":"sun","eyebrow":"Bank holiday","short":"The last bank holiday before Christmas, and the weekend of Notting Hill Carnival.","full":[["","The last Monday in August, and the final bank holiday before Christmas, so lots gets crammed in: the seaside, barbecues and festivals. Notting Hill Carnival in London, started by the Caribbean community in the 1960s, fills the streets with steel bands, sound systems and dancers in feathered costumes, and is one of the biggest street parties in Europe."]]},
-  "Krishna Janmashtami": {"src":"Hindu","tier":"festive","scene":"janmashtami","bg":"#0B1238","eyebrow":"Celebrating","w":2,"short":"Krishna’s birthday, celebrated at midnight. Teams build human pyramids to reach a pot of butter hung over the street.","full":[["Who is Krishna?","Janmashtami is the birthday of Krishna, one of the most loved Hindu gods. As a child he was famous for mischief, especially for stealing butter from the pots the village women hung out of reach. He grew up to be a wise hero, and the friend and guide in the Bhagavad Gita."],["What happens","Krishna was born at midnight, so people fast all day and stay up until then, when bells ring, conch shells blow and a statue of baby Krishna is placed in a cradle. The next day in Mumbai, teams build human pyramids up to nine people high to reach a pot of butter or yoghurt hung above the street, and break it, just like the young Krishna."]],"art":"At midnight a human pyramid climbs towards a swinging pot of butter, and breaks it."},
-  "Ganesh Chaturthi": {"src":"Hindu","tier":"festive","scene":"ganesha","bg":"#4A0E0E","eyebrow":"Celebrating","w":2,"short":"Ganesha, the elephant-headed god who clears obstacles, is welcomed home as a clay statue, then let go into the water.","full":[["Who is Ganesha?","Ganesha is the god with an elephant’s head, who removes obstacles and is prayed to before starting anything new. In the story his mother Parvati made him from clay and asked him to guard her door. Shiva, not knowing who he was, fought him and cut off his head, then, to put it right, gave him the head of the first animal he found: an elephant."],["What happens","Families and whole neighbourhoods bring home clay statues of Ganesha, some taller than a house, and feed him his favourite sweets, steamed dumplings called modak. After up to ten days the statues are carried to the sea or a river with drums and dancing, and let go into the water while everyone chants “Ganpati Bappa Morya!”, asking him to come back soon."]],"art":"Ganesha waves his ears and curls his trunk, holding a sweet modak, with his mouse at his feet."},
+  "Krishna Janmashtami": {"src":"Hindu","tier":"festive","scene":"janmashtami","bg":"#0B1238","eyebrow":"Celebrating","w":2,"short":"Krishna’s birthday, celebrated at midnight. Teams build human pyramids to reach a pot of butter hung over the street.","full":[["Who is Krishna?","Janmashtami is the birthday of Krishna, one of the most loved Hindu gods. As a child he was famous for mischief, especially for stealing butter from the pots the village women hung out of reach. He grew up to be a wise hero, and the friend and guide in the Bhagavad Gita."],["What happens","Krishna was born at midnight, so people fast all day and stay up until then, when bells ring, conch shells blow and a statue of baby Krishna is placed in a cradle. The next day in Mumbai, teams build human pyramids up to nine people high to reach a pot of butter or yoghurt hung above the street, and break it, just like the young Krishna."]],"art":"A team builds a human pyramid under a swinging pot of curd while water arcs over them, and the child at the top breaks it open."},
+  "Ganesh Chaturthi": {"src":"Hindu","tier":"festive","scene":"ganesha","bg":"#4A0E0E","eyebrow":"Celebrating","w":2,"short":"Ganesha, the elephant-headed god who clears obstacles, is welcomed home as a clay statue, then let go into the water.","full":[["Who is Ganesha?","Ganesha is the god with an elephant’s head, who removes obstacles and is prayed to before starting anything new. In the story his mother Parvati made him from clay and asked him to guard her door. Shiva, not knowing who he was, fought him and cut off his head, then, to put it right, gave him the head of the first animal he found: an elephant."],["What happens","Families and whole neighbourhoods bring home clay statues of Ganesha, some taller than a house, and feed him his favourite sweets, steamed dumplings called modak. After up to ten days the statues are carried to the sea or a river with drums and dancing, and let go into the water while everyone chants “Ganpati Bappa Morya!”, asking him to come back soon."]],"art":"Ganesha sits in his pandal under a ring of chasing lights, fanning his ears and curling his trunk towards a bowl of modak, while his mouse nibbles one at his feet."},
   "Vishwakarma Puja": {"src":"Hindu","tier":"festive","scene":"tools","bg":"#1D1F2A","eyebrow":"Celebrating","short":"The day tools get thanked. Machines are cleaned and garlanded for Vishwakarma, engineer of the gods.","full":[["Who is Vishwakarma?","Vishwakarma is the architect and engineer of the gods. In the stories he built their palaces, their flying chariots and their weapons, and even whole cities, including the golden city of Lanka and Krishna’s city of Dwarka."],["What happens","This is the day tools get a thank you. In factories, workshops and garages across eastern India, workers clean their machines, decorate them with marigold garlands and stop work to pray. Cars, rickshaws and even computers get a garland. In Bengal and Bihar people fly kites, and the sky can be full of them."]],"art":"In a garlanded workshop the gears of a machine turn together, while kites swing in the evening sky through the open shutter."},
   "Black History Month": {"src":"Observance","tier":"quiet","motif":"book","eyebrow":"This month","short":"A month for Black British history, held every October in the UK since 1987.","full":[["","Held every October in the UK since 1987. A month to learn about the Black people who helped shape Britain. Their stories are often missing from history lessons, where Black history is usually told as the American story. It is a chance to learn about people like Mary Seacole, a Jamaican nurse who cared for soldiers in the Crimean War, and Walter Tull, one of Britain’s first Black professional footballers and its first Black army officer to lead troops in battle."]]},
   "Mahalaya Amavasya": {"src":"Hindu","tier":"festive","scene":"dawn","bg":"#141A3A","eyebrow":"Today","short":"Ancestors are remembered, and before dawn Bengal listens to the radio programme that says Durga is on her way.","full":[["What is it?","Mahalaya is the new moon that ends a two-week time called Pitru Paksha, when Hindus remember family members who have died. On the river banks people offer water, sesame seeds and rice in their memory. It also marks the start of the goddess season: Durga is said to set off on her journey home."],["What happens","In Bengal, before dawn, millions of people switch on the radio to hear Mahishasura Mardini, a programme of songs and Sanskrit verses first broadcast in the 1930s and repeated every year since, at four in the morning. Many say Durga Puja has not really begun until they have heard it. Artists paint the eyes on the clay Durga statues today."]],"art":"Before dawn a man pours river water from his cupped hands while an old radio on the ghat plays and kash grass nods."},
@@ -11631,7 +12306,7 @@ const FEST_TABLE = {
   "Ada Lovelace Day": {"src":"Observance","tier":"quiet","motif":"gear","eyebrow":"Observance","short":"Ada Lovelace wrote the first computer program in the 1840s, a century before there was a computer to run it.","full":[["","Ada Lovelace worked out, in the 1840s, that a machine could follow a written set of steps: the first computer program, written a century before there was a computer to run it. She was the daughter of the poet Lord Byron and worked with Charles Babbage on his Analytical Engine, a mechanical computer that was never finished. The day, the second Tuesday of October, celebrates women in science, technology, engineering and maths."]]},
   "Durga Puja": {"src":"Hindu","tier":"festive","scene":"durga","bg":"#2A0610","eyebrow":"Celebrating","pal":["#E8343A","#F7F2E8","#E8343A","#F7F2E8","#F2B33A"],"w":3,"short":"Bengal celebrates the warrior goddess Durga, who beat a demon no god could defeat, with spectacular temporary temples called pandals.","full":[["Who is Durga?","Durga is a Hindu goddess: a warrior and a mother who protects the world from harm. In the old story, a buffalo demon called Mahishasura was promised that no man or god could ever beat him, so he took over the heavens. The gods joined all their powers together, and out of that light came Durga. Each god gave her a weapon, which is why she has ten arms to hold them all, and the mountain king gave her a lion to ride. She fought the demon for nine days and won on the tenth."],["What happens","Durga Puja is the biggest festival in Bengal, in eastern India, and it is also a homecoming. Every autumn Durga is said to visit her parents’ home for a few days, bringing her four children: Ganesha, Lakshmi, Saraswati and Kartik. Whole neighbourhoods build huge temporary temples called pandals, some shaped like palaces or ships, each with a clay Durga inside, and people go pandal-hopping late into the night. On the last day the statues are carried to the river and let go into the water, and everyone calls out “Asche bochor abar hobe”: it will happen again next year."]],"art":"Durga with ten arms in front of her halo, her lion at her feet. Shown full size at the top of this page."},
   "Maha Navami": {"src":"Hindu","tier":"festive","scene":"navaratri","bg":"#1E1430","eyebrow":"Last night","pal":["#F7F2E8","#E8343A","#2D5BD8","#F2D03A","#2FA84F","#8A8A8A","#F28A2E","#3FB6C9","#E84F9A"],"short":"The ninth and biggest night of Navaratri, the last day of Durga’s battle.","full":[["What is it?","Maha Navami is the ninth and last night of Navaratri, and the biggest. In the story it is the final day of Durga’s battle with the demon Mahishasura, the day before her victory. In Bengal it falls in the middle of Durga Puja."],["What happens","The garba circles are fullest and last longest tonight. In many homes in the south, books, musical instruments and tools are placed before the goddess and left untouched for the day, called Ayudha Puja. In the north, families invite nine young girls into their home, wash their feet and feed them, honouring them as forms of the goddess."]],"art":"The garba scene again, with all nine pips lit."},
-  "Dusshera": {"src":"Hindu","tier":"festive","scene":"ravana","bg":"#170811","eyebrow":"Celebrating","w":2,"short":"Good beats evil. Giant figures of the demon king Ravana are burned, fireworks packed inside them.","full":[["What is it?","Dusshera, also called Vijayadashami, “the tenth day of victory”, celebrates good beating evil, in two stories at once. In one, Rama defeats Ravana, the ten-headed demon king who kidnapped Sita. In the other, Durga finally defeats the buffalo demon Mahishasura."],["What happens","In north India, plays of the Ramayana called Ramlila are acted out over the nine nights before. On the last evening, giant figures of Ravana, sometimes taller than a house and stuffed with fireworks, are set alight with a flaming arrow, and the crowd cheers as they burn. In Bengal the Durga statues are carried to the river, and in Mysore elephants dressed in gold lead a royal procession."]],"art":"A flaming arrow strikes a ten-headed effigy of Ravana, which burns and bursts into fireworks."},
+  "Dusshera": {"src":"Hindu","tier":"festive","scene":"ravana","bg":"#170811","eyebrow":"Celebrating","w":2,"short":"Good beats evil. Giant figures of the demon king Ravana are burned, fireworks packed inside them.","full":[["What is it?","Dusshera, also called Vijayadashami, “the tenth day of victory”, celebrates good beating evil, in two stories at once. In one, Rama defeats Ravana, the ten-headed demon king who kidnapped Sita. In the other, Durga finally defeats the buffalo demon Mahishasura."],["What happens","In north India, plays of the Ramayana called Ramlila are acted out over the nine nights before. On the last evening, giant figures of Ravana, sometimes taller than a house and stuffed with fireworks, are set alight with a flaming arrow, and the crowd cheers as they burn. In Bengal the Durga statues are carried to the river, and in Mysore elephants dressed in gold lead a royal procession."]],"art":"A flaming arrow strikes a ten-headed effigy of Ravana, which burns from the feet up and bursts into fireworks over the crowd."},
   "Sharad Purnima": {"src":"Hindu","tier":"festive","scene":"moon","v":"kheer","bg":"#0E1430","eyebrow":"Tonight","short":"The brightest full moon of the year. Rice pudding is left out overnight to soak up the moonlight.","full":[["What is it?","Sharad Purnima is the full moon after the monsoon rains, when the air is clear and the moon is said to be at its brightest of the year. In the stories it is the night Krishna danced with the village girls in a great circle in the moonlight."],["What happens","People make kheer, a rice pudding with milk, sugar and cardamom, and leave it outside overnight under thin cloth to soak up the moonlight, then eat it in the morning. In Bengal it is Kojagari Lakshmi Puja: Lakshmi is said to visit homes asking “Ko jagarti?”, which means “Who is awake?”, and to bless those who are."]],"art":"The brightest moon of the year pours a shaft of light into a bowl of kheer left on the terrace wall."},
   "Karwa Chauth": {"src":"Hindu","tier":"festive","scene":"moon","v":"sieve","bg":"#0E1430","eyebrow":"Tonight","short":"Married women fast from sunrise until the moon appears, then look at it through a sieve before eating.","full":[["What is it?","Karwa Chauth is a day when married women, mostly in north India, fast for their husbands’ long and healthy lives. Karwa is the clay pot of water used in the prayers, and chauth means the fourth day after the full moon."],["What happens","Women eat a meal called sargi before sunrise, then go without food or even water all day. They dress up, have mehndi patterns drawn on their hands and gather in the evening to hear the story of the day. When the moon rises they look at it through a sieve, then at their husband’s face, and he gives them their first sip of water. Many husbands now fast too."]],"art":"A woman in a red sari lifts a sieve to the rising moon, looks through it, then lowers it and the moon shines clear."},
   "National Engineering Day": {"src":"Observance","tier":"quiet","motif":"gear","eyebrow":"Observance","short":"A day to show what engineers actually do, from bridges and wind turbines to games consoles.","full":[["","Run by the Royal Academy of Engineering since 2021, a day to show what engineers actually do: design the bridges, phones, wind turbines, games consoles and medical machines people use every day. Engineers solve problems, and a lot of them started out by taking things apart to see how they worked."]]},
