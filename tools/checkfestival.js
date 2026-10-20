@@ -344,6 +344,19 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("Escape closes it", sheet.closed, sheet);
   check(`no event scrolls full screen on a 1280x800 panel (${scrolls.count} checked)`, scrolls.count > 60 && !scrolls.out.length, scrolls);
 
+  /* Every event that is drawn has a picture of its own: two days never
+     share one scene and variant (Advent's doors aside, which change by
+     the day). */
+  const table = String(js).slice(String(js).indexOf("const FEST_TABLE = {"));
+  const seen = {}, shared = [];
+  for (const m of table.slice(0, table.indexOf("\n};")).matchAll(/\n  ("[^"]+"): (\{.*\}),?(?=\n)/g)) {
+    const e = JSON.parse(m[2]);
+    if (!e.scene) continue;
+    const id = `${e.scene}:${e.v || ""}`;
+    if (seen[id]) shared.push(`${JSON.parse(m[1])} = ${seen[id]} (${id})`); else seen[id] = JSON.parse(m[1]);
+  }
+  check(`every drawn event has its own picture (${Object.keys(seen).length} pictures)`, Object.keys(seen).length > 50 && !shared.length, shared);
+
   /* A phone: no room beside the words, so the scene takes a band above
      them, framed on its stage so the subject fills it. */
   await page.setViewportSize({ width: 390, height: 844 });
