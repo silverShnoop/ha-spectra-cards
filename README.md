@@ -2729,10 +2729,11 @@ body:
 ```
 
 `kind` is one of `refuse`, `recycling`, `garden`, `paper`, `glass` or `food`.
-It picks the colour from `colours` and the shape: `food` is a caddy, `glass` a
-box, and everything else, including a kind nobody listed, a wheelie bin. A bin
-can also take its own `shape` (`wheelie`, `caddy`, `box`). There is no glyph
-on the front: the colour and the shape say which bin, and the name is under it.
+It picks the colour from `colours`, the shape (`food` is a caddy, `glass` a
+box, everything else a wheelie bin) and the glyph on the front. A bin can also
+take its own `shape` (`wheelie`, `caddy`, `box`) and `icon`. A kind nobody
+listed is a wheelie bin with a bin on it, never an empty slot. The small bins
+on the later lines carry no glyph; at that size it would be a smudge.
 
 **The drawing leads.** The question at the door is *which ones*, and a shape
 answers it before a word is read. A caddy is drawn in the same box as a

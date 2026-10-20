@@ -127,7 +127,7 @@ const TOKENS_LIGHT = `
      repaint an accent and no bin changes colour. */
   --sp-bin-blue:#3D6E9C; --sp-bin-brown:#6B4A2F; --sp-bin-purple:#6A4A7E;
   --sp-bin-black:#2E2B28; --sp-bin-green:#4E7A3A; --sp-bin-grey:#8A8F93;
-  --sp-bin-line:rgba(0,0,0,.38);
+  --sp-bin-line:rgba(0,0,0,.38); --sp-bin-glyph:#FFFFFF;
   /* The temperature ramp. A DEPICTION, like --sp-sun and like a bulb's
      colour temperature: cold is blue because cold is blue, and nobody chose
      it. It holds yellow, orange and red, which are the three level colours,
@@ -210,7 +210,7 @@ const TOKENS_DARK = `
   /* Lifted, so a black bin is still a bin on a dark card. */
   --sp-bin-blue:#5B86B3; --sp-bin-brown:#8A6545; --sp-bin-purple:#8A6AA0;
   --sp-bin-black:#46423D; --sp-bin-green:#6E9A55; --sp-bin-grey:#9AA0A4;
-  --sp-bin-line:rgba(255,255,255,.34);
+  --sp-bin-line:rgba(255,255,255,.34); --sp-bin-glyph:#F4F1EA;
   --sp-ramp-0:#5A9CBF; --sp-ramp-1:#86BFAE; --sp-ramp-2:#DECB78;
   --sp-ramp-3:#E3A15C; --sp-ramp-4:#D0614B; --sp-ramp-5:#A63A3A;
   --sp-attention:#D9A63F; --sp-attention-soft:#382C14; --sp-attention-on:#EBC97E;
@@ -2148,22 +2148,35 @@ ${TOKENS_DARK}
    colour the council painted it -- a depiction, see --sp-bin-blue -- so
    the bin you are looking for on the card is the bin you are looking for
    on the drive. A bin with no colour configured wears the card's accent.
-   The shape tells them apart as well: a caddy is small beside a wheelie
-   bin, as it is on the kerb. */
-.binsnext { display:flex; align-items:flex-end; gap:8px 16px; flex-wrap:wrap; }
+   The shape and the glyph on the front tell them apart as well: a caddy
+   is small beside a wheelie bin, as it is on the kerb. */
+/* The day stays beside the bins up to three going out: the bins and the
+   day both step down a size for the third, rather than one squeezing the
+   other into an ellipsis. Four on one day is rare enough to let the day
+   drop under them instead. A name may run a little past its bin, into
+   the gap, so "Recycling" is read whole under a narrow one. */
+.binsnext { display:flex; align-items:flex-end; gap:14px; --bin-w:64px; --bin-glyph:24px; }
+.binsnext.n3 { --bin-w:54px; --bin-glyph:21px; }
+.binsnext.n4 { --bin-w:52px; --bin-glyph:20px; flex-wrap:wrap; row-gap:8px; }
 .binsout { display:flex; align-items:flex-end; gap:10px; }
-.binout { width:68px; text-align:center; min-width:0; }
-.binout svg { display:block; width:100%; height:auto; }
-.binname {
-  margin:3px 0 0; font-size:13px; color:var(--sp-ink);
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+.binout { flex:none; width:var(--bin-w); text-align:center; }
+.binpic { position:relative; }
+.binpic svg { display:block; width:100%; height:auto; }
+.binpic ha-icon {
+  position:absolute; left:50%; top:56%; transform:translate(-50%,-50%);
+  --mdc-icon-size:var(--bin-glyph); color:var(--accent-on);
 }
-.binswhen { min-width:0; padding-bottom:19px; }
+.binpic.caddy ha-icon { top:79%; --mdc-icon-size:calc(var(--bin-glyph) * .7); }
+.binname { margin:3px -5px 0; font-size:12px; color:var(--sp-ink); white-space:nowrap; }
+.binswhen { flex:none; padding-bottom:18px; }
+.binsnext.n3 .binswhen .hero { font-size:27px; }
+.binsnext.n4 .binswhen { padding-bottom:0; }
 .binswhen .hero { margin:0; }
 .binbody { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; stroke-linejoin:round; }
 .binlid { fill:var(--accent); }
 .binhandle { fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linecap:round; }
 .binwheel { fill:var(--sp-surface); stroke:var(--accent); stroke-width:1.5; }
+.binbail { fill:none; stroke:var(--sp-bin-black); stroke-width:2.5; stroke-linejoin:round; }
 /* The ones after are not going out, so they are drawn small, beside a
    line of words. Painted, they keep their colour, which is how a bin is
    recognised; unpainted, they are hollow and in ink. */
@@ -2182,6 +2195,7 @@ ${TOKENS_DARK}
 .painted .binbody, .painted .binlid { fill:var(--bin); stroke:var(--sp-bin-line); stroke-width:1; }
 .painted .binhandle { stroke:var(--bin); }
 .painted .binwheel { fill:var(--sp-bin-black); stroke:var(--sp-bin-line); stroke-width:1; }
+.binpic.painted ha-icon { color:var(--sp-bin-glyph); }
 
 .binlater .name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .binlater .when { margin-left:auto; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -13604,8 +13618,8 @@ const BODIES = {
     let html = "";
     if (out.length) {
       const when = binWhen(b.days);
-      html += `<div class="binsnext"><div class="binsout">`
-        + out.map((x) => `<div class="binout">${binPicture(x)}`
+      html += `<div class="binsnext n${Math.min(4, Math.max(2, out.length))}"><div class="binsout">`
+        + out.map((x) => `<div class="binout">${binPicture(x, true)}`
           + (isBlank(x.name) ? "" : `<p class="binname">${esc(x.name)}</p>`) + `</div>`).join("")
         + `</div>`;
       if (when) {
@@ -13619,7 +13633,7 @@ const BODIES = {
     if (later.length) {
       html += `<div class="binslater">` + later.map((x) => {
         const date = binDate(x.days);
-        return `<div class="binlater">${binPicture(x)}`
+        return `<div class="binlater">${binPicture(x, false)}`
           + `<span class="name">${esc(x.name)}</span>`
           + (date ? `<span class="when">${esc(date.short)}</span>` : "") + `</div>`;
       }).join("") + `</div>`;
@@ -18491,10 +18505,17 @@ function mealFoot(b, picked, moving, dates, plan, types) {
 
 /* ---- bins ---- */
 
-/* What shape each kind of bin is. A kind nobody has listed is a wheelie
-   bin, which is right more often than not. No glyph on the front: the
-   colour and the shape say which bin, and the name is under it. */
-const BIN_SHAPES = { glass: "box", food: "caddy" };
+/* What each kind of bin looks like. The shape is the drawing; the icon is
+   the glyph on its front. A kind nobody has listed is a wheelie bin with a
+   bin on it, which is right more often than not and never an empty slot. */
+const BIN_KINDS = {
+  refuse: { shape: "wheelie", icon: "mdi:trash-can" },
+  recycling: { shape: "wheelie", icon: "mdi:recycle" },
+  garden: { shape: "wheelie", icon: "mdi:leaf" },
+  paper: { shape: "wheelie", icon: "mdi:newspaper-variant" },
+  glass: { shape: "box", icon: "mdi:bottle-wine" },
+  food: { shape: "caddy", icon: "mdi:food-apple" },
+};
 
 /* The bins that read as something. A part whose name and kind both read as
    nothing is a second type sensor on a day with one collection, and drops
@@ -18505,16 +18526,20 @@ function binList(list) {
     .filter((x) => x && typeof x === "object" && !(isBlank(x.name) && isBlank(x.kind)));
 }
 
-function binShapeOf(x) {
-  if (["wheelie", "caddy", "box"].includes(x.shape)) return x.shape;
-  return BIN_SHAPES[String(firstOf(x.kind, "")).trim().toLowerCase()] || "wheelie";
+function binKind(x) {
+  const kind = BIN_KINDS[String(firstOf(x.kind, "")).trim().toLowerCase()] || {};
+  const shape = ["wheelie", "caddy", "box"].includes(x.shape) ? x.shape : (kind.shape || "wheelie");
+  const icon = !isBlank(x.icon) && String(x.icon).indexOf(":") > 0 ? x.icon : (kind.icon || "mdi:trash-can");
+  return { shape, icon };
 }
 
 /* Drawn front-on in one 60 x 80 box whatever the shape, so a caddy beside
    a wheelie bin is as much smaller as it is on the pavement. */
 function binShape(shape) {
   if (shape === "caddy") {
-    return `<path class="binhandle" d="M17 45 Q30 31 43 45"></path>`
+    /* The bail is black wire on every caddy, whatever colour the caddy is,
+       and stands tall and square above the lid, as a carried one does. */
+    return `<path class="binbail" d="M18 45 V30 Q18 27 21 27 H39 Q42 27 42 30 V45"></path>`
       + `<rect class="binlid" x="12" y="44" width="36" height="6" rx="2"></rect>`
       + `<path class="binbody" d="M14 50 H46 L44 75 Q44 77 42 77 H18 Q16 77 16 75 Z"></path>`;
   }
@@ -18542,11 +18567,19 @@ function binPainted(x, colours) {
   return Object.assign({}, x, { paint: BIN_COLOURS.includes(colour) ? colour : null });
 }
 
-function binPicture(x) {
+/* Big, the bin carries its glyph; small, on a line of its own, it is the
+   shape and the colour alone -- a glyph at that size is a smudge. */
+function binPicture(x, big) {
+  const kind = binKind(x);
   const name = isBlank(x.name) ? "Bin" : String(x.name);
   const paint = x.paint ? ` class="painted" style="--bin:var(--sp-bin-${x.paint})"` : "";
-  return `<svg viewBox="0 0 60 80" role="img" aria-label="${esc(name)}"${paint}>`
-    + `${binShape(binShapeOf(x))}</svg>`;
+  const svg = `<svg viewBox="0 0 60 80" role="img" aria-label="${esc(name)}"${big ? "" : paint}>`
+    + `${binShape(kind.shape)}</svg>`;
+  if (!big) return svg;
+  const box = kind.shape === "wheelie" ? "" : " caddy";
+  const style = x.paint ? ` style="--bin:var(--sp-bin-${x.paint})"` : "";
+  return `<div class="binpic${box}${x.paint ? " painted" : ""}"${style}>${svg}`
+    + `<ha-icon icon="${esc(kind.icon)}"></ha-icon></div>`;
 }
 
 /* A collection some whole days from today, as the day it falls on. */

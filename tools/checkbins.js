@@ -115,11 +115,15 @@ const js = fs.readFileSync(file);
     scene(3, "Cardboard & paper", "Food Caddy");
     await show();
     shots.push("two");
-    check("no glyph on the front", all(".binout ha-icon").length === 0, all(".binout ha-icon").length);
     check("two bins going out, two drawn", all(".binout").length === 2, all(".binout").length);
     check("named under each",
       all(".binout .binname").map((e) => e.textContent).join(",") === "Cardboard,Food",
       all(".binout .binname").map((e) => e.textContent).join(","));
+    check("each with its glyph",
+      all(".binpic ha-icon").map((e) => e.getAttribute("icon")).join(",")
+        === "mdi:newspaper-variant,mdi:food-apple",
+      all(".binpic ha-icon").map((e) => e.getAttribute("icon")).join(","));
+    check("and the small ones without", all(".binlater ha-icon").length === 0, all(".binlater ha-icon").length);
     const height = (i) => {
       const bodies = all(".binout")[i].querySelectorAll(".binbody, .binlid, .binhandle");
       const r = Array.from(bodies).map((b) => b.getBoundingClientRect());
@@ -158,6 +162,24 @@ const js = fs.readFileSync(file);
     check("tomorrow says so", hero() === "Tomorrow", hero());
     check("and which day that is", sub().startsWith(day(1) + " "), sub());
 
+    /* Three on one day: the day still beside them, nothing overlapping. */
+    set(S + "next_type_3", "Food Caddy");
+    const three = {
+      type: "custom:spectra-card", accent: 3, icon: "mdi:trash-can", title: "Bins",
+      body: { type: "bins", days: 1, colours,
+        out: [{ kind: kind(1), name: name(1) }, { kind: kind(2), name: name(2) },
+          { kind: kind(3), name: name(3) }] },
+    };
+    scene(1, "Mixed recycling", "Cardboard & paper");
+    el.setConfig(three); el._signature = null; el.hass = hass;
+    await new Promise((r) => requestAnimationFrame(r));
+    const bx = q(".binsout").getBoundingClientRect();
+    const wx = q(".binswhen").getBoundingClientRect();
+    check("three bins keep the day beside them", wx.left >= bx.right && wx.bottom > bx.top,
+      JSON.stringify([bx.right, wx.left, wx.top, bx.bottom]));
+    check("and inside the card", wx.right <= q(".binsnext").getBoundingClientRect().right + 0.5,
+      `${wx.right} vs ${q(".binsnext").getBoundingClientRect().right}`);
+
     scene(0, "Mixed recycling", "Garden waste");
     await show();
     check("today says so", hero() === "Today", hero());
@@ -178,8 +200,10 @@ const js = fs.readFileSync(file);
 
     set(S + "next_type_1", "Something new");
     await show();
-    check("a kind nobody listed is still a wheelie bin",
-      all(".binout .binwheel").length === 2, q(".binout") && q(".binout").outerHTML.slice(0, 200));
+    check("a kind nobody listed is still a wheelie bin, with a bin on it",
+      all(".binout .binwheel").length === 2
+        && q(".binpic ha-icon") && q(".binpic ha-icon").getAttribute("icon") === "mdi:trash-can",
+      q(".binout") && q(".binout").outerHTML.slice(0, 200));
 
     for (const id of Object.keys(hass.states)) set(id, "unavailable");
     await show();
