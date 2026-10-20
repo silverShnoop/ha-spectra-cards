@@ -29372,6 +29372,20 @@ const PANEL_SHEET = `
 .qa.open { background:var(--sp-surface); color:var(--sp-ink); }
 .qa.done { background:var(--sp-a3); border-color:var(--sp-a3); color:var(--sp-surface); }
 .qa:focus-visible { outline:2px solid var(--sp-notice); outline-offset:4px; }
+/* An on/off action (toggle:) is a switch, not an errand: no sheet, and
+   the square says which way it is. Off is hollow, paper with an ink edge;
+   on is filled moss, the colour a finished step already wears; and while
+   the house is still getting there a line sweeps along its foot and the
+   word under the name says which way it is going. */
+.qa .qastate { font-size:calc(var(--qa-size) * .085); font-weight:500; letter-spacing:.08em;
+  text-transform:uppercase; opacity:.78; font-variant-numeric:tabular-nums; }
+.qa.tog { background:var(--sp-surface); color:var(--sp-ink); }
+.qa.tog.on { background:var(--sp-a3); border-color:var(--sp-a3); color:var(--sp-surface); }
+.qa.tog.busy::after { content:""; position:absolute; left:14%; right:14%; bottom:calc(var(--qa-size) * .07); height:3px;
+  border-radius:2px; background:linear-gradient(90deg, transparent, currentColor, transparent);
+  background-size:200% 100%; animation:qasweep 1.1s linear infinite; }
+@keyframes qasweep { from { background-position:100% 0; } to { background-position:-100% 0; } }
+@media (prefers-reduced-motion: reduce) { .qa.tog.busy::after { animation:none; background:currentColor; opacity:.5; } }
 .panel.phone .quick { --qa-size:min(var(--pn-qa-size, 140px), 96px); }
 
 .qdim { position:absolute; inset:0; z-index:8; background:rgba(0,0,0,.62);
@@ -29483,6 +29497,37 @@ function quickMinutes(text) {
   const min = Number(m[2] || 0);
   if (h > 24 || min > 59) return null;
   return (h * 60 + min) % 1440;
+}
+
+/* An on/off quick action reads its state off one entity:
+   `toggle: {entity, state, attribute, is, busy}`. It is on when the entity
+   is in one of `state` (default "on") and, when `attribute` is set, that
+   attribute is one of `is`. Null when the entity is not there to ask. */
+function quickToggleOn(toggle, hass) {
+  if (!toggle || typeof toggle !== "object" || isBlank(toggle.entity)) return null;
+  const st = hass && hass.states ? hass.states[toggle.entity] : null;
+  if (!st) return null;
+  const states = [].concat(toggle.state === undefined || toggle.state === null ? "on" : toggle.state).map(String);
+  if (!states.includes(String(st.state))) return false;
+  if (isBlank(toggle.attribute)) return true;
+  const value = st.attributes ? st.attributes[toggle.attribute] : undefined;
+  return [].concat(toggle.is === undefined || toggle.is === null ? [] : toggle.is).map(String).includes(String(value));
+}
+
+/* `busy`, an entity that is "on" while the change is still under way -- a
+   script that fades the sound in, say -- so the square can say it is
+   getting there rather than claim it is there. */
+function quickToggleBusy(toggle, hass) {
+  if (!toggle || typeof toggle !== "object" || isBlank(toggle.busy)) return false;
+  const st = hass && hass.states ? hass.states[toggle.busy] : null;
+  return Boolean(st) && st.state === "on";
+}
+
+/* What a press calls: `action` both ways, or `turn_on` / `turn_off`. */
+function quickToggleCall(action, on) {
+  if (action.action && typeof action.action === "object") return action.action;
+  const which = on ? action.turn_off : action.turn_on;
+  return which && typeof which === "object" ? which : null;
 }
 
 function quickWindowOpen(show, now) {
@@ -29709,6 +29754,8 @@ class SpectraPanel extends HTMLElement {
     this._quickActions = [];
     this._quick = null;
     this._quickKey = "";
+    this._quickPending = new Map();
+    this._quickSeen = new Map();
     this._quickLayer.addEventListener("click", (event) => {
       const button = event.target.closest(".qa");
       if (!button) return;
@@ -29762,6 +29809,7 @@ class SpectraPanel extends HTMLElement {
        waiting for the first card to. */
     publishTokens(v);
     this._updateBar();
+    if (this._quickActions && this._quickActions.some((a) => a.toggle)) this._renderQuick();
     if (!this._config.no_load_report) loadReport.see(v);
   }
   get hass() { return this._hass; }
@@ -29986,12 +30034,18 @@ class SpectraPanel extends HTMLElement {
     const key = shown.map((x) => x.index).join(",");
     if (key !== this._quickKey) {
       this._quickKey = key;
-      this._quickLayer.innerHTML = shown.map(({ action, index }) =>
-        `<button type="button" class="qa" data-qa="${index}" aria-haspopup="dialog">`
+      this._quickLayer.innerHTML = shown.map(({ action, index }) => (action.toggle
+        ? `<button type="button" class="qa tog" data-qa="${index}" aria-pressed="false">`
+        : `<button type="button" class="qa" data-qa="${index}" aria-haspopup="dialog">`)
         + iconMarkup(firstOf(action.icon, "mdi:flash"))
-        + `<span class="qalbl">${esc(firstOf(action.name, "Quick action"))}</span></button>`).join("");
+        + `<span class="qalbl">${esc(firstOf(action.name, "Quick action"))}</span>`
+        + (action.toggle ? '<span class="qastate"></span>' : "")
+        + "</button>").join("");
     }
     for (const button of this._quickLayer.querySelectorAll(".qa")) {
+      const index = Number(button.dataset.qa);
+      const action = this._quickActions[index];
+      if (action && action.toggle) { this._quickPaintToggle(button, index, action); continue; }
       const mine = Boolean(this._quick) && Number(button.dataset.qa) === this._quick.index;
       button.classList.toggle("open", mine && this._quick.phase !== "done");
       button.classList.toggle("done", mine && this._quick.phase === "done");
@@ -29999,7 +30053,68 @@ class SpectraPanel extends HTMLElement {
     }
   }
 
+  /* An on/off square: its state from the entity, and while a press is
+     on its way -- from the tap until the entity has turned and any `busy`
+     entity has finished -- which way it is going. A press that has not
+     landed in 30 seconds stops claiming anything. */
+  _quickPaintToggle(button, index, action) {
+    const on = quickToggleOn(action.toggle, this._hass);
+    const pending = this._quickPending.get(index);
+    const busyNow = quickToggleBusy(action.toggle, this._hass);
+    if (pending) {
+      if (pending.failed) {
+        if (Date.now() > pending.until) this._quickPending.delete(index);
+      } else {
+        if (busyNow) pending.sawBusy = true;
+        const settled = on !== null && on !== pending.from && !busyNow;
+        if (settled || Date.now() > pending.until || (pending.sawBusy && !busyNow)) this._quickPending.delete(index);
+      }
+    }
+    /* Which way a busy spell is going is fixed when it starts: a fade in
+       turns the player on before it has finished, and read off the state
+       at that point it would look like a fade out. A spell started from
+       another screen has no press here to say, so the state at its start
+       does. */
+    const seen = this._quickSeen.get(index);
+    if (busyNow && !seen) this._quickSeen.set(index, { from: Boolean(on) });
+    if (!busyNow && seen) this._quickSeen.delete(index);
+    const still = this._quickPending.get(index);
+    const busy = Boolean(still && !still.failed) || busyNow;
+    const spell = this._quickSeen.get(index);
+    const going = still && !still.failed ? !still.from : spell ? !spell.from : !on;
+    const word = still && still.failed ? "Not done"
+      : busy ? (going ? "Starting" : "Stopping")
+      : on === null ? "" : on ? "On" : "Off";
+    button.classList.toggle("on", Boolean(on));
+    button.classList.toggle("busy", busy);
+    button.setAttribute("aria-pressed", busy ? "mixed" : String(Boolean(on)));
+    const label = button.querySelector(".qastate");
+    if (label && label.textContent !== word) label.textContent = word;
+  }
+
+  _quickToggle(index, action) {
+    const pending = this._quickPending.get(index);
+    if (pending && !pending.failed) return;  /* already on its way */
+    const on = Boolean(quickToggleOn(action.toggle, this._hass));
+    const call = quickToggleCall(action, on);
+    const entry = { from: on, until: Date.now() + 30000, sawBusy: false, failed: false };
+    this._quickPending.set(index, entry);
+    this._renderQuick();
+    const settle = () => this._renderQuick();
+    this._quickCall(call).then(() => setTimeout(settle, 1000), (error) => {
+      if (this._quickPending.get(index) !== entry) return;
+      entry.failed = true;
+      entry.until = Date.now() + 5000;
+      console.warn(`spectra.panel: quick action "${firstOf(action.name, "Quick action")}" did not respond: ${quickErrorText(error)}`);
+      this._renderQuick();
+      setTimeout(settle, 5100);
+    });
+    setTimeout(settle, 30100);
+  }
+
   _quickPress(index) {
+    const toggleAction = this._quickActions[index];
+    if (toggleAction && toggleAction.toggle) return this._quickToggle(index, toggleAction);
     const st = this._quick;
     if (st && st.index === index) {
       if (st.phase === "open") return this._quickClose();

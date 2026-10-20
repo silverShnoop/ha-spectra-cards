@@ -59,6 +59,10 @@ const js = fs.readFileSync(file);
       states: {
         "media_player.loud": { entity_id: "media_player.loud", state: "playing", attributes: {} },
         "media_player.quiet": { entity_id: "media_player.quiet", state: "off", attributes: {} },
+        "media_player.hall": { entity_id: "media_player.hall", state: "playing", attributes: { media_content_id: "radio://one" } },
+        "script.noise": { entity_id: "script.noise", state: "off", attributes: {} },
+        "switch.lamp": { entity_id: "switch.lamp", state: "off", attributes: {} },
+        "switch.mute": { entity_id: "switch.mute", state: "off", attributes: {} },
       },
       themes: { darkMode: true },
       /* The server's answer, which differs from the page's copy on purpose:
@@ -74,6 +78,7 @@ const js = fs.readFileSync(file);
         const id = target && target.entity_id;
         calls.push(`${domain}.${service}:${Array.isArray(id) ? id.join("+") : id}`);
         if (String(id) === "light.broken") return Promise.reject(new Error("bulb unreachable"));
+        if (`${domain}.${service}` === "switch.unreachable") return Promise.reject(new Error("no answer"));
         return Promise.resolve();
       },
     };
@@ -109,6 +114,13 @@ const js = fs.readFileSync(file);
           { name: "Stop playing", optional: "Nothing was playing", action: off("light.broken") },
           { name: "Lights", action: off("light.ok") },
         ] },
+        { name: "Noise", icon: "mdi:waveform",
+          toggle: { entity: "media_player.hall", state: "playing", attribute: "media_content_id", is: "noise://white", busy: "script.noise" },
+          action: { service: "script.noise" } },
+        { name: "Lamp", toggle: { entity: "switch.lamp" },
+          turn_on: { service: "switch.turn_on", target: { entity_id: "switch.lamp" } },
+          turn_off: { service: "switch.turn_off", target: { entity_id: "switch.lamp" } } },
+        { name: "Mute", toggle: { entity: "switch.mute" }, action: { service: "switch.unreachable" } },
         { name: "Playing", hold: 1500, steps: [
           { name: "Stop what's playing", when: { state: ["playing", "paused"] }, skipped: "Nothing was playing",
             action: { service: "media_player.media_stop", target: { entity_id: ["media_player.loud", "media_player.quiet"] } } },
@@ -134,7 +146,7 @@ const js = fs.readFileSync(file);
       ["running", "done", "failed", "skipped"].filter((c) => li.classList.contains(c)).join("") || "-");
     const tapDim = () => dim().dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    out.shown = buttons().map((b) => b.textContent.trim());
+    out.shown = buttons().map((b) => b.querySelector(".qalbl").textContent.trim());
     const panelRect = root.querySelector(".panel").getBoundingClientRect();
     const cornerRect = root.querySelector(".quick").getBoundingClientRect();
     out.corner = { right: panelRect.right - cornerRect.right, bottom: panelRect.bottom - cornerRect.bottom };
@@ -259,6 +271,66 @@ const js = fs.readFileSync(file);
       message: (root.querySelector(".qtail .qmsg .qbig") || {}).textContent,
     };
     view.remove();
+    /* On/off squares: state off an entity, no sheet, and which way it is
+       going while the house gets there. */
+    const tog = (name) => buttons().find((b) => b.querySelector(".qalbl") && b.querySelector(".qalbl").textContent === name);
+    const look = (b) => ({ on: b.classList.contains("on"), busy: b.classList.contains("busy"),
+      word: b.querySelector(".qastate").textContent, pressed: b.getAttribute("aria-pressed") });
+    const setState = (id, state, attributes) => {
+      window.HASS = { ...window.HASS, states: { ...window.HASS.states,
+        [id]: { entity_id: id, state, attributes: attributes || (window.HASS.states[id] || {}).attributes || {} } } };
+      view.hass = window.HASS;
+    };
+    out.tog = {};
+    out.tog.radioIsOff = look(tog("Noise"));
+    out.tog.haspopup = tog("Noise").hasAttribute("aria-haspopup");
+    let before = calls.length;
+    const sheetBefore = sheet();
+    tog("Noise").click();
+    await sleep(30);
+    out.tog.noSheet = sheet() === sheetBefore;
+    out.tog.called = calls.slice(before);
+    out.tog.starting = look(tog("Noise"));
+    out.tog.doublePress = (() => { const n = calls.length; tog("Noise").click(); return calls.length - n; })();
+    setState("script.noise", "on");
+    setState("media_player.hall", "playing", { media_content_id: "noise://white" });
+    await sleep(20);
+    out.tog.stillFading = look(tog("Noise"));
+    setState("script.noise", "off");
+    await sleep(20);
+    out.tog.on = look(tog("Noise"));
+    before = calls.length;
+    tog("Noise").click();
+    await sleep(20);
+    out.tog.stopping = look(tog("Noise"));
+    out.tog.calledAgain = calls.slice(before);
+    setState("script.noise", "on");
+    setState("media_player.hall", "idle");
+    setState("script.noise", "off");
+    await sleep(20);
+    out.tog.off = look(tog("Noise"));
+    before = calls.length;
+    tog("Lamp").click();
+    await sleep(20);
+    setState("switch.lamp", "on");
+    await sleep(20);
+    out.tog.lampOn = look(tog("Lamp"));
+    tog("Lamp").click();
+    await sleep(20);
+    out.tog.lampCalls = calls.slice(before);
+    tog("Mute").click();
+    await sleep(60);
+    out.tog.failed = look(tog("Mute"));
+    /* Started from another screen: no press here, the fade turns the
+       player on early, and the square must still say Starting. */
+    setState("script.noise", "on");
+    await sleep(20);
+    setState("media_player.hall", "playing", { media_content_id: "noise://white" });
+    await sleep(20);
+    out.tog.elsewhere = look(tog("Noise"));
+    setState("script.noise", "off");
+    await sleep(20);
+    out.tog.elsewhereDone = look(tog("Noise"));
     return out;
   });
 
@@ -267,7 +339,7 @@ const js = fs.readFileSync(file);
     if (!ok) problems.push(label);
   };
   check("only the actions in their window are drawn, a wrapped window included",
-    got.shown.join("|") === "Last to bed|Always|Wrapping|Broken|Quiet|Playing", got.shown);
+    got.shown.join("|") === "Last to bed|Always|Wrapping|Broken|Quiet|Noise|Lamp|Mute|Playing", got.shown);
   check("the corner sits bottom right", got.corner.right >= 0 && got.corner.right <= 24 && got.corner.bottom >= 0 && got.corner.bottom <= 24, got.corner);
   check("the button is a square of the configured size", got.square[0] === got.square[1] && got.square[0] === 160, got.square);
   check("pressed, the sheet opens and lists the steps", got.opened && got.stepNames.join("|") === "Outside lights off|Downstairs lights off, except the hallway", got.stepNames);
@@ -312,6 +384,26 @@ const js = fs.readFileSync(file);
   check("an optional step that fails takes a dash and the run goes on",
     got.quiet.steps.join(",") === "skipped,done" && got.quiet.calls.join("|") === "light.turn_off:light.broken|light.turn_off:light.ok"
     && got.quiet.note === "Nothing was playing" && got.quiet.message === "Done", got.quiet);
+
+  const t = got.tog;
+  check("an on/off square reads off its entity, attribute included: radio playing is not noise",
+    !t.radioIsOff.on && t.radioIsOff.word === "Off" && t.radioIsOff.pressed === "false", t.radioIsOff);
+  check("an on/off square opens no sheet and calls its action straight away",
+    t.noSheet && !t.haspopup && t.called.join("|") === "script.noise:undefined", t);
+  check("pressed, it says it is starting until the house has got there",
+    t.starting.busy && t.starting.word === "Starting" && t.starting.pressed === "mixed", t.starting);
+  check("a second press while it is on its way calls nothing", t.doublePress === 0, t.doublePress);
+  check("while the busy entity runs it is still getting there, even once the state has turned",
+    t.stillFading.busy && t.stillFading.word === "Starting", t.stillFading);
+  check("then it is on: filled, and it says so", t.on.on && !t.on.busy && t.on.word === "On" && t.on.pressed === "true", t.on);
+  check("pressed again it says it is stopping, with the same action",
+    t.stopping.busy && t.stopping.word === "Stopping" && t.calledAgain.join("|") === "script.noise:undefined", t);
+  check("and then it is off", !t.off.on && !t.off.busy && t.off.word === "Off", t.off);
+  check("turn_on and turn_off are picked by the state",
+    t.lampOn.on && t.lampCalls.join("|") === "switch.turn_on:switch.lamp|switch.turn_off:switch.lamp", t);
+  check("a fade started from another screen still says which way it is going",
+    t.elsewhere.busy && t.elsewhere.word === "Starting" && t.elsewhereDone.word === "On", t);
+  check("a press that fails says so on the square", t.failed.word === "Not done" && !t.failed.busy, t.failed);
 
   await browser.close();
   server.close();

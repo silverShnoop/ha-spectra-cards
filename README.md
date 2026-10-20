@@ -3878,6 +3878,36 @@ than a cross, and does not count against the run.
 
 On a phone the square sits above the rail.
 
+**`toggle` makes a square a switch instead of an errand.** Some things
+are not done once and finished but left on: a sound for a sleeping room,
+a fan. For those the square opens no sheet and asks for no Confirm.
+Pressed, it calls its action at once, and it shows which way it is.
+
+```yaml
+      - name: White noise
+        icon: mdi:waveform
+        toggle:
+          entity: media_player.hall            # what is read
+          state: playing                       # on in this state (or a list); default "on"
+          attribute: media_content_id          # optional: and this attribute...
+          is: ambient_sounds://sound_effect/white_noise   # ...is this (or a list)
+          busy: script.white_noise_toggle      # optional: "on" while the change is under way
+        action: {service: script.white_noise_toggle}      # one action both ways
+```
+
+`turn_on` and `turn_off` in place of `action` are picked by the state the
+square reads at the press. Off is hollow, paper with an ink edge; on is
+filled moss, and the word under the name says **On** or **Off**. Between
+the press and the house getting there it says **Starting** or
+**Stopping**, and a line sweeps along its foot. A `busy` entity keeps it
+saying so until the change has really finished, which matters for a
+fade: the player is playing a second after the press, ten seconds before
+the sound has risen. Which way a busy spell is going is fixed when it
+starts, so a fade begun from another screen reads right here too. A
+second press while it is on its way calls nothing. A press that fails
+says **Not done** for a few seconds and writes a line to the browser
+console. `show` works as it does for any quick action.
+
 `tools/checkquickactions.js` holds the panel to all of it: the window, the
 wrapped window, that nothing is called before Confirm, the order of the
 calls, the tick classes step by step, the sheet's identity and height
