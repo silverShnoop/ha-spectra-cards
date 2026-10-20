@@ -3771,10 +3771,15 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   .fsalso { font-size:16px; }
   .fsalso i { font-size:12px; }
 }
+/* A phone, or a card one column wide: there is no room beside the words,
+   so the picture gets its own band above them and nothing of it sits
+   under text. The band shows the scene's stage (see FEST_STAGE). */
 @container (max-width: 420px) {
+  .fscanvas { inset:0 0 auto 0; height:56cqi; border-radius:4px 4px 0 0; --fs-crop:stage; }
+  .fsscrim { display:none; }
+  .fsin { padding-top:calc(56cqi + 10px); }
   .fsin > :not(.fsxp) { max-width:100%; }
-  .fsin { padding-right:44px; }
-  .fsscrim { background:linear-gradient(90deg, rgba(8,5,12,.78), rgba(8,5,12,.4)); }
+  .fsname { text-shadow:none; }
 }
 
 /* A bank holiday or an awareness day: the plain card, laid out as a
@@ -3835,7 +3840,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   display:grid; place-items:center; cursor:pointer; }
 .fsbox.quiet .fsclose { background:var(--sp-sink); color:var(--sp-ink); }
 .fsstage { position:relative; height:clamp(240px, 46vh, 460px); }
-.fsstage .fscanvas { border-radius:0; }
+.fsstage .fscanvas { border-radius:0; --fs-crop:stage; }
 .fsfade { position:absolute; left:0; right:0; bottom:0; height:90px; z-index:1;
   background:linear-gradient(180deg, transparent, var(--fg)); }
 .fsbody { position:relative; z-index:2; padding:0 24px 48px; max-width:760px; margin-top:-28px;
@@ -3875,6 +3880,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
   .fsbox:not(.quiet) { width:100%; overflow:hidden; padding-bottom:0; }
   .fsbox:not(.quiet) .fsstage { position:absolute; inset:0; height:auto; }
+  .fsbox:not(.quiet) .fsstage .fscanvas { --fs-crop:none; }
   .fsbox:not(.quiet) .fsfade { left:0; right:auto; top:0; bottom:0; width:66%; height:auto;
     background:linear-gradient(90deg, rgba(8,5,12,.86) 0%, rgba(8,5,12,.74) 62%, rgba(8,5,12,0) 100%); }
   .fsbox:not(.quiet) .fsbody { position:relative; width:58%; height:100%; margin:0; max-width:none;
@@ -10219,10 +10225,14 @@ function festSheetMarkup(item, others) {
    Kept across repaints, so a light switching somewhere in the house does
    not send Santa back to the start of his run. */
 const FEST_FPS = 30;
+/* The part of a scene's width that holds its subject: the words cover
+   the rest. A scene must keep everything that matters in it. */
+const FEST_STAGE = .42;
+
 class FestPainter {
   constructor() {
     this.canvas = null; this.raf = 0; this.visible = true; this.key = ""; this.draw = null;
-    this.t0 = 0; this.last = 0; this.w = 0; this.h = 0; this.step = 0; this.cost = 0;
+    this.t0 = 0; this.last = 0; this.w = 0; this.h = 0; this.vw = 0; this.step = 0; this.cost = 0;
     this.still = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
@@ -10262,12 +10272,18 @@ class FestPainter {
     this.w = r.width; this.h = r.height;
     this.canvas.width = Math.round(r.width * dpr);
     this.canvas.height = Math.round(r.height * dpr);
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    /* Every scene keeps its subject in the right third, clear of the
+       words. Where the words go below the picture instead (a phone, a
+       narrow card), the frame shows only that third, so the subject
+       fills it: the scene is drawn wider than the canvas and slid left. */
+    const crop = typeof getComputedStyle === "function" && getComputedStyle(this.canvas).getPropertyValue("--fs-crop").trim() === "stage";
+    this.vw = crop ? r.width / FEST_STAGE : r.width;
+    this.ctx.setTransform(dpr, 0, 0, dpr, (r.width - this.vw) * dpr, 0);
     /* A composed picture on arrival rather than the first frame of
        everything: snow already falling, the rangoli part drawn. Times
        under five are the warm-up; the scenes that need a live clock
        (Santa) wait for five. */
-    if (this.draw) for (let i = 0; i < (this.still ? 90 : 30); i += 1) this.draw(this.ctx, this.w, this.h, 4 + i / 30, 1 / 30);
+    if (this.draw) for (let i = 0; i < (this.still ? 90 : 30); i += 1) this.draw(this.ctx, this.vw, this.h, 4 + i / 30, 1 / 30);
   }
 
   stop() {
@@ -10298,7 +10314,7 @@ class FestPainter {
       this.last = now;
       if (!this.w || !this.h) return;
       const t1 = performance.now();
-      this.draw(this.ctx, this.w, this.h, 5 + (now - this.t0) / 1000, dt);
+      this.draw(this.ctx, this.vw, this.h, 5 + (now - this.t0) / 1000, dt);
       const cost = performance.now() - t1;
       this.cost = this.cost ? this.cost * .9 + cost * .1 : cost;
       this.step = this.cost < 6 ? 0 : 1000 / FEST_FPS * .7;
