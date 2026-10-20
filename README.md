@@ -8,7 +8,7 @@ wrapping exactly one **body** from a closed set of archetypes. The split is
 what keeps the system consistent structurally rather than by discipline — no
 cell draws its own title bar, so none of them can drift.
 
-**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `ahead`, `clock`, `control`, `day`, `diary`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
+**Shipping now:** `agenda`, `alert`, `arc`, `batteries`, `bins`, `camera`, `chart`, `daysplit`, `devices`, `climate`, `ahead`, `clock`, `control`, `day`, `diary`, `festival`, `floorplan`, `forecast`, `list`, `lock`, `meals`, `people`, `pie`, `picker`, `quote`, `rail`, `recipes`, `scenes`, `sky`, `softener`, `stat`, `status`, `strip`, `summary`, `todo`, `visits`, `washer`.
 
 The ones with a section below are the ones whose shape needs explaining; the rest read from their own config and are covered by the examples.
 
@@ -2706,6 +2706,57 @@ every other day on a softener that was working.
 A missed reading is a fact and not a job, so it never takes ochre. **The
 card's outline is the dashboard's to set** through `outline`, and only while
 the salt row is in Needs you. The body paints no level of its own.
+
+### `bins` — which bins go out next, and when?
+
+The bins going out, drawn side by side with their names under them, and the
+day beside them. The collections after are a line each, drawn small.
+
+```yaml
+body:
+  type: bins
+  days: {entity: sensor.bin_next, attribute: daysTo}
+  out:
+    - kind: {entity: sensor.bin_next_type_1, map: {Food Caddy: food, Garden waste: garden, ...}}
+      name: {entity: sensor.bin_next_type_1, map: {Food Caddy: Food, Garden waste: Garden, ...}}
+    - kind: {entity: sensor.bin_next_type_2, map: {...}}
+      name: {entity: sensor.bin_next_type_2, map: {...}}
+  later:
+    - kind: {entity: sensor.bin_after_1, map: {Garden: garden, ...}, match: prefix}
+      name: {entity: sensor.bin_after_1, map: {Garden: Garden, ...}, match: prefix}
+      days: {entity: sensor.bin_after_1, attribute: daysTo}
+  colours: {paper: blue, garden: brown, food: brown, refuse: purple, recycling: black}
+```
+
+`kind` is one of `refuse`, `recycling`, `garden`, `paper`, `glass` or `food`.
+It picks the colour from `colours`, the shape (`food` is a caddy, `glass` a
+box, everything else a wheelie bin) and the glyph on the front. A bin can also
+take its own `shape` (`wheelie`, `caddy`, `box`) and `icon`. A kind nobody
+listed is a wheelie bin with a bin on it, never an empty slot. The small bins
+on the later lines carry no glyph; at that size it would be a smudge.
+
+**The drawing leads.** The question at the door is *which ones*, and a shape
+answers it before a word is read. A caddy is drawn in the same box as a
+wheelie bin, so it is as much smaller beside one as it is on the kerb.
+
+**Council colours, as depictions.** `colours` paints each kind the colour
+the council painted it, from `blue`, `brown`, `purple`, `black`, `green` and
+`grey`; a bin can also take its own `colour`. These are `--sp-bin-*`, their
+own tokens like `--sp-salt` and the sky's: matte, a blue that cannot pass for
+the notice blue, and only ever a fill inside the drawing, never an edge. Any
+other name, and any bin without one, wears the card's accent.
+
+**The day is two facts.** `Today`, `Tomorrow` or the weekday answers *is it
+tonight*; the date under it answers *which collection is this*. Beyond a week
+the word is a date, because "Friday" ten days out is next week's and reads as
+this one.
+
+**Nothing here is a job.** Putting the bins out is a Needs you row owned by
+the bin calendar, so this card takes no level however close the day is. The
+ones after are drawn small, keeping their colour; unpainted, they are hollow.
+
+A part whose name and kind both read as nothing drops out, so one bin going
+out draws one bin with no change to the config.
 
 ### `meals` — what are we eating this week?
 
