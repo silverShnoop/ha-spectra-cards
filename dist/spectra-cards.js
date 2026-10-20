@@ -7995,6 +7995,197 @@ const FEST_SCENES = (() => {
     x.fillStyle = "rgba(255,240,200,.55)"; x.beginPath(); x.arc(tx, base - u * .35, tw * .3, 0, TAU); x.fill();
     x.fillStyle = col; x.fillRect(tx - tw * 2.6, base - u * .14, tw * 5.2, u * .14); for (let k = 0; k < 9; k++) x.fillRect(tx - tw * 2.6 + k * tw * .62, base - u * .19, tw * .16, u * .05); }
 
+  /* LGBT+ History Month: an archive reading room on a February evening.
+     A banker's lamp over an open book with a rainbow ribbon in it, an old
+     photograph of a march propped against the box files, snow at the
+     window. Painted once; the snow, the lamp's motes, the ribbon and a
+     turning page move. */
+  function prideHistory(st) {
+    st.snow = Array.from({ length: 34 }, () => ({ x: rnd(), y: rnd(), v: .03 + rnd() * .05, p: rnd() * TAU, s: .5 + rnd() * .9 }));
+    st.motes = Array.from({ length: 22 }, () => ({ x: rnd(), y: rnd(), p: rnd() * TAU, s: .4 + rnd() * .8 }));
+    const spines = ["#6A1E1E", "#1E3A2A", "#1E2A4A", "#7A5A2A", "#4A2A3A", "#2A2A2A", "#8A6A3A", "#3A1E1E", "#2A4A4A", "#5A3A1E"];
+    return (c, w, h, t, dt) => {
+      const u = Math.min(h * .92, w * .34), desk = h * .7;
+      const wx = w * .675, ww = u * .44, wy = h * .07, wh = desk - u * .31 - wy;
+      const sx0 = wx + ww + u * .07, sx1 = w - u * .02;
+      const bx = wx + ww * .62, by = desk + (h - desk) * .3, pw = u * .3, ph = u * .19;
+      const lx = wx + u * .01;
+      still(st, "archive", c, w, h, (x) => {
+        // panelled wall, darkest under the words
+        const wg = x.createLinearGradient(0, 0, w, 0); wg.addColorStop(0, "#140D0A"); wg.addColorStop(.55, "#1E140F"); wg.addColorStop(1, "#2E1E16");
+        x.fillStyle = wg; x.fillRect(0, 0, w, h);
+        for (let px = u * .3; px < w; px += u * .42) { x.fillStyle = "rgba(255,220,180,.025)"; x.fillRect(px, 0, 2, desk); x.fillStyle = "rgba(0,0,0,.2)"; x.fillRect(px + 2, 0, 2, desk); }
+        // shelves of the stacks behind, only shapes under the words
+        for (let row = 0; row < 5; row++) { const ry = h * .06 + row * (desk - h * .06) / 5, rh = (desk - h * .06) / 5;
+          x.fillStyle = "rgba(0,0,0,.28)"; x.fillRect(0, ry + rh - u * .015, w * .62, u * .015);
+          for (let px = 0; px < w * .62; ) { const bw = u * (.022 + rnd() * .02), bh = rh * (.6 + rnd() * .3); x.fillStyle = `rgba(${60 + rnd() * 30},${40 + rnd() * 20},${30 + rnd() * 15},.35)`; x.fillRect(px, ry + rh - u * .015 - bh, bw - 1, bh); px += bw; } }
+        // the window: a February night, snow on the roofs opposite, a street lamp
+        const sky = x.createLinearGradient(0, wy, 0, wy + wh); sky.addColorStop(0, "#0E1A3A"); sky.addColorStop(1, "#2A3A6A"); x.fillStyle = sky; x.fillRect(wx, wy, ww, wh);
+        glow(x, wx + ww * .75, wy + wh * .55, u * .2, "#FFD8A0", .5);
+        // the houses opposite: gables with snow on the slates, a chimney each, a few lit windows
+        x.save(); x.beginPath(); x.rect(wx, wy, ww, wh); x.clip();
+        const hw2 = ww / 3.2;
+        for (let k = -1; k < 4; k++) { const hx = wx + k * hw2 + hw2 * .1, top = wy + wh * (.6 + (k & 1) * .05), ridge = top - hw2 * .38;
+          x.fillStyle = "#141A30"; x.fillRect(hx, top, hw2, wy + wh - top);
+          x.beginPath(); x.moveTo(hx - hw2 * .04, top); x.lineTo(hx + hw2 / 2, ridge); x.lineTo(hx + hw2 * 1.04, top); x.fill();
+          x.fillStyle = "rgba(232,238,255,.9)"; x.beginPath(); x.moveTo(hx - hw2 * .04, top); x.lineTo(hx + hw2 / 2, ridge); x.lineTo(hx + hw2 * 1.04, top); x.lineTo(hx + hw2 * .9, top + 1); x.lineTo(hx + hw2 / 2, ridge + hw2 * .07); x.lineTo(hx + hw2 * .1, top + 1); x.fill();
+          x.fillStyle = "#141A30"; x.fillRect(hx + hw2 * .7, ridge + hw2 * .04, hw2 * .1, hw2 * .2); x.fillStyle = "rgba(232,238,255,.9)"; x.fillRect(hx + hw2 * .69, ridge + hw2 * .03, hw2 * .12, hw2 * .03);
+          for (const [fx2, fy2] of [[.2, .25], [.6, .25], [.2, .6], [.6, .6]]) { x.fillStyle = rnd() < .45 ? "rgba(255,206,130,.85)" : "#1E2640"; x.fillRect(hx + hw2 * fx2, top + (wy + wh - top) * fy2, hw2 * .18, (wy + wh - top) * .18); } }
+        x.restore();
+        x.fillStyle = "#0A0A14"; x.fillRect(wx + ww * .74, wy + wh * .55, 2, wh * .45); x.fillStyle = "#FFE2A8"; x.beginPath(); x.arc(wx + ww * .74 + 1, wy + wh * .55, u * .012, 0, TAU); x.fill();
+        // the frame: sash, glazing bars, a drift of snow on the outer sill
+        x.fillStyle = "#3A2A20"; const fb = u * .022; x.fillRect(wx - fb, wy - fb, ww + fb * 2, fb); x.fillRect(wx - fb, wy, fb, wh); x.fillRect(wx + ww, wy, fb, wh);
+        x.fillRect(wx, wy + wh * .5 - fb * .4, ww, fb * .8); x.fillRect(wx + ww / 2 - fb * .25, wy, fb * .5, wh); x.fillRect(wx + ww / 4 - fb * .2, wy, fb * .4, wh * .5); x.fillRect(wx + ww * .75 - fb * .2, wy, fb * .4, wh * .5);
+        x.fillStyle = "rgba(240,244,255,.9)"; for (const fy of [wy + wh * .5 - fb * .4, wy + wh]) { x.beginPath(); x.moveTo(wx, fy); x.quadraticCurveTo(wx + ww * .3, fy - u * .03, wx + ww * .55, fy - u * .012); x.quadraticCurveTo(wx + ww * .8, fy - u * .025, wx + ww, fy); x.fill(); }
+        x.fillStyle = "#4A3426"; x.fillRect(wx - fb * 1.6, wy + wh, ww + fb * 3.2, fb * 1.2);
+        x.strokeStyle = "rgba(0,0,0,.3)"; x.lineWidth = 1; x.strokeRect(wx + ww * .08, wy + wh + fb * 2.2, ww * .38, desk - wy - wh - fb * 3.6); x.strokeRect(wx + ww * .54, wy + wh + fb * 2.2, ww * .38, desk - wy - wh - fb * 3.6);
+        // the bookcase: leather spines with gold bands
+        x.fillStyle = "#2A1A12"; x.fillRect(sx0 - u * .02, 0, sx1 - sx0 + u * .04, desk);
+        const rows = 5, rh = desk / rows;
+        for (let r = 0; r < rows; r++) { const base = (r + 1) * rh - u * .02;
+          x.fillStyle = "#1A100A"; x.fillRect(sx0, r * rh + u * .01, sx1 - sx0, rh - u * .03);
+          for (let px = sx0 + 1; px < sx1 - u * .02; ) { const bw = u * (.022 + rnd() * .022), bh = (rh - u * .05) * (.72 + rnd() * .26), col = spines[Math.floor(rnd() * spines.length)];
+            if (rnd() < .08) { x.save(); x.translate(px, base); x.rotate(-.18); x.fillStyle = col; x.fillRect(0, -bh, bw, bh); x.restore(); px += bw * 1.4; continue; }
+            const g = x.createLinearGradient(px, 0, px + bw, 0); g.addColorStop(0, col); g.addColorStop(.4, "rgba(255,255,255,.08)"); g.addColorStop(1, "rgba(0,0,0,.35)");
+            x.fillStyle = col; x.fillRect(px, base - bh, bw - 1, bh); x.fillStyle = g; x.fillRect(px, base - bh, bw - 1, bh);
+            x.fillStyle = "rgba(220,180,90,.7)"; x.fillRect(px + 1, base - bh * .85, bw - 3, 1.2); x.fillRect(px + 1, base - bh * .2, bw - 3, 1.2); px += bw; }
+          x.fillStyle = "#4A3020"; x.fillRect(sx0 - u * .02, base, sx1 - sx0 + u * .04, u * .02); }
+        // the desk, its top lit by the lamp
+        const dg = x.createLinearGradient(0, desk, 0, h); dg.addColorStop(0, "#5A3A24"); dg.addColorStop(.15, "#3E2818"); dg.addColorStop(1, "#1A100A");
+        x.fillStyle = dg; x.fillRect(w * .5, desk, w * .5, h - desk);
+        const dl = x.createLinearGradient(w * .5, 0, w * .66, 0); dl.addColorStop(0, "rgba(20,13,10,1)"); dl.addColorStop(1, "rgba(20,13,10,0)"); x.fillStyle = dl; x.fillRect(w * .5, desk, w * .16, h - desk);
+        x.fillStyle = "rgba(255,210,150,.18)"; x.fillRect(w * .64, desk, w * .36, 1.5);
+        glow(x, lx + u * .1, by, u * .5, "#FFD890", .22);
+        // the archive box and a stack of old books at the right
+        const aw = Math.min(u * .2, (sx1 - sx0) * .6), ax = sx1 - aw, ah = u * .14;
+        x.fillStyle = "#8A7454"; x.fillRect(ax, desk + u * .02 - ah, aw, ah); x.fillStyle = "#7A6446"; x.fillRect(ax, desk + u * .02 - ah, aw, ah * .18);
+        x.fillStyle = "#EDE2C8"; x.fillRect(ax + aw * .25, desk + u * .02 - ah * .62, aw * .5, ah * .26); x.fillStyle = "rgba(60,40,30,.6)"; x.fillRect(ax + aw * .3, desk + u * .02 - ah * .52, aw * .4, 1); x.fillRect(ax + aw * .3, desk + u * .02 - ah * .44, aw * .3, 1);
+        x.fillStyle = "#3A2A20"; x.beginPath(); x.arc(ax + aw * .5, desk + u * .02 - ah * .2, aw * .07, 0, TAU); x.fill();
+        // an old photograph of a march, propped against the box
+        const fx = ax - u * .01, fw2 = u * .15, fh2 = u * .12, fy2 = desk + u * .03 - fh2;
+        x.save(); x.translate(fx, fy2 + fh2); x.rotate(-.06); x.fillStyle = "#C8B48A"; x.fillRect(-fw2, -fh2, fw2, fh2);
+        x.fillStyle = "#EDE2C8"; x.fillRect(-fw2 + 2, -fh2 + 2, fw2 - 4, fh2 - 4);
+        const pg = x.createLinearGradient(0, -fh2, 0, 0); pg.addColorStop(0, "#C8B08A"); pg.addColorStop(1, "#8A7050"); x.fillStyle = pg; x.fillRect(-fw2 + 4, -fh2 + 4, fw2 - 8, fh2 - 10);
+        x.fillStyle = "#4A3828"; for (let k = 0; k < 9; k++) { const mx = -fw2 + 6 + k * (fw2 - 12) / 8, my = -10 - (k % 3) * 1.5; x.beginPath(); x.arc(mx, my - fh2 * .32, fh2 * .05, 0, TAU); x.fill(); x.fillRect(mx - fh2 * .04, my - fh2 * .27, fh2 * .08, fh2 * .2); }
+        x.fillStyle = "#EDE0C0"; x.fillRect(-fw2 * .8, -fh2 * .78, fw2 * .6, fh2 * .2); x.fillStyle = "#4A3828"; x.fillRect(-fw2 * .82, -fh2 * .78, 1, fh2 * .5); x.fillRect(-fw2 * .2, -fh2 * .78, 1, fh2 * .5);
+        x.fillStyle = "rgba(74,56,40,.7)"; x.fillRect(-fw2 * .72, -fh2 * .7, fw2 * .44, 1.2);
+        x.restore();
+        // the banker's lamp: brass column, green glass shade
+        x.fillStyle = "#B88A3A"; x.beginPath(); x.ellipse(lx, desk + u * .02, u * .07, u * .018, 0, 0, TAU); x.fill();
+        x.fillStyle = "#D8A84A"; x.fillRect(lx - u * .008, desk - u * .17, u * .016, u * .19);
+        x.beginPath(); x.moveTo(lx - u * .008, desk - u * .17); x.quadraticCurveTo(lx + u * .02, desk - u * .22, lx + u * .07, desk - u * .2); x.lineTo(lx + u * .07, desk - u * .19); x.quadraticCurveTo(lx + u * .02, desk - u * .205, lx + u * .008, desk - u * .16); x.fill();
+        const sg = x.createLinearGradient(0, desk - u * .25, 0, desk - u * .18); sg.addColorStop(0, "#2E7A4A"); sg.addColorStop(1, "#0E3A20");
+        x.fillStyle = sg; x.beginPath(); x.moveTo(lx + u * .0, desk - u * .19); x.quadraticCurveTo(lx + u * .07, desk - u * .27, lx + u * .2, desk - u * .19); x.closePath(); x.fill();
+        x.fillStyle = "rgba(160,255,190,.35)"; x.beginPath(); x.ellipse(lx + u * .1, desk - u * .225, u * .05, u * .006, -.2, 0, TAU); x.fill();
+        // the open book's shadow and its covers
+        shadow(x, bx, by + ph * .55, pw * 1.15, ph * .2, .45);
+        x.fillStyle = "#4A1E1E"; x.beginPath(); x.moveTo(bx - pw * 1.04, by + ph * .48); x.lineTo(bx + pw * 1.04, by + ph * .48); x.lineTo(bx + pw * .98, by - ph * .48); x.lineTo(bx - pw * .98, by - ph * .48); x.fill();
+        grain(x, w, h, .025); vignette(x, w, h, .5, .78); });
+      // the lamp's light, breathing a little, and the dust in it
+      const flick = .92 + Math.sin(t * 1.3) * .04 + Math.sin(t * 3.7) * .02;
+      glow(c, lx + u * .1, desk - u * .15, u * .32, "#FFE2A0", .32 * flick);
+      st.motes.forEach((m) => { m.y -= dt * .015 * m.s; if (m.y < 0) m.y = 1;
+        const mx = lx + u * (.02 + m.x * .24) + Math.sin(t * .5 + m.p) * u * .02, my = desk - u * .17 + m.y * u * .3;
+        c.fillStyle = `rgba(255,236,190,${(.35 + .3 * Math.sin(t * 2 + m.p)) * m.s})`; c.fillRect(mx, my, 1.4, 1.4); });
+      // snow beyond the glass
+      c.save(); c.beginPath(); c.rect(wx, wy, ww, wh); c.clip();
+      st.snow.forEach((f) => { f.y += f.v * dt; if (f.y > 1) { f.y = 0; f.x = rnd(); }
+        c.fillStyle = `rgba(255,255,255,${.5 + f.s * .4})`; c.beginPath(); c.arc(wx + (f.x + Math.sin(t * .7 + f.p) * .03) * ww, wy + f.y * wh, f.s * u * .0035 + .35, 0, TAU); c.fill(); });
+      c.restore();
+      // the open book: two pages bowed at the spine
+      const page = (side, lift) => { const sgn = side, ex = bx + sgn * pw * Math.cos(lift), ey = by - Math.sin(lift) * ph * 1.6;
+        c.beginPath(); c.moveTo(bx, by - ph * .46); c.quadraticCurveTo(bx + sgn * pw * .2, by - ph * .56 - Math.sin(lift) * ph, ex, ey - ph * .44);
+        c.lineTo(ex, ey + ph * .4); c.quadraticCurveTo(bx + sgn * pw * .2, by + ph * .36 - Math.sin(lift) * ph, bx, by + ph * .44); c.closePath(); };
+      ["#F2E6CC", "#EADCBE"].forEach((col, i) => { const sgn = i ? 1 : -1; c.fillStyle = col; page(sgn, 0); c.fill();
+        const pg = c.createLinearGradient(bx, 0, bx + sgn * pw, 0); pg.addColorStop(0, "rgba(120,90,50,.35)"); pg.addColorStop(.25, "rgba(120,90,50,0)"); c.fillStyle = pg; page(sgn, 0); c.fill();
+        c.fillStyle = "rgba(70,50,30,.38)"; for (let l = 0; l < 7; l++) { const ly = by - ph * .32 + l * ph * .1; c.fillRect(Math.min(bx + sgn * pw * .14, bx + sgn * pw * (.14 + .66 - (l === 6 ? .3 : 0))), ly, pw * (l === 6 ? .36 : .66), .9); } });
+      // a page turning, every eleven seconds
+      const tk = (t % 11) / 1.8;
+      if (tk < 1) { const a = smooth(tk) * Math.PI, back = a > Math.PI / 2;
+        c.fillStyle = back ? "#E2D4B4" : "#F4EAD2"; c.beginPath(); const ex = bx + pw * Math.cos(a), lift = Math.sin(a) * ph * 1.4;
+        c.moveTo(bx, by - ph * .46); c.quadraticCurveTo(bx + (ex - bx) * .4, by - ph * .5 - lift, ex, by - ph * .44 - lift * .9);
+        c.lineTo(ex, by + ph * .4 - lift * .9); c.quadraticCurveTo(bx + (ex - bx) * .4, by + ph * .4 - lift, bx, by + ph * .44); c.closePath(); c.fill();
+        c.strokeStyle = "rgba(90,60,30,.35)"; c.lineWidth = .8; c.stroke(); }
+      // the rainbow ribbon from the spine, over the desk's edge
+      const rx = bx + u * .004, ry = by + ph * .44, sw = Math.sin(t * .9) * u * .012, rw = Math.max(3, u * .03), rl = Math.min(h - ry - 2, u * .2);
+      prideProgress.forEach((col, i) => { const off = (i - 2.5) / 6 * rw; c.strokeStyle = col; c.lineWidth = rw / 6 + .6; c.beginPath();
+        c.moveTo(rx + off, ry); c.quadraticCurveTo(rx + off + u * .02, ry + rl * .45, rx + off + sw, ry + rl); c.stroke(); });
+      c.fillStyle = "#E40303"; c.beginPath(); c.moveTo(rx - rw / 2 + sw, ry + rl); c.lineTo(rx + rw / 2 + sw, ry + rl); c.lineTo(rx + sw, ry + rl - rw * .4); c.fill();
+    };
+  }
+
+  /* IDAHOBIT: a city bridge lit in the rainbow on a May night, its
+     colours running slowly along it and broken up in the river below.
+     People cross it with a banner; blossom drifts from the bank. */
+  function prideIdahobit(st) {
+    st.walk = Array.from({ length: 7 }, (_, i) => ({ o: i / 7, s: .85 + rnd() * .3, p: rnd() * TAU, flag: i % 3 === 1 }));
+    st.petals = Array.from({ length: 26 }, () => ({ x: rnd(), y: rnd(), v: .02 + rnd() * .03, p: rnd() * TAU, s: .6 + rnd() * .7 }));
+    const rainbow = prideProgress;
+    return (c, w, h, t, dt) => {
+      const u = Math.min(h * .92, w * .34), water = h * .7, deck = h * .5, x0 = w * .655, x1 = w * 1.02;
+      const piers = [x0, x0 + (x1 - x0) * .36, x0 + (x1 - x0) * .7, x1 + (x1 - x0) * .04];
+      const face = (x) => { x.beginPath(); x.moveTo(x0 - u * .02, deck - u * .02); x.lineTo(x1, deck - u * .02); x.lineTo(x1, water);
+        for (let k = piers.length - 1; k > 0; k--) { const a = piers[k - 1], b = piers[k], pw2 = u * .045, mid = (a + b) / 2, span = (b - a) / 2 - pw2;
+          x.lineTo(b - pw2, water); x.ellipse(mid, water, span, (water - deck) * .78, 0, 0, Math.PI, true); x.lineTo(a, water); }
+        x.lineTo(x0 - u * .02, water); x.closePath(); };
+      still(st, "river", c, w, h, (x) => {
+        fill(x, w, h, [[0, "#070B1E"], [.4, "#151A3A"], [.66, "#2A2448"], [.7, "#0C1024"], [1, "#05060E"]]);
+        for (let i = 0; i < 70; i++) { const sx = rnd() * w, sy = rnd() * h * .45; x.fillStyle = `rgba(255,255,255,${(.15 + rnd() * .5) * (sx > w * .6 ? 1 : .4)})`; x.fillRect(sx, sy, 1, 1); }
+        // the far bank: a quiet skyline, almost nothing lit under the words
+        x.fillStyle = "#121630"; for (let px = 0; px < w; px += u * (.05 + rnd() * .05)) { const bh = u * (.06 + rnd() * .16), bw = u * (.04 + rnd() * .05); x.fillRect(px, water - bh, bw, bh);
+          for (let wy = water - bh + 3; wy < water - 3; wy += 4) for (let wx2 = px + 2; wx2 < px + bw - 2; wx2 += 4) if (rnd() < (px > w * .6 ? .18 : .04)) { x.fillStyle = "rgba(255,210,150,.35)"; x.fillRect(wx2, wy, 1.2, 1.2); x.fillStyle = "#121630"; } }
+        x.fillStyle = "#0E1226"; x.fillRect(0, water - u * .02, w, u * .02);
+        // the embankment the bridge springs from
+        x.fillStyle = "#0B0D1C"; x.beginPath(); x.moveTo(x0 - u * .02, deck - u * .02); x.quadraticCurveTo(x0 - u * .12, deck + u * .02, x0 - u * .3, water - u * .035); x.lineTo(w * .3, water - u * .035); x.lineTo(w * .3, water); x.lineTo(x0, water); x.closePath(); x.fill();
+        grain(x, w, h, .02); vignette(x, w, h, .3, .75); });
+      // six searchlights from the bridge, one in each colour, sweeping slowly
+      c.save(); c.beginPath(); c.rect(x0, 0, w - x0, deck); c.clip(); c.globalCompositeOperation = "lighter";
+      rainbow.forEach((col, j) => { const bx2 = x0 + (x1 - x0) * (.08 + j * .15), a = -Math.PI / 2 + Math.sin(t * .25 + j * 1.1) * .12 + j * .035, L = deck * .98, sp = .035;
+        const tx = bx2 + Math.cos(a) * L, ty = deck + Math.sin(a) * L, g = c.createLinearGradient(bx2, deck, tx, ty); g.addColorStop(0, col + "55"); g.addColorStop(1, col + "00");
+        c.fillStyle = g; c.beginPath(); c.moveTo(bx2 - 1, deck - u * .06); c.lineTo(bx2 + Math.cos(a - sp) * L, deck + Math.sin(a - sp) * L); c.lineTo(bx2 + Math.cos(a + sp) * L, deck + Math.sin(a + sp) * L); c.lineTo(bx2 + 1, deck - u * .06); c.fill(); });
+      c.restore();
+      // the light on the bridge: the six colours, drifting slowly along it
+      const sh = (t * .04) % 1, lg = c.createLinearGradient(x0, 0, x1, 0);
+      for (let k = 0; k <= 12; k++) { const f = k / 12; lg.addColorStop(f, rainbow[Math.floor(((f + sh) % 1) * 6) % 6]); }
+      c.save(); face(c); c.clip(); c.fillStyle = lg; c.globalAlpha = .82; c.fillRect(x0 - u * .05, deck - u * .05, x1 - x0 + u * .1, water - deck + u * .05);
+      const shade = c.createLinearGradient(0, deck, 0, water); shade.addColorStop(0, "rgba(10,8,20,.05)"); shade.addColorStop(1, "rgba(10,8,20,.55)"); c.globalAlpha = 1; c.fillStyle = shade; c.fillRect(x0 - u * .05, deck - u * .05, x1 - x0 + u * .1, water - deck + u * .05);
+      c.restore();
+      c.drawImage(cache(st, "stone", w, h, c, (x) => { x.save(); face(x); x.clip(); x.fillStyle = "rgba(0,0,0,.22)";
+        for (let ry = deck; ry < water; ry += u * .028) { x.fillRect(x0 - u * .05, ry, x1 - x0 + u * .1, 1); const off = (Math.round((ry - deck) / (u * .028)) % 2) * u * .04;
+          for (let rx = x0 - u * .05 + off; rx < x1; rx += u * .08) x.fillRect(rx, ry, 1, u * .028); } x.restore(); }), 0, 0, w, h);
+      // parapet and lamps
+      c.fillStyle = "#1A1830"; c.fillRect(x0 - u * .02, deck - u * .06, x1 - x0, u * .04);
+      for (let k = 0; k < 5; k++) { const lx = x0 + u * .02 + k * (x1 - x0 - u * .04) / 4.2; c.fillStyle = "#0E0E1C"; c.fillRect(lx - 1, deck - u * .17, 2, u * .12);
+        c.fillStyle = "#FFE6B0"; c.beginPath(); c.arc(lx, deck - u * .175, u * .012, 0, TAU); c.fill(); glow(c, lx, deck - u * .175, u * .05, "#FFD890", .5); }
+      // people crossing, a banner carried between two of them
+      const cross = (o) => x0 + u * .05 + ((o + t * .012) % 1) * (x1 - x0 - u * .12);
+      const fig = (px, s, p) => { const b = Math.abs(Math.sin(t * 4 + p)) * u * .004, fh = u * .085 * s, y = deck - u * .06 - b;
+        const edge = Math.min(1, (px - x0) / (u * .08), (x1 - u * .04 - px) / (u * .08)); if (edge <= 0) return null; c.globalAlpha = edge;
+        c.fillStyle = "#07060E"; c.beginPath(); c.ellipse(px, y - fh * .45, fh * .17, fh * .4, 0, 0, TAU); c.fill(); c.beginPath(); c.arc(px, y - fh * .95, fh * .13, 0, TAU); c.fill(); c.globalAlpha = 1; return { y, fh, edge }; };
+      st.walk.forEach((m) => { const px = cross(m.o), f = fig(px, m.s, m.p); if (!f || !m.flag) return;
+        c.globalAlpha = f.edge; c.strokeStyle = "#07060E"; c.lineWidth = 1; c.beginPath(); c.moveTo(px + f.fh * .15, f.y - f.fh * .7); c.lineTo(px + f.fh * .15, f.y - f.fh * 1.45); c.stroke();
+        const fw = f.fh * .5, wv = Math.sin(t * 5 + m.p) * 1.2; rainbow.forEach((col, j) => { c.fillStyle = col; c.fillRect(px + f.fh * .15, f.y - f.fh * 1.45 + j * fw * .11 + wv * (j / 6), fw, fw * .11 + .5); }); c.globalAlpha = 1; });
+      const ba = cross(.03), bb = ba + u * .16;
+      if (bb < x1 - u * .06 && ba > x0 + u * .02) { const fa = fig(ba, 1, 0), fb = fig(bb, 1, 1); if (fa && fb) { const top = fa.y - fa.fh * 1.1, bh = fa.fh * .38;
+        rainbow.forEach((col, j) => { c.fillStyle = col; c.beginPath(); for (let q = 0; q <= 10; q++) { const f = q / 10, yy = top + j * bh / 6 + Math.sin(t * 3 + f * 5) * 1.5; q ? c.lineTo(ba + (bb - ba) * f, yy) : c.moveTo(ba, yy); }
+          for (let q = 10; q >= 0; q--) { const f = q / 10, yy = top + (j + 1) * bh / 6 + Math.sin(t * 3 + f * 5) * 1.5; c.lineTo(ba + (bb - ba) * f, yy + .5); } c.fill(); }); } }
+      // the river: the bridge's light broken into ripples
+      for (let i = 0; i < 26; i++) { const yy = water + 2 + i * (h - water) * .9 / 26, k = 1 - i / 26, wob = Math.sin(t * 1.6 + i * 1.3) * u * .02 * (1 + i * .05);
+        for (let j = 0; j < 6; j++) { const f = (j / 6 + 1 - sh) % 1, sx = x0 + (x1 - x0) * f + wob, sw = (x1 - x0) / 6 * (.5 + .4 * Math.sin(i * 2.1 + j + t));
+          c.fillStyle = rainbow[j]; c.globalAlpha = .38 * k; c.fillRect(sx, yy, sw, 1.4); } }
+      c.globalAlpha = 1;
+      // blossom from a branch above the bank
+      st.petals.forEach((q) => { q.y += q.v * dt; q.x -= q.v * dt * .4; if (q.y > 1 || q.x < 0) { q.y = -.02; q.x = .3 + rnd() * .7; }
+        const px = x0 + q.x * (w - x0) + Math.sin(t + q.p) * u * .03, py = q.y * h; if (px < w * .66) return;
+        c.save(); c.translate(px, py); c.rotate(t * 1.5 + q.p); c.fillStyle = "rgba(255,200,220,.85)"; c.beginPath(); c.ellipse(0, 0, u * .009 * q.s, u * .005 * q.s, 0, 0, TAU); c.fill(); c.restore(); });
+      c.drawImage(cache(st, "branch", w, h, c, (x) => { x.strokeStyle = "#1A1020"; x.lineCap = "round";
+        const seg = (ax, ay, bx2, by2, wd) => { x.lineWidth = wd; x.beginPath(); x.moveTo(ax, ay); x.quadraticCurveTo((ax + bx2) / 2, ay + u * .02, bx2, by2); x.stroke(); };
+        seg(w + 4, h * .02, w - u * .42, h * .14, u * .02); seg(w - u * .2, h * .06, w - u * .3, h * .22, u * .01); seg(w - u * .32, h * .12, w - u * .46, h * .08, u * .008);
+        for (let i = 0; i < 90; i++) { const f = rnd(), bx2 = w - u * .45 * f + (rnd() - .5) * u * .08, by2 = h * (.03 + f * .12) + (rnd() - .4) * u * .07;
+          x.fillStyle = ["#FFC8DA", "#FFB0C8", "#FFE4EC", "#F598B4"][i % 4]; x.beginPath(); x.arc(bx2, by2, u * (.008 + rnd() * .008), 0, TAU); x.fill(); } }), 0, 0, w, h);
+    };
+  }
+
   /* The rakhi's rosette in rings, each ring painted once so it can turn:
      gold zari points, red velvet petals, a row of pearls. */
   const rakhiRing = (st, c, R, kind) => cache(st, `ring:${kind}:${Math.round(R)}`, R * 2.2, R * 2.2, c, (x) => {
@@ -10506,6 +10697,8 @@ const FEST_SCENES = (() => {
     },
 
     pride(st, v) {
+      if (v === "history") return prideHistory(st);
+      if (v === "idahobit") return prideIdahobit(st);
       const trans = v === "trans", london = v === "london", cols = trans ? prideTrans : prideProgress;
       const conf = prideProgress.concat(["#FFFFFF", "#74D7EE", "#FFAFC8"]);
       st.cl = mkDrift(4, .06, .3);
@@ -12252,7 +12445,7 @@ const FEST_TABLE = {
   "Burns Night": {"src":"UK","tier":"festive","scene":"burns","bg":"#0B1030","eyebrow":"Tonight","short":"Scotland remembers its favourite poet, Robert Burns, with bagpipes, haggis and a poem read to the pudding.","full":[["Who was Robert Burns?","Robert Burns was born in a small cottage in Ayrshire, Scotland, on 25 January 1759. He grew up on a farm and wrote poems and songs in the Scots language about ordinary life: mice, friends, love and the countryside. He became so loved that Scotland calls him its national poet, and Auld Lang Syne, a song he wrote down, is sung all over the world at New Year."],["What happens","People hold a Burns Supper. A piper plays the bagpipes as the haggis is carried in, and someone reads Burns’s poem Address to a Haggis to it, cutting it open with a knife at just the right line. Haggis is a savoury pudding of oats, onion and spices, eaten with neeps and tatties: turnips and potatoes. Then come more poems, songs and speeches, and the night ends with everyone holding hands to sing Auld Lang Syne."]],"art":"A piper plays on a hill against the moon, music rising from his pipes, thistles swaying below."},
   "Republic Day": {"src":"Observance","tier":"festive","scene":"tricolour","bg":"#1D3557","eyebrow":"India","short":"India’s constitution came into force in 1950 and the country began choosing its own leaders. A huge parade fills New Delhi.","full":[["What is it?","On 26 January 1950, India’s constitution came into force and the country became a republic, choosing its own leaders instead of a king. The constitution, written over nearly three years by a team led by B. R. Ambedkar, is one of the longest in the world. Ambedkar was born into a group treated as “untouchable”, and he made sure the constitution banned that."],["What happens","In New Delhi there is a huge parade along a wide avenue called Kartavya Path, with marching soldiers, camels, dancers and colourful floats from every state, while jets fly overhead trailing the colours of the flag."]],"art":"India’s flag lifts on the breeze down the long avenue as balloons in its three colours rise past it."},
   "Thaipusam": {"src":"Hindu","tier":"festive","scene":"kavadi","bg":"#2A1446","eyebrow":"Celebrating","short":"A Tamil festival for the warrior god Murugan. Devotees walk to his temple carrying kavadi, arches decorated with peacock feathers.","full":[["What is it?","Thaipusam is a Tamil festival for Murugan, a young warrior god and a son of Shiva. The story says that on this day his mother Parvati gave him a spear called a vel, which he used to defeat a demon. It is celebrated wherever Tamil people live, from India to Malaysia and Singapore."],["What happens","After weeks of fasting and prayer, devotees walk to Murugan’s temple carrying a kavadi, a decorated arch on their shoulders, often covered in peacock feathers. Some carry pots of milk on their heads. A few even pierce their cheeks or skin with small silver spears, which they say they barely feel because their mind is fixed on the god."]],"art":"At dusk a devotee carries a kavadi fanned with peacock feathers and hung with bells, while others climb the lamplit steps to the hill temple."},
-  "LGBT+ History Month": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"This month","short":"A month for remembering LGBT+ people and their history, held every February in the UK since 2005.","full":[["What is it?","A month of remembering LGBT+ lives and history, held every February in the UK. It was started here in 2005, soon after Section 28 was scrapped. That was a law that stopped schools from talking about gay people as if they were a normal part of life."],["What happens","Schools, libraries and museums hold talks and displays, and each year has a theme. It is a chance to learn about LGBT+ people from history: scientists like Alan Turing, who helped crack secret codes in the Second World War, writers, sports stars and campaigners."]],"art":"The Progress flag flies over a brick terrace at dusk, its colours painted across the crossing below."},
+  "LGBT+ History Month": {"src":"Observance","tier":"festive","scene":"pride","v":"history","bg":"#1A1426","eyebrow":"This month","short":"A month for remembering LGBT+ people and their history, held every February in the UK since 2005.","full":[["What is it?","A month of remembering LGBT+ lives and history, held every February in the UK. It was started here in 2005, soon after Section 28 was scrapped. That was a law that stopped schools from talking about gay people as if they were a normal part of life."],["What happens","Schools, libraries and museums hold talks and displays, and each year has a theme. It is a chance to learn about LGBT+ people from history: scientists like Alan Turing, who helped crack secret codes in the Second World War, writers, sports stars and campaigners."]],"art":"On a snowy evening in the archive, a rainbow ribbon marks the page of an open book beneath the lamp, beside an old photograph of a march."},
   "International Day of Women and Girls in Science": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"United Nations day","short":"A United Nations day for the women and girls doing science, and for asking why so many are still put off it.","full":[["","A United Nations day, started in 2016, for the women and girls doing science, and for asking why so many are still put off it. Only about a third of the world’s scientists are women. Scientists like Rosalind Franklin, whose X-ray photograph helped show the shape of DNA, often went without credit in their own lifetimes."]]},
   "Valentine’s Day": {"src":"UK","tier":"festive","scene":"valentine","bg":"#5A0E2A","eyebrow":"Celebrating","short":"A day for love and friendship: cards, flowers, and sometimes a secret admirer who doesn’t sign their name.","full":[["Who was Valentine?","Saint Valentine was a Christian priest in Rome about 1,700 years ago. Very little is known for certain about him, though there are stories that he helped couples marry in secret. About 600 years ago the English poet Geoffrey Chaucer wrote that birds choose their partners on Saint Valentine’s Day, and from then on the day was linked with love."],["What happens","People send cards, flowers and chocolates to someone they love. In Victorian times millions of cards were sent, often with no name inside, so the person had to guess who it was from. Lots of people send them to friends and family too. Hearts stand for love, and Cupid, the Roman god of love, is said to make people fall in love with a shot from his bow."]],"art":"A big heart beats, Cupid’s arrow flies through it, and little hearts float up."},
   "Pancake Day": {"src":"UK","tier":"festive","scene":"pancake","bg":"#4A2810","eyebrow":"Shrove Tuesday","short":"The last treat before Lent: pancakes for tea, lemon and sugar, and races with frying pans.","full":[["Why pancakes?","Pancake Day is the Tuesday before Lent, the forty days when many Christians give something up to get ready for Easter. Long ago that meant no eggs, butter or rich food, so on the last day before Lent people used them all up, and pancakes were the perfect way. It is called Shrove Tuesday because people went to church to be “shriven”: to say sorry and be forgiven."],["What happens","Everyone makes pancakes and tries to flip them, with lemon and sugar the British favourite. In Olney, in Buckinghamshire, people have run a pancake race since 1445, tossing pancakes in frying pans as they run. The story is that a woman heard the church bell while cooking and ran there still holding her pan. Pancake Day moves every year, because it is always 47 days before Easter."]],"art":"A pancake is flipped high out of the pan and lands the other side up, beside a stack with lemon and sugar."},
@@ -12282,7 +12475,7 @@ const FEST_TABLE = {
   "Akshaya Tritiya": {"src":"Hindu","tier":"festive","scene":"gold","bg":"#3A2205","eyebrow":"Celebrating","short":"The luckiest day of the year, when whatever you start is said to keep growing. Many people buy a little gold.","full":[["What is it?","Akshaya means “never-ending”, and this is thought to be the luckiest day of the whole year: whatever you begin today is said to keep growing. Stories say it is the day the river Ganga came down to Earth, and the day the sage Vyasa began the Mahabharata, with Ganesha writing it down for him."],["What happens","Lots of people buy gold today, even a tiny coin, so jewellery shops are packed. It is a popular day to start a business, move house, get married or begin learning something. Many also give food, water or clothes to people who need them, since a kindness done today is said to keep giving too."]],"art":"Gold coins tumble, turning, into a brass pot already heaped with them, while a lamp burns and a tulsi seedling grows beside it."},
   "Early May bank holiday": {"src":"UK","tier":"quiet","motif":"flower","eyebrow":"Bank holiday","short":"A day off that grew out of May Day, with maypoles, May Queens and Morris dancers.","full":[["","The first Monday in May is a bank holiday that grew out of May Day, an ancient spring festival. Villages would crown a May Queen and dance round a maypole, weaving its coloured ribbons together, while Morris dancers with bells on their legs waved hankies and clashed sticks. 1 May is also International Workers’ Day in many countries. The UK holiday was first added in 1978."]]},
   "Savitri Pooja": {"src":"Hindu","tier":"festive","scene":"banyan","bg":"#22361C","eyebrow":"Celebrating","short":"Married women wind thread round a banyan tree, remembering Savitri, who argued with death and won.","full":[["The story","Savitri’s husband Satyavan was told he would die within a year. When Yama, the god of death, came to take him, Savitri followed and would not turn back. She talked to Yama so cleverly and so politely that he offered her any wish except her husband’s life. She asked to have children with Satyavan, and Yama, caught by his own promise, had to give him back."],["What happens","Married women, especially in Odisha, Bihar and Maharashtra, fast and pray for their husbands’ long lives. They gather at a banyan tree, which can live for hundreds of years, and walk around it winding a red or yellow thread round its trunk while the story of Savitri is told."]],"art":"Roots sway from an old banyan as red and yellow thread winds round its trunk, with offerings at its foot."},
-  "IDAHOBIT": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"Observance","short":"The International Day Against Homophobia, Biphobia and Transphobia, on the date in 1990 the WHO stopped calling being gay an illness.","full":[["What is it?","The International Day Against Homophobia, Biphobia and Transphobia. It is held on 17 May because on that date in 1990 the World Health Organization stopped calling being gay an illness. It began in 2004."],["Why it matters","In more than sixty countries it is still against the law to be gay, and in many more LGBT+ people are bullied or treated unfairly. The day is about changing that, with events, flags on town halls and campaigns around the world."]],"art":"The Progress flag flies over a brick terrace at dusk, its colours painted across the crossing below."},
+  "IDAHOBIT": {"src":"Observance","tier":"festive","scene":"pride","v":"idahobit","bg":"#1A1426","eyebrow":"Observance","short":"The International Day Against Homophobia, Biphobia and Transphobia, on the date in 1990 the WHO stopped calling being gay an illness.","full":[["What is it?","The International Day Against Homophobia, Biphobia and Transphobia. It is held on 17 May because on that date in 1990 the World Health Organization stopped calling being gay an illness. It began in 2004."],["Why it matters","In more than sixty countries it is still against the law to be gay, and in many more LGBT+ people are bullied or treated unfairly. The day is about changing that, with events, flags on town halls and campaigns around the world."]],"art":"A city bridge glows in the rainbow on a spring night, its colours rippling in the river as people cross with a banner and blossom falls."},
   "Spring bank holiday": {"src":"UK","tier":"quiet","motif":"sun","eyebrow":"Bank holiday","short":"The last Monday in May, often the first warm weekend, and the day people chase a cheese down a hill in Gloucestershire.","full":[["","The last Monday in May. It replaced Whit Monday, a holiday that moved around with Easter, in 1971, and is often the first warm weekend of the year. It has some odd traditions: at Cooper’s Hill in Gloucestershire, people chase a big round cheese down a hill so steep that most of them fall over, and the winner keeps the cheese."]]},
   "Pride Month": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"This month","short":"A month for LGBT+ people and everyone who supports them, held in June because of the Stonewall riots in 1969.","full":[["Why June?","Pride Month is for LGBT+ people (lesbian, gay, bisexual, trans and more) and for everyone who supports them. It is held in June because of the Stonewall riots in New York in June 1969. Police often raided bars where gay people met, and one night the people at the Stonewall Inn fought back. Pride began as a protest about being treated fairly, not as a party."],["What happens","Today there are marches and parades in cities all over the world, with music, costumes and a lot of rainbow. The flag on this card is the Progress flag: the rainbow, with extra stripes added for trans people and for Black people and people of colour."]],"art":"The Progress flag flies over a brick terrace at dusk, its colours painted across the crossing below."},
   "Father’s Day": {"src":"UK","tier":"festive","scene":"fathers","bg":"#1F3C74","eyebrow":"Celebrating","short":"A day to thank dads, and anyone like a dad to you. Cards, presents, and time together.","full":[["Where it comes from","Father’s Day began in America over a hundred years ago. A woman called Sonora Smart Dodd and her five brothers had been brought up by their father after their mother died. She heard a church sermon about Mother’s Day and thought dads deserved a day too. The first one was held in 1910, and it came to Britain much later. It is always the third Sunday in June."],["What happens","People give their dads cards and presents, make them a special breakfast, or spend the day doing something together: a walk, a game, a trip somewhere. It is for anyone who cares for you like a dad: grandads, stepdads, uncles and carers too."]],"art":"At sunset, a parent and child fly a kite together from the top of a hill."},
