@@ -65,6 +65,9 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
     ganesh3: "2026-09-16T09:00:00", advent12: "2026-12-12T09:00:00", advent16: "2026-12-16T09:00:00",
     christmas: "2026-12-25T09:00:00", bhm: "2026-10-27T09:00:00", nothing: "2026-09-30T09:00:00",
     holi: "2026-03-04T09:00:00",
+    bonfire: "2026-11-05T09:00:00", xmaseve: "2026-12-24T09:00:00", nye: "2026-12-31T09:00:00",
+    pancake: "2026-02-17T09:00:00", mothers: "2026-03-15T09:00:00", easter27: "2027-03-28T09:00:00",
+    fathers: "2026-06-21T09:00:00", remember: "2026-11-08T09:00:00", remember29: "2029-11-11T09:00:00",
   };
   await page.evaluate(({ dates, hindu, uk }) => {
     const hass = {
@@ -304,6 +307,15 @@ const asEvents = (rows) => rows.map(([d, summary]) => {
   check("Ganesh Chaturthi runs ten days", r.ganesh3.name === "Ganesh Chaturthi" && r.ganesh3.when.startsWith("Day 3 of 10"), r.ganesh3);
   check("Advent counts its doors", r.advent12.name === "Advent" && r.advent12.when.startsWith("Door 12 of 24") && r.advent12.when.includes("13 sleeps"), r.advent12);
   check("Advent leads over a small day inside it", r.advent16.name === "Advent" && r.advent16.also.includes("Dhanu Sankranti"), r.advent16);
+  check("Bonfire Night, from the date alone, drawn as a scene", r.bonfire.name === "Bonfire Night" && r.bonfire.scene, r.bonfire);
+  check("Christmas Eve leads, with Advent's last door beside it", r.xmaseve.name === "Christmas Eve" && r.xmaseve.also.includes("Advent"), r.xmaseve);
+  check("New Year's Eve", r.nye.name === "New Year’s Eve" && r.nye.scene, r.nye);
+  check("Pancake Day is 47 days before Easter", r.pancake.name === "Pancake Day", r.pancake);
+  check("Mother's Day is three weeks before Easter", r.mothers.name === "Mother’s Day", r.mothers);
+  check("Easter Sunday moves with the moon: 28 March in 2027", r.easter27.name === "Easter Sunday", r.easter27);
+  check("Father's Day is the third Sunday in June", r.fathers.name === "Father’s Day", r.fathers);
+  check("Remembrance Sunday shares its day with Diwali", [r.remember.name, r.remember.also].join(" ").includes("Remembrance Sunday") && [r.remember.name, r.remember.also].join(" ").includes("Diwali"), r.remember);
+  check("on the 11th itself, Remembrance Sunday and no second Armistice Day", r.remember29.name === "Remembrance Sunday" && !r.remember29.also.includes("Armistice"), r.remember29);
   check("Christmas Day, and no Advent", r.christmas.name === "Christmas Day" && !r.christmas.also.includes("Advent"), r.christmas);
   check("a single day says nothing about days", r.holi.name === "Holi" && r.holi.when === "" && r.holi.pips === 0, r.holi);
   check("a month-long observance on its own is the plain card", r.bhm.quiet && r.bhm.name === "Black History Month" && r.bhm.when.startsWith("Day 27 of 31"), r.bhm);

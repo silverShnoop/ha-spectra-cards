@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.193.0";
+const VERSION = "0.194.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -7762,7 +7762,953 @@ const FEST_SCENES = (() => {
       };
     },
   };
-  Object.assign(SCENES, MORE);
+  /* ---------- The UK's own days ----------
+     Each keeps its subject in the right-hand third, where the words are
+     not, and sizes it from u: the smaller of the height and a share of
+     the width, so a one-column card and a wall full screen both frame it. */
+  const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k);
+  const heartPath = (c, x, y, s) => {
+    c.beginPath(); c.moveTo(x, y + s);
+    c.bezierCurveTo(x - s * .35, y + s * .62, x - s * 1.2, y + s * .15, x - s * 1.12, y - s * .38);
+    c.bezierCurveTo(x - s * 1.02, y - s * 1.02, x - s * .22, y - s * 1.08, x, y - s * .5);
+    c.bezierCurveTo(x + s * .22, y - s * 1.08, x + s * 1.02, y - s * 1.02, x + s * 1.12, y - s * .38);
+    c.bezierCurveTo(x + s * 1.2, y + s * .15, x + s * .35, y + s * .62, x, y + s);
+    c.closePath(); };
+  const cloud = (c, x, y, s, a = .9) => { c.fillStyle = `rgba(255,255,255,${a})`; c.beginPath();
+    [[0, 0, 1], [.95, .2, .72], [-.95, .25, .66], [.45, -.42, .74], [-.42, -.3, .62]].forEach(([dx, dy, r]) => {
+      c.moveTo(x + dx * s + r * s, y + dy * s); c.arc(x + dx * s, y + dy * s, r * s, 0, TAU); });
+    c.fill(); };
+  const glowFlat = (c, x, y, r, k, col, a) => { c.save(); c.translate(x, y); c.scale(1, k); glow(c, 0, 0, r, col, a); c.restore(); };
+  const mkClouds = n => Array.from({ length: n }, () => ({ x: rnd(), y: .08 + rnd() * .3, s: .5 + rnd() * .6, v: .004 + rnd() * .008 }));
+  const clouds = (c, w, h, u, dt, C, a = .85) => C.forEach(k => { k.x += k.v * dt; if (k.x > 1.25) k.x = -.25;
+    cloud(c, k.x * w, k.y * h, u * .09 * k.s, a); });
+  const mkBlades = (n, x0 = 0) => Array.from({ length: n }, () => ({ x: x0 + rnd() * (1 - x0), l: .4 + rnd() * .6, p: rnd() * TAU }));
+  const blades = (c, w, y, len, t, B, col, wind = 1) => { c.strokeStyle = col; c.lineWidth = 1.4; c.lineCap = "round";
+    c.beginPath(); B.forEach(b => { const x = b.x * w, L = len * b.l, bend = (Math.sin(t * 1.6 + b.p + b.x * 4) * .5 + .4) * wind * L * .35;
+      c.moveTo(x, y); c.quadraticCurveTo(x + bend * .3, y - L * .6, x + bend, y - L); }); c.stroke(); };
+
+  /* A flag painted once, flat, then drawn in strips that ripple. */
+  const FLAGS = {};
+  const flagImg = (name, paint) => {
+    if (FLAGS[name]) return FLAGS[name];
+    if (typeof document === "undefined") return null;
+    const o = document.createElement("canvas"); o.width = 500; o.height = 300;
+    paint(o.getContext("2d"), 500, 300); return (FLAGS[name] = o); };
+  const waveFlag = (c, img, x, y, fw, fh, t, amp = .07, speed = 3.2) => {
+    if (!img) return;
+    const n = Math.max(24, Math.min(100, Math.round(fw / 3))), sw = img.width / n, dw = fw / n;
+    for (let i = 0; i < n; i++) {
+      const k = i / n, ph = k * 5.2 - t * speed, a = .12 + k * .88;
+      const off = Math.sin(ph) * fh * amp * a + k * k * fh * .06, dx = x + i * dw;
+      c.drawImage(img, i * sw, 0, sw, img.height, dx, y + off, dw + .9, fh * (1 - k * .04));
+      const sh = Math.cos(ph) * a;
+      c.fillStyle = sh > 0 ? `rgba(255,255,255,${(sh * .16).toFixed(3)})` : `rgba(0,0,0,${(-sh * .32).toFixed(3)})`;
+      c.fillRect(dx, y + off, dw + .5, fh * (1 - k * .04));
+    } };
+  const pole = (c, x, top, foot, u) => {
+    const g = c.createLinearGradient(x - u * .012, 0, x + u * .012, 0);
+    g.addColorStop(0, "#5A5A62"); g.addColorStop(.5, "#D8D8DE"); g.addColorStop(1, "#4A4A52");
+    c.fillStyle = g; c.fillRect(x - u * .008, top, u * .016, foot - top);
+    c.fillStyle = "#E8C45A"; c.beginPath(); c.arc(x, top, u * .016, 0, TAU); c.fill(); };
+
+  /* The red dragon of Wales, passant, in a 120 x 90 box about its middle. */
+  function welshDragon(c, x, y, s) {
+    c.save(); c.translate(x, y); c.scale(s / 90, s / 90); c.fillStyle = "#D30731"; c.strokeStyle = "#D30731";
+    c.lineJoin = "round"; c.lineCap = "round";
+    // tail, up over the back to an arrow
+    c.lineWidth = 6; c.beginPath(); c.moveTo(22, 8); c.bezierCurveTo(46, 14, 52, -10, 40, -20); c.bezierCurveTo(32, -27, 40, -36, 50, -34); c.stroke();
+    c.beginPath(); c.moveTo(50, -42); c.lineTo(60, -33); c.lineTo(47, -28); c.closePath(); c.fill();
+    // wings
+    c.beginPath(); c.moveTo(-6, -4); c.lineTo(-14, -40); c.quadraticCurveTo(-8, -34, -4, -38); c.quadraticCurveTo(0, -30, 6, -42);
+    c.quadraticCurveTo(10, -32, 16, -40); c.quadraticCurveTo(18, -28, 26, -34); c.lineTo(14, -4); c.closePath(); c.fill();
+    // body
+    c.beginPath(); c.ellipse(4, 4, 24, 11, -.05, 0, TAU); c.fill();
+    // neck and head, looking forward with jaw open
+    c.lineWidth = 11; c.beginPath(); c.moveTo(-14, 0); c.quadraticCurveTo(-26, -8, -28, -22); c.stroke();
+    c.beginPath(); c.moveTo(-24, -30); c.lineTo(-44, -28); c.lineTo(-36, -24); c.lineTo(-46, -20); c.lineTo(-30, -16); c.lineTo(-22, -20); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(-26, -30); c.lineTo(-22, -38); c.lineTo(-20, -29); c.fill();
+    c.lineWidth = 1.6; c.beginPath(); c.moveTo(-44, -24); c.lineTo(-54, -25); c.moveTo(-54, -25); c.lineTo(-57, -28); c.moveTo(-54, -25); c.lineTo(-57, -22); c.stroke();
+    // legs: one forefoot raised
+    c.lineWidth = 6;
+    [[-14, 10, -26, 4, -32, -4], [-6, 12, -8, 24, -14, 30], [14, 12, 16, 24, 10, 30], [22, 10, 28, 22, 24, 30]].forEach(([a, b, d, e, f, g]) => {
+      c.beginPath(); c.moveTo(a, b); c.quadraticCurveTo(d, e, f, g); c.stroke(); });
+    c.restore(); }
+
+  /* Piper, facing left, the drones over his shoulder. 100 units tall. */
+  function drawPiper(c, x, y, s, t) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    const K = "#05061A"; c.fillStyle = K; c.strokeStyle = K; c.lineCap = "round"; c.lineJoin = "round";
+    c.fillRect(-7, -27, 5, 26); c.fillRect(2, -27, 5, 26);
+    c.beginPath(); c.ellipse(-7, -1.5, 5.5, 2.4, 0, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(4, -1.5, 5.5, 2.4, 0, 0, TAU); c.fill();
+    const sw = Math.sin(t * 2.2) * 1.4;
+    c.fillStyle = "#2B0A1A";
+    c.beginPath(); c.moveTo(-10, -51); c.lineTo(10, -51); c.lineTo(13 + sw, -27); c.lineTo(-13 + sw, -27); c.closePath(); c.fill();
+    c.save(); c.clip(); c.strokeStyle = "rgba(255,190,120,.18)"; c.lineWidth = 1;
+    for (let k = -14; k <= 14; k += 4) { c.beginPath(); c.moveTo(k + sw * .5, -51); c.lineTo(k * 1.2 + sw, -27); c.stroke(); }
+    for (let k = -48; k <= -28; k += 5) { c.beginPath(); c.moveTo(-15, k); c.lineTo(15, k); c.stroke(); }
+    c.restore(); c.fillStyle = K;
+    c.beginPath(); c.moveTo(-9, -79); c.lineTo(9, -79); c.lineTo(10, -49); c.lineTo(-10, -49); c.closePath(); c.fill();
+    c.beginPath(); c.ellipse(-2, -46, 4, 5, 0, 0, TAU); c.fillStyle = "#C9C2B0"; c.fill(); c.fillStyle = K;
+    c.beginPath(); c.arc(-2, -86, 6.5, 0, TAU); c.fill();
+    c.beginPath(); c.moveTo(-9, -88); c.quadraticCurveTo(-10, -107, -1, -109); c.quadraticCurveTo(8, -107, 6, -88); c.closePath(); c.fill();
+    // drones, each with a ribbon that lifts in the wind
+    c.lineWidth = 2.6;
+    [[8, -72, 32, -120], [7, -72, 26, -114], [6, -72, 20, -108]].forEach(([a, b, d, e], i) => {
+      c.strokeStyle = K; c.beginPath(); c.moveTo(a, b); c.lineTo(d, e); c.stroke();
+      c.fillStyle = "#C9C2B0"; c.beginPath(); c.arc(d, e, 2.4, 0, TAU); c.fill();
+      if (i === 0) { c.strokeStyle = "#8C1C2C"; c.lineWidth = 2; c.beginPath(); c.moveTo(d - 6, e + 10);
+        for (let k = 1; k <= 5; k++) c.lineTo(d - 6 + k * 4, e + 10 + Math.sin(t * 4 + k) * 2.5 + k * 1.2); c.stroke(); c.lineWidth = 2.6; } });
+    const puff = 1 + Math.sin(t * 3.1) * .07;
+    c.fillStyle = "#1C0A24"; c.beginPath(); c.ellipse(5, -63, 12 * puff, 8.5 * puff, -.35, 0, TAU); c.fill();
+    c.strokeStyle = K; c.lineWidth = 2; c.beginPath(); c.moveTo(1, -69); c.lineTo(-7, -83); c.stroke();
+    c.lineWidth = 2.4; c.beginPath(); c.moveTo(-5, -68); c.lineTo(-15, -42); c.stroke();
+    c.lineWidth = 3.6; c.beginPath(); c.moveTo(-6, -76); c.lineTo(-15, -62); c.lineTo(-11, -55); c.stroke();
+    c.beginPath(); c.moveTo(7, -76); c.lineTo(0, -61); c.lineTo(-14, -48); c.stroke();
+    c.restore(); }
+
+  function thistle(c, x, y, s, a) {
+    c.save(); c.translate(x, y); c.rotate(a);
+    c.strokeStyle = "#3E6B3A"; c.lineWidth = Math.max(1.5, s * .05); c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(s * .06, -s * .5, 0, -s); c.stroke();
+    c.fillStyle = "#4E7F45";
+    [-1, 1].forEach(d => { c.beginPath(); c.moveTo(0, -s * .35);
+      for (let k = 1; k <= 5; k++) c.lineTo(d * s * (.06 + k * .055), -s * (.35 + k * .05) + (k % 2 ? -s * .06 : s * .03));
+      c.lineTo(0, -s * .48); c.closePath(); c.fill(); });
+    c.translate(0, -s);
+    c.fillStyle = "#5C8C4E"; c.beginPath(); c.ellipse(0, 0, s * .12, s * .14, 0, 0, TAU); c.fill();
+    c.strokeStyle = "rgba(20,50,20,.55)"; c.lineWidth = 1;
+    for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(-s * .12, k * s * .05 - s * .05); c.lineTo(s * .12, k * s * .05 + s * .05); c.stroke(); }
+    c.strokeStyle = "#5C8C4E"; c.lineWidth = Math.max(1, s * .015);
+    for (let k = 0; k < 9; k++) { const q = Math.PI * .1 + k / 8 * Math.PI * .8; c.beginPath();
+      c.moveTo(Math.cos(q) * s * .1, Math.sin(q) * s * .1); c.lineTo(Math.cos(q) * s * .2, Math.sin(q) * s * .2); c.stroke(); }
+    c.lineWidth = Math.max(1.2, s * .022);
+    for (let k = 0; k < 17; k++) { const q = -Math.PI / 2 + (k / 16 - .5) * 1.7;
+      c.strokeStyle = k % 2 ? "#B067D6" : "#8A3FB8"; c.beginPath(); c.moveTo(Math.cos(q) * s * .05, -s * .1 + Math.sin(q) * s * .02);
+      c.lineTo(Math.cos(q) * s * .2, -s * .1 + Math.sin(q) * s * .2); c.stroke(); }
+    c.restore(); }
+
+  const noteGlyph = (c, x, y, s, rot) => { c.save(); c.translate(x, y); c.rotate(rot);
+    c.beginPath(); c.ellipse(0, 0, s * .55, s * .38, -.4, 0, TAU); c.fill();
+    c.fillRect(s * .42, -s * 2, s * .14, s * 2);
+    c.beginPath(); c.moveTo(s * .56, -s * 2); c.quadraticCurveTo(s * 1.3, -s * 1.5, s * 1.1, -s * .8); c.quadraticCurveTo(s * 1.1, -s * 1.4, s * .56, -s * 1.5); c.fill();
+    c.restore(); };
+
+  function tulip(c, x, y, s, a, col, open) {
+    c.save(); c.translate(x, y); c.rotate(a);
+    const g = c.createLinearGradient(-s, -s, s, s); g.addColorStop(0, col[0]); g.addColorStop(1, col[1]);
+    c.fillStyle = g; const o = s * (.55 + open * .25);
+    c.beginPath(); c.moveTo(-o, -s * .9); c.quadraticCurveTo(-s * .2, -s * .5, 0, -s * 1.05); c.quadraticCurveTo(s * .2, -s * .5, o, -s * .9);
+    c.quadraticCurveTo(s * .75, s * .35, 0, s * .45); c.quadraticCurveTo(-s * .75, s * .35, -o, -s * .9); c.fill();
+    c.strokeStyle = "rgba(0,0,0,.12)"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, s * .4); c.lineTo(0, -s * .8); c.stroke();
+    c.restore(); }
+
+  function shamrock(c, x, y, s, rot, flip, col = "#2FA84F") {
+    c.save(); c.translate(x, y); c.rotate(rot); c.scale(flip, 1);
+    c.fillStyle = col;
+    for (let k = 0; k < 3; k++) { c.save(); c.rotate(k * TAU / 3); heartPath(c, 0, -s * .5, s * .5); c.fill(); c.restore(); }
+    c.strokeStyle = col; c.lineWidth = Math.max(1, s * .14); c.lineCap = "round";
+    c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(s * .25, s * .6, s * .1, s * 1.05); c.stroke();
+    c.restore(); }
+
+  function penguin(c, x, y, s, t, i) {
+    c.save(); c.translate(x, y); c.scale(s, s); c.rotate(-.12);
+    const flap = Math.sin(t * 12 + i * 2);
+    c.fillStyle = "#111318";
+    c.save(); c.translate(-2, -2); c.rotate(-.6 - flap * .7); c.beginPath(); c.ellipse(0, -9, 3, 10, 0, 0, TAU); c.fill(); c.restore();
+    c.beginPath(); c.ellipse(0, 0, 18, 8, 0, 0, TAU); c.fill();
+    c.fillStyle = "#F4F4F0"; c.beginPath(); c.ellipse(1, 3, 14, 4.6, 0, 0, TAU); c.fill();
+    c.fillStyle = "#111318"; c.beginPath(); c.arc(-15, -2, 6, 0, TAU); c.fill();
+    c.fillStyle = "#F4B400"; c.beginPath(); c.moveTo(-20, -3); c.lineTo(-27, -1); c.lineTo(-20, 0); c.fill();
+    c.fillStyle = "#FFFFFF"; c.beginPath(); c.arc(-17, -4, 1.6, 0, TAU); c.fill();
+    c.fillStyle = "#F4B400"; c.beginPath(); c.ellipse(19, 2, 3.5, 1.6, .3, 0, TAU); c.fill();
+    c.fillStyle = "#1B1E26"; c.save(); c.translate(2, -1); c.rotate(.5 + flap * .8); c.beginPath(); c.ellipse(0, -9, 3, 10, 0, 0, TAU); c.fill(); c.restore();
+    c.restore(); }
+
+  /* An egg with a pattern, clipped to its shape. */
+  function egg(c, x, y, s, kind, cols, tilt) {
+    c.save(); c.translate(x, y); c.rotate(tilt);
+    const path = () => { c.beginPath(); c.moveTo(0, -s); c.bezierCurveTo(s * .72, -s, s * .82, s * .55, 0, s * .62);
+      c.bezierCurveTo(-s * .82, s * .55, -s * .72, -s, 0, -s); c.closePath(); };
+    path(); c.fillStyle = cols[0]; c.fill(); c.save(); c.clip();
+    if (kind === 0) { c.fillStyle = cols[1]; for (let k = -2; k <= 2; k++) c.fillRect(-s, k * s * .34 - s * .07, s * 2, s * .14); }
+    if (kind === 1) { c.strokeStyle = cols[1]; c.lineWidth = s * .12; c.beginPath();
+      for (let k = 0; k <= 8; k++) c.lineTo(-s + k * s * .25, -s * .05 + (k % 2 ? -1 : 1) * s * .14); c.stroke(); c.fillStyle = cols[2]; c.fillRect(-s, s * .3, s * 2, s * .1); c.fillRect(-s, -s * .45, s * 2, s * .1); }
+    if (kind === 2) { c.fillStyle = cols[1]; for (let k = 0; k < 14; k++) { c.beginPath(); c.arc(((k * 37) % 17 / 17 - .5) * s * 1.5, ((k * 23) % 19 / 19 - .55) * s * 1.6, s * .09, 0, TAU); c.fill(); } }
+    if (kind === 3) { c.fillStyle = cols[1]; c.fillRect(-s, -s * .2, s * 2, s * .4); c.fillStyle = cols[2];
+      for (let k = 0; k < 6; k++) { c.beginPath(); c.arc(-s * .75 + k * s * .3, 0, s * .08, 0, TAU); c.fill(); } }
+    const g = c.createRadialGradient(-s * .3, -s * .45, 0, 0, 0, s * 1.2); g.addColorStop(0, "rgba(255,255,255,.45)"); g.addColorStop(.4, "rgba(255,255,255,0)"); g.addColorStop(1, "rgba(0,0,0,.28)");
+    c.fillStyle = g; c.fillRect(-s, -s, s * 2, s * 2); c.restore();
+    c.restore(); }
+
+  function bunny(c, x, y, s, hop, dir) {
+    c.save(); c.translate(x, y); c.scale(s * dir, s);
+    c.fillStyle = "#E9E1D6";
+    const st = Math.sin(hop * Math.PI);
+    c.beginPath(); c.ellipse(4, -10 - st * 2, 13, 9 + st * 1.5, -.15 - st * .25, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(-9, -18 - st * 3, 6.5, 6, 0, 0, TAU); c.fill();
+    c.save(); c.translate(-9, -22 - st * 3); [-.25, .1].forEach(r => { c.save(); c.rotate(r - st * .3);
+      c.fillStyle = "#E9E1D6"; c.beginPath(); c.ellipse(0, -9, 2.6, 9, 0, 0, TAU); c.fill();
+      c.fillStyle = "#F2B7B7"; c.beginPath(); c.ellipse(0, -9, 1.2, 6.5, 0, 0, TAU); c.fill(); c.restore(); }); c.restore();
+    c.fillStyle = "#FFFFFF"; c.beginPath(); c.arc(17, -12 - st * 2, 3.5, 0, TAU); c.fill();
+    c.fillStyle = "#2A1A14"; c.beginPath(); c.arc(-12, -19 - st * 3, 1.1, 0, TAU); c.fill();
+    c.fillStyle = "#D7CBBC"; c.beginPath(); c.ellipse(10 + st * 5, -2, 7, 2.6, st * .5, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(-6 - st * 4, -2, 3, 2, 0, 0, TAU); c.fill();
+    c.restore(); }
+
+  /* A friendly green dragon in flight, facing right. */
+  function flyingDragon(c, x, y, s, t) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    const f = Math.sin(t * 7);
+    c.fillStyle = "#2E8B57"; c.strokeStyle = "#2E8B57"; c.lineCap = "round"; c.lineJoin = "round";
+    c.save(); c.translate(-2, -4); c.scale(1, f * .9); c.fillStyle = "#1F6B43";
+    c.beginPath(); c.moveTo(-10, 0); c.lineTo(-4, -26); c.quadraticCurveTo(0, -18, 4, -22); c.quadraticCurveTo(7, -14, 12, -16); c.lineTo(10, 0); c.closePath(); c.fill(); c.restore();
+    c.lineWidth = 5; c.beginPath(); c.moveTo(-14, 0); c.bezierCurveTo(-26, 2, -32, -6, -42, -2); c.stroke();
+    c.beginPath(); c.moveTo(-42, -2); c.lineTo(-48, -7); c.lineTo(-47, 2); c.closePath(); c.fill();
+    c.beginPath(); c.ellipse(0, 0, 16, 6.5, -.05, 0, TAU); c.fill();
+    c.lineWidth = 5.5; c.beginPath(); c.moveTo(12, -2); c.quadraticCurveTo(20, -6, 22, -12); c.stroke();
+    c.beginPath(); c.ellipse(26, -13, 7, 4.2, .15, 0, TAU); c.fill();
+    c.fillStyle = "#F4C04E"; c.beginPath(); c.moveTo(22, -16); c.lineTo(20, -22); c.lineTo(25, -17); c.fill();
+    c.fillStyle = "#fff"; c.beginPath(); c.arc(27, -14.5, 1.6, 0, TAU); c.fill(); c.fillStyle = "#111"; c.beginPath(); c.arc(27.5, -14.5, .8, 0, TAU); c.fill();
+    c.fillStyle = "#9BE38B"; c.beginPath(); c.ellipse(1, 2.5, 11, 2.6, 0, 0, TAU); c.fill();
+    c.strokeStyle = "#2E8B57"; c.lineWidth = 2.5; [[-6, 5, -10, 11], [8, 5, 6, 11]].forEach(([a, b, d, e]) => { c.beginPath(); c.moveTo(a, b); c.lineTo(d, e); c.stroke(); });
+    c.save(); c.translate(0, -4); c.scale(1, -f); c.fillStyle = "#3FA86B";
+    c.beginPath(); c.moveTo(-8, 0); c.lineTo(-2, 28); c.quadraticCurveTo(2, 20, 6, 24); c.quadraticCurveTo(9, 16, 14, 18); c.lineTo(10, 0); c.closePath(); c.fill(); c.restore();
+    c.restore(); }
+
+  function bat(c, x, y, s, t, i) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    const f = Math.sin(t * 16 + i * 1.7);
+    c.fillStyle = "#0A0410";
+    [-1, 1].forEach(d => { c.save(); c.scale(d, 1); c.beginPath(); c.moveTo(2, 0);
+      c.quadraticCurveTo(8, -6 - f * 6, 16, -4 - f * 9); c.quadraticCurveTo(14, 0 - f * 4, 15, 2 - f * 3);
+      c.quadraticCurveTo(11, 0, 9, 3); c.quadraticCurveTo(6, 1, 2, 3); c.closePath(); c.fill(); c.restore(); });
+    c.beginPath(); c.ellipse(0, 1, 3, 4, 0, 0, TAU); c.fill();
+    c.beginPath(); c.moveTo(-2.4, -2); c.lineTo(-2, -5.5); c.lineTo(-.6, -2.6); c.moveTo(2.4, -2); c.lineTo(2, -5.5); c.lineTo(.6, -2.6); c.fill();
+    c.restore(); }
+
+  function pumpkin(c, x, y, s, t, i) {
+    const fl = .78 + .22 * Math.sin(t * 9 + i) * Math.sin(t * 4.3 + i * 2);
+    glow(c, x, y - s * .2, s * 1.9, "#FF8A1A", .34 * fl);
+    c.save(); c.translate(x, y);
+    const ribs = [[-.62, .5], [-.32, .62], [0, .66], [.32, .62], [.62, .5]];
+    ribs.forEach(([dx, rx], k) => { const g = c.createRadialGradient(dx * s - s * .1, -s * .2, s * .05, dx * s, 0, s * rx * 1.2);
+      g.addColorStop(0, "#FFA640"); g.addColorStop(1, k % 2 ? "#C2560C" : "#D9670F");
+      c.fillStyle = g; c.beginPath(); c.ellipse(dx * s, 0, s * rx * .62, s * .62, 0, 0, TAU); c.fill(); });
+    c.fillStyle = "#4A6B2A"; c.beginPath(); c.moveTo(-s * .06, -s * .58); c.quadraticCurveTo(-s * .02, -s * .85, s * .14, -s * .9); c.lineTo(s * .1, -s * .78); c.quadraticCurveTo(s * .04, -s * .7, s * .06, -s * .58); c.fill();
+    const face = () => { c.beginPath();
+      c.moveTo(-s * .4, -s * .12); c.lineTo(-s * .18, -s * .12); c.lineTo(-s * .29, -s * .34); c.closePath();
+      c.moveTo(s * .4, -s * .12); c.lineTo(s * .18, -s * .12); c.lineTo(s * .29, -s * .34); c.closePath();
+      c.moveTo(-s * .06, -s * .02); c.lineTo(s * .06, -s * .02); c.lineTo(0, -s * .12); c.closePath();
+      c.moveTo(-s * .45, s * .1); c.quadraticCurveTo(0, s * .45, s * .45, s * .1); c.lineTo(s * .3, s * .14); c.lineTo(s * .22, s * .06);
+      c.lineTo(s * .12, s * .2); c.lineTo(0, s * .12); c.lineTo(-s * .12, s * .2); c.lineTo(-s * .22, s * .06); c.lineTo(-s * .3, s * .14); c.closePath(); };
+    face(); c.fillStyle = `rgb(${Math.round(255)},${Math.round(170 + 60 * fl)},${Math.round(40 + 50 * fl)})`; c.fill();
+    c.save(); face(); c.clip(); glow(c, 0, 0, s * .6, "#FFF4B0", .7 * fl); c.restore();
+    c.restore(); }
+
+  function ghost(c, x, y, s, t, a) {
+    c.save(); c.translate(x, y); c.globalAlpha = a;
+    glow(c, 0, 0, s * 1.6, "#CFE8FF", .25);
+    c.fillStyle = "rgba(236,244,255,.92)"; c.beginPath(); c.moveTo(-s * .6, s * .2); c.bezierCurveTo(-s * .65, -s * 1.05, s * .65, -s * 1.05, s * .6, s * .2);
+    for (let k = 0; k <= 6; k++) { const px = s * .6 - k * s * .2; c.lineTo(px, s * .55 + Math.sin(t * 5 + k * 1.3) * s * .1 + (k % 2 ? s * .12 : 0)); }
+    c.closePath(); c.fill();
+    c.fillStyle = "#1A1030"; c.beginPath(); c.ellipse(-s * .2, -s * .3, s * .09, s * .14, 0, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(s * .2, -s * .3, s * .09, s * .14, 0, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(0, -s * .02, s * .1, s * .13 + Math.sin(t * 3) * s * .03, 0, 0, TAU); c.fill();
+    c.restore(); }
+
+  function poppy(c, x, y, s, a) {
+    c.save(); c.translate(x, y); c.rotate(a);
+    [[-.38, -.08], [.38, -.08], [-.22, -.4], [.22, -.4]].forEach(([dx, dy], k) => {
+      const g = c.createRadialGradient(0, 0, s * .1, dx * s, dy * s, s * .62);
+      g.addColorStop(0, "#7A0710"); g.addColorStop(.35, "#D0121F"); g.addColorStop(1, k < 2 ? "#E8323C" : "#F04650");
+      c.fillStyle = g; c.beginPath(); c.ellipse(dx * s, dy * s, s * .48, s * .42, dx * 1.2, 0, TAU); c.fill(); });
+    c.fillStyle = "#14110F"; c.beginPath(); c.arc(0, -s * .16, s * .16, 0, TAU); c.fill();
+    c.fillStyle = "#3A3420"; for (let k = 0; k < 8; k++) { const q = k / 8 * TAU; c.beginPath(); c.arc(Math.cos(q) * s * .2, -s * .16 + Math.sin(q) * s * .2, s * .03, 0, TAU); c.fill(); }
+    c.restore(); }
+
+  /* A fire as tongues of flame: red outside, gold in the heart, each
+     tongue swaying and reaching on its own beat. */
+  function flames(c, x, y, wd, ht, t) {
+    const N = 9;
+    glow(c, x, y - ht * .35, ht * 1.6, "#FF7A1A", .45 + .08 * Math.sin(t * 7));
+    c.globalCompositeOperation = "lighter";
+    [["rgba(220,60,20,.75)", 1, 1], ["rgba(255,140,30,.7)", .8, .78], ["rgba(255,220,110,.75)", .55, .52]].forEach(([col, kw, kh], pass) => {
+      c.fillStyle = col;
+      for (let i = 0; i < N; i++) {
+        const q = i / (N - 1) - .5, edge = 1 - Math.abs(q) * 1.5;
+        const bx = x + q * wd * kw, bw = wd * kw / N * 1.15;
+        const fh = ht * kh * edge * (.72 + .28 * Math.sin(t * 7.3 + i * 2.3 + pass) * Math.sin(t * 3.1 + i * 1.1));
+        const tip = bx + Math.sin(t * 4.7 + i * 1.7 + pass * .6) * bw * 1.1;
+        c.beginPath(); c.moveTo(bx - bw, y);
+        c.bezierCurveTo(bx - bw * 1.25, y - fh * .45, tip - bw * .3, y - fh * .7, tip, y - fh);
+        c.bezierCurveTo(tip + bw * .3, y - fh * .7, bx + bw * 1.25, y - fh * .45, bx + bw, y);
+        c.closePath(); c.fill(); } });
+    c.globalCompositeOperation = "source-over"; }
+
+  /* The burst of a firework, richer than the generic one: trails, glitter
+     and, for a willow, gold that hangs and falls. */
+  const mkSky = () => ({ rockets: [], sparks: [], next: .2 });
+  function skyFire(st, c, w, h, dt, cols, rate, x0, x1, top = .1, bot = .42) {
+    let force = st.force || 0; st.force = 0;
+    st.next -= dt * rate;
+    while (force > 0 || st.next <= 0) {
+      if (force > 0) force -= 1; else st.next += .55 + rnd() * .9;
+      const kind = rnd() < .3 ? "willow" : rnd() < .5 ? "ring" : "peony";
+      st.rockets.push({ x: w * (x0 + rnd() * (x1 - x0)), y: h, px: 0, py: 0, vx: (rnd() - .5) * w * .03, vy: -h * (1.05 + rnd() * .3), ty: h * (top + rnd() * (bot - top)), col: cols[Math.floor(rnd() * cols.length)], col2: cols[Math.floor(rnd() * cols.length)], kind });
+      if (st.next > 0 && force <= 0) break; }
+    c.globalCompositeOperation = "lighter";
+    st.rockets = st.rockets.filter(r => { r.px = r.x; r.py = r.y; r.x += r.vx * dt; r.y += r.vy * dt; r.vy += h * .25 * dt;
+      c.strokeStyle = "rgba(255,220,170,.85)"; c.lineWidth = 1.6; c.beginPath(); c.moveTo(r.x, r.y); c.lineTo(r.x - r.vx * .04, r.y - r.vy * .04); c.stroke();
+      if (Math.random() < .7) st.sparks.push({ x: r.x, y: r.y + 2, vx: (rnd() - .5) * 20, vy: 20, life: .35, col: "#FFC870", g: .3, d: 1.5, tw: 0 });
+      if (r.y <= r.ty) { const n = r.kind === "willow" ? 60 : 72, sp = Math.min(h * 1.1, w * .5) * (r.kind === "willow" ? .32 : .42);
+        for (let i = 0; i < n; i++) { const a = i / n * TAU + rnd() * .05, v = sp * (r.kind === "ring" ? 1 : .55 + rnd() * .45);
+          st.sparks.push({ x: r.x, y: r.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: r.kind === "willow" ? 2.4 : 1.4 + rnd() * .4,
+            col: r.kind === "willow" ? "#FFC85A" : (i % 2 ? r.col : r.col2), g: r.kind === "willow" ? .55 : .35, d: r.kind === "willow" ? 2.4 : 1.6, tw: rnd() < .2 ? rnd() * TAU : -1 }); }
+        st.flash = Math.max(st.flash || 0, .5); return false; }
+      return true; });
+    st.sparks = st.sparks.filter(s => { const ox = s.x, oy = s.y;
+      s.vy += h * s.g * dt; const drag = Math.pow(.2, dt * s.d); s.vx *= drag; s.vy *= drag; s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt * .75;
+      const L = Math.max(0, Math.min(1, s.life)); if (s.tw >= 0 && s.life < .8 && Math.sin(s.life * 40 + s.tw) > .3) return s.life > 0;
+      c.strokeStyle = s.col; c.globalAlpha = L; c.lineWidth = Math.max(2.2, Math.min(w, h) * .004); c.beginPath(); c.moveTo(ox - (s.x - ox) * 1.5, oy - (s.y - oy) * 1.5); c.lineTo(s.x, s.y); c.stroke();
+      if (L > .5) { c.fillStyle = "#FFFFFF"; c.globalAlpha = (L - .5) * 1.6; c.fillRect(s.x - 1, s.y - 1, 2, 2); }
+      return s.life > 0; });
+    c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+    st.flash = Math.max(0, (st.flash || 0) - dt * 1.6); }
+
+  function cottage(c, x, foot, s, t) {
+    const W = s, H = s * .55;
+    c.fillStyle = "#3A2A2E"; c.fillRect(x - W / 2, foot - H, W, H);
+    c.fillStyle = "#2A1E22"; c.fillRect(x + W * .22, foot - H - s * .38, s * .12, s * .3);
+    c.fillStyle = "#4A2F2A"; c.beginPath(); c.moveTo(x - W * .6, foot - H); c.lineTo(x, foot - H - s * .42); c.lineTo(x + W * .6, foot - H); c.closePath(); c.fill();
+    c.fillStyle = "#F2F6FF"; c.beginPath(); c.moveTo(x - W * .62, foot - H + 2); c.lineTo(x, foot - H - s * .44); c.lineTo(x + W * .62, foot - H + 2);
+    for (let k = 0; k <= 10; k++) c.lineTo(x + W * .62 - k * W * .124, foot - H + 2 + (k % 2 ? s * .04 : s * .015)); c.closePath(); c.fill();
+    c.fillStyle = "#F2F6FF"; c.fillRect(x + W * .21, foot - H - s * .4, s * .14, s * .04);
+    const lit = .85 + .15 * Math.sin(t * 2.3);
+    [[-.3, -.6], [.18, -.6]].forEach(([dx, dy]) => { const wx = x + dx * W, wy = foot + dy * H * .9, ww = W * .16, wh = H * .3;
+      glow(c, wx + ww / 2, wy + wh / 2, ww * 2.2, "#FFC870", .35 * lit);
+      c.fillStyle = `rgba(255,${Math.round(196 * lit)},110,1)`; c.fillRect(wx, wy, ww, wh);
+      c.strokeStyle = "#3A2A2E"; c.lineWidth = Math.max(1, s * .012); c.beginPath(); c.moveTo(wx + ww / 2, wy); c.lineTo(wx + ww / 2, wy + wh); c.moveTo(wx, wy + wh / 2); c.lineTo(wx + ww, wy + wh / 2); c.stroke(); });
+    const tx = x - .3 * W + W * .08, ty = foot - H * .54 + H * .3;
+    c.fillStyle = "#1F4A2E"; c.beginPath(); c.moveTo(tx, ty - H * .26); c.lineTo(tx - W * .05, ty); c.lineTo(tx + W * .05, ty); c.fill();
+    c.fillStyle = "#5A2A1A"; c.fillRect(x - W * .04, foot - H * .5, W * .13, H * .5);
+    c.strokeStyle = "#2E7D46"; c.lineWidth = Math.max(1.5, s * .02); c.beginPath(); c.arc(x + W * .025, foot - H * .34, W * .035, 0, TAU); c.stroke();
+    c.fillStyle = "#D7263D"; c.beginPath(); c.arc(x + W * .025, foot - H * .3, s * .012, 0, TAU); c.fill();
+    return { cx: x + W * .28, cy: foot - H - s * .38 }; }
+
+  function bigBen(c, x, foot, s, t, hm) {
+    const K = "#0B0E1C";
+    c.fillStyle = K;
+    c.fillRect(x - s * .07, foot - s * .78, s * .14, s * .78);
+    c.fillRect(x - s * .085, foot - s * .98, s * .17, s * .22);
+    c.beginPath(); c.moveTo(x - s * .085, foot - s * .98); c.lineTo(x, foot - s * 1.22); c.lineTo(x + s * .085, foot - s * .98); c.fill();
+    c.fillRect(x - s * .005, foot - s * 1.3, s * .01, s * .1);
+    for (let k = 0; k < 7; k++) { c.fillStyle = "rgba(255,210,120,.12)"; c.fillRect(x - s * .05, foot - s * (.7 - k * .09), s * .1, s * .012); }
+    const cx = x, cy = foot - s * .87, r = s * .062;
+    glow(c, cx, cy, r * 3, "#FFE6A0", .45);
+    c.fillStyle = "#FFF3CF"; c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.fill();
+    c.strokeStyle = "#5A4A2A"; c.lineWidth = Math.max(.8, r * .06);
+    for (let k = 0; k < 12; k++) { const q = k / 12 * TAU; c.beginPath(); c.moveTo(cx + Math.cos(q) * r * .8, cy + Math.sin(q) * r * .8); c.lineTo(cx + Math.cos(q) * r * .93, cy + Math.sin(q) * r * .93); c.stroke(); }
+    const hand = (q, L, wd) => { c.lineWidth = wd; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.sin(q) * L, cy - Math.cos(q) * L); c.stroke(); };
+    c.strokeStyle = "#1A1A1A"; c.lineCap = "round";
+    hand(hm.h, r * .5, Math.max(1.5, r * .12)); hand(hm.m, r * .78, Math.max(1, r * .08));
+    if (hm.s !== undefined) { c.strokeStyle = "#B3202A"; hand(hm.s, r * .82, Math.max(.6, r * .035)); }
+    return { cx, cy, r }; }
+
+  const parliament = (c, x0, x1, foot, s) => { c.fillStyle = "#0B0E1C";
+    c.fillRect(x0, foot - s * .22, x1 - x0, s * .22);
+    for (let x = x0; x < x1; x += s * .06) { c.fillRect(x, foot - s * .3, s * .012, s * .1); c.beginPath(); c.moveTo(x - s * .004, foot - s * .3); c.lineTo(x + s * .006, foot - s * .34); c.lineTo(x + s * .016, foot - s * .3); c.fill(); }
+    c.fillRect(x0 + (x1 - x0) * .12, foot - s * .55, s * .1, s * .55); };
+
+  function cenotaph(c, x, foot, s) { c.fillStyle = "rgba(20,22,30,.85)";
+    c.fillRect(x - s * .05, foot - s * .3, s * .1, s * .3); c.fillRect(x - s * .07, foot - s * .03, s * .14, s * .03);
+    c.fillRect(x - s * .04, foot - s * .36, s * .08, s * .06); }
+
+  /* A golden eagle soaring, seen from below: long broad wings with the
+     fingered primaries at their tips, and a fanned tail. */
+  function eagle(c, x, y, s, t) { c.save(); c.translate(x, y); c.scale(s, s);
+    const f = Math.sin(t * 1.4) * 2.5; c.fillStyle = "#1E1820";
+    [-1, 1].forEach(d => { c.save(); c.scale(d, 1); c.beginPath(); c.moveTo(2, -3);
+      c.quadraticCurveTo(15, -8 - f, 29, -6 - f * 1.4);
+      for (let k = 0; k < 4; k++) { const fx = 29 - k * 1.2, fy = -6 - f * 1.4 + k * 2.6; c.lineTo(fx + 5.5 - k * .8, fy + .5 + k * .5); c.lineTo(fx - .5, fy + 2.4); }
+      c.quadraticCurveTo(16, 7 - f * .4, 3, 5); c.closePath(); c.fill(); c.restore(); });
+    c.beginPath(); c.ellipse(0, 1, 3.4, 8, 0, 0, TAU); c.fill();
+    c.beginPath(); c.arc(0, -7.5, 2.6, 0, TAU); c.fill();
+    c.beginPath(); c.moveTo(-3, 7); c.lineTo(-6, 15); c.quadraticCurveTo(0, 17, 6, 15); c.lineTo(3, 7); c.fill();
+    c.restore(); }
+
+  function witch(c, x, y, s, t) { c.save(); c.translate(x, y); c.scale(s, s); c.fillStyle = "#08030C"; c.strokeStyle = "#08030C";
+    c.lineWidth = 2; c.beginPath(); c.moveTo(-26, 4); c.lineTo(22, 0); c.stroke();
+    c.beginPath(); c.moveTo(-26, 4); c.lineTo(-38, -2); c.lineTo(-40, 6); c.lineTo(-37, 11); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(-8, 2); c.quadraticCurveTo(-12, -10, -4, -16); c.lineTo(6, -14); c.quadraticCurveTo(8, -4, 6, 2); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(-14, 2); c.lineTo(-24 + Math.sin(t * 8) * 2, 8); c.lineTo(-6, 3); c.fill();
+    c.beginPath(); c.arc(2, -19, 4, 0, TAU); c.fill();
+    c.beginPath(); c.moveTo(-8, -21); c.lineTo(10, -21); c.lineTo(-3, -36); c.closePath(); c.fill();
+    c.restore(); }
+
+  const UK = {
+    burns(st) {
+      st.s = mkStars(60); st.notes = []; st.next = 0;
+      st.th = Array.from({ length: 6 }, (_, i) => ({ x: .56 + i * .085 + rnd() * .03, k: .8 + rnd() * .5, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#070A26"], [.55, "#1B2456"], [1, "#3A2C55"]]);
+        stars(c, w, h, t, st.s);
+        const u = Math.min(h, w * .42), mx = w * .8, my = h * .36, mr = u * .2;
+        glow(c, mx, my, mr * 3.2, "#FFF1C9", .32); c.fillStyle = "#FBF0D0"; c.beginPath(); c.arc(mx, my, mr, 0, TAU); c.fill();
+        c.fillStyle = "rgba(200,190,150,.25)"; [[-.3, -.2, .2], [.25, .2, .14], [.05, -.45, .1]].forEach(([a, b, k]) => { c.beginPath(); c.arc(mx + a * mr, my + b * mr, k * mr, 0, TAU); c.fill(); });
+        c.fillStyle = "#18204A"; c.beginPath(); c.moveTo(0, h * .72);
+        [[.08, .6], [.18, .66], [.3, .5], [.42, .62], [.55, .48], [.66, .6], [.78, .55], [.9, .64], [1, .56]].forEach(([x, y]) => c.lineTo(x * w, y * h));
+        c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        const hill = x => h * .84 - Math.exp(-(((x - w * .8) / (w * .2)) ** 2)) * h * .1;
+        c.fillStyle = "#0A0D24"; c.beginPath(); c.moveTo(0, h); for (let x = 0; x <= w; x += 6) c.lineTo(x, hill(x)); c.lineTo(w, h); c.fill();
+        const px = w * .8, py = hill(px) + 1, s = u * .52 / 100;
+        st.next -= dt;
+        if (st.next <= 0) { st.next = .3 + rnd() * .3; const tipx = px - 15 * s, tipy = py - 42 * s, dir = rnd() < .65 ? 1 : -1;
+          st.notes.push({ x: tipx, y: tipy, vx: dir * u * (.06 + rnd() * .1), vy: -u * (.08 + rnd() * .07), life: 1, p: rnd() * TAU, r: (rnd() - .5) * .6, k: .8 + rnd() * .5 }); }
+        drawPiper(c, px, py, s, t);
+        c.fillStyle = "#F6E7B8";
+        st.notes = st.notes.filter(n => { n.x += (n.vx + Math.sin(t * 2 + n.p) * u * .05) * dt; n.y += n.vy * dt; n.life -= dt * .3;
+          c.globalAlpha = Math.max(0, Math.min(1, n.life * 1.6)); noteGlyph(c, n.x, n.y, Math.max(3.5, u * .036 * n.k), n.r + Math.sin(t * 2 + n.p) * .25); return n.life > 0; });
+        c.globalAlpha = 1;
+        st.th.forEach(q => thistle(c, q.x * w, h + 2, u * .3 * q.k, Math.sin(t * .9 + q.p) * .06));
+      };
+    },
+
+    valentine(st) {
+      st.f = Array.from({ length: 26 }, () => ({ x: rnd(), y: rnd(), v: .04 + rnd() * .07, s: .5 + rnd(), p: rnd() * TAU, col: ["#FF8FB1", "#FFC2D4", "#FF4D6D", "#FFFFFF"][Math.floor(rnd() * 4)] }));
+      st.bk = Array.from({ length: 11 }, () => ({ x: rnd(), y: rnd(), r: .02 + rnd() * .06, p: rnd() * TAU }));
+      st.burst = [];
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#2A0618"], [.5, "#6E0F33"], [1, "#B8264A"]]);
+        const u = Math.min(h, w * .42);
+        st.bk.forEach(b => glow(c, b.x * w, b.y * h + Math.sin(t * .4 + b.p) * 8, b.r * u * 2.2, "#FF9EC0", .14 + .08 * Math.sin(t + b.p)));
+        st.f.forEach(q => { q.y -= q.v * dt; if (q.y < -.1) { q.y = 1.1; q.x = rnd(); }
+          c.save(); c.globalAlpha = .55; c.translate(q.x * w + Math.sin(t * 1.3 + q.p) * u * .04, q.y * h); c.rotate(Math.sin(t + q.p) * .35);
+          c.fillStyle = q.col; heartPath(c, 0, 0, u * .03 * q.s); c.fill(); c.restore(); });
+        const hx = w * .8, hy = h * .5, cyc = t % 9, beatT = t % 1.1;
+        const beat = Math.exp(-(((beatT - .05) / .07) ** 2)) + .55 * Math.exp(-(((beatT - .3) / .07) ** 2));
+        const hit = cyc > .55 && cyc < 1.2 ? Math.sin((cyc - .55) / .65 * Math.PI) * .12 : 0;
+        const hs = u * .26 * (1 + beat * .07 + hit);
+        if (cyc > .55 && !st.hitDone) { st.hitDone = true;
+          for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; st.burst.push({ x: hx, y: hy, vx: Math.cos(a) * u * .5, vy: Math.sin(a) * u * .5, life: 1 }); } }
+        if (cyc < .55) st.hitDone = false;
+        glow(c, hx, hy, hs * 2.6, "#FF5C8A", .45 + beat * .2);
+        // the arrow: flies in, stays through the heart, then fades
+        const ax0 = hx - u * .9, ay0 = hy - u * .55, ang = Math.atan2(hy - ay0, hx - ax0);
+        const fly = ease(cyc / .55), fade = cyc > 7.4 ? Math.max(0, 1 - (cyc - 7.4) / .8) : 1, L = u * .62;
+        const mx = ax0 + (hx - ax0) * fly, my = ay0 + (hy - ay0) * fly;
+        if (cyc < 8.2) { c.save(); c.globalAlpha = fade; c.translate(mx, my); c.rotate(ang);
+          c.strokeStyle = "#E9D2A6"; c.lineWidth = Math.max(2, u * .014); c.beginPath(); c.moveTo(-L / 2, 0); c.lineTo(L / 2, 0); c.stroke();
+          c.fillStyle = "#D9D9E0"; c.beginPath(); c.moveTo(L / 2 + u * .05, 0); c.lineTo(L / 2 - u * .01, -u * .025); c.lineTo(L / 2 - u * .01, u * .025); c.fill();
+          c.fillStyle = "#FFFFFF"; [-1, 1].forEach(d => { c.beginPath(); c.moveTo(-L / 2, 0); c.lineTo(-L / 2 - u * .05, d * u * .035); c.lineTo(-L / 2 + u * .05, d * u * .035); c.lineTo(-L / 2 + u * .08, 0); c.fill(); });
+          c.restore(); }
+        const g = c.createRadialGradient(hx - hs * .35, hy - hs * .45, hs * .05, hx, hy, hs * 1.3);
+        g.addColorStop(0, "#FF8FA8"); g.addColorStop(.5, "#E3173E"); g.addColorStop(1, "#8A0A24");
+        c.fillStyle = g; heartPath(c, hx, hy, hs); c.fill();
+        c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = Math.max(1.5, hs * .05); c.lineCap = "round";
+        c.beginPath(); c.arc(hx - hs * .5, hy - hs * .42, hs * .32, Math.PI * 1.1, Math.PI * 1.55); c.stroke();
+        if (cyc > fly && fly >= 1 && cyc < 8.2) { c.save(); c.globalAlpha = fade; c.translate(mx, my); c.rotate(ang);
+          c.strokeStyle = "#E9D2A6"; c.lineWidth = Math.max(2, u * .014); c.beginPath(); c.moveTo(-L / 2, 0); c.lineTo(-hs * .95, 0); c.stroke();
+          c.fillStyle = "#FFFFFF"; [-1, 1].forEach(d => { c.beginPath(); c.moveTo(-L / 2, 0); c.lineTo(-L / 2 - u * .05, d * u * .035); c.lineTo(-L / 2 + u * .05, d * u * .035); c.lineTo(-L / 2 + u * .08, 0); c.fill(); });
+          c.strokeStyle = "#E9D2A6"; c.beginPath(); c.moveTo(hs * .95, 0); c.lineTo(L / 2, 0); c.stroke();
+          c.fillStyle = "#D9D9E0"; c.beginPath(); c.moveTo(L / 2 + u * .05, 0); c.lineTo(L / 2 - u * .01, -u * .025); c.lineTo(L / 2 - u * .01, u * .025); c.fill();
+          c.restore(); }
+        st.burst = st.burst.filter(b => { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= .96; b.vy *= .96; b.life -= dt * 1.2;
+          c.globalAlpha = Math.max(0, b.life); c.fillStyle = "#FFD1DC"; heartPath(c, b.x, b.y, u * .022); c.fill(); return b.life > 0; });
+        c.globalAlpha = 1;
+      };
+    },
+
+    pancake(st) {
+      st.sugar = []; st.steam = Array.from({ length: 10 }, () => ({ p: rnd(), x: rnd() - .5 }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#2B1609"], [.55, "#5A3214"], [1, "#2A1408"]]);
+        const u = Math.min(h, w * .42);
+        glow(c, w * .72, h * .2, u * 1.1, "#FFD9A0", .22);
+        const top = h * .8;
+        c.fillStyle = "#7A4A22"; c.fillRect(0, top, w, h - top);
+        c.fillStyle = "rgba(255,220,170,.15)"; c.fillRect(0, top, w, 2);
+        for (let k = 0; k < 6; k++) { c.fillStyle = "rgba(40,20,8,.25)"; c.fillRect(0, top + 6 + k * (h - top) / 6, w, 1); }
+        // the stack, with lemon and sugar
+        const sx = w * .92, sr = u * .14;
+        c.fillStyle = "#EDEFF2"; c.beginPath(); c.ellipse(sx, top + 2, sr * 1.35, sr * .3, 0, 0, TAU); c.fill();
+        for (let k = 0; k < 6; k++) { const y = top - 2 - k * sr * .13;
+          c.fillStyle = k % 2 ? "#E2A14A" : "#D58E37"; c.beginPath(); c.ellipse(sx, y, sr, sr * .26, 0, 0, TAU); c.fill();
+          c.fillStyle = "#F4C77A"; c.beginPath(); c.ellipse(sx, y - sr * .03, sr * .92, sr * .2, 0, 0, TAU); c.fill(); }
+        const ly = top - 2 - 6 * sr * .13 - sr * .05;
+        c.fillStyle = "#F7E04A"; c.beginPath(); c.moveTo(sx + sr * .1, ly); c.arc(sx + sr * .1, ly, sr * .32, Math.PI, Math.PI * 1.6); c.closePath(); c.fill();
+        st.sugar.push({ x: sx + (rnd() - .5) * sr, y: top - sr * 1.6, v: u * (.18 + rnd() * .1) });
+        c.fillStyle = "#FFFFFF"; st.sugar = st.sugar.filter(q => { q.y += q.v * dt; c.fillRect(q.x, q.y, 1.4, 1.4); return q.y < ly; });
+        // the pan, and the pancake going up and over
+        const cyc = 2.8, k = (t % cyc) / cyc, n = Math.floor(t / cyc);
+        const px = w * .74, py = h * .66, pr = u * .2;
+        const flick = k > .14 && k < .26 ? Math.sin((k - .14) / .12 * Math.PI) : 0, land = k > .82 && k < .92 ? Math.sin((k - .82) / .1 * Math.PI) : 0;
+        const pa = -flick * .32 + land * .08, pdy = -flick * u * .05 + land * u * .03;
+        c.fillStyle = "#1A1210"; c.beginPath(); c.ellipse(px, top - 1, pr * 1.25, pr * .16, 0, Math.PI, TAU); c.fill();
+        c.fillStyle = "#2A2220"; c.fillRect(px - pr * 1.25, top - 1, pr * 2.5, pr * .06);
+        c.strokeStyle = "#3A3230"; c.lineWidth = Math.max(2, pr * .06); c.beginPath(); c.moveTo(px - pr * .8, top - 2); c.lineTo(px - pr * .5, py + pr * .25); c.moveTo(px + pr * .8, top - 2); c.lineTo(px + pr * .5, py + pr * .25); c.stroke();
+        glow(c, px, py + pr * .4, pr * 1.2, "#3A7BFF", .25 + .05 * Math.sin(t * 9));
+        glow(c, px, py + u * .12, pr * 1.6, "#FF6A1A", .3);
+        let ck, cyy, rot;
+        if (k < .2 || k > .86) { ck = 0; cyy = py + pdy - pr * .08; rot = 0; }
+        else { const q = (k - .2) / .66; ck = q; cyy = py - Math.sin(q * Math.PI) * (py - h * .26) - pr * .08; rot = q * Math.PI; }
+        const base = 1.27, side = n % 2, ry = pr * .82 * Math.abs(Math.cos(rot + base));
+        const showA = (Math.cos(rot + base) > 0) !== Boolean(side);
+        const drawCake = () => { c.save(); c.translate(px + Math.sin(ck * Math.PI) * u * .03, cyy); c.rotate(ck > 0 ? Math.sin(ck * Math.PI) * .12 : pa);
+          c.fillStyle = "#B8722C"; c.beginPath(); c.ellipse(0, 1.5, pr * .82, Math.max(1.5, ry) + 1.5, 0, 0, TAU); c.fill();
+          c.fillStyle = showA ? "#F2C46D" : "#DDA04B"; c.beginPath(); c.ellipse(0, 0, pr * .82, Math.max(1.2, ry), 0, 0, TAU); c.fill();
+          if (!showA && ry > pr * .2) { c.fillStyle = "rgba(140,70,20,.55)"; [[-.3, -.1, .1], [.2, .15, .08], [.35, -.2, .06], [-.05, .3, .07]].forEach(([a, b, r]) => {
+            c.beginPath(); c.ellipse(a * pr, b * ry, r * pr, r * ry, 0, 0, TAU); c.fill(); }); }
+          c.restore(); };
+        c.save(); c.translate(px, py + pdy); c.rotate(pa);
+        c.fillStyle = "#1E1E22"; c.fillRect(-pr * 2.4, -pr * .06, pr * 1.5, pr * .14);
+        c.fillStyle = "#5A3A22"; c.fillRect(-pr * 2.45, -pr * .08, pr * .7, pr * .18);
+        c.fillStyle = "#2A2A30"; c.beginPath(); c.ellipse(0, pr * .12, pr * 1.02, pr * .34, 0, 0, Math.PI); c.fill();
+        c.fillStyle = "#3C3C44"; c.beginPath(); c.ellipse(0, 0, pr, pr * .3, 0, 0, TAU); c.fill();
+        c.fillStyle = "#16161A"; c.beginPath(); c.ellipse(0, pr * .02, pr * .88, pr * .24, 0, 0, TAU); c.fill();
+        c.restore();
+        drawCake();
+        if (ck === 0 && k < .2) { c.fillStyle = "rgba(255,255,255,.5)"; for (let i = 0; i < 5; i++) { const q = (t * 3 + i * .37) % 1; c.beginPath(); c.arc(px + (i - 2) * pr * .3, py - pr * .1 - q * 4, 1.2, 0, TAU); c.fill(); } }
+        c.lineCap = "round";
+        st.steam.slice(0, 4).forEach((s2, i) => { s2.p += dt * .3; if (s2.p > 1) { s2.p = 0; s2.x = rnd() - .5; }
+          const x0 = px + s2.x * pr, y0 = py - pr * .15, L = u * .35;
+          c.strokeStyle = `rgba(255,255,255,${(Math.sin(s2.p * Math.PI) * .2).toFixed(3)})`; c.lineWidth = Math.max(2, u * .02);
+          c.beginPath(); for (let k = 0; k <= 10; k++) { const q = k / 10; c.lineTo(x0 + Math.sin(q * 5 + t * 2 + i * 2) * u * .025 * q, y0 - q * L * (.5 + s2.p)); } c.stroke(); });
+        c.globalAlpha = 1;
+      };
+    },
+
+    daffodil(st) {
+      st.c = mkClouds(4);
+      st.d = Array.from({ length: 11 }, (_, i) => ({ x: .6 + i * .04 + (rnd() - .5) * .03, hh: .35 + rnd() * .3, p: rnd() * TAU, s: .8 + rnd() * .4, face: rnd() < .5 ? -1 : 1 }));
+      st.far = Array.from({ length: 70 }, () => ({ x: rnd(), y: .78 + rnd() * .2, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#5FA6E0"], [.55, "#B9DDF4"], [1, "#EAF4D0"]]);
+        const u = Math.min(h, w * .42), wind = Math.sin(t * .7) * .6 + Math.sin(t * 1.9) * .25;
+        glow(c, w * .9, h * .14, u * .8, "#FFF6C8", .7); c.fillStyle = "#FFF3B0"; c.beginPath(); c.arc(w * .9, h * .14, u * .08, 0, TAU); c.fill();
+        clouds(c, w, h, u, dt, st.c);
+        c.fillStyle = "#8CC26A"; c.beginPath(); c.moveTo(0, h * .62); c.bezierCurveTo(w * .3, h * .5, w * .55, h * .66, w * .7, h * .56); c.bezierCurveTo(w * .82, h * .5, w * .92, h * .54, w, h * .52); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        const fx = w * .78, fy = h * .56 - u * .02;
+        pole(c, fx, fy - u * .34, fy + u * .02, u);
+        waveFlag(c, flagImg("wales", (x, W, H) => { x.fillStyle = "#FFFFFF"; x.fillRect(0, 0, W, H / 2); x.fillStyle = "#00AB39"; x.fillRect(0, H / 2, W, H / 2); welshDragon(x, W * .52, H * .55, H * .82); }),
+          fx + u * .008, fy - u * .33, u * .32, u * .19, t, .07, 2.6);
+        c.fillStyle = "#5FA046"; c.beginPath(); c.moveTo(0, h * .78); c.bezierCurveTo(w * .35, h * .66, w * .6, h * .8, w, h * .7); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        st.far.forEach(f => { const x = f.x * w + Math.sin(t * 1.5 + f.p) * 1.5, y = f.y * h, r = (f.y - .7) * u * .05;
+          c.fillStyle = "#FFD93B"; c.beginPath(); c.arc(x, y, Math.max(1, r), 0, TAU); c.fill(); });
+        st.d.forEach(d => { const bx = d.x * w, sx = u * .55 * d.hh, sway = (wind + Math.sin(t * 2.1 + d.p) * .25) * .12;
+          const hx = bx + Math.sin(sway) * sx, hy = h - Math.cos(sway) * sx, s = u * .095 * d.s;
+          c.strokeStyle = "#3E7A2E"; c.lineWidth = Math.max(1.5, u * .012); c.beginPath(); c.moveTo(bx, h); c.quadraticCurveTo(bx, h - sx * .5, hx, hy); c.stroke();
+          c.fillStyle = "#4E8A36"; c.beginPath(); c.moveTo(bx - 2, h); c.quadraticCurveTo(bx - sx * .25 + sway * 20, h - sx * .5, bx - sx * .1 + sway * 30, h - sx * .78); c.quadraticCurveTo(bx - sx * .1, h - sx * .4, bx + 3, h); c.fill();
+          c.save(); c.translate(hx, hy); c.rotate(sway * 1.5 + d.face * .5);
+          for (let k = 0; k < 6; k++) { c.save(); c.rotate(k / 6 * TAU + d.p); c.fillStyle = k % 2 ? "#FFE45C" : "#FFD21F";
+            c.beginPath(); c.ellipse(0, -s * .55, s * .3, s * .58, 0, 0, TAU); c.fill(); c.restore(); }
+          c.fillStyle = "#F59A0B"; c.beginPath(); c.ellipse(d.face * s * .2, 0, s * .32, s * .36, 0, 0, TAU); c.fill();
+          c.fillStyle = "#FFB52E"; c.beginPath(); c.ellipse(d.face * s * .48, 0, s * .16, s * .38, 0, 0, TAU); c.fill();
+          c.strokeStyle = "#E57F00"; c.lineWidth = Math.max(1, s * .06); c.beginPath(); c.ellipse(d.face * s * .48, 0, s * .16, s * .38, 0, 0, TAU); c.stroke();
+          c.restore(); });
+      };
+    },
+
+    mothers(st) {
+      st.pet = Array.from({ length: 16 }, () => ({ x: rnd(), y: rnd(), v: .03 + rnd() * .04, p: rnd() * TAU, col: ["#FFB3C7", "#FFFFFF", "#FFD1A3"][Math.floor(rnd() * 3)] }));
+      st.fl = Array.from({ length: 7 }, (_, i) => ({ a: (i - 3) * .17 + (rnd() - .5) * .08, l: .55 + rnd() * .2, p: rnd() * TAU,
+        col: [["#FF7FA6", "#D6336C"], ["#FFE27A", "#F2A900"], ["#FFFFFF", "#F2C6D6"], ["#FF5A5F", "#B3202A"], ["#E3A6FF", "#9B4FC4"]][i % 5] }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#4A1E3A"], [.55, "#A8506A"], [1, "#F0A88E"]]);
+        const u = Math.min(h, w * .42);
+        glow(c, w * .95, h * .1, u * 1.2, "#FFE6C8", .35);
+        const table = h * .86; c.fillStyle = "#5A2A2E"; c.fillRect(0, table, w, h - table); c.fillStyle = "rgba(255,220,200,.15)"; c.fillRect(0, table, w, 2);
+        const vx = w * .78, vy = table, vw = u * .15, vh = u * .3;
+        st.fl.forEach((f, i) => { const sway = Math.sin(t * 1.1 + f.p) * .045, a = f.a * 1.3 + sway, L = u * f.l * .62;
+          const tx = vx + Math.sin(a) * L, ty = vy - vh * .9 - Math.cos(a) * L * .95;
+          c.strokeStyle = "#3E7A3A"; c.lineWidth = Math.max(1.5, u * .01); c.beginPath(); c.moveTo(vx + (i - 3) * vw * .08, vy - vh * .5); c.quadraticCurveTo(vx + Math.sin(a) * L * .4, ty + L * .4, tx, ty); c.stroke();
+          if (i % 2) { c.fillStyle = "#4E8A46"; c.beginPath(); c.ellipse(vx + Math.sin(a) * L * .45, ty + L * .5, u * .015, u * .06, a + .5, 0, TAU); c.fill(); }
+          tulip(c, tx, ty, u * .075, a * 1.2, f.col, .5 + .5 * Math.sin(t * .5 + f.p)); });
+        c.fillStyle = "rgba(255,255,255,.85)"; for (let k = 0; k < 14; k++) { const q = k / 14 * TAU; c.beginPath();
+          c.arc(vx + Math.cos(q) * u * .2 * (k % 3 ? 1 : .7), vy - vh - u * .22 + Math.sin(q) * u * .08 + Math.sin(t + k) * 1.5, Math.max(1.2, u * .01), 0, TAU); c.fill(); }
+        const g = c.createLinearGradient(vx - vw, 0, vx + vw, 0); g.addColorStop(0, "rgba(140,210,220,.35)"); g.addColorStop(.4, "rgba(220,250,255,.55)"); g.addColorStop(1, "rgba(100,170,190,.4)");
+        c.fillStyle = g; c.beginPath(); c.moveTo(vx - vw * .55, vy - vh); c.quadraticCurveTo(vx - vw * 1.2, vy - vh * .4, vx - vw * .7, vy); c.lineTo(vx + vw * .7, vy);
+        c.quadraticCurveTo(vx + vw * 1.2, vy - vh * .4, vx + vw * .55, vy - vh); c.closePath(); c.fill();
+        c.strokeStyle = "rgba(255,255,255,.6)"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(vx - vw * .4, vy - vh * .85); c.quadraticCurveTo(vx - vw * .85, vy - vh * .4, vx - vw * .5, vy - vh * .1); c.stroke();
+        // the card, opening and closing on its fold
+        const cx0 = w * .89, cw = u * .2, ch = u * .28, open = ease((Math.sin(t * .6) + 1) / 2 * 1.2 - .1);
+        c.fillStyle = "#FFF6EE"; c.beginPath(); c.moveTo(cx0, table); c.lineTo(cx0 + cw * .9, table); c.lineTo(cx0 + cw * .9, table - ch); c.lineTo(cx0, table - ch); c.fill();
+        c.fillStyle = "#E3173E"; heartPath(c, cx0 + cw * .45, table - ch * .55, cw * .18); c.fill();
+        c.fillStyle = "#8A2A40"; c.font = `italic ${Math.max(8, Math.round(cw * .2))}px Georgia, serif`; c.textAlign = "center"; c.fillText("Mum", cx0 + cw * .45, table - ch * .18);
+        const fw2 = cw * .9 * (1 - open * 1.6);
+        c.fillStyle = open > .62 ? "#F2D7DF" : "#F7B8CB"; c.beginPath(); c.moveTo(cx0, table); c.lineTo(cx0 + fw2, table - ch * .06 * open); c.lineTo(cx0 + fw2, table - ch - ch * .06 * open); c.lineTo(cx0, table - ch); c.fill();
+        if (fw2 > cw * .25) { const fx = cx0 + fw2 * .5, fy = table - ch * .55, r = Math.min(fw2 * .16, ch * .12);
+          c.fillStyle = "#FFFFFF"; for (let k = 0; k < 5; k++) { const q = k / 5 * TAU - Math.PI / 2; c.beginPath(); c.arc(fx + Math.cos(q) * r, fy + Math.sin(q) * r, r * .62, 0, TAU); c.fill(); }
+          c.fillStyle = "#FFD166"; c.beginPath(); c.arc(fx, fy, r * .5, 0, TAU); c.fill();
+          c.strokeStyle = "#5E9E45"; c.lineWidth = Math.max(1, r * .2); c.beginPath(); c.moveTo(fx, fy + r * 1.3); c.lineTo(fx, table - ch * .12); c.stroke(); }
+        st.pet.forEach(p => { p.y += p.v * dt; p.x += Math.sin(t + p.p) * dt * .01; if (p.y > 1) { p.y = -.05; p.x = rnd(); }
+          c.save(); c.translate(p.x * w, p.y * h); c.rotate(t * .8 + p.p); c.globalAlpha = .7; c.fillStyle = p.col;
+          c.beginPath(); c.ellipse(0, 0, u * .014, u * .007, 0, 0, TAU); c.fill(); c.restore(); });
+      };
+    },
+
+    shamrock(st) {
+      st.f = Array.from({ length: 28 }, () => ({ x: rnd(), y: rnd(), v: .05 + rnd() * .08, s: .6 + rnd() * .8, p: rnd() * TAU, spin: (rnd() - .5) * 2 }));
+      st.coins = [];
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#041F13"], [.6, "#0B4027"], [1, "#145C34"]]);
+        const u = Math.min(h, w * .42), pxx = w * .84, pyy = h * .86, R = u * .7;
+        const cols = ["#E8343A", "#F28A2E", "#F7D23E", "#3DBA5A", "#2D8CFF", "#5A4BD6", "#A14BD6"], bw = u * .045;
+        c.save(); c.beginPath(); c.rect(0, 0, w, pyy - u * .06); c.clip();
+        cols.forEach((col, i) => { const r = R - i * bw; c.strokeStyle = col; c.globalAlpha = .55 + .2 * Math.sin(t * 1.5 - i * .5);
+          c.lineWidth = bw + .5; c.beginPath(); c.arc(pxx + R - bw * 3, pyy, r, Math.PI, Math.PI * 1.75); c.stroke(); });
+        c.restore(); c.globalAlpha = 1;
+        glow(c, pxx, pyy - u * .1, u * .45, "#FFD54A", .55 + .15 * Math.sin(t * 3));
+        const pr = u * .15;
+        c.fillStyle = "#15151A"; c.beginPath(); c.moveTo(pxx - pr, pyy - pr * .5); c.quadraticCurveTo(pxx - pr * 1.25, pyy + pr * .9, pxx, pyy + pr * .95);
+        c.quadraticCurveTo(pxx + pr * 1.25, pyy + pr * .9, pxx + pr, pyy - pr * .5); c.closePath(); c.fill();
+        for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI, x = pxx + Math.cos(a) * pr * .8 * (i % 2 ? .6 : 1), y = pyy - pr * .5 - Math.sin(a) * pr * .45;
+          coin(c, x, y, pr * .17, i * .7 + Math.sin(t * .6 + i) * .4); }
+        c.fillStyle = "#2A2A30"; c.beginPath(); c.ellipse(pxx, pyy - pr * .5, pr * 1.05, pr * .16, 0, 0, TAU); c.fill();
+        for (let i = 0; i < 4; i++) { const q = (t * .7 + i * .25) % 1, sx = pxx + Math.sin(i * 2.3) * pr * .7, sy = pyy - pr * .75 - Math.cos(i * 1.7) * pr * .2;
+          c.save(); c.translate(sx, sy); c.globalAlpha = Math.sin(q * Math.PI); c.fillStyle = "#FFF7C2";
+          const sz = pr * .22 * Math.sin(q * Math.PI); c.beginPath(); c.moveTo(0, -sz); c.lineTo(sz * .2, 0); c.lineTo(0, sz); c.lineTo(-sz * .2, 0); c.closePath(); c.fill();
+          c.beginPath(); c.moveTo(-sz, 0); c.lineTo(0, sz * .2); c.lineTo(sz, 0); c.lineTo(0, -sz * .2); c.closePath(); c.fill(); c.restore(); }
+        c.globalAlpha = 1;
+        if (rnd() < dt * .9) st.coins.push({ x: pxx + (rnd() - .5) * pr, y: pyy - pr * .6, vx: (rnd() - .5) * u * .4, vy: -u * (1 + rnd() * .5), spin: 0 });
+        st.coins = st.coins.filter(q => { q.vy += u * 3 * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.spin += dt * 14; coin(c, q.x, q.y, pr * .15, q.spin); return q.y < pyy - pr * .5 || q.vy < 0; });
+        st.f.forEach(q => { q.y += q.v * dt; if (q.y > 1.08) { q.y = -.08; q.x = rnd(); }
+          shamrock(c, q.x * w + Math.sin(t * .9 + q.p) * u * .06, q.y * h, u * .045 * q.s, t * q.spin + q.p, Math.cos(t * 1.4 + q.p), q.s > 1 ? "#3DBA5A" : "#2E9A4A"); });
+      };
+    },
+
+    fools(st) {
+      st.c = mkClouds(4); st.B = mkBlades(140);
+      st.strands = Array.from({ length: 34 }, () => ({ a: rnd() * TAU, r: rnd(), l: .14 + rnd() * .18, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#4D9BE6"], [.6, "#A9D6F5"], [1, "#DDEFC0"]]);
+        const u = Math.min(h, w * .42);
+        glow(c, w * .6, h * .1, u * .7, "#FFF8D0", .6);
+        clouds(c, w, h, u, dt, st.c);
+        // penguins, the BBC's other famous joke, flying past now and then
+        const pc = (t % 14) / 6;
+        if (pc < 1) for (let i = 0; i < 3; i++) { const x = w * (1.1 - pc * 1.3) + i * u * .18, y = h * (.2 + i * .07) + Math.sin(t * 3 + i) * u * .02;
+          penguin(c, x, y, u * .008, t, i); }
+        c.fillStyle = "#7CB85A"; c.beginPath(); c.moveTo(0, h * .74); c.bezierCurveTo(w * .4, h * .66, w * .7, h * .76, w, h * .7); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        c.fillStyle = "#5E9E45"; c.fillRect(0, h * .86, w, h * .14);
+        const tx = w * .8, ty = h * .86, th = u * .45;
+        c.fillStyle = "#6B4423"; c.beginPath(); c.moveTo(tx - u * .035, ty); c.lineTo(tx - u * .02, ty - th); c.lineTo(tx + u * .02, ty - th); c.lineTo(tx + u * .04, ty); c.fill();
+        const cx = tx, cy = ty - th - u * .1, cr = u * .22;
+        [[0, 0, 1], [-.6, .2, .7], [.6, .2, .7], [-.3, -.4, .7], [.35, -.35, .7]].forEach(([dx, dy, r], i) => {
+          const lg = c.createRadialGradient(cx + dx * cr - r * cr * .35, cy + dy * cr - r * cr * .4, r * cr * .1, cx + dx * cr, cy + dy * cr, r * cr);
+          lg.addColorStop(0, "#6FBF5A"); lg.addColorStop(1, i % 2 ? "#2F6E2E" : "#3A7F36");
+          c.fillStyle = lg; c.beginPath(); c.arc(cx + dx * cr, cy + dy * cr, r * cr, 0, TAU); c.fill(); });
+        c.strokeStyle = "#F3DFA0"; c.lineWidth = Math.max(1.2, u * .007); c.lineCap = "round";
+        st.strands.forEach(s => { const x0 = cx + Math.cos(s.a) * cr * .95 * s.r, y0 = cy + cr * (.3 + Math.abs(Math.sin(s.a)) * .4), L = u * s.l, sw = Math.sin(t * 1.4 + s.p) * u * .012;
+          c.beginPath(); c.moveTo(x0, y0); for (let k = 1; k <= 8; k++) c.lineTo(x0 + Math.sin(k * 1.3 + s.p) * u * .006 + sw * k / 8, y0 + L * k / 8); c.stroke(); });
+        // ladder and the harvest basket
+        c.strokeStyle = "#A0703A"; c.lineWidth = Math.max(1.5, u * .01);
+        const lx = tx - u * .2; c.beginPath(); c.moveTo(lx, ty); c.lineTo(lx + u * .14, ty - th * .95); c.moveTo(lx + u * .07, ty); c.lineTo(lx + u * .19, ty - th * .9); c.stroke();
+        for (let k = 1; k < 7; k++) { const q = k / 7; c.beginPath(); c.moveTo(lx + u * .14 * q, ty - th * .95 * q); c.lineTo(lx + u * .07 + u * .12 * q, ty - th * .9 * q); c.stroke(); }
+        const bx = tx + u * .17, by = ty;
+        c.fillStyle = "#B07A3A"; c.beginPath(); c.moveTo(bx - u * .08, by - u * .08); c.lineTo(bx + u * .08, by - u * .08); c.lineTo(bx + u * .06, by); c.lineTo(bx - u * .06, by); c.fill();
+        c.strokeStyle = "#F3DFA0"; for (let k = 0; k < 7; k++) { c.beginPath(); c.moveTo(bx - u * .06 + k * u * .02, by - u * .08); c.quadraticCurveTo(bx - u * .05 + k * u * .02, by - u * .14, bx - u * .02 + k * u * .012, by - u * .085); c.stroke(); }
+        blades(c, w, h, u * .06, t, st.B, "rgba(60,120,40,.8)");
+      };
+    },
+
+    easter(st) {
+      st.B = mkBlades(160); st.c = mkClouds(3);
+      st.fl = Array.from({ length: 26 }, () => ({ x: rnd(), y: .84 + rnd() * .15, col: ["#FFFFFF", "#FFD84A", "#C9A4FF", "#FF9EC0"][Math.floor(rnd() * 4)] }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#3E6FB8"], [.5, "#9CC8EE"], [1, "#FBE8B8"]]);
+        const u = Math.min(h, w * .42), sx = w * .86, sy = h * .5;
+        c.save(); c.translate(sx, sy); c.rotate(t * .05);
+        for (let k = 0; k < 10; k++) { c.rotate(TAU / 10); const rg = c.createLinearGradient(0, 0, 0, -u * 1.1); rg.addColorStop(0, "rgba(255,244,200,.15)"); rg.addColorStop(1, "rgba(255,244,200,0)");
+          c.fillStyle = rg; c.beginPath(); c.moveTo(0, 0); c.lineTo(-u * .05, -u * 1.1); c.lineTo(u * .05, -u * 1.1); c.fill(); }
+        c.restore();
+        glow(c, sx, sy, u * .5, "#FFF1B0", .8); c.fillStyle = "#FFF4C4"; c.beginPath(); c.arc(sx, sy, u * .1, 0, TAU); c.fill();
+        clouds(c, w, h, u, dt, st.c, .75);
+        c.fillStyle = "#7DBE5A"; c.beginPath(); c.moveTo(0, h * .7); c.bezierCurveTo(w * .3, h * .62, w * .6, h * .72, w, h * .6); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        c.fillStyle = "#5FA545"; c.beginPath(); c.moveTo(0, h * .84); c.bezierCurveTo(w * .4, h * .76, w * .7, h * .84, w, h * .78); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        st.fl.forEach(f => { c.fillStyle = f.col; c.beginPath(); c.arc(f.x * w, f.y * h, Math.max(1.2, u * .008), 0, TAU); c.fill(); });
+        // the bunny hops across now and then
+        const bc = (t % 13) / 6;
+        if (bc < 1) { const hop = (bc * 7) % 1, bx = w * (1.08 - bc * .55), by = h * .82 - Math.sin(hop * Math.PI) * u * .09;
+          bunny(c, bx, by, u * .0065, hop, 1); }
+        // eggs in the grass, and one that hatches
+        const eggs = [[.68, .91, 0, ["#7FC8F8", "#FFFFFF"], -.2], [.73, .92, 2, ["#FFB3C7", "#FFFFFF"], .15], [.94, .9, 1, ["#C9A4FF", "#FFE066", "#FFFFFF"], -.1]];
+        eggs.forEach(([x, y, kind, cols, tl], i) => egg(c, x * w, y * h, u * .09, kind, cols, tl + Math.sin(t * 1.5 + i) * .03));
+        const hc = t % 10, ex = w * .83, ey = h * .87, es = u * .13;
+        const wob = hc > 1 && hc < 3 ? Math.sin(hc * 18) * .12 * Math.sin((hc - 1) / 2 * Math.PI) : 0;
+        const crack = hc > 2.2, lift = hc > 3 ? ease((hc - 3) / .6) : 0, chick = hc > 3.2 ? ease((hc - 3.2) / .5) : 0, gone = hc > 9 ? (hc - 9) : 0;
+        c.save(); c.globalAlpha = 1 - gone;
+        if (chick > 0) { const cy = ey - es * .25 - chick * es * .55; glow(c, ex, cy, es, "#FFF4A0", .4 * chick);
+          c.fillStyle = "#FFD93B"; c.beginPath(); c.arc(ex, cy, es * .42, 0, TAU); c.fill();
+          c.fillStyle = "#F28A2E"; c.beginPath(); c.moveTo(ex - es * .45, cy); c.lineTo(ex - es * .62, cy + es * .06); c.lineTo(ex - es * .43, cy + es * .1); c.fill();
+          c.fillStyle = "#2A1A14"; c.beginPath(); c.arc(ex - es * .2, cy - es * .1, es * .05, 0, TAU); c.fill();
+          c.fillStyle = "#FFC21A"; c.beginPath(); c.ellipse(ex + es * .2, cy + es * .1, es * .16, es * .1, -.5 + Math.sin(t * 10) * .3, 0, TAU); c.fill(); }
+        c.save(); c.translate(ex, ey); c.rotate(wob);
+        c.save(); c.beginPath(); c.rect(-es, -es * .15, es * 2, es * 2); c.clip(); egg(c, 0, 0, es, 3, ["#FFE066", "#7FC8F8", "#FFFFFF"], 0); c.restore();
+        c.save(); c.translate(-es * .3 * lift, -lift * es * .9); c.rotate(-lift * .6); c.beginPath(); c.rect(-es, -es * 1.2, es * 2, es * 1.05); c.clip(); egg(c, 0, 0, es, 3, ["#FFE066", "#7FC8F8", "#FFFFFF"], 0); c.restore();
+        if (crack && lift < 1) { c.strokeStyle = "#5A3A1A"; c.lineWidth = 1.2; c.beginPath(); for (let k = 0; k <= 8; k++) c.lineTo(-es * .7 + k * es * .175, -es * .15 + (k % 2 ? -es * .07 : es * .02)); c.stroke(); }
+        c.restore(); c.restore();
+        blades(c, w, h, u * .07, t, st.B, "rgba(70,140,50,.85)", .8);
+      };
+    },
+
+    stgeorge(st) {
+      st.c = mkClouds(5);
+      st.r = Array.from({ length: 6 }, (_, i) => ({ x: .6 + i * .07 + rnd() * .02, y: .86 + rnd() * .08, p: rnd() * TAU, s: .8 + rnd() * .4 }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#3C7BD0"], [.65, "#A6CDF0"], [1, "#E6F0E0"]]);
+        const u = Math.min(h, w * .42);
+        clouds(c, w, h, u, dt, st.c);
+        // a dragon, friendly now, crossing far off
+        const dc = (t % 16) / 8;
+        if (dc < 1) { const x = -w * .1 + dc * w * 1.25, y = h * (.32 - Math.sin(dc * Math.PI) * .12) + Math.sin(t * 2) * u * .02;
+          flyingDragon(c, x, y, u * .006, t);
+          if (dc > .45 && dc < .6) { const q = (dc - .45) / .15; c.globalAlpha = Math.sin(q * Math.PI);
+            glow(c, x + u * .22 + q * u * .1, y - u * .08, u * .08, "#FF9A2A", .9); c.globalAlpha = 1; } }
+        c.fillStyle = "#7DB25A"; c.beginPath(); c.moveTo(0, h * .82); c.bezierCurveTo(w * .4, h * .72, w * .65, h * .7, w, h * .74); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        const cx = w * .8, base = h * .8, s = u * .72;
+        c.fillStyle = "#8A8576";
+        c.fillRect(cx - s * .28, base - s * .26, s * .56, s * .26);
+        for (let k = 0; k < 8; k++) c.fillRect(cx - s * .28 + k * s * .075, base - s * .3, s * .04, s * .04);
+        c.fillStyle = "#9A9585"; c.fillRect(cx - s * .09, base - s * .48, s * .18, s * .48);
+        for (let k = 0; k < 4; k++) c.fillRect(cx - s * .09 + k * s * .05, base - s * .52, s * .03, s * .04);
+        c.fillStyle = "#3A3428"; c.beginPath(); c.moveTo(cx - s * .04, base); c.lineTo(cx - s * .04, base - s * .1); c.arc(cx, base - s * .1, s * .04, Math.PI, TAU); c.lineTo(cx + s * .04, base); c.fill();
+        c.fillStyle = "#2E2A22"; c.fillRect(cx - s * .02, base - s * .38, s * .04, s * .06);
+        pole(c, cx, base - s * .98, base - s * .5, u);
+        waveFlag(c, flagImg("england", (x, W, H) => { x.fillStyle = "#FFFFFF"; x.fillRect(0, 0, W, H); x.fillStyle = "#CE1124"; x.fillRect(W / 2 - H * .1, 0, H * .2, H); x.fillRect(0, H * .4, W, H * .2); }),
+          cx + u * .008, base - s * .97, u * .3, u * .18, t, .08, 3);
+        st.r.forEach(r => { const x = r.x * w, y = r.y * h, sz = u * .045 * r.s, a = Math.sin(t * .9 + r.p) * .08;
+          c.fillStyle = "#2E6B2E"; c.beginPath(); c.ellipse(x - sz, y + sz * .8, sz * .7, sz * .35, -.5, 0, TAU); c.ellipse(x + sz, y + sz * .9, sz * .7, sz * .35, .5, 0, TAU); c.fill();
+          c.save(); c.translate(x, y); c.rotate(a);
+          for (let k = 0; k < 3; k++) { c.fillStyle = ["#9A0F1E", "#C8102E", "#E23A4A"][k]; c.beginPath(); c.arc(0, 0, sz * (1 - k * .28), 0, TAU); c.fill();
+            c.strokeStyle = "rgba(80,0,10,.5)"; c.lineWidth = 1; c.beginPath(); c.arc(sz * .1 * k, 0, sz * (.8 - k * .25), Math.PI * (.2 + k * .3), Math.PI * (1.2 + k * .3)); c.stroke(); }
+          c.restore(); });
+      };
+    },
+
+    fathers(st) {
+      st.B = mkBlades(150); st.birds = Array.from({ length: 4 }, (_, i) => ({ x: rnd(), y: .2 + rnd() * .2, v: .015 + rnd() * .01, p: rnd() * TAU }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#1F3C74"], [.5, "#E8875A"], [1, "#F8D27A"]]);
+        const u = Math.min(h, w * .42);
+        glow(c, w * .6, h * .78, u * .85, "#FFE2A0", .7); c.fillStyle = "#FFE9B0"; c.beginPath(); c.arc(w * .6, h * .78, u * .14, 0, TAU); c.fill();
+        st.birds.forEach(b => { b.x += b.v * dt; if (b.x > 1.1) b.x = -.1; const x = b.x * w, y = b.y * h, f = Math.sin(t * 6 + b.p) * u * .012;
+          c.strokeStyle = "rgba(40,20,40,.7)"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - u * .025, y - f); c.quadraticCurveTo(x - u * .01, y - u * .01, x, y); c.quadraticCurveTo(x + u * .01, y - u * .01, x + u * .025, y - f); c.stroke(); });
+        const hill = x => h * .82 - Math.exp(-(((x - w * .78) / (w * .25)) ** 2)) * h * .1;
+        c.fillStyle = "#3A2A3A"; c.beginPath(); c.moveTo(0, h); for (let x = 0; x <= w; x += 6) c.lineTo(x, hill(x)); c.lineTo(w, h); c.fill();
+        const dx = w * .76, dy = hill(dx), kx = w * .82, ky = hill(kx), s = u * .0042;
+        const K = "#160E1C"; c.fillStyle = K; c.strokeStyle = K; c.lineCap = "round"; c.lineJoin = "round";
+        // dad
+        c.save(); c.translate(dx, dy); c.scale(s, s);
+        c.lineWidth = 9; c.beginPath(); c.moveTo(-4, 0); c.lineTo(-2, -40); c.moveTo(6, 0); c.lineTo(3, -40); c.stroke();
+        c.beginPath(); c.moveTo(-10, -40); c.lineTo(12, -40); c.lineTo(11, -82); c.lineTo(-9, -82); c.closePath(); c.fill();
+        c.beginPath(); c.arc(1, -92, 9, 0, TAU); c.fill();
+        c.lineWidth = 6; c.beginPath(); c.moveTo(9, -78); c.lineTo(22, -58); c.lineTo(34, -48); c.stroke();
+        c.beginPath(); c.moveTo(-6, -78); c.lineTo(-20, -96); c.lineTo(-26, -112); c.stroke();
+        c.restore();
+        // child, holding the string
+        const hx = kx + 4 * s * 2, hy = ky - 52 * s;
+        c.save(); c.translate(kx, ky); c.scale(s, s);
+        c.lineWidth = 6; c.beginPath(); c.moveTo(-3, 0); c.lineTo(-2, -24); c.moveTo(4, 0); c.lineTo(3, -24); c.stroke();
+        c.beginPath(); c.moveTo(-7, -24); c.lineTo(8, -24); c.lineTo(7, -50); c.lineTo(-6, -50); c.closePath(); c.fill();
+        c.beginPath(); c.arc(1, -57, 7, 0, TAU); c.fill();
+        c.lineWidth = 4.5; c.beginPath(); c.moveTo(5, -46); c.lineTo(12, -56); c.lineTo(10, -66); c.stroke();
+        c.restore();
+        // the kite, dancing on the wind, and its string
+        const kxx = w * .9 + Math.sin(t * .7) * u * .08, kyy = h * .2 + Math.sin(t * 1.1) * u * .05, ang = Math.sin(t * 1.3) * .25;
+        const handX = kx + 10 * s, handY = ky - 66 * s;
+        c.strokeStyle = "rgba(255,255,255,.75)"; c.lineWidth = 1; c.beginPath(); c.moveTo(handX, handY);
+        c.quadraticCurveTo((handX + kxx) / 2 + u * .05, (handY + kyy) / 2 + u * .12, kxx, kyy + u * .08); c.stroke();
+        c.save(); c.translate(kxx, kyy); c.rotate(ang);
+        const ks = u * .09;
+        [["#E8343A", 0, -1, 1, 0], ["#2D8CFF", 0, -1, -1, 0], ["#F7D23E", -1, 0, 0, 1], ["#3DBA5A", 1, 0, 0, 1]].forEach(([col, ax, ay, bx2, by2]) => {
+          c.fillStyle = col; c.beginPath(); c.moveTo(0, 0); c.lineTo(ax * ks * .7, ay * ks); c.lineTo(bx2 * ks * .7, by2 * ks * 1.2); c.closePath(); c.fill(); });
+        c.strokeStyle = "rgba(0,0,0,.3)"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -ks); c.lineTo(0, ks * 1.2); c.moveTo(-ks * .7, 0); c.lineTo(ks * .7, 0); c.stroke();
+        c.strokeStyle = "#FFFFFF"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(0, ks * 1.2);
+        for (let k = 1; k <= 10; k++) c.lineTo(Math.sin(t * 4 - k * .7) * ks * .25, ks * 1.2 + k * ks * .28); c.stroke();
+        for (let k = 2; k <= 10; k += 2) { c.fillStyle = k % 4 ? "#E8343A" : "#F7D23E"; const bx = Math.sin(t * 4 - k * .7) * ks * .25, by = ks * 1.2 + k * ks * .28;
+          c.beginPath(); c.moveTo(bx, by); c.lineTo(bx - ks * .1, by - ks * .06); c.lineTo(bx - ks * .1, by + ks * .06); c.closePath(); c.moveTo(bx, by); c.lineTo(bx + ks * .1, by - ks * .06); c.lineTo(bx + ks * .1, by + ks * .06); c.closePath(); c.fill(); }
+        c.restore();
+        blades(c, w, h, u * .05, t, st.B, "rgba(30,20,34,.9)");
+      };
+    },
+
+    halloween(st) {
+      st.s = mkStars(50); st.bats = Array.from({ length: 6 }, (_, i) => ({ ph: rnd(), sp: .05 + rnd() * .04, y: .15 + rnd() * .35, s: .7 + rnd() * .6, i }));
+      st.mist = Array.from({ length: 4 }, () => ({ x: rnd(), y: .84 + rnd() * .12, r: .25 + rnd() * .2, v: .01 + rnd() * .015 }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#0E0418"], [.6, "#2A0B3A"], [1, "#3A1530"]]);
+        stars(c, w, h, t, st.s);
+        const u = Math.min(h, w * .42), mx = w * .82, my = h * .32, mr = u * .22;
+        glow(c, mx, my, mr * 2.4, "#FFB860", .35);
+        const mg = c.createRadialGradient(mx - mr * .3, my - mr * .3, mr * .1, mx, my, mr); mg.addColorStop(0, "#FFF0C0"); mg.addColorStop(1, "#F2B860");
+        c.fillStyle = mg; c.beginPath(); c.arc(mx, my, mr, 0, TAU); c.fill();
+        c.fillStyle = "rgba(200,140,60,.3)"; [[-.3, -.2, .2], [.3, .2, .15], [.0, .45, .1]].forEach(([a, b, k]) => { c.beginPath(); c.arc(mx + a * mr, my + b * mr, k * mr, 0, TAU); c.fill(); });
+        const wc = (t % 15) / 5;
+        if (wc < 1) witch(c, w * (1.1 - wc * 1.4), my + Math.sin(wc * TAU) * mr * .3, u * .006, t);
+        st.bats.forEach(b => { const q = (b.ph + t * b.sp) % 1, x = w * (1.1 - q * 1.3), y = h * b.y + Math.sin(t * 2.5 + b.i) * u * .05;
+          bat(c, x, y, u * .006 * b.s, t, b.i); });
+        // the old tree, and a cobweb in its corner
+        c.strokeStyle = "#07020C"; c.fillStyle = "#07020C"; c.lineCap = "round";
+        const tx = w * .97, ty = h;
+        const branch = (x, y, a, L, wd, d) => { if (d > 5 || L < 3) return; const x2 = x + Math.cos(a) * L, y2 = y + Math.sin(a) * L;
+          c.lineWidth = wd; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + Math.cos(a + .3) * L * .5, y + Math.sin(a + .3) * L * .5, x2, y2); c.stroke();
+          branch(x2, y2, a - .5 - d * .05, L * .68, wd * .62, d + 1); branch(x2, y2, a + .45, L * .62, wd * .6, d + 1); };
+        branch(tx, ty, -Math.PI / 2 - .25, u * .38, u * .06, 0);
+        const wx = w, wy = 0, wr = u * .28; c.strokeStyle = "rgba(220,220,240,.35)"; c.lineWidth = 1;
+        for (let k = 0; k <= 5; k++) { const a = Math.PI / 2 + k / 5 * Math.PI / 2; c.beginPath(); c.moveTo(wx, wy); c.lineTo(wx + Math.cos(a) * wr, wy + Math.sin(a) * wr); c.stroke(); }
+        for (let r = 1; r <= 4; r++) { c.beginPath(); for (let k = 0; k <= 5; k++) { const a = Math.PI / 2 + k / 5 * Math.PI / 2, rr = wr * r / 4.4;
+          const x = wx + Math.cos(a) * rr, y = wy + Math.sin(a) * rr; k ? c.quadraticCurveTo(wx + Math.cos(a - .16) * rr * .9, wy + Math.sin(a - .16) * rr * .9, x, y) : c.moveTo(x, y); } c.stroke(); }
+        const sy = wr * .45 + Math.sin(t * .8) * wr * .15; c.beginPath(); c.moveTo(w - wr * .35, 0); c.lineTo(w - wr * .35, sy); c.stroke();
+        c.fillStyle = "#0A0410"; c.beginPath(); c.arc(w - wr * .35, sy + 3, Math.max(2, u * .012), 0, TAU); c.fill();
+        // ghost, drifting in and out
+        const gc = (t % 9) / 9, ga = Math.sin(gc * Math.PI) ** 2 * .9;
+        ghost(c, w * .66 + Math.sin(t * .7) * u * .06, h * .58 + Math.sin(t * 1.6) * u * .04, u * .1, t, ga);
+        c.fillStyle = "#14081A"; c.beginPath(); c.moveTo(0, h * .9); c.bezierCurveTo(w * .4, h * .84, w * .7, h * .9, w, h * .86); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        pumpkin(c, w * .8, h * .86, u * .15, t, 0); pumpkin(c, w * .92, h * .9, u * .09, t, 2);
+        st.mist.forEach(m => { m.x += m.v * dt; if (m.x > 1.3) m.x = -.3; glowFlat(c, m.x * w, m.y * h, m.r * u * 2, .25, "#B8A0D8", .2); });
+      };
+    },
+
+    guyfawkes(st) {
+      st.sky = mkSky(); st.p = []; st.trail = []; st.sp = [];
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#03030E"], [.7, "#141030"], [1, "#2A1418"]]);
+        const u = Math.min(h, w * .42);
+        skyFire(st.sky, c, w, h * .9, dt, ["#FF5A5F", "#FFD166", "#7FD1FF", "#B48CFF", "#9BE38B", "#FFFFFF"], 1.5, .1, .98);
+        if (st.sky.flash) { c.fillStyle = `rgba(255,240,220,${st.sky.flash * .06})`; c.fillRect(0, 0, w, h); }
+        parliament(c, w * .02, w * .5, h * .9, u * .5);
+        bigBen(c, w * .55, h * .9, u * .7, t, { h: (8 + t / 3600) / 12 * TAU, m: t / 3600 * TAU });
+        c.fillStyle = "#0A060A"; c.fillRect(0, h * .9, w, h * .1);
+        const bx = w * .84, by = h * .93, bw = u * .32;
+        c.strokeStyle = "#3A2414"; c.lineWidth = Math.max(2, u * .022); c.lineCap = "round";
+        for (let k = -3; k <= 3; k++) { c.beginPath(); c.moveTo(bx + k * bw * .17, by); c.lineTo(bx + k * bw * .02, by - u * .3); c.stroke(); }
+        flames(c, bx, by - u * .02, bw * .9, u * .48, t);
+        if (rnd() < .6) st.p.push({ x: bx + (rnd() - .5) * bw * .6, y: by - u * .2, vx: (rnd() - .5) * u * .1, vy: -(u * .3 + rnd() * u * .4), life: 1 });
+        c.globalCompositeOperation = "lighter";
+        st.p = st.p.filter(p => { p.x += p.vx * dt + Math.sin(t * 5 + p.y * .05) * .6; p.y += p.vy * dt; p.life -= dt * .55;
+          c.fillStyle = `rgba(255,${Math.round(160 + 80 * p.life)},90,${Math.max(0, p.life)})`; c.fillRect(p.x, p.y, 1.8, 1.8); return p.life > 0; });
+        c.fillStyle = "#1A0E08"; [[-.45, .3], [.4, -.25], [-.1, .1]].forEach(([a, b2]) => { c.save(); c.translate(bx + a * bw * .4, by - u * .015); c.rotate(b2); c.fillRect(-bw * .35, -u * .02, bw * .7, u * .04); c.restore(); });
+        // a sparkler, writing loops in the dark
+        const q = t * 1.6, sxp = w * .66 + Math.sin(q) * u * .12, syp = h * .62 + Math.sin(q * 2) * u * .07;
+        st.trail.push({ x: sxp, y: syp, life: 1 });
+        c.lineCap = "round"; let prev = null;
+        st.trail = st.trail.filter(p => { p.life -= dt * 2.2; if (prev && p.life > 0) { c.strokeStyle = `rgba(255,230,160,${p.life * .8})`; c.lineWidth = 2.4 * p.life + .5;
+          c.beginPath(); c.moveTo(prev.x, prev.y); c.lineTo(p.x, p.y); c.stroke(); } prev = p; return p.life > 0; });
+        for (let i = 0; i < 5; i++) { const a = rnd() * TAU, v = u * (.2 + rnd() * .5); st.sp.push({ x: sxp, y: syp, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: .3 + rnd() * .25 }); }
+        st.sp = st.sp.filter(s => { const ox = s.x, oy = s.y; s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
+          c.strokeStyle = `rgba(255,250,220,${Math.max(0, s.life * 2.5)})`; c.lineWidth = 1; c.beginPath(); c.moveTo(ox, oy); c.lineTo(s.x, s.y); c.stroke(); return s.life > 0; });
+        glow(c, sxp, syp, u * .08, "#FFF4C2", .9);
+        c.globalCompositeOperation = "source-over";
+        c.strokeStyle = "#3A3A3A"; c.lineWidth = 1.4; c.beginPath(); c.moveTo(sxp, syp); c.lineTo(sxp + u * .04, syp + u * .18); c.stroke();
+      };
+    },
+
+    poppies(st, v) {
+      st.f = Array.from({ length: 90 }, () => ({ x: rnd(), y: .72 + rnd() * .28, p: rnd() * TAU })).sort((a, b) => a.y - b.y);
+      st.big = Array.from({ length: 5 }, (_, i) => ({ x: .7 + i * .065 + rnd() * .02, hh: .2 + rnd() * .16, p: rnd() * TAU, s: .8 + rnd() * .4 }));
+      st.pet = [];
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#1A2030"], [.55, "#5E4C58"], [1, "#C79072"]]);
+        const u = Math.min(h, w * .42);
+        glow(c, w * .78, h * .62, u * 1.1, "#FFD3A0", .45);
+        c.fillStyle = "#3A3238"; c.beginPath(); c.moveTo(0, h * .7); c.bezierCurveTo(w * .35, h * .64, w * .6, h * .7, w, h * .66); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        cenotaph(c, w * .7, h * .675, u * .5);
+        c.fillStyle = "#2A3A22"; c.fillRect(0, h * .74, w, h * .26);
+        st.f.forEach(f => { const k = (f.y - .72) / .28, r = Math.max(1.2, k * u * .022), x = f.x * w + Math.sin(t * .6 + f.p) * k * 2, y = f.y * h;
+          c.strokeStyle = "rgba(40,60,30,.8)"; c.lineWidth = 1; c.beginPath(); c.moveTo(x, y + r * 3); c.lineTo(x, y); c.stroke();
+          c.fillStyle = k > .6 ? "#D0121F" : "#B0141E"; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); });
+        st.big.forEach(b => { const bx = b.x * w, L = u * b.hh * 1.2, a = Math.sin(t * .5 + b.p) * .05 + (b.x - .78) * .3;
+          const hx = bx + Math.sin(a) * L, hy = h - Math.cos(a) * L;
+          c.strokeStyle = "#3E5A2A"; c.lineWidth = Math.max(1.5, u * .01); c.beginPath(); c.moveTo(bx, h); c.quadraticCurveTo(bx + Math.sin(a) * L * .3, h - L * .5, hx, hy); c.stroke();
+          poppy(c, hx, hy, u * .085 * b.s, a * 2);
+          if (rnd() < dt * .04) st.pet.push({ x: hx, y: hy, vx: u * (.03 + rnd() * .04), vy: u * .05, r: rnd() * TAU, life: 1 }); });
+        st.pet = st.pet.filter(p => { p.x += p.vx * dt + Math.sin(t + p.r) * .2; p.y += p.vy * dt; p.r += dt * .8; p.life -= dt * .12;
+          c.save(); c.translate(p.x, p.y); c.rotate(p.r); c.globalAlpha = Math.min(1, p.life * 2); c.fillStyle = "#D0121F";
+          c.beginPath(); c.ellipse(0, 0, u * .03, u * .02, 0, 0, TAU); c.fill(); c.restore(); return p.life > 0 && p.y < h; });
+        c.globalAlpha = 1;
+      };
+    },
+
+    saltire(st) {
+      st.mist = Array.from({ length: 4 }, () => ({ x: rnd(), y: .48 + rnd() * .14, r: .3 + rnd() * .2, v: .006 + rnd() * .01 }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#1D3366"], [.45, "#6F8FC4"], [.62, "#E8B8A8"], [1, "#F2D6C2"]]);
+        const u = Math.min(h, w * .42);
+        glow(c, w * .45, h * .42, u * .6, "#FFE2C6", .25);
+        /* It circles, as eagles do, over the hills and clear of the words. */
+        const ea = t * .25, ex = w * .62 + Math.cos(ea) * u * .3, ey = h * .24 + Math.sin(ea) * u * .07;
+        eagle(c, ex, ey, u * (.005 + .001 * Math.sin(ea)), t);
+        const ridge = (pts, col) => { c.fillStyle = col; c.beginPath(); c.moveTo(0, h); pts.forEach(([x, y]) => c.lineTo(x * w, y * h)); c.lineTo(w, h); c.fill(); };
+        ridge([[0, .55], [.12, .4], [.25, .5], [.4, .32], [.52, .46], [.66, .36], [.8, .44], [.92, .34], [1, .4]], "#4A5F86");
+        st.mist.forEach(m => { m.x += m.v * dt; if (m.x > 1.3) m.x = -.3; glowFlat(c, m.x * w, m.y * h, m.r * u * 1.8, .22, "#E8EEF6", .45); });
+        ridge([[0, .62], [.15, .52], [.3, .6], [.48, .5], [.62, .6], [.74, .5], [.86, .58], [1, .52]], "#2E3E5E");
+        const lake = h * .72; c.fillStyle = "#3C5680"; c.fillRect(0, lake, w, h - lake);
+        for (let k = 0; k < 18; k++) { const y = lake + (k + 1) * (h - lake) / 19, x = ((k * 97) % 100) / 100 * w + Math.sin(t * .6 + k) * u * .05;
+          c.fillStyle = `rgba(230,240,255,${.06 + .05 * Math.sin(t + k)})`; c.fillRect(x, y, u * (.1 + (k % 3) * .05), 1.2); }
+        c.fillStyle = "#1A2236"; c.beginPath(); c.moveTo(w * .62, h); c.lineTo(w * .66, lake - u * .02); c.quadraticCurveTo(w * .8, lake - u * .12, w * .9, lake - u * .06); c.lineTo(w, lake - u * .04); c.lineTo(w, h); c.fill();
+        const fx = w * .8, fy = lake - u * .1;
+        pole(c, fx, fy - u * .62, fy, u);
+        waveFlag(c, flagImg("scotland", (x, W, H) => { x.fillStyle = "#005EB8"; x.fillRect(0, 0, W, H); x.strokeStyle = "#FFFFFF"; x.lineWidth = H * .2;
+          x.beginPath(); x.moveTo(0, 0); x.lineTo(W, H); x.moveTo(W, 0); x.lineTo(0, H); x.stroke(); }),
+          fx + u * .008, fy - u * .6, u * .36, u * .216, t, .08, 3);
+      };
+    },
+
+    christmaseve(st) {
+      st.s = mkStars(60); st.snow = Array.from({ length: 90 }, () => ({ x: rnd(), y: rnd(), r: .8 + rnd() * 2.2, s: .03 + rnd() * .06, p: rnd() * TAU }));
+      st.smoke = Array.from({ length: 9 }, (_, i) => ({ p: i / 9 }));
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#060B22"], [.6, "#14224A"], [1, "#2A3460"]]);
+        stars(c, w, h, t, st.s);
+        const u = Math.min(h, w * .42);
+        moonDisc(c, w * .6, h * .2, Math.min(u * .07, 22));
+        santaPass(st, c, w, h * .7, t, dt, 9);
+        c.fillStyle = "#E8EEF8"; c.beginPath(); c.moveTo(0, h * .86); c.bezierCurveTo(w * .3, h * .8, w * .6, h * .88, w, h * .82); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+        const ch = cottage(c, w * .8, h * .88, u * .5, t);
+        st.smoke.forEach((s, i) => { s.p += dt * .12; if (s.p > 1) s.p -= 1;
+          glow(c, ch.cx + Math.sin(s.p * 4 + i) * u * .03 + s.p * u * .16, ch.cy - s.p * u * .5, u * (.04 + s.p * .09), "#C8D0E0", Math.sin(s.p * Math.PI) * .45); });
+        c.globalAlpha = 1;
+        c.fillStyle = "#1E3A2A"; [[.6, .9, .5], [.66, .92, .35], [.96, .9, .45]].forEach(([x, y, k]) => { const tx = x * w, ty = y * h, s = u * .3 * k;
+          c.beginPath(); c.moveTo(tx, ty - s); c.lineTo(tx - s * .35, ty); c.lineTo(tx + s * .35, ty); c.fill();
+          c.fillStyle = "#F2F6FF"; c.beginPath(); c.moveTo(tx, ty - s); c.lineTo(tx - s * .14, ty - s * .55); c.lineTo(tx + s * .14, ty - s * .55); c.fill(); c.fillStyle = "#1E3A2A"; });
+        st.snow.forEach(s => { s.y += s.s * dt; s.x += Math.sin(t + s.p) * dt * .004; if (s.y > 1) { s.y = 0; s.x = rnd(); }
+          c.beginPath(); c.arc(s.x * w, s.y * h, s.r, 0, TAU); c.fillStyle = "rgba(255,255,255,.8)"; c.fill(); });
+      };
+    },
+
+    nye(st) {
+      st.sky = mkSky(); st.conf = []; st.s = mkStars(40);
+      return (c, w, h, t, dt) => {
+        fill(c, w, h, [[0, "#04061A"], [.7, "#10153A"], [1, "#1A1A3A"]]);
+        stars(c, w, h, t, st.s);
+        const u = Math.min(h, w * .42), cyc = 16, k = t % cyc, mid = 10;
+        const live = k >= mid;
+        if (live && !st.went) { st.went = true; st.sky.force = 6;
+          for (let i = 0; i < 120; i++) st.conf.push({ x: w * (.4 + rnd() * .6), y: -rnd() * h * .3, vx: (rnd() - .5) * u * .2, vy: u * (.15 + rnd() * .2), r: rnd() * TAU, col: ["#FFD166", "#FF5A8A", "#7FD1FF", "#9BE38B", "#FFFFFF"][Math.floor(rnd() * 5)] }); }
+        if (!live) st.went = false;
+        skyFire(st.sky, c, w, h * .72, dt, ["#FFD166", "#FF5A8A", "#7FD1FF", "#FFFFFF", "#B48CFF"], live ? 3.2 : .25, .05, .98, .1, .4);
+        if (st.sky.flash) { c.fillStyle = `rgba(255,240,220,${st.sky.flash * .08})`; c.fillRect(0, 0, w, h); }
+        const river = h * .8;
+        parliament(c, w * .46, w * .76, river, u * .5);
+        const left = mid - k;
+        const tower = bigBen(c, w * .84, river, Math.min(u * .8, river * .74), t, { h: -left / 43200 * TAU, m: -left / 3600 * TAU, s: -left / 60 * TAU });
+        c.fillStyle = "#0A0F26"; c.fillRect(0, river, w, h - river);
+        for (let i = 0; i < 26; i++) { const x = ((i * 61) % 100) / 100 * w, y = river + 3 + (i % 7) * (h - river) / 8;
+          c.fillStyle = `rgba(255,${180 + (i % 3) * 25},${120 + (i % 5) * 20},${.08 + .07 * Math.sin(t * 2 + i) + (st.sky.flash || 0) * .2})`; c.fillRect(x, y, u * .08, 1.5); }
+        if (!live) { const n = Math.ceil(mid - k), f = 1 - (mid - k - Math.floor(mid - k)), a = n <= 10 ? Math.max(0, 1 - f * 1.1) : 0;
+          c.save(); c.globalAlpha = a * .9; c.fillStyle = "#FFE6A0"; c.textAlign = "center"; c.textBaseline = "middle";
+          c.font = `700 ${Math.round(u * (.2 + f * .06))}px Georgia, serif`; c.shadowColor = "#FFB020"; c.shadowBlur = 18;
+          if (n <= 10) c.fillText(String(n), tower.cx - u * .34, h * .36); c.restore(); }
+        else { const q = k - mid, a = Math.min(1, q * 2) * Math.min(1, Math.max(0, (cyc - k - .6) / 1.2));
+          c.save(); c.globalAlpha = a; c.fillStyle = "#FFE6A0"; c.textAlign = "center"; c.textBaseline = "middle";
+          c.font = `700 ${Math.round(u * .1 * (1 + Math.max(0, .3 - q) ))}px Georgia, serif`; c.shadowColor = "#FFB020"; c.shadowBlur = 16;
+          c.textAlign = "right"; c.fillText("Happy New Year!", tower.cx - Math.max(tower.r * 2.2, u * .14), h * .36); c.restore(); }
+        st.conf = st.conf.filter(q => { q.x += (q.vx + Math.sin(t * 3 + q.r) * u * .05) * dt; q.y += q.vy * dt; q.r += dt * 4;
+          c.save(); c.translate(q.x, q.y); c.rotate(q.r); c.scale(1, Math.cos(q.r * 1.7)); c.fillStyle = q.col; c.fillRect(-3, -1.5, 6, 3); c.restore(); return q.y < h; });
+      };
+    },
+  };
+  Object.assign(SCENES, MORE, UK);
 
   return SCENES;
 })();
@@ -7773,33 +8719,43 @@ const FEST_TABLE = {
   "New Year’s Day": {"src":"UK","tier":"festive","scene":"fireworks","bg":"#0A0F2E","eyebrow":"Bank holiday","short":"The first day of the year. Fireworks at midnight, Auld Lang Syne, and resolutions that last until February.","full":[["What is it?","1 January is the first day of the year in the calendar most of the world uses. It has not always been: in England, until 1752, the new year officially began on 25 March. In Scotland, Hogmanay on New Year’s Eve was for centuries a bigger celebration than Christmas."],["What happens","At midnight people count down the last ten seconds, cheer, hug and sing Auld Lang Syne, a Scottish song about old friends, usually without knowing most of the words. London sets off fireworks over the Thames as Big Ben strikes twelve. The next morning is the traditional time for resolutions, promises to yourself about the year ahead, which most people have forgotten by February."]],"art":"Fireworks over a city skyline and a turning wheel, reflected in the river."},
   "Makar Sankranti / Pongal": {"src":"Hindu","tier":"festive","scene":"sankranti","bg":"#2B3F6E","eyebrow":"Celebrating","short":"The harvest is in and the days start getting longer. Kites fill the sky, and Pongal rice is boiled until it bubbles over for luck.","full":[["What is it?","Makar Sankranti marks the day the sun starts its journey north, so the days begin to get longer. It is also harvest time, the moment to say thank you for the crops. Different parts of India celebrate it in their own way and under their own names."],["What happens","In Gujarat the sky fills with thousands of kites, and people try to cut each other’s strings. In Tamil Nadu it is Pongal, which lasts four days: rice is boiled with milk and sugar in a new pot until it bubbles over, and everyone shouts “Pongalo Pongal!”, because overflowing means plenty for the year ahead. Cows are washed and decorated too."]],"art":"Kites bob on their strings while a pot of Pongal rice bubbles over."},
   "Vasant Panchami": {"src":"Hindu","tier":"festive","scene":"mustard","bg":"#5A4210","eyebrow":"Celebrating","short":"Spring is welcomed in yellow, and Saraswati, goddess of learning and music, is thanked. Some children write their first letters today.","full":[["What is it?","Vasant means spring, and this day welcomes it, even though it comes in January or February. It belongs to Saraswati, the goddess of learning, music and art, who is usually shown dressed in white, sitting on a lotus and playing a stringed instrument called a veena."],["What happens","Yellow is everywhere: yellow clothes, yellow flowers and yellow sweet rice, the colour of the mustard fields that bloom at this time. Books, pens and instruments are placed in front of Saraswati to be blessed, and some little children write their very first letters today. In parts of north India, people fly kites."]],"art":"A field of yellow mustard flowers sways while petals and one kite drift past."},
+  "Burns Night": {"src":"UK","tier":"festive","scene":"burns","bg":"#0B1030","eyebrow":"Tonight","short":"Scotland remembers its favourite poet, Robert Burns, with bagpipes, haggis and a poem read to the pudding.","full":[["Who was Robert Burns?","Robert Burns was born in a small cottage in Ayrshire, Scotland, on 25 January 1759. He grew up on a farm and wrote poems and songs in the Scots language about ordinary life: mice, friends, love and the countryside. He became so loved that Scotland calls him its national poet, and Auld Lang Syne, a song he wrote down, is sung all over the world at New Year."],["What happens","People hold a Burns Supper. A piper plays the bagpipes as the haggis is carried in, and someone reads Burns’s poem Address to a Haggis to it, cutting it open with a knife at just the right line. Haggis is a savoury pudding of oats, onion and spices, eaten with neeps and tatties: turnips and potatoes. Then come more poems, songs and speeches, and the night ends with everyone holding hands to sing Auld Lang Syne."]],"art":"A piper plays on a hill against the moon, music rising from his pipes, thistles swaying below."},
   "Republic Day": {"src":"Observance","tier":"festive","scene":"tricolour","bg":"#1D3557","eyebrow":"India","short":"India’s constitution came into force in 1950 and the country began choosing its own leaders. A huge parade fills New Delhi.","full":[["What is it?","On 26 January 1950, India’s constitution came into force and the country became a republic, choosing its own leaders instead of a king. The constitution, written over nearly three years by a team led by B. R. Ambedkar, is one of the longest in the world. Ambedkar was born into a group treated as “untouchable”, and he made sure the constitution banned that."],["What happens","In New Delhi there is a huge parade along a wide avenue called Kartavya Path, with marching soldiers, camels, dancers and colourful floats from every state, while jets fly overhead trailing the colours of the flag."]],"art":"India’s flag waves, its wheel of 24 spokes turning."},
   "Thaipusam": {"src":"Hindu","tier":"festive","scene":"kavadi","bg":"#2A1446","eyebrow":"Celebrating","short":"A Tamil festival for the warrior god Murugan. Devotees walk to his temple carrying kavadi, arches decorated with peacock feathers.","full":[["What is it?","Thaipusam is a Tamil festival for Murugan, a young warrior god and a son of Shiva. The story says that on this day his mother Parvati gave him a spear called a vel, which he used to defeat a demon. It is celebrated wherever Tamil people live, from India to Malaysia and Singapore."],["What happens","After weeks of fasting and prayer, devotees walk to Murugan’s temple carrying a kavadi, a decorated arch on their shoulders, often covered in peacock feathers. Some carry pots of milk on their heads. A few even pierce their cheeks or skin with small silver spears, which they say they barely feel because their mind is fixed on the god."]],"art":"A procession walks at dusk, each person carrying a kavadi arch tipped with peacock feathers."},
   "LGBT+ History Month": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"This month","short":"A month for remembering LGBT+ people and their history, held every February in the UK since 2005.","full":[["What is it?","A month of remembering LGBT+ lives and history, held every February in the UK. It was started here in 2005, soon after Section 28 was scrapped. That was a law that stopped schools from talking about gay people as if they were a normal part of life."],["What happens","Schools, libraries and museums hold talks and displays, and each year has a theme. It is a chance to learn about LGBT+ people from history: scientists like Alan Turing, who helped crack secret codes in the Second World War, writers, sports stars and campaigners."]],"art":"The Progress flag ripples across the band."},
   "International Day of Women and Girls in Science": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"United Nations day","short":"A United Nations day for the women and girls doing science, and for asking why so many are still put off it.","full":[["","A United Nations day, started in 2016, for the women and girls doing science, and for asking why so many are still put off it. Only about a third of the world’s scientists are women. Scientists like Rosalind Franklin, whose X-ray photograph helped show the shape of DNA, often went without credit in their own lifetimes."]]},
+  "Valentine’s Day": {"src":"UK","tier":"festive","scene":"valentine","bg":"#5A0E2A","eyebrow":"Celebrating","short":"A day for love and friendship: cards, flowers, and sometimes a secret admirer who doesn’t sign their name.","full":[["Who was Valentine?","Saint Valentine was a Christian priest in Rome about 1,700 years ago. Very little is known for certain about him, though there are stories that he helped couples marry in secret. About 600 years ago the English poet Geoffrey Chaucer wrote that birds choose their partners on Saint Valentine’s Day, and from then on the day was linked with love."],["What happens","People send cards, flowers and chocolates to someone they love. In Victorian times millions of cards were sent, often with no name inside, so the person had to guess who it was from. Lots of people send them to friends and family too. Hearts stand for love, and Cupid, the Roman god of love, is said to make people fall in love with a shot from his bow."]],"art":"A big heart beats, Cupid’s arrow flies through it, and little hearts float up."},
+  "Pancake Day": {"src":"UK","tier":"festive","scene":"pancake","bg":"#4A2810","eyebrow":"Shrove Tuesday","short":"The last treat before Lent: pancakes for tea, lemon and sugar, and races with frying pans.","full":[["Why pancakes?","Pancake Day is the Tuesday before Lent, the forty days when many Christians give something up to get ready for Easter. Long ago that meant no eggs, butter or rich food, so on the last day before Lent people used them all up, and pancakes were the perfect way. It is called Shrove Tuesday because people went to church to be “shriven”: to say sorry and be forgiven."],["What happens","Everyone makes pancakes and tries to flip them, with lemon and sugar the British favourite. In Olney, in Buckinghamshire, people have run a pancake race since 1445, tossing pancakes in frying pans as they run. The story is that a woman heard the church bell while cooking and ran there still holding her pan. Pancake Day moves every year, because it is always 47 days before Easter."]],"art":"A pancake is flipped high out of the pan and lands the other side up, beside a stack with lemon and sugar."},
+  "St David’s Day": {"src":"UK","tier":"festive","scene":"daffodil","bg":"#2E6B3A","eyebrow":"Dydd Gŵyl Dewi","short":"Wales celebrates its patron saint, David, with daffodils, leeks and red dragons everywhere.","full":[["Who was David?","Saint David, Dewi Sant in Welsh, was a monk who lived in Wales about 1,500 years ago. He started churches and monasteries and lived very simply, eating mostly bread, vegetables and water. His most famous words were “Do the little things”: be kind in small ways every day. He died on 1 March, and he became the patron saint of Wales, its special protector."],["What happens","Welsh people wear a daffodil or a leek, the two symbols of Wales. The story goes that Welsh soldiers once wore leeks in their hats so they could tell friend from enemy in a battle. Many children dress in traditional Welsh costume, with a tall black hat, and schools hold an eisteddfod, a festival of singing, poems and dancing. The red dragon flag flies everywhere."]],"art":"Daffodils nod in the wind on green hills, and the red dragon flag of Wales ripples above."},
   "Maha Shivaratri": {"src":"Hindu","tier":"festive","scene":"shiva","bg":"#0B1030","eyebrow":"Celebrating","short":"The great night of Shiva. Many people fast and stay awake all night, singing until sunrise.","full":[["What is it?","Maha Shivaratri means “the great night of Shiva”. Shiva is one of the most important Hindu gods: the destroyer, who clears away the old so that new things can begin. He is shown with a crescent moon in his hair, a snake around his neck and a trident in his hand, living high in the Himalayas."],["What happens","Many people fast all day and stay awake all night, singing and praying. At temples, milk, water and leaves from the bael tree are poured over a stone symbol of Shiva called a lingam. The chant “Om Namah Shivaya” can go on until sunrise."]],"art":"A crescent moon over snowy Himalayan peaks, with a row of lamps that burn all night."},
   "Holika Dahan": {"src":"Hindu","tier":"festive","scene":"bonfire","bg":"#1A0A0C","eyebrow":"Tonight","short":"The bonfire on the night before Holi, remembering a prince who walked out of the flames unharmed.","full":[["The story","Prince Prahlad prayed to the god Vishnu, which made his father, a proud demon king, furious. The king’s sister Holika could not be hurt by fire, so she sat in a bonfire holding Prahlad to get rid of him. Instead Holika burned, and Prahlad walked out without a scratch."],["What happens","On the night before Holi, people build a big bonfire in the street or square and walk around it, throwing in grains, coconuts and popcorn. It stands for good beating harm. Some take a little of the ash home for luck, and then everyone goes to bed ready for the colours in the morning."]],"art":"A bonfire roars and throws sparks into the night."},
   "Holi": {"src":"Hindu","tier":"festive","scene":"holi","bg":"#1C1830","eyebrow":"Celebrating","w":2,"short":"The festival of colours. Everyone throws coloured powder at everyone else, and by lunchtime nobody is clean.","full":[["The story","Holi marks the end of winter and the start of spring. A favourite story is about the god Krishna, who had blue skin as a boy and worried that Radha, the girl he liked, would think it strange. His mother told him to colour Radha’s face any colour he liked. He did, and a tradition was born."],["What happens","Everyone goes outside to throw coloured powder, called gulal, and squirt coloured water at each other: friends, neighbours, grandparents, even strangers. By lunchtime nobody is clean and nobody minds. It is also a day for making up with people you have argued with, and for eating gujiya, sweet pastries filled with nuts."]],"art":"Handfuls of coloured powder are flung in from the edges and drift, overlap and settle."},
+  "Mother’s Day": {"src":"UK","tier":"festive","scene":"mothers","bg":"#6B2D4E","eyebrow":"Mothering Sunday","short":"A day to say thank you to mums, and anyone like a mum to you: cards, flowers and breakfast in bed.","full":[["Where it comes from","Mothering Sunday in Britain is much older than the American Mother’s Day. Hundreds of years ago, on the fourth Sunday of Lent, people went back to their “mother church”, the big church where they were baptised. Young people working away from home as servants were given the day off to go, and on the way they picked wild flowers to give to their mothers."],["What happens","Now it is a day to thank mums, and anyone who cares for you like a mum: grandmas, stepmums, aunts and carers. People give cards and flowers, make breakfast in bed, and do the jobs at home so she can rest. A traditional treat is simnel cake, a fruit cake with marzipan. It moves every year, because it is always three weeks before Easter."]],"art":"A bunch of tulips sways in a vase, and a homemade card opens and closes beside it."},
   "British Science Week": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"Starts today","short":"Ten days of experiments, talks and competitions in schools and museums across the UK.","full":[["","Ten days of science events in schools, museums and towns across the UK, run by the British Science Association, with experiments, talks and competitions. It started in 1994 as National Science Week, and each year has a theme. Anyone can take part, and a lot of the best experiments need nothing more than a kitchen."]]},
   "International Women’s Day": {"src":"Observance","tier":"quiet","motif":"star","eyebrow":"Observance","short":"A day since 1911 for what women have won, from the vote to equal pay laws, and for what is still unfinished.","full":[["","Marked since 1911. A day for what women have won, like the vote, equal pay laws and the right to their own bank account, and for how much is still unfinished. Its colours, purple, green and white, come from the suffragettes, who campaigned for women’s votes in Britain. Women over 30 first voted here in 1918, and women got the same voting rights as men in 1928."]]},
+  "St Patrick’s Day": {"src":"UK","tier":"festive","scene":"shamrock","bg":"#0B4027","eyebrow":"Celebrating","short":"Ireland’s patron saint, remembered with shamrocks, parades and a great deal of green.","full":[["Who was Patrick?","Saint Patrick was born in Britain about 1,600 years ago. At sixteen he was captured by pirates and taken to Ireland, where he looked after sheep for six years before escaping home. Later he chose to go back, as a Christian teacher. A famous story says he used the shamrock, a little plant with three leaves on one stem, to explain the Christian idea of one God in three parts."],["What happens","Irish people all over the world celebrate with parades, music and dancing, and everyone wears green, the colour of Ireland. Some pin a real shamrock to their coat, and rivers and buildings are lit up green. The rainbow and the pot of gold come from old Irish stories about leprechauns, little shoemakers who are said to hide their gold at the end of the rainbow."]],"art":"Shamrocks tumble down, and a rainbow ends in a pot of gold whose coins glint and jump."},
   "Hindi New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in the Hindu calendar, which follows the moon. Homes are cleaned and doorways hung with mango leaves.","full":[["What is it?","The Hindu calendar follows the moon, so its new year does not fall on 1 January. In much of north India the year starts in spring, on the first day of the month of Chaitra, which is also the start of Chaitra Navratri, nine more nights for the goddess Durga."],["What happens","Homes are swept and washed from top to bottom, doorways are hung with mango leaves and marigolds, and patterns are drawn at the entrance to welcome good luck. Families visit the temple, wear new clothes and share sweets, and many look up the new year’s almanac, called a panchang, to see what the year might bring."]],"art":"A string of mango leaves and marigolds sways over the door while a kolam draws itself."},
   "Ugadi / Gudi Padwa": {"src":"Hindu","tier":"festive","scene":"newyear","v":"gudi","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in several Indian states. A dish is eaten that is sweet, sour, salty and bitter at once, like the year ahead.","full":[["What is it?","This is new year in several states at once: Ugadi in Andhra Pradesh, Telangana and Karnataka, and Gudi Padwa in Maharashtra. The name Ugadi comes from words meaning “the start of a new age”."],["What happens","In Maharashtra families raise a gudi outside the window: a tall pole topped with bright silk, a garland and an upside-down pot, like a flag of victory. In the south people eat ugadi pachadi, a dish that is sweet, sour, salty, bitter, spicy and tangy all at once, because the year ahead will hold all of those, and it is best to taste them together."]],"art":"A gudi, a pole flying bright silk under an upturned pot, stands beside the door."},
   "International Day for the Elimination of Racial Discrimination": {"src":"Observance","tier":"quiet","motif":"globe","eyebrow":"United Nations day","short":"Remembers 21 March 1960, when police shot at a peaceful protest against apartheid in Sharpeville, South Africa.","full":[["","On 21 March 1960, in Sharpeville, South Africa, police opened fire on a peaceful protest against apartheid, the laws that kept Black and white people apart and unequal. Sixty-nine people were killed. The United Nations chose the date so that it would not be forgotten. In South Africa it is now a public holiday, Human Rights Day."]]},
   "Ramanavami": {"src":"Hindu","tier":"festive","scene":"rama","bg":"#6A2A12","eyebrow":"Celebrating","short":"The birthday of Rama, hero of the Ramayana, celebrated at noon, the hour he was born.","full":[["Who is Rama?","Ramanavami is the birthday of Rama, hero of the Ramayana, one of the oldest and longest stories in the world. Rama is a prince famous for always doing the right thing, even when it cost him his throne, and for rescuing his wife Sita from the demon king Ravana."],["What happens","Rama is said to have been born at midday, so the biggest prayers happen at noon. His story is read aloud in temples, sometimes over the nine days before, and statues of baby Rama are placed in little cradles and rocked. People share a cooling drink called panakam, made from jaggery, pepper and cardamom."]],"art":"The midday sun turns, a bow stands ready and an arrow flies across."},
   "Transgender Day of Visibility": {"src":"Observance","tier":"festive","scene":"pride","v":"trans","bg":"#1E2A3A","eyebrow":"Observance","short":"A day for trans people living their lives openly, and for celebrating them rather than only remembering.","full":[["What is it?","A day for trans people living their lives openly. It was started in 2009 by Rachel Crandall, a trans woman in the United States, who noticed that the only well-known day for trans people was about those who had died."],["The flag","The trans flag was designed by Monica Helms in 1999: light blue for boys, pink for girls, and white in the middle for people who are in between or neither. She made it read the same whichever way up it is flown, so it is never upside down."]],"art":"The trans flag waves: light blue, pink and white."},
   "Hanuman Jayanti": {"src":"Hindu","tier":"festive","scene":"hanuman","bg":"#2A1240","eyebrow":"Celebrating","short":"The birthday of Hanuman, the monkey god so strong he once carried a whole mountain across India.","full":[["Who is Hanuman?","This is the birthday of Hanuman, the monkey god and Rama’s most loyal friend. In the Ramayana he can leap across the sea, grow as big as a mountain and shrink as small as a cat. He stands for strength, courage and loyalty."],["The mountain","When Rama’s brother was badly hurt in battle, Hanuman flew to the Himalayas to fetch a healing herb. He could not tell which plant it was, so he picked up the whole mountain and flew back with it. Today people visit his temples, often painted bright orange, and sing the Hanuman Chalisa, a prayer of forty verses."]],"art":"A whole mountain, its healing herbs glowing, flies across the sky in a saffron streak."},
+  "April Fools’ Day": {"src":"UK","tier":"festive","scene":"fools","bg":"#2D6FB0","eyebrow":"Until midday","short":"Tricks and jokes all morning. Fall for one and you are an April Fool.","full":[["What is it?","On 1 April people play harmless tricks and jokes on each other, and shout “April Fool!” when someone falls for one. In Britain the rule is that tricks stop at midday: play one in the afternoon and the joke is on you. Nobody knows for sure how it started, but people have been fooling each other on this day for hundreds of years."],["Famous tricks","In 1957 the BBC showed a film of farmers in Switzerland picking spaghetti from spaghetti trees, and lots of people believed it, because spaghetti was still unusual in Britain then. Some even asked how to grow their own. In 2008 the BBC showed penguins flying off to the rainforest for the winter. Both were April Fool’s jokes, and both are in this picture."]],"art":"Spaghetti hangs from a tree ready for picking, and penguins fly past now and then: two famous BBC jokes."},
   "Good Friday": {"src":"UK","tier":"quiet","motif":"candle","eyebrow":"Bank holiday","short":"Christians remember the day Jesus died on the cross. A quiet day, and a bank holiday.","full":[["","The Friday before Easter, when Christians remember the day Jesus was put to death on a cross in Jerusalem. It is a sad and serious day in church, often with quiet services at three in the afternoon, the time Jesus is said to have died. The “Good” probably comes from an old meaning of the word: holy. Hot cross buns are traditional today, and in the UK it is a bank holiday."]]},
+  "Easter Sunday": {"src":"UK","tier":"festive","scene":"easter","bg":"#3E6FB8","eyebrow":"Celebrating","w":2,"short":"Christians celebrate Jesus coming back to life. Eggs, chicks and bunnies stand for new life.","full":[["The story","Easter is the most important festival of the Christian year. On Good Friday Jesus was put to death on a cross. Christians believe that on the Sunday morning, when his friends came to his tomb, it was empty: he had risen from the dead. Easter Sunday celebrates that, and the hope that death is not the end."],["Eggs, bunnies and chicks","Eggs are a sign of new life, which is why they are given at Easter: painted, rolled down hills or, now, made of chocolate and hidden for egg hunts. The Easter bunny comes from German stories of a hare that brought eggs to good children. Easter moves every year: it is the first Sunday after the first full moon after 21 March, so it can fall anywhere from late March to late April."]],"art":"The sun rises over a spring hill, an egg wobbles and cracks and a chick pops out, and a bunny hops by."},
   "Easter Monday": {"src":"UK","tier":"quiet","motif":"egg","eyebrow":"Bank holiday","short":"The day after Easter Sunday, which celebrates Jesus coming back to life. Eggs stand for new life.","full":[["","Easter Sunday is the most important day of the Christian year, celebrating the belief that Jesus came back to life three days after he died. Eggs, a sign of new life, became part of it, which is why there are chocolate eggs and egg hunts. Easter Monday is the day after, with traditions like rolling eggs down hills. Easter moves every year because it follows the moon: it is the first Sunday after the first full moon after 21 March."]]},
   "International Day of Human Space Flight": {"src":"Observance","tier":"quiet","motif":"rocket","eyebrow":"United Nations day","short":"On this day in 1961 Yuri Gagarin became the first person to travel into space.","full":[["","On 12 April 1961 Yuri Gagarin, a Soviet pilot, became the first person in space. He went once around the Earth in a spacecraft called Vostok 1, in 108 minutes, then parachuted into a field in Russia, where a farmer and her granddaughter were the first people to meet him. Twenty years later to the day, in 1981, the first space shuttle launched."]]},
   "Vaisakhi / Vishu": {"src":"Hindu","tier":"festive","scene":"vaisakhi","bg":"#4A2E08","eyebrow":"Celebrating","short":"The spring harvest in Punjab and a big day for Sikhs, who mark the founding of the Khalsa in 1699.","full":[["What is it?","In Punjab this is the spring harvest, when the wheat is golden and ready to cut. For Sikhs it is one of the most important days of the year: in 1699 Guru Gobind Singh founded the Khalsa, the community of baptised Sikhs, on this day, after asking for five volunteers who became known as the Panj Pyare, the five beloved ones."],["What happens","Sikhs go to the gurdwara, and there are processions called Nagar Kirtan with singing and music, including big ones in Southall and Birmingham. In Punjab people dance bhangra to the dhol drum. In Kerala it is Vishu, the new year, when children are woken with their eyes covered and shown a tray of lucky things first: rice, fruit, gold, a mirror and yellow flowers."]],"art":"Golden wheat sways under the sun while a dhol drum beats."},
   "Tamil New Year": {"src":"Hindu","tier":"festive","scene":"newyear","bg":"#5A1F3A","eyebrow":"Happy new year","short":"Puthandu, the Tamil new year. Kolam patterns are drawn at the door before sunrise.","full":[["What is it?","Puthandu is the Tamil new year, on the first day of the Tamil month of Chithirai, usually 14 April. The sun moves into Aries in the zodiac on this day, which is why several other new years land around now too."],["What happens","Before sunrise, women draw kolam at the doorstep: patterns of white rice-flour lines looping around rows of dots, a little invitation to good luck. A tray of fruit, flowers, gold and a mirror is the first thing many families look at. Lunch includes mango pachadi, sweet, sour and bitter together, and the new year’s almanac is read aloud."]],"art":"A kolam draws itself loop by loop around its dots under a string of mango leaves."},
   "Bengali New Year / Bihu": {"src":"Hindu","tier":"festive","scene":"newyear","v":"bihu","bg":"#5A1F3A","eyebrow":"Happy new year","short":"New year in Bengal and Assam. New account books, parades with giant masks, and Bihu dancing.","full":[["What is it?","Pohela Boishakh is new year in Bengal, and Bohag Bihu is new year in Assam, both in mid-April. In Bangladesh the new year is a national holiday celebrated by everyone, whatever their religion."],["What happens","In Bengal shopkeepers close their old account books and open fresh red ones called haal khata, and customers are offered sweets. In Dhaka there is a huge, colourful parade with giant masks and puppets. In Assam, Bihu lasts several days: young people dance the fast Bihu dance to drums and buffalo-horn pipes, and cattle are washed and garlanded on the first day."]],"art":"Mango leaves and marigolds sway, a kolam draws itself and a drum beats."},
+  "St George’s Day": {"src":"UK","tier":"festive","scene":"stgeorge","bg":"#3C7BD0","eyebrow":"Celebrating","short":"England’s patron saint, famous for a story about a dragon. Look out for the red cross flag.","full":[["Who was George?","Saint George was a soldier in the Roman army about 1,700 years ago, in what is now Turkey. He was killed for refusing to give up his Christian faith, and people admired his courage. He never came to England, but English soldiers took him as their protector, and about 700 years ago he became England’s patron saint. His red cross on white is England’s flag."],["The dragon","The most famous story says a dragon was terrifying a town until George rode up, fought it and rescued a princess. It is a legend, not history, but it is why dragons appear on St George’s Day. People fly the flag, wear a red rose, England’s flower, and some towns hold parades. It is also said to be the birthday of William Shakespeare."]],"art":"The flag of St George flies over a castle, red roses bloom, and a friendly dragon flies past."},
   "Akshaya Tritiya": {"src":"Hindu","tier":"festive","scene":"gold","bg":"#3A2205","eyebrow":"Celebrating","short":"The luckiest day of the year, when whatever you start is said to keep growing. Many people buy a little gold.","full":[["What is it?","Akshaya means “never-ending”, and this is thought to be the luckiest day of the whole year: whatever you begin today is said to keep growing. Stories say it is the day the river Ganga came down to Earth, and the day the sage Vyasa began the Mahabharata, with Ganesha writing it down for him."],["What happens","Lots of people buy gold today, even a tiny coin, so jewellery shops are packed. It is a popular day to start a business, move house, get married or begin learning something. Many also give food, water or clothes to people who need them, since a kindness done today is said to keep giving too."]],"art":"Gold coins spin as they fall, catching the light."},
   "Early May bank holiday": {"src":"UK","tier":"quiet","motif":"flower","eyebrow":"Bank holiday","short":"A day off that grew out of May Day, with maypoles, May Queens and Morris dancers.","full":[["","The first Monday in May is a bank holiday that grew out of May Day, an ancient spring festival. Villages would crown a May Queen and dance round a maypole, weaving its coloured ribbons together, while Morris dancers with bells on their legs waved hankies and clashed sticks. 1 May is also International Workers’ Day in many countries. The UK holiday was first added in 1978."]]},
   "Savitri Pooja": {"src":"Hindu","tier":"festive","scene":"banyan","bg":"#22361C","eyebrow":"Celebrating","short":"Married women wind thread round a banyan tree, remembering Savitri, who argued with death and won.","full":[["The story","Savitri’s husband Satyavan was told he would die within a year. When Yama, the god of death, came to take him, Savitri followed and would not turn back. She talked to Yama so cleverly and so politely that he offered her any wish except her husband’s life. She asked to have children with Satyavan, and Yama, caught by his own promise, had to give him back."],["What happens","Married women, especially in Odisha, Bihar and Maharashtra, fast and pray for their husbands’ long lives. They gather at a banyan tree, which can live for hundreds of years, and walk around it winding a red or yellow thread round its trunk while the story of Savitri is told."]],"art":"A banyan tree sways its hanging roots as a red and yellow thread winds round its trunk."},
   "IDAHOBIT": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"Observance","short":"The International Day Against Homophobia, Biphobia and Transphobia, on the date in 1990 the WHO stopped calling being gay an illness.","full":[["What is it?","The International Day Against Homophobia, Biphobia and Transphobia. It is held on 17 May because on that date in 1990 the World Health Organization stopped calling being gay an illness. It began in 2004."],["Why it matters","In more than sixty countries it is still against the law to be gay, and in many more LGBT+ people are bullied or treated unfairly. The day is about changing that, with events, flags on town halls and campaigns around the world."]],"art":"The Progress flag ripples across the band."},
   "Spring bank holiday": {"src":"UK","tier":"quiet","motif":"sun","eyebrow":"Bank holiday","short":"The last Monday in May, often the first warm weekend, and the day people chase a cheese down a hill in Gloucestershire.","full":[["","The last Monday in May. It replaced Whit Monday, a holiday that moved around with Easter, in 1971, and is often the first warm weekend of the year. It has some odd traditions: at Cooper’s Hill in Gloucestershire, people chase a big round cheese down a hill so steep that most of them fall over, and the winner keeps the cheese."]]},
   "Pride Month": {"src":"Observance","tier":"festive","scene":"pride","bg":"#1A1426","eyebrow":"This month","short":"A month for LGBT+ people and everyone who supports them, held in June because of the Stonewall riots in 1969.","full":[["Why June?","Pride Month is for LGBT+ people (lesbian, gay, bisexual, trans and more) and for everyone who supports them. It is held in June because of the Stonewall riots in New York in June 1969. Police often raided bars where gay people met, and one night the people at the Stonewall Inn fought back. Pride began as a protest about being treated fairly, not as a party."],["What happens","Today there are marches and parades in cities all over the world, with music, costumes and a lot of rainbow. The flag on this card is the Progress flag: the rainbow, with extra stripes added for trans people and for Black people and people of colour."]],"art":"The Progress flag ripples across the band."},
+  "Father’s Day": {"src":"UK","tier":"festive","scene":"fathers","bg":"#1F3C74","eyebrow":"Celebrating","short":"A day to thank dads, and anyone like a dad to you. Cards, presents, and time together.","full":[["Where it comes from","Father’s Day began in America over a hundred years ago. A woman called Sonora Smart Dodd and her five brothers had been brought up by their father after their mother died. She heard a church sermon about Mother’s Day and thought dads deserved a day too. The first one was held in 1910, and it came to Britain much later. It is always the third Sunday in June."],["What happens","People give their dads cards and presents, make them a special breakfast, or spend the day doing something together: a walk, a game, a trip somewhere. It is for anyone who cares for you like a dad: grandads, stepdads, uncles and carers too."]],"art":"At sunset, a parent and child fly a kite together from the top of a hill."},
   "Windrush Day": {"src":"Observance","tier":"quiet","motif":"ship","eyebrow":"Observance","short":"Honours the people who came from the Caribbean from 1948 to help rebuild Britain, and everyone who followed.","full":[["","On 22 June 1948 the ship Empire Windrush arrived at Tilbury, near London, carrying around a thousand passengers, many from Jamaica and other Caribbean islands, invited to help rebuild Britain after the Second World War. They and the people who came after them worked as nurses, bus drivers, builders and much more. In 2018 it came out that some had been wrongly told they had no right to live here, and the official day began that same year."]]},
   "Pride in London": {"src":"Observance","tier":"festive","scene":"pride","v":"london","bg":"#1A1426","eyebrow":"Today","short":"London’s Pride parade, first marched by about 2,000 people in 1972 and now watched by around a million.","full":[["What is it?","London’s first Pride march was in 1972, when about 2,000 people walked from Trafalgar Square to Hyde Park. It was brave: being openly gay could still cost you your job or your home."],["What happens","Now around a million people line the streets each summer to watch a parade of floats, bands and marching groups, from schools and hospitals to football clubs and the fire brigade, with music and stages across the city centre."]],"art":"The Progress flag waves while confetti falls."},
   "Puri Rath Yatra": {"src":"Hindu","tier":"festive","scene":"chariots","bg":"#5A2A12","eyebrow":"Celebrating","short":"Three giant chariots carry the god Jagannath and his brother and sister through the streets of Puri.","full":[["What is it?","In the city of Puri, on India’s east coast, the god Jagannath, with his brother Balabhadra and sister Subhadra, leaves the temple once a year to visit another temple about three kilometres away. Jagannath means “lord of the universe”, and the English word juggernaut comes from his enormous chariot."],["What happens","Three giant wooden chariots, as tall as a four-storey building, are built new every year and pulled through the streets on thick ropes by huge crowds. Pulling a rope even for a moment is thought to bring great luck. The gods stay for a week, then ride home again."]],"art":"Three chariots roll down the street, wheels turning, crowds hauling on the ropes. Jagannath’s is red and yellow, his brother’s red and green, his sister’s red and black."},
@@ -7824,21 +8780,28 @@ const FEST_TABLE = {
   "Sharad Purnima": {"src":"Hindu","tier":"festive","scene":"moon","v":"kheer","bg":"#0E1430","eyebrow":"Tonight","short":"The brightest full moon of the year. Rice pudding is left out overnight to soak up the moonlight.","full":[["What is it?","Sharad Purnima is the full moon after the monsoon rains, when the air is clear and the moon is said to be at its brightest of the year. In the stories it is the night Krishna danced with the village girls in a great circle in the moonlight."],["What happens","People make kheer, a rice pudding with milk, sugar and cardamom, and leave it outside overnight under thin cloth to soak up the moonlight, then eat it in the morning. In Bengal it is Kojagari Lakshmi Puja: Lakshmi is said to visit homes asking “Ko jagarti?”, which means “Who is awake?”, and to bless those who are."]],"art":"The brightest full moon of the year shines into a steaming bowl of kheer."},
   "Karwa Chauth": {"src":"Hindu","tier":"festive","scene":"moon","v":"sieve","bg":"#0E1430","eyebrow":"Tonight","short":"Married women fast from sunrise until the moon appears, then look at it through a sieve before eating.","full":[["What is it?","Karwa Chauth is a day when married women, mostly in north India, fast for their husbands’ long and healthy lives. Karwa is the clay pot of water used in the prayers, and chauth means the fourth day after the full moon."],["What happens","Women eat a meal called sargi before sunrise, then go without food or even water all day. They dress up, have mehndi patterns drawn on their hands and gather in the evening to hear the story of the day. When the moon rises they look at it through a sieve, then at their husband’s face, and he gives them their first sip of water. Many husbands now fast too."]],"art":"The rising moon is seen through a sieve, then shines clear."},
   "National Engineering Day": {"src":"Observance","tier":"quiet","motif":"gear","eyebrow":"Observance","short":"A day to show what engineers actually do, from bridges and wind turbines to games consoles.","full":[["","Run by the Royal Academy of Engineering since 2021, a day to show what engineers actually do: design the bridges, phones, wind turbines, games consoles and medical machines people use every day. Engineers solve problems, and a lot of them started out by taking things apart to see how they worked."]]},
+  "Halloween": {"src":"UK","tier":"festive","scene":"halloween","bg":"#2A0B3A","eyebrow":"Tonight","w":1.5,"short":"Pumpkins, costumes and trick or treat: the spooky night before All Saints’ Day.","full":[["Where it comes from","Halloween comes from an old Celtic festival called Samhain, at the end of the harvest when winter began. People believed that on that night the world of the living and the world of spirits came close together, so they lit bonfires and wore disguises. Later the church made 1 November All Saints’ Day, or All Hallows, and the night before became All Hallows’ Eve: Halloween."],["What happens","Children dress up as witches, ghosts and monsters and go trick or treating, knocking on doors for sweets. In Scotland and Ireland this was called guising, and you were meant to tell a joke or sing a song for your treat. Lanterns were once carved from turnips. In America they used pumpkins, which are much easier to carve, and now we do too."]],"art":"Bats cross a big orange moon, a ghost drifts in and out, and two jack-o’-lanterns flicker."},
+  "Bonfire Night": {"src":"UK","tier":"festive","scene":"guyfawkes","bg":"#141030","eyebrow":"Tonight","w":1.5,"short":"Remember, remember the fifth of November: bonfires and fireworks for a plot that failed.","full":[["The story","In 1605 a group of men planned to blow up the Houses of Parliament in London, with King James I inside, because they were angry at how Catholics were being treated. They hid 36 barrels of gunpowder in a cellar under the building. Late on 4 November, Guy Fawkes was caught guarding the gunpowder, and the plot failed. It is called the Gunpowder Plot."],["What happens","When the people of London heard the king was safe, they lit bonfires to celebrate, and we still do, over four hundred years later. Families go to bonfires and firework displays, wrap up warm, and write their names in the air with sparklers. Some bonfires still have a guy on top, a stuffed figure of Guy Fawkes. Fireworks are loud, so remember to look after pets."]],"art":"A bonfire crackles, a sparkler writes loops in the dark, and fireworks burst over Parliament."},
   "Dhan Teras": {"src":"Hindu","tier":"festive","scene":"diwali","v":"coins","bg":"#231028","eyebrow":"Diwali begins","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"short":"The first day of Diwali, and the day for buying something metal, which is meant to bring luck for the year.","full":[["What is it?","Dhan Teras is the first day of Diwali. Dhan means wealth, and teras the thirteenth day of the moon’s cycle. It honours Dhanvantari, the doctor of the gods, who rose out of the ocean holding a pot of the nectar of life, and Lakshmi, the goddess of good fortune."],["What happens","It is the day for buying something metal, gold, silver or even a new steel pot or spoon, which is meant to bring luck for the year, so the markets are packed. Houses are cleaned and the first lamps of Diwali are lit. One lamp is set facing south, the direction of Yama, the god of death, asking him to keep the family safe."]],"art":"The first lamp of Diwali is lit while gold coins fall."},
   "Diwali": {"src":"Hindu","tier":"festive","scene":"diwali","bg":"#231028","eyebrow":"Celebrating","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"w":3,"short":"The festival of lights. Rows of little clay lamps, rangoli at the door, sweets for everyone and fireworks.","full":[["What is it?","Diwali is the festival of lights, celebrated by over a billion people: Hindus, Sikhs and Jains. For many Hindus it remembers Prince Rama coming home after fourteen years away, having rescued his wife Sita from the demon king Ravana. It was a night with no moon, so people lit rows of lamps to show him the way. Sikhs mark Bandi Chhor Divas at the same time, remembering Guru Hargobind being freed from prison."],["What happens","Houses are cleaned from top to bottom, and patterns called rangoli are made at the front door with coloured powder, rice or petals. After dark, little clay lamps called diyas go on every step and windowsill. Families visit each other with boxes of sweets, welcome Lakshmi, the goddess of good fortune, into the home, and finish with fireworks."]],"art":"A rangoli draws itself, one more lamp is lit each day, and rockets burst overhead."},
+  "Remembrance Sunday": {"src":"UK","tier":"festive","scene":"poppies","bg":"#2A2830","eyebrow":"Remembering","short":"The country remembers everyone who has died in wars, with poppies and two minutes’ silence.","full":[["What is it?","The First World War ended at 11 o’clock on 11 November 1918: the eleventh hour of the eleventh day of the eleventh month. Millions of people had died. Every year since, Britain has stopped to remember them, and everyone who has died in wars since. Remembrance Sunday is the second Sunday in November, the Sunday nearest that day."],["Why poppies?","On the battlefields of Flanders, in Belgium, red poppies grew in the churned-up earth. A Canadian doctor, John McCrae, wrote a poem about them called In Flanders Fields. People wear paper poppies to show they remember, and the money helps people who have served and their families. At 11 o’clock everyone keeps two minutes’ silence, and the King lays a wreath at the Cenotaph in London."]],"art":"Red poppies sway quietly in a field at dawn, and a petal drifts down now and then."},
+  "Armistice Day": {"src":"UK","tier":"festive","scene":"poppies","bg":"#2A2830","eyebrow":"Remembering","short":"The day the First World War ended, in 1918. At 11 o’clock the country keeps two minutes’ silence.","full":[["What is it?","An armistice is an agreement to stop fighting. At 11 o’clock on 11 November 1918, the eleventh hour of the eleventh day of the eleventh month, the guns of the First World War fell silent. Today many people, wherever they are, stop at 11 o’clock for two minutes of silence to remember everyone who has died in wars."],["The poppy","Red poppies grew on the battlefields of Flanders, in Belgium, and became the sign of remembering. People wear them in the weeks before, and the money from them helps people who have served in the armed forces, and their families."]],"art":"Red poppies sway quietly in a field at dawn, and a petal drifts down now and then."},
   "World Science Day for Peace and Development": {"src":"Observance","tier":"quiet","motif":"atom","eyebrow":"United Nations day","short":"A UNESCO day for science that is shared openly and used to make life better.","full":[["","A day started by UNESCO, the United Nations body for education, science and culture, in 2001. It is for science done in the open and shared across borders, and used for things like clean water, vaccines and warning of earthquakes, rather than for winning."]]},
   "Bhai Dooj": {"src":"Hindu","tier":"festive","scene":"diwali","v":"calm","bg":"#231028","eyebrow":"Last day of Diwali","pal":["#E8762C","#E8B33A","#F2D06B","#C9447E","#A05CC4","#E8762C"],"short":"The last day of Diwali, when sisters mark their brothers’ foreheads and feed them, and brothers bring gifts.","full":[["The story","Bhai Dooj comes two days after Diwali and celebrates brothers and sisters, a little like Raksha Bandhan. In the story Yama, the god of death, visited his sister Yamuna on this day. She welcomed him, marked his forehead and fed him so well that he promised any brother who visits his sister today will be blessed with a long life."],["What happens","Sisters invite their brothers home, put a tilak, a mark of red powder and rice, on their foreheads, say a small prayer with a lamp and feed them their favourite food. Brothers bring presents. In Bengal it is called Bhai Phonta, and in Nepal Bhai Tika, where the tika is made in seven colours."]],"art":"Every lamp lit, the rangoli finished, and a quieter sky."},
   "Chhath Puja": {"src":"Hindu","tier":"festive","scene":"chhath","bg":"#2A0F2E","eyebrow":"Celebrating","short":"Families stand in rivers at sunset and again at sunrise to thank the sun.","full":[["What is it?","Chhath is a festival for Surya, the sun god, mostly in Bihar, Jharkhand and eastern Uttar Pradesh, and among Bihari families around the world. It thanks the sun for life on Earth and asks for health for the family. It lasts four days."],["What happens","People fast for about 36 hours, without even water. At sunset on the third day, families walk to a river or pond, stand waist-deep in the water and offer the setting sun fruit and sweets in bamboo baskets. They come back before dawn to do the same for the rising sun. It is one of the few festivals that thanks the setting sun first."]],"art":"The sun sets into the river, where families stand in the water holding up baskets."},
   "Transgender Day of Remembrance": {"src":"Observance","tier":"quiet","motif":"candle","solemn":true,"eyebrow":"Remembrance","short":"Names of trans people killed in the past year are read aloud and candles are lit.","full":[["","Every year on 20 November, people gather to remember trans people around the world who were killed in the past year because of who they were. Their names are read out and candles are lit. It started in 1999, a year after a woman called Rita Hester was killed in Boston, and is now held in towns and cities all over the world."]]},
   "Kartik Poornima": {"src":"Hindu","tier":"festive","scene":"riverlamps","bg":"#08102A","eyebrow":"Tonight","short":"Thousands of tiny lamps float down the river at Varanasi, so the water looks full of stars.","full":[["What is it?","Kartik Poornima is the full moon of the month of Kartik, about two weeks after Diwali. It is said to be the day Shiva defeated the demon Tripurasura, and the day the gods themselves come down to bathe in the river Ganga. Sikhs celebrate Guru Nanak’s birthday on this full moon too."],["What happens","In Varanasi it is Dev Deepawali, the Diwali of the gods: lamps are lit all along the stone steps leading down to the river, and thousands more float on it, so the water looks full of stars. People bathe in the river at dawn, and in Odisha families float little boats to remember the sailors among their ancestors."]],"art":"Lamps float down the river past steps lined with flames."},
   "International Day for the Elimination of Violence against Women": {"src":"Observance","tier":"quiet","motif":"ribbonorange","eyebrow":"United Nations day","short":"A United Nations day, and the start of sixteen days of action against violence towards women and girls.","full":[["","A United Nations day for ending violence against women and girls, which around one in three women around the world face at some point in their lives. The date remembers the Mirabal sisters, killed in 1960 for standing up to a dictator in the Dominican Republic. It starts sixteen days of action that end on Human Rights Day, 10 December. Its colour is orange."]]},
+  "St Andrew’s Day": {"src":"UK","tier":"festive","scene":"saltire","bg":"#1D3366","eyebrow":"Latha Naomh Anndrais","short":"Scotland’s patron saint, whose X-shaped cross is the blue and white flag of Scotland.","full":[["Who was Andrew?","Saint Andrew was a fisherman from Galilee and one of the twelve disciples, the closest friends of Jesus; his brother was Saint Peter. The story says he was put to death on an X-shaped cross, because he felt he did not deserve to die on the same shape of cross as Jesus. That X, white on a blue sky, is the saltire, Scotland’s flag."],["Why Scotland?","A legend says that more than a thousand years ago, before a battle, a Scottish king saw a white X of clouds across the blue sky and took it as a sign that Andrew was on his side. The Scots won, and Andrew became Scotland’s patron saint. On 30 November people celebrate with ceilidh dancing, music and Scottish food, and in Scotland it is a bank holiday."]],"art":"The saltire flies above a loch, mist drifts across the mountains, and an eagle circles high above."},
   "Advent": {"src":"Advent","tier":"festive","scene":"advent","bg":"#0F241B","eyebrow":"Counting down","w":1.5,"short":"The countdown to Christmas: one door a day from 1 December, and the last one on Christmas Eve.","full":[["What is it?","Advent means “coming”. It is the time before Christmas when Christians get ready to celebrate the birth of Jesus. Advent calendars began in Germany in the 1800s, when families chalked a line on the door for every day left until Christmas Eve. Calendars with little doors to open came about a hundred years ago."],["What happens","Every morning from 1 December you open one door, and the last one, number 24, is Christmas Eve. Some homes burn an Advent candle down one mark a day, and many churches light one more candle on an Advent wreath each Sunday, with one in the middle for Christmas Day."]],"art":"Today’s door swings open, snow falls and the Advent candle burns down one mark a day."},
   "World AIDS Day": {"src":"Observance","tier":"quiet","motif":"ribbon","solemn":true,"eyebrow":"Observance","short":"Support for people living with HIV, and remembrance of the many who died. Marked with a red ribbon.","full":[["","HIV is a virus that attacks the body’s defences. In the 1980s and 90s it killed millions of people, partly because many governments were slow to act and people living with it were treated badly. Today medicine means people with HIV can live long, healthy lives and cannot pass it on. The red ribbon, worn since 1991, shows support for people living with HIV and remembers those who died."]]},
   "Dhanu Sankranti": {"src":"Hindu","tier":"festive","scene":"dhanu","bg":"#0A0F26","eyebrow":"Today","short":"The sun moves into Sagittarius, the archer, starting a month thought especially good for prayer.","full":[["What is it?","Sankranti is the day the sun moves into a new sign of the zodiac, which happens twelve times a year. Dhanu Sankranti is when it moves into Dhanu, the archer, which is Sagittarius. It starts a month called Dhanurmasa, thought especially good for prayer."],["What happens","In Odisha the god Jagannath is offered special sweet rice cakes. Around this time the town of Bargarh puts on Dhanu Jatra, said to be the world’s biggest open-air theatre: for eleven days the whole town becomes the set for a play about Krishna and his wicked uncle, King Kansa. In Tamil Nadu, women draw extra-large kolams every morning of this month."]],"art":"The sun drifts into the stars of Sagittarius, the archer, as they join up."},
   "Geeta Jayanti": {"src":"Hindu","tier":"festive","scene":"gita","bg":"#2A1206","eyebrow":"Today","short":"Marks the day the Bhagavad Gita was spoken: a conversation about doing the right thing when it is hard.","full":[["What is it?","The Bhagavad Gita, “the song of God”, is a conversation in the middle of the Mahabharata. Just before a great battle, the warrior Arjuna looks across the field, sees his cousins, teachers and friends on the other side, and puts down his bow. His charioteer, the god Krishna, talks to him about duty, courage and how to do the right thing when it is hard."],["What happens","Geeta Jayanti marks the day Krishna is said to have spoken it. People read it aloud, sometimes all 700 verses at once, and in Kurukshetra, the town said to stand on the old battlefield, there is a big festival with lamps on the lake. It is one of the most read books in the world, and its ideas are still argued about today."]],"art":"A book’s pages turn and glow in front of a slowly turning chariot wheel."},
+  "Christmas Eve": {"src":"UK","tier":"festive","scene":"christmaseve","bg":"#14224A","eyebrow":"Tonight","w":2,"short":"The night before Christmas: stockings up, a mince pie for Santa and a carrot for the reindeer.","full":[["What is it?","Christmas Eve is the day before Christmas. In many countries, like Germany and Poland, it is the main celebration, with presents opened that evening. In Britain it is the night of getting ready: the last presents wrapped, carols sung, and for many Christians a midnight service, to welcome Christmas Day as the clock strikes twelve."],["Before bed","Children hang up a stocking and leave out a mince pie, or a glass of milk, for Father Christmas, and a carrot for his reindeer. Then it is early to bed, because he only comes when everyone is asleep. Every year a defence centre in North America tracks his sleigh by radar, and you can follow his journey around the world online."]],"art":"Snow falls on a cottage with lit windows and smoke from the chimney, while Santa’s sleigh flies over."},
   "Christmas Day": {"src":"UK","tier":"festive","scene":"christmas","bg":"#0C2219","eyebrow":"Celebrating","w":3,"short":"Christians celebrate the birth of Jesus. Family, food, presents, and Santa somewhere overhead.","full":[["The story","Christians celebrate the birth of Jesus, who they believe is the son of God, born in a stable in Bethlehem about 2,000 years ago. The story tells of shepherds visited by angels, and wise men who followed a bright star to find him, which is why there is often a star on top of the tree."],["Where our traditions come from","Decorated trees became popular in Britain in Victorian times, after Queen Victoria and Prince Albert, who was German, put one up. Crackers were invented by a London sweet-maker called Tom Smith in the 1840s. Father Christmas is a mix of an old English winter figure and Saint Nicholas, a bishop famous for giving presents in secret."]],"art":"A tree of twinkling lights, a star that flares, a strand of bulbs and snow."},
   "Boxing Day": {"src":"UK","tier":"festive","scene":"christmas","v":"boxing","bg":"#0C2219","eyebrow":"Bank holiday","short":"The day after Christmas, named after the Christmas boxes once given to workers. Leftovers and long walks.","full":[["Why “Boxing”?","The name probably comes from Christmas boxes: money or presents given to servants, delivery people and workers, many of whom had to work on Christmas Day itself. Churches also opened their alms boxes and shared the money out among the poor. It is St Stephen’s Day too."],["What happens","These days it is a day for leftovers, long walks, visiting the relatives you did not see yesterday, football matches and a lot of sitting down."]],"art":"The Christmas scene, with the tree’s lights a little dimmer."},
   "Boxing Day (observed)": {"src":"UK","tier":"quiet","motif":"sun","eyebrow":"Bank holiday","short":"Boxing Day fell on a Saturday, so the bank holiday moves to today.","full":[["","When Boxing Day falls on a weekend, the bank holiday moves to the next weekday so everyone still gets a day off. In 2026 Boxing Day is a Saturday, so the holiday is on Monday 28 December."]]},
+  "New Year’s Eve": {"src":"UK","tier":"festive","scene":"nye","bg":"#10153A","eyebrow":"Tonight","w":2,"short":"The last night of the year: counting down to midnight, Big Ben’s bongs, and fireworks over the Thames.","full":[["What happens","On 31 December people stay up late to see the new year in. In the last minute everyone counts down the seconds, and at midnight Big Ben strikes twelve and London’s fireworks burst over the river Thames. People cheer, hug, and link arms to sing Auld Lang Syne, a Scottish song about not forgetting old friends, written down by Robert Burns."],["Hogmanay","In Scotland New Year’s Eve is called Hogmanay, and for a long time it was a bigger celebration than Christmas. One tradition is first-footing: the first person to step into your home after midnight brings luck for the year, especially if they carry a gift like coal, shortbread or salt."]],"art":"Big Ben counts down the last seconds of the year, then fireworks and confetti fill the sky."},
 };
 
 /* ------------------------------------------------------------------ *
@@ -7992,6 +8955,9 @@ function festActive(b, nowArg) {
   const d = now.getDate();
   if (m === 12 && d <= 24) add({ key: "Advent", day: d, of: 24, rank: 1 });
 
+  /* The UK's own days: Bonfire Night, Halloween, Easter Sunday and the rest. */
+  for (const key of festUkDays(now)) add({ key, day: 0, of: 0, rank: 1 });
+
   /* An awareness day, from the sensor that knows them. */
   const obs = festKey(b.observance);
   if (obs) add({ key: obs, day: 0, of: 0, rank: 4 });
@@ -8004,6 +8970,45 @@ function festActive(b, nowArg) {
     add({ key: span.name, day: festDiff(now, from) + 1, of: festDiff(to, from) + 1, rank: 5 });
   }
   return festRanked(found);
+}
+
+/* The days the UK keeps that no calendar here carries -- the bank holiday
+   calendar has only the days off -- worked out from the date: fixed days,
+   the ones that hang off Easter, and the nth Sunday of a month. */
+const FEST_UK_FIXED = {
+  "1-25": "Burns Night", "2-14": "Valentine’s Day", "3-1": "St David’s Day", "3-17": "St Patrick’s Day",
+  "4-1": "April Fools’ Day", "4-23": "St George’s Day", "10-31": "Halloween", "11-5": "Bonfire Night",
+  "11-11": "Armistice Day", "11-30": "St Andrew’s Day", "12-24": "Christmas Eve", "12-31": "New Year’s Eve",
+};
+
+/* Easter Sunday, Gregorian: the anonymous algorithm (Meeus/Jones/Butcher). */
+function festEaster(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const n = h + l - 7 * m + 114;
+  return new Date(y, Math.floor(n / 31) - 1, (n % 31) + 1);
+}
+
+function festNthSunday(y, month, n) {
+  const d = new Date(y, month - 1, 1);
+  d.setDate(1 + (7 - d.getDay()) % 7 + (n - 1) * 7);
+  return d;
+}
+
+function festUkDays(now) {
+  const y = now.getFullYear();
+  const out = [];
+  const fixed = FEST_UK_FIXED[`${now.getMonth() + 1}-${now.getDate()}`];
+  if (fixed) out.push(fixed);
+  const fromEaster = festDiff(now, festEaster(y));
+  if (fromEaster === 0) out.push("Easter Sunday");
+  if (fromEaster === -47) out.push("Pancake Day");
+  if (fromEaster === -21) out.push("Mother’s Day");
+  if (festDiff(now, festNthSunday(y, 6, 3)) === 0) out.push("Father’s Day");
+  /* Remembrance Sunday can fall on the 11th itself, and is then the one. */
+  if (festDiff(now, festNthSunday(y, 11, 2)) === 0) return out.filter((k) => k !== "Armistice Day").concat("Remembrance Sunday");
+  return out;
 }
 
 function festRunLength(run, key, date, days) {

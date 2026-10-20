@@ -1299,6 +1299,16 @@ Onam's ten days up to its calendar day, Ganesh Chaturthi for ten. Advent runs
 Month, Pride Month, South Asian Heritage Month, Black History Month) come from
 the date too.
 
+So do the days the UK keeps that no calendar here carries, since the bank
+holiday calendar has only the days off: Burns Night, Valentine's Day, Pancake
+Day, St David's Day, Mother's Day, St Patrick's Day, April Fools' Day, Easter
+Sunday, St George's Day, Father's Day, Halloween, Bonfire Night, Remembrance
+Sunday, Armistice Day, St Andrew's Day, Christmas Eve and New Year's Eve. The
+ones that move are worked out too: Easter by the Gregorian rule, Pancake Day 47
+days before it, Mothering Sunday three weeks before it, Father's Day the third
+Sunday of June and Remembrance Sunday the second of November, which takes the
+place of Armistice Day when the two fall together. Each has its own scene.
+
 ```yaml
 type: custom:spectra-card
 body:
@@ -1317,9 +1327,9 @@ explanation, written for a child to read, and a line for each other thing on
 today that opens in turn. Bank holidays and awareness days are the plain card
 with a small motif; days of remembrance stay quiet on purpose.
 
-Tapped, the card opens full screen in the browser's top layer, like the
-camera's live view: nothing of the dashboard shows, not the rail, not Home
-Assistant's header. On a wall panel the words fit beside the scene without
+Tapped, the card opens full screen the way the camera's live view does, a
+fixed layer over everything: nothing of the dashboard shows, not the rail,
+not Home Assistant's header. On a wall panel the words fit beside the scene without
 scrolling; the cross or Escape closes it.
 
 Two or more things on one day take turns: the card slides from one to the
