@@ -4,7 +4,9 @@
  *   - one bin drawn per bin going out, and a second type sensor that reads
  *     as nothing draws nothing rather than an empty bin
  *   - a caddy is drawn smaller than a wheelie bin, as it is on the kerb
- *   - the day word: Today, Tomorrow, a weekday inside the week, a date
+ *   - the big word is the night they go out -- Tonight, Tomorrow, the
+ *     weekday before, a date beyond the week -- and under it when they
+ *     are collected; on the day itself, Collected / Today
  *     beyond it -- and the date always beside it
  *   - each bin wears its council colour, from the depictions only, and a
  *     bin with none is the card's accent; the ones after are a line each
@@ -131,8 +133,12 @@ const js = fs.readFileSync(file);
     };
     check("a caddy is drawn well under a wheelie bin's height", height(1) < height(0) * 0.7,
       `${height(1)} vs ${height(0)}`);
-    check("a day inside the week is named", hero() === day(3), hero());
-    check("with the date and how far", /\d(st|nd|rd|th) [A-Z][a-z]{2} · in 3 days$/.test(sub()), sub());
+    const label = () => (q(".binslabel") || {}).textContent;
+    check("the big word is the night they go out, the evening before",
+      label() === "Put out" && hero() === day(2), `${label()} / ${hero()}`);
+    check("and under it, when they are collected",
+      sub() === `Collected ${day(3).slice(0, 3)} ` + sub().split(" ").slice(2).join(" ")
+        && /^Collected [A-Z][a-z]{2} \d+(st|nd|rd|th) [A-Z][a-z]{2}$/.test(sub()), sub());
     check("the ones after, a line each", all(".binlater").length === 2, all(".binlater").length);
     check("each with its date", all(".binlater .when").every((e) =>
       /^[A-Z][a-z]{2} \d+(st|nd|rd|th) [A-Z][a-z]{2}$/.test(e.textContent)),
@@ -159,8 +165,8 @@ const js = fs.readFileSync(file);
     shots.push("one");
     check("one bin out draws one bin, not an empty second", all(".binout").length === 1,
       all(".binout").length);
-    check("tomorrow says so", hero() === "Tomorrow", hero());
-    check("and which day that is", sub().startsWith(day(1) + " "), sub());
+    check("collected tomorrow goes out tonight", hero() === "Tonight", hero());
+    check("and says which day it is collected", sub().startsWith(`Collected ${day(1).slice(0, 3)} `), sub());
 
     /* Three on one day: the day still beside them, nothing overlapping. */
     set(S + "next_type_3", "Food Caddy");
@@ -182,7 +188,12 @@ const js = fs.readFileSync(file);
 
     scene(0, "Mixed recycling", "Garden waste");
     await show();
-    check("today says so", hero() === "Today", hero());
+    check("on the day, it says collected today",
+      (q(".binslabel") || {}).textContent === "Collected" && hero() === "Today", hero());
+    check("with the date", sub().startsWith(day(0) + " "), sub());
+    scene(2, "Mixed recycling", "Garden waste");
+    await show();
+    check("collected the day after tomorrow goes out tomorrow", hero() === "Tomorrow", hero());
 
     scene(9, "Mixed recycling", "");
     await show();

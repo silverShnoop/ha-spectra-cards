@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.197.0";
+const VERSION = "0.198.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -2172,6 +2172,10 @@ ${TOKENS_DARK}
 .binsnext.n3 .binswhen .hero { font-size:27px; }
 .binsnext.n4 .binswhen { padding-bottom:0; }
 .binswhen .hero { margin:0; }
+.binslabel {
+  margin:0 0 3px; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--sp-ink-2);
+}
 .binbody { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; stroke-linejoin:round; }
 .binlid { fill:var(--accent); }
 .binhandle { fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linecap:round; }
@@ -17707,7 +17711,8 @@ const BODIES = {
           + (isBlank(x.name) ? "" : `<p class="binname">${esc(x.name)}</p>`) + `</div>`).join("")
         + `</div>`;
       if (when) {
-        html += `<div class="binswhen"><p class="hero">${esc(when.word)}</p>`
+        html += `<div class="binswhen"><p class="binslabel">${esc(when.label)}</p>`
+          + `<p class="hero">${esc(when.word)}</p>`
           + (when.note ? `<p class="sub">${esc(when.note)}</p>` : "") + `</div>`;
       }
       html += `</div>`;
@@ -22678,17 +22683,20 @@ function binDate(days) {
   return { n: Math.round(n), day, date, short: `${day.slice(0, 3)} ${date}` };
 }
 
-/* The day word answers "is it tonight"; the date under it answers "which
-   collection is this", and they stay two facts -- see dayDateLabel. A day
-   inside the week is named; one further out is a date, because "Friday"
-   ten days away is next week's Friday and reads as this one. */
+/* Two facts, kept apart: the night the bins go out, which is the one you
+   act on and so the big word, and the day they are collected, with its
+   date, which says which collection this is -- see dayDateLabel. Out is
+   the evening before. On the day itself going out has already happened,
+   so the big word becomes the collection. A night inside the week is
+   named; one further out is a date, because "Thursday" ten days away is
+   next week's and reads as this one. */
 function binWhen(days) {
   const d = binDate(days);
   if (!d) return null;
-  if (d.n === 0) return { word: "Today", note: `${d.day} ${d.date}` };
-  if (d.n === 1) return { word: "Tomorrow", note: `${d.day} ${d.date}` };
-  if (d.n < 7) return { word: d.day, note: `${d.date} · in ${d.n} days` };
-  return { word: d.short, note: `in ${d.n} days` };
+  if (d.n === 0) return { label: "Collected", word: "Today", note: `${d.day} ${d.date}` };
+  const out = binDate(d.n - 1);
+  const word = d.n === 1 ? "Tonight" : d.n === 2 ? "Tomorrow" : d.n <= 7 ? out.day : out.short;
+  return { label: "Put out", word, note: `Collected ${d.short}` };
 }
 
 /* ---- softener ---- */

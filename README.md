@@ -2746,10 +2746,12 @@ own tokens like `--sp-salt` and the sky's: matte, a blue that cannot pass for
 the notice blue, and only ever a fill inside the drawing, never an edge. Any
 other name, and any bin without one, wears the card's accent.
 
-**The day is two facts.** `Today`, `Tomorrow` or the weekday answers *is it
-tonight*; the date under it answers *which collection is this*. Beyond a week
-the word is a date, because "Friday" ten days out is next week's and reads as
-this one.
+**When they go out, and when they are collected.** The big word is the
+night the bins go out, the evening before collection: `Tonight`, `Tomorrow`,
+the weekday inside a week, or a date beyond it, under a small `Put out`. The
+line under it is the collection, `Collected Fri 23rd Oct`, which says which
+collection this is. On collection day going out has already happened, so it
+reads `Collected` / `Today` with the date.
 
 **Nothing here is a job.** Putting the bins out is a Needs you row owned by
 the bin calendar, so this card takes no level however close the day is. The
