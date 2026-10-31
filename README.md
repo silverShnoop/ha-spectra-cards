@@ -1147,6 +1147,29 @@ taking the left third and about the next eighteen hours to its right; on a
 phone it is two hours by day and four by night, and now takes more of the
 width. `tools/checkahead.js` holds this.
 
+**`today` puts the day so far behind the readings.**
+
+```yaml
+  today: {temperature: sensor.outdoor_temperature, weather: weather.home}
+```
+
+Now and the hours coming, and the hours that have gone, in one picture: the
+room left of the now line, under the readings, becomes today from midnight —
+midnight at the left edge, now at the line, the night at half the width of
+the day as everywhere else on the card. Its sky is each hour's own, off the
+weather's history, dimmed the way the `day` card dims what has happened and
+lifting towards now; the clouds over now still blow left into it. The
+measured line runs solid from midnight to the reading now, where the
+forecast's dashes take over, with the low and the high so far marked and the
+hours it has crossed along the foot. The ids are read exactly as `day` reads
+them — the sensor's hourly statistics and the weather's history, once every
+ten minutes, shared with any `day` card on the page.
+
+The line keeps to the lower part of the sky so it runs under the readings
+rather than through them, and the picture is given 48px more height for it.
+On a card 1000px or wider the light left moves down to the ground with the
+other figures. `tools/checktoday.js` holds all of it.
+
 ### `day` — the whole of today, as a picture
 
 ```yaml
@@ -3818,6 +3841,28 @@ spectra panel: load=reload discarded=no from=- prev=pagehide prev_quiet=4s
 It is read from a heartbeat the bundle keeps in `localStorage` every 30
 seconds. Set `no_load_report: true` on the view to turn it off.
 `tools/checkloadreport.js` covers it.
+
+**`sheet: [Home]` draws a tab as one thing rather than a set of cards.**
+(`sheet: true` for every tab.) The grid is the box: one ground, one edge,
+one set of corners, and no gaps — the sections meet at a hairline. The cards
+on it give up their own ground, edge and corners, so the clock, the sky and
+the lists read as parts of one page. The picture cards run edge to edge
+inside their part of it.
+
+The edge goes transparent rather than away: it keeps its two pixels, so a
+card that takes a level shows it exactly as before and nothing moves when
+it does. (Home never wears a level, but the sheet does not depend on that.)
+Needs you and the rail are never part of the sheet — the jobs stay a list of
+their own. Other tabs are cards, gaps and all. It is done with four
+properties the panel sets on the grid and the shell reads,
+`--pn-card-ground`, `--pn-card-edge`, `--pn-card-radius` and
+`--pn-card-pad`, so a card outside a sheet is untouched.
+`tools/checksheet.js` holds it, and `tools/shothome.js` screenshots the
+whole Home tab both ways with made-up data:
+
+```
+node tools/shothome.js --out DIR [--layout cards|sheet] [--at 19:30] [--light]
+```
 
 ### Quick actions: a scheduled square in the corner
 

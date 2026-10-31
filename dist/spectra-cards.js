@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.198.0";
+const VERSION = "0.199.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -300,9 +300,15 @@ ${TOKENS_DARK}
 ha-icon { display:inline-flex; line-height:0; }
 
 /* shell */
+/* The --pn-card-* four are the panel's to set: on a tab drawn as one sheet
+   (spectra-panel's sheet option) the cards give up their own ground, edge and
+   corners to it and are told so through these. Anywhere else they are
+   unset and the card is the box it always was. The edge keeps its two
+   pixels either way -- transparent, not gone -- so a level still has
+   somewhere to show without anything moving. */
 .card {
-  background:var(--sp-surface); border:2px solid var(--sp-edge);
-  border-radius:6px; padding:9px 10px; position:relative;
+  background:var(--pn-card-ground, var(--sp-surface)); border:2px solid var(--pn-card-edge, var(--sp-edge));
+  border-radius:var(--pn-card-radius, 6px); padding:var(--pn-card-pad, 9px 10px); position:relative;
 }
 /* "grow: true": in a fill_row section, this is the card that takes up the
    difference, so the row ends level. Room at its foot, unless its body
@@ -517,7 +523,7 @@ ha-icon { display:inline-flex; line-height:0; }
 .card.seasoncard { overflow:hidden; }
 .seasoncanvas {
   position:absolute; inset:0; width:100%; height:100%; display:block;
-  pointer-events:none; z-index:0; border-radius:4px;
+  pointer-events:none; z-index:0; border-radius:var(--pn-card-inner, 4px);
 }
 .card.seasoncard > .titlebar, .card.seasoncard .clock { position:relative; z-index:1; }
 .card.seasoncard .clockwhen > *, .card.seasoncard .clocktime {
@@ -3751,7 +3757,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    palette swallows the words sitting on top of it. inset:-2px so it covers
    the border box too, now that the border is transparent. */
 .card.festive::before {
-  content:""; position:absolute; inset:-2px; border-radius:6px;
+  content:""; position:absolute; inset:-2px; border-radius:var(--pn-card-radius, 6px);
   background:linear-gradient(180deg,rgba(8,5,12,.5),rgba(8,5,12,.82));
   pointer-events:none;
 }
@@ -3776,7 +3782,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
   color:#fff; container-type:inline-size;
 }
 .fscanvas { position:absolute; inset:0; width:100%; height:100%; display:block;
-  z-index:0; pointer-events:none; border-radius:4px; }
+  z-index:0; pointer-events:none; border-radius:var(--pn-card-inner, 4px); }
 .fsscrim { position:absolute; inset:0; z-index:1; pointer-events:none;
   background:linear-gradient(90deg, rgba(8,5,12,.72) 0%, rgba(8,5,12,.45) 55%, rgba(8,5,12,0) 100%); }
 .fsin { position:relative; z-index:2; min-height:184px; box-sizing:border-box;
@@ -3852,7 +3858,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    so the picture gets its own band above them and nothing of it sits
    under text. The band shows the scene's stage (see FEST_STAGE). */
 @container (max-width: 420px) {
-  .fscanvas { inset:0 0 auto 0; height:56cqi; border-radius:4px 4px 0 0; --fs-crop:stage; }
+  .fscanvas { inset:0 0 auto 0; height:56cqi; border-radius:var(--pn-card-inner, 4px) var(--pn-card-inner, 4px) 0 0; --fs-crop:stage; }
   .fsscrim { display:none; }
   .fsin { padding-top:calc(56cqi + 10px); }
   .fsin > :not(.fsxp) { max-width:100%; }
@@ -4343,7 +4349,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
    off the box rather than the viewport, so a phone gets the same picture
    smaller rather than a different one. */
 .skybox {
-  position:relative; margin-top:2px; border-radius:4px; overflow:hidden;
+  position:relative; margin-top:2px; border-radius:var(--pn-card-inner, 4px); overflow:hidden;
   aspect-ratio:576 / 236; max-width:100%; container-type:inline-size;
 }
 /* On a panel a section with "fill_row" is told how much taller (or shorter)
@@ -4359,7 +4365,7 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .card.skycard > .titlebar {
   position:absolute; top:9px; left:10px; right:10px; z-index:1; margin:0;
 }
-.card.skycard .skybox { margin:0; border-radius:4px; }
+.card.skycard .skybox { margin:0; border-radius:var(--pn-card-inner, 4px); }
 /* On a picture card the way to full screen is a button in the top right
    corner, on a shade of the paper, after the meta: as faint ink beside the
    title it was lost against the sky. The meta moves left to make room. */
@@ -4372,11 +4378,19 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .skycanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
 /* day -- the same picture-is-the-card treatment as the sky, at a fixed
    height so the temperatures and icons read the same at any width. */
-.daybox { position:relative; height:248px; border-radius:4px; overflow:hidden; }
+.daybox { position:relative; height:248px; border-radius:var(--pn-card-inner, 4px); overflow:hidden; }
 /* ahead -- the Now card's readings over the left of a picture of the day
    ahead. The painter says where now ends, as --ahead-now, and the readings
    and the figures keep to it. */
-.aheadbox { position:relative; height:calc(264px + max(0px, var(--pn-row-grow, 0px))); border-radius:4px; overflow:hidden; container-type:inline-size; }
+.aheadbox { position:relative; height:calc(264px + max(0px, var(--pn-row-grow, 0px))); border-radius:var(--pn-card-inner, 4px); overflow:hidden; container-type:inline-size; }
+/* With the day so far behind the readings the line keeps to the lower part
+   of the sky, under them, so the picture is given the height for it. */
+.aheadbox.today { height:calc(312px + max(0px, var(--pn-row-grow, 0px))); }
+.aheadbox.today .skybase .aheadleft { margin:0; font-size:inherit; color:var(--sp-ink-2); white-space:nowrap; display:none; }
+@container (min-width: 1000px) {
+  .aheadbox.today .skybase .aheadleft { display:inline; }
+  .aheadbox.today .skyread .aheadleft { display:none; }
+}
 .aheadcanvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:pan-y; cursor:pointer; }
 /* Full screen: the box is the screen, the readings larger, and the hours
    are dragged rather than tapped. The way back sits clear of the cross. */
@@ -15521,7 +15535,7 @@ function aheadWeather(cond, cover, wet) {
 }
 
 /* Everything the picture needs: now as it is, and the forecast's hours. */
-function aheadModel(b, now) {
+function aheadModel(b, now, got) {
   const mid = dayMidnight(now);
   const at = (t) => (t - mid) / 3600000;
   const nowH = at(now);
@@ -15547,10 +15561,45 @@ function aheadModel(b, now) {
   const nightCfg = b.night && typeof b.night === "object" ? b.night : {};
   let night = { from: clock(nightCfg.from, 20), until: clock(nightCfg.until, 6) };
   if (night.from <= night.until) night = { from: 20, until: 6 };
-  return { mid, now: nowH, days: aheadDays(b, mid), current, rows, temps, night,
+  /* `today`: the day so far, behind the readings -- the sensor's hourly
+     means since midnight and the weather's history, read as the day card
+     reads them. Only once there is something to draw. */
+  const past = aheadPast(b, got, mid, nowH, live);
+  return { mid, now: nowH, days: aheadDays(b, mid), current, rows, temps, night, past,
     moon: skyNum(b.moon), times: skyTimes(b),
     key: [rows.map((r) => `${r.h.toFixed(2)}${r.cond}${r.cover.toFixed(2)}${r.rain}`).join(","), cond, current.cover.toFixed(2),
       String(b.rising), String(b.setting), night.from, night.until].join("|") };
+}
+
+/* The day so far for an ahead card with `today`: the line since midnight,
+   ending at the reading now, and each past hour's weather off the history.
+   Null without `today`, or before anything has been read. */
+function aheadPast(b, got, mid, nowH, live) {
+  if (!b.today || typeof b.today !== "object" || !got) return null;
+  const at = (t) => (t - mid) / 3600000;
+  const line = [];
+  for (const r of got.stats || []) {
+    const t = typeof r.start === "number" ? r.start : skyTime(r.start);
+    const v = Number(r.mean);
+    if (t === null || !Number.isFinite(v)) continue;
+    const h = at(t) + .5;
+    if (h >= 0 && h < nowH - .1) line.push([h, v]);
+  }
+  if (live !== null && line.length) line.push([nowH, live]);
+  const usable = (c) => !isBlank(c) && c !== "unavailable" && c !== "unknown";
+  const hist = (got.hist || [])
+    .map((e) => ({ h: at(Number(e.lu || e.lc || 0) * 1000), s: e.s, a: e.a || {} }))
+    .filter((e) => usable(e.s))
+    .sort((x, y) => x.h - y.h);
+  const hours = [];
+  for (let i = 0; i < Math.ceil(nowH); i++) {
+    let hit = null;
+    for (const e of hist) { if (e.h <= i + .5) hit = e; else break; }
+    hit = hit || hist[0] || null;
+    hours.push(hit ? aheadWeather(String(hit.s), skyNum(hit.a.cloud_coverage), 0) : null);
+  }
+  if (line.length < 2 && !hours.some(Boolean)) return null;
+  return { line, hours, key: `${line.length}|${hours.map((x) => (x ? x.cond + x.cover.toFixed(2) : "-")).join(",")}` };
 }
 
 /* The full screen's day chips: today, and each day the hourly forecast
@@ -15770,13 +15819,15 @@ class AheadPainter extends DayPainter {
     this.home = { from: this.sc, to: 0, at: now || performance.now(), ms: 900 };
   }
 
-  /* The sky's colour at an hour, as on the Today card. */
-  skyAt(h) {
+  /* The sky's colour at an hour, as on the Today card. `wx`, when given,
+     is the weather to colour it by instead of the forecast's: the history's,
+     for an hour already gone. */
+  skyAt(h, given) {
     const ctx = this.ctx;
     const tk = this.tk;
     const m = this.model;
     const e = aheadSun(m, h);
-    const wx = aheadBlend(m, h);
+    const wx = given || aheadBlend(m, h);
     const lightness = daySmooth(-.85, .5, e);
     const glow = Math.exp(-(((e + .05) / .42) ** 2)) * (1 - wx.cover * .7);
     let top = skyMix(ctx, tk["night-top"], tk["day-top"], lightness);
@@ -15880,6 +15931,116 @@ class AheadPainter extends DayPainter {
     this.nowStars = Array.from({ length: Math.round(L.x0 / 8) }, () => ({ x: skyRand(0, L.x0 - 10), y: skyRand(4, skyH * .75), r: skyRand(.4, 1.2), p: skyRand(0, 6), s: skyRand(.5, 1.7) }));
   }
 
+  /* Today so far, squeezed into the room left of the now line: midnight at
+     the left edge, now at the line, the night at half the width of the day
+     as everywhere else. Where an hour of today is drawn. */
+  pastX(h, x0, nowH) {
+    const U = this.axis.U;
+    const span = Math.max(1e-6, U(nowH) - U(0));
+    return (U(Math.max(0, Math.min(nowH, h))) - U(0)) / span * x0;
+  }
+
+  /* An hour gone's weather, off the history and eased between its hours;
+     now's own where the history has nothing. */
+  pastWx(h) {
+    const m = this.model;
+    const list = (m.past && m.past.hours) || [];
+    const p = Math.max(0, h - .5);
+    const i = Math.floor(p);
+    const a = list[Math.min(i, list.length - 1)] || m.current;
+    const c = list[Math.min(i + 1, list.length - 1)] || m.current;
+    const k = daySmooth(0, 1, p - i);
+    return { cover: a.cover + (c.cover - a.cover) * k, rain: a.rain + (c.rain - a.rain) * k, snow: a.snow + (c.snow - a.snow) * k };
+  }
+
+  /* The day so far as a line: measured, solid, from midnight to the reading
+     now, where the forecast's dashes take over. The hours it has crossed
+     are marked along the foot of the sky, and its coldest and warmest
+     points carry their figures. */
+  paintPast(past, Y, ramp, x0, skyH, nowH, big) {
+    const ctx = this.ctx;
+    const tk = this.tk;
+    const A = (c, a) => skyAlpha(ctx, c, a);
+    const PX = (h) => this.pastX(h, x0, nowH);
+    ctx.font = `${big ? 12 : 10}px ${tk.mono}`; ctx.textAlign = "left";
+    for (let hh = 0; hh < nowH - 1.5; hh += 6) {
+      const x = PX(hh);
+      ctx.strokeStyle = A(tk.ink, .1); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, skyH * .55); ctx.lineTo(x, skyH); ctx.stroke();
+      ctx.fillStyle = A(tk.ink, .5);
+      ctx.fillText(`${String(hh).padStart(2, "0")}:00`, x + 4, skyH - 6);
+    }
+    const pts = past.line.map(([h, v]) => [PX(h), Y(v)]);
+    if (pts.length < 2) return;
+    const curve = () => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+        ctx.bezierCurveTo(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+          p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1]);
+      }
+    };
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = A("#000", .35); ctx.lineWidth = big ? 8 : 6; curve(); ctx.stroke();
+    ctx.strokeStyle = ramp; ctx.lineWidth = big ? 4 : 3; curve(); ctx.stroke();
+    /* The low and the high so far, if either is clear of now. */
+    const body = past.line.slice(0, -1);
+    const marks = [];
+    if (body.length) {
+      const lo = body.reduce((p, q) => (q[1] < p[1] ? q : p));
+      const hi = body.reduce((p, q) => (q[1] > p[1] ? q : p));
+      marks.push(lo);
+      if (Math.round(hi[1]) !== Math.round(lo[1])) marks.push(hi);
+    }
+    ctx.font = `${big ? 600 : 500} ${big ? 15 : 12}px ${tk.mono}`; ctx.textAlign = "center";
+    for (const [h, v] of marks) {
+      const x = PX(h);
+      if (x0 - x < 36) continue;
+      const y = Y(v);
+      ctx.fillStyle = tk.ink; ctx.beginPath(); ctx.arc(x, y, big ? 3.6 : 2.6, 0, 7); ctx.fill();
+      ctx.strokeStyle = A("#000", .6); ctx.lineWidth = 3;
+      ctx.strokeText(`${Math.round(v)}°`, x, y - 9); ctx.fillText(`${Math.round(v)}°`, x, y - 9);
+    }
+  }
+
+  /* The sky of the day so far, column by column, fading out over its last
+     F pixels into the hours ahead. Drawn again only as now moves on. */
+  buildPast(x0, skyH, F, nowH) {
+    const m = this.model;
+    const key = [x0, skyH, F, this.tkKey, m.past.key, Math.round(nowH * 12), this.built].join("|");
+    if (key === this.pastBuilt) return;
+    this.pastBuilt = key;
+    const cv = this.pastCanvas || (this.pastCanvas = document.createElement("canvas"));
+    cv.width = Math.max(1, Math.ceil(x0)); cv.height = Math.max(1, Math.round(skyH));
+    const x = cv.getContext("2d");
+    x.clearRect(0, 0, cv.width, cv.height);
+    const hourAt = (u) => {
+      let lo = 0;
+      let hi = nowH;
+      for (let n = 0; n < 24; n++) { const mm = (lo + hi) / 2; if (this.pastX(mm, x0, nowH) < u) lo = mm; else hi = mm; }
+      return lo;
+    };
+    this.pastNight = [];
+    for (let u = 0; u < cv.width; u += 1) {
+      const hh = hourAt(u + .5);
+      const sk = this.skyAt(hh, this.pastWx(hh));
+      const g = x.createLinearGradient(0, 0, 0, skyH);
+      g.addColorStop(0, sk.top); g.addColorStop(1, sk.low);
+      x.fillStyle = g;
+      x.fillRect(u, 0, 1.5, skyH);
+      this.pastNight.push(sk.night * (1 - sk.cover));
+    }
+    x.globalCompositeOperation = "destination-in";
+    /* The whole width: destination-in clears whatever it does not cover. */
+    const k0 = Math.max(0, (x0 - F) / x0);
+    const fm = x.createLinearGradient(0, 0, x0, 0);
+    fm.addColorStop(0, "#000"); fm.addColorStop(k0, "#000");
+    fm.addColorStop(k0 + (1 - k0) * .35, "rgba(0,0,0,.85)"); fm.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = fm; x.fillRect(0, 0, cv.width, skyH);
+    x.globalCompositeOperation = "source-over";
+  }
+
   paint(now, once) {
     const canvas = this.canvas;
     const m = this.model;
@@ -15957,6 +16118,17 @@ class AheadPainter extends DayPainter {
     fm.addColorStop(0, "#000"); fm.addColorStop(.35, "rgba(0,0,0,.85)"); fm.addColorStop(1, "rgba(0,0,0,0)");
     fx.fillStyle = fm; fx.fillRect(0, 0, F, skyH);
     ctx.drawImage(fade, x0 - F, 0);
+    /* `today`: the day so far takes the room under the readings -- its own
+       sky, hour by hour off the history, dimmed the way the day card dims
+       what has happened, and lifting towards now. */
+    const past = m.past && m.past.line ? m.past : null;
+    if (past) {
+      this.buildPast(x0, skyH, F, nowH);
+      ctx.drawImage(this.pastCanvas, 0, 0);
+      const dg = ctx.createLinearGradient(0, 0, x0, 0);
+      dg.addColorStop(0, A(tk.sink, .5)); dg.addColorStop(.7, A(tk.sink, .28)); dg.addColorStop(1, A(tk.sink, 0));
+      ctx.fillStyle = dg; ctx.fillRect(0, 0, x0, skyH);
+    }
 
     /* Stars: ahead in their own hours, and over now when it is dark. */
     for (const o of this.stars) {
@@ -15966,11 +16138,12 @@ class AheadPainter extends DayPainter {
       ctx.beginPath(); ctx.arc(x, o.y, o.r, 0, 7); ctx.fill();
     }
     const dim = s.night * (1 - s.cover);
-    if (dim > .02) {
-      for (const o of this.nowStars) {
-        ctx.fillStyle = A(tk.star, (.2 + .8 * Math.abs(Math.sin(t * o.s + o.p))) * dim);
-        ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, 7); ctx.fill();
-      }
+    for (const o of this.nowStars) {
+      /* Over the day so far, only where that hour was dark. */
+      const k = past && this.pastNight ? (this.pastNight[Math.floor(o.x)] || 0) : dim;
+      if (k <= .02) continue;
+      ctx.fillStyle = A(tk.star, (.2 + .8 * Math.abs(Math.sin(t * o.s + o.p))) * k);
+      ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, 7); ctx.fill();
     }
 
     /* The sun and the moon, on the now line, only rising and setting. */
@@ -16135,10 +16308,13 @@ class AheadPainter extends DayPainter {
     const vals = [];
     for (let hh = nowH; hh <= end; hh += .25) { const v = aheadTempAt(m, hh); if (v !== null) vals.push(v); }
     const blocks = this.axis.blocks.filter(([a, b]) => b > leadH && X(Math.max(a, leadH)) < w);
+    if (past) for (const p of past.line) vals.push(p[1]);
     if (vals.length) {
       const lo = Math.floor(Math.min(...vals)) - 1;
       const hi = Math.ceil(Math.max(...vals)) + 1;
-      const top = big ? skyH * .36 : Math.max(56, skyH * .5);
+      /* With the day so far, the line keeps under the readings it runs
+         beneath. */
+      const top = big ? skyH * .36 : Math.max(56, skyH * (past ? .66 : .5));
       const bot = big ? skyH * .66 : skyH - 24;
       const Y = (v) => top + (1 - (v - lo) / (hi - lo)) * (bot - top);
       const pts = [];
@@ -16150,6 +16326,7 @@ class AheadPainter extends DayPainter {
       ctx.strokeStyle = A("#000", .4); ctx.lineWidth = big ? 9 : 6; path(); ctx.stroke();
       ctx.strokeStyle = ramp; ctx.setLineDash(big ? [8, 7] : [5, 5]); ctx.lineDashOffset = (U(nowH) * px + sc) % (big ? 15 : 10);
       ctx.lineWidth = big ? 3.4 : 2.2; path(); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+      if (past) this.paintPast(past, Y, ramp, x0, skyH, nowH, big);
       const ny = Y(aheadTempAt(m, leadH));
       ctx.globalAlpha = sc > 1 ? .45 : 1;
       ctx.fillStyle = A(tk.ink, .25); ctx.beginPath(); ctx.arc(x0, ny, big ? 12 : 9, 0, 7); ctx.fill();
@@ -16271,7 +16448,7 @@ class AheadPainter extends DayPainter {
       const c = skyClock(m.times, Date.now());
       if (c.left !== null) {
         const text = skyLeft(c.left, c.up);
-        if (this.label.textContent !== text) this.label.textContent = text;
+        for (const el of [].concat(this.label)) if (el && el.textContent !== text) el.textContent = text;
       }
     }
   }
@@ -18297,17 +18474,23 @@ const BODIES = {
     if (icon || says.length) read.push(`<div class="aheadnow">${icon}<div>${says.join("")}</div></div>`);
     const metrics = (Array.isArray(b.metrics) ? b.metrics : []).filter((m) => m && !isBlank(m.value));
     const said = [b.text, b.hero].filter((v) => !isBlank(v)).join(", ");
-    return `<div class="aheadbox">`
+    const today = Boolean(b.today && typeof b.today === "object");
+    return `<div class="aheadbox${today ? " today" : ""}">`
       + `<canvas class="aheadcanvas" role="img" aria-label="${esc(said || "Sky")}, and the hours ahead."></canvas>`
       + `<button class="aheadback" type="button" hidden aria-label="Back to now">`
       + `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke-width="2" class="track"/>`
       + `<circle cx="10" cy="10" r="8" fill="none" stroke-width="2" class="ring" stroke-dasharray="50.27" transform="rotate(-90 10 10)"/></svg>`
       + `<span>Back to now</span></button>`
       + `<span class="aheadwhen" hidden></span>`
-      + `<div class="skyread">${read.join("")}<p class="aheadleft skyleft">${esc(skyLeft(scene.left, scene.up))}</p></div>`
+      + `<div class="skyread">${read.join("")}`
+      + `<p class="aheadleft skyleft">${esc(skyLeft(scene.left, scene.up))}</p></div>`
       + `<div class="skybase">${metrics.map((m) => `<span>`
         + (isBlank(m.label) ? "" : `<i>${esc(m.label)}</i>`)
-        + `${esc(m.value)}</span>`).join("")}</div>`
+        + `${esc(m.value)}</span>`).join("")}`
+      /* With the day so far under the readings, the light left goes down
+         to the ground with the other figures where there is room for it,
+         leaving the sky to the line (see .aheadbox.today). */
+      + (today ? `<span class="aheadleft aheadleftbase">${esc(skyLeft(scene.left, scene.up))}</span>` : "") + `</div>`
       + `</div>`;
   },
 
@@ -24578,9 +24761,20 @@ class SpectraCard extends HTMLElement {
       return;
     }
     if (!this._ahead) this._ahead = new AheadPainter();
-    this._ahead.label = this._holder.querySelector(".aheadleft");
+    this._ahead.label = [...this._holder.querySelectorAll(".aheadleft")];
     this._ahead.returnAfter = Math.max(3, Number((b || {}).return_after) || 30) * 1000;
-    this._ahead.attach(canvas, aheadModel(b || {}, Date.now()));
+    const today = b && b.today && typeof b.today === "object" ? b.today : null;
+    const past = today ? this._pastRead("ahead", today.temperature, today.weather, (got) => {
+      if (this._ahead && this._model && this._config && this._config.body.type === "ahead") {
+        const live = this._holder.querySelector(".aheadcanvas");
+        if (live) this._ahead.attach(live, aheadModel(this._model.body || {}, Date.now(), got));
+        if (this._axSheet && this._axSheet.painter.canvas) {
+          this._axSheet.painter.attach(this._axSheet.painter.canvas, aheadModel(this._model.body || {}, Date.now(), got));
+        }
+      }
+    }) : null;
+    this._aheadPast = past;
+    this._ahead.attach(canvas, aheadModel(b || {}, Date.now(), past));
     /* The card does not scroll: a tap, or the symbol by the title, opens it
        full screen, where the hours do. */
     this._holder.querySelectorAll("[data-expand], .aheadcanvas").forEach((el) => {
@@ -24654,8 +24848,8 @@ class SpectraCard extends HTMLElement {
         const now = fresh.querySelector(`.${k}`);
         if (was && now && was.innerHTML !== now.innerHTML) was.innerHTML = now.innerHTML;
       });
-      s.painter.label = box.querySelector(".aheadleft");
-      const m = aheadModel(b, Date.now());
+      s.painter.label = [...box.querySelectorAll(".aheadleft")];
+      const m = aheadModel(b, Date.now(), this._aheadPast || null);
       const days = wrap.querySelector("[data-axdays]");
       const chips = aheadDayChips(m);
       if (days && days.dataset.html !== chips) { days.dataset.html = chips; days.innerHTML = chips; s.painter.dayOn = null; }
@@ -24697,27 +24891,43 @@ class SpectraCard extends HTMLElement {
     }
     if (!this._day) this._day = new DayPainter();
     const body = b || {};
+    const data = this._pastRead("day", body.temperature, body.weather, (got) => {
+      if (this._day && this._model && this._config && this._config.body.type === "day") {
+        const live = this._holder.querySelector(".daycanvas");
+        if (live) this._day.attach(live, dayModel(this._model.body || {}, got, Date.now()));
+      }
+    });
+    this._day.attach(canvas, dayModel(body, data, Date.now()));
+  }
+
+  /* Today so far, for the day card and for an ahead card with `today`: the
+     temperature sensor's hourly means since midnight, and the weather's
+     history for what the sky did. Shared by every card on the page that
+     reads the same pair, and read again after ten minutes. Returns what is
+     in hand now; `landed` is called with the read when it arrives, once per
+     read for each `slot` (the body asking). */
+  _pastRead(slot, temperature, weather, landed) {
     const now = Date.now();
     const mid = dayMidnight(now);
-    const key = `${body.temperature}|${body.weather}|${mid}`;
+    const key = `${temperature}|${weather}|${mid}`;
     let hit = DAY_PAST.get(key);
     if ((!hit || now - hit.at > 600000) && this._hass && typeof this._hass.callWS === "function") {
       const from = new Date(mid).toISOString();
       const to = new Date(now).toISOString();
       const ask = (msg) => Promise.resolve(this._hass.callWS(msg)).catch(() => null);
       const promise = Promise.all([
-        isBlank(body.temperature) ? null : ask({
+        isBlank(temperature) ? null : ask({
           type: "recorder/statistics_during_period", start_time: from, end_time: to,
-          statistic_ids: [String(body.temperature)], period: "hour", types: ["mean"],
+          statistic_ids: [String(temperature)], period: "hour", types: ["mean"],
         }),
-        isBlank(body.weather) ? null : ask({
+        isBlank(weather) ? null : ask({
           type: "history/history_during_period", start_time: from, end_time: to,
-          entity_ids: [String(body.weather)], minimal_response: false, no_attributes: false,
+          entity_ids: [String(weather)], minimal_response: false, no_attributes: false,
           significant_changes_only: false,
         }),
       ]).then(([stats, hist]) => ({
-        stats: (stats && stats[String(body.temperature)]) || [],
-        hist: (hist && hist[String(body.weather)]) || [],
+        stats: (stats && stats[String(temperature)]) || [],
+        hist: (hist && hist[String(weather)]) || [],
       }));
       const entry = { at: now, data: hit ? hit.data : null, promise };
       promise.then((data) => { entry.data = data; });
@@ -24726,16 +24936,12 @@ class SpectraCard extends HTMLElement {
       for (const k of DAY_PAST.keys()) if (!k.endsWith(`|${mid}`)) DAY_PAST.delete(k);
     }
     /* Every copy of the card waiting on the same read repaints when it lands. */
-    if (hit && this._dayWaits !== hit.promise) {
-      this._dayWaits = hit.promise;
-      hit.promise.then((data) => {
-        if (this._day && this._model && this._config && this._config.body.type === "day") {
-          const live = this._holder.querySelector(".daycanvas");
-          if (live) this._day.attach(live, dayModel(this._model.body || {}, data, Date.now()));
-        }
-      });
+    this._pastWaits = this._pastWaits || {};
+    if (hit && this._pastWaits[slot] !== hit.promise) {
+      this._pastWaits[slot] = hit.promise;
+      hit.promise.then(landed);
     }
-    this._day.attach(canvas, dayModel(body, hit ? hit.data : null, now));
+    return hit ? hit.data : null;
   }
 
   /* The sky body's painter: one per card, kept across repaints so a light
@@ -33584,6 +33790,19 @@ const PANEL_SHEET = `
 .grid.masonry > .section { grid-row-end:span var(--pn-rows, 1); }
 .section:has(> [hidden]) { display:none; }
 .section.offtab { display:none; }
+/* \`sheet\`: the tab is one thing rather than a set of cards. The grid is
+   the box -- one ground, one edge, one set of corners -- and the cards in
+   it give up theirs (the --pn-card-* the card's shell reads). No gaps:
+   sections meet at a hairline, drawn on each one's top and left and
+   clipped at the sheet's own edge, so only the seams between them show. */
+:host([sheet]) { --pn-col-gap:0px; --pn-row-gap:0px; }
+.grid.sheet { background:var(--sp-surface); border:2px solid var(--sp-edge); border-radius:8px;
+  overflow:hidden; max-width:none;
+  --pn-card-ground:transparent; --pn-card-edge:transparent; --pn-card-radius:0px;
+  --pn-card-inner:0px; --pn-card-pad:11px 14px; }
+.grid.sheet > .section { box-shadow:-1px -1px 0 0 var(--sp-edge); }
+.grid.sheet > .section.bg { padding:0; border-radius:0; }
+.grid.sheet > .section > .sbg { display:none; }
 .section > hui-section { position:relative; }
 .section.bg { padding:8px; border-radius:var(--ha-section-border-radius, 16px); }
 .sbg { position:absolute; inset:0; border-radius:inherit; pointer-events:none;
@@ -33992,6 +34211,14 @@ function quickSheetMarkup(st) {
     + `<div class="qtail" data-phase="${st.phase}">${quickTailMarkup(st)}</div></div>`;
 }
 
+/* A length read off a custom property, in px: the fallback only when it is
+   not a number at all, so a sheet's 0px gap is a gap of nought and not of
+   the default. */
+function cssPx(value, fallback) {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 class SpectraPanel extends HTMLElement {
   constructor() {
     super();
@@ -34091,6 +34318,7 @@ class SpectraPanel extends HTMLElement {
     set("--pn-qa-size", this._config.quick_size, "px");
     tabStore.setDefault(this._config.default_tab);
     this._grid.classList.toggle("masonry", Boolean(this._config.masonry));
+    this._applyTab();
     this._layout();
   }
 
@@ -34181,6 +34409,11 @@ class SpectraPanel extends HTMLElement {
     for (const w of this._wrappers) {
       w.wrap.classList.toggle("offtab", Boolean(w.tabs) && !w.tabs.includes(tab));
     }
+    /* `sheet: [Home]` (or `sheet: true` for every tab): drawn as one thing. */
+    const sheet = this._config && this._config.sheet;
+    const on = sheet === true || (Array.isArray(sheet) && sheet.map(String).includes(String(tab)));
+    this.toggleAttribute("sheet", on);
+    this._grid.classList.toggle("sheet", on);
   }
 
   connectedCallback() {
@@ -34258,7 +34491,7 @@ class SpectraPanel extends HTMLElement {
     const shown = this._wrappers.filter((w) => !off(w) && !(side && w.side));
     const spanOf = (w) => Math.max(1, Number(w.section.config && w.section.config.column_span) || 1);
     const style = getComputedStyle(this);
-    const gap = parseFloat(style.getPropertyValue("--pn-col-gap")) || 20;
+    const gap = cssPx(style.getPropertyValue("--pn-col-gap"), 20);
     const min = parseFloat(style.getPropertyValue("--pn-min")) || 320;
     const inner = this._scroll.clientWidth || width;
     const fit = Math.max(1, Math.floor((inner + gap) / (min + gap)));
@@ -34724,9 +34957,14 @@ class SpectraPanel extends HTMLElement {
       if (!card._config || !card._config.grow) continue;
       const max = room ? Math.max(0, Math.floor(room - (card.getBoundingClientRect().top - top) / zoom)) : 0;
       const was = card.style.getPropertyValue("--pn-max-h");
-      if (was === (max ? `${max}px` : "")) continue;
-      if (max) card.style.setProperty("--pn-max-h", `${max}px`);
-      else card.style.removeProperty("--pn-max-h");
+      if (was !== (max ? `${max}px` : "")) {
+        if (max) card.style.setProperty("--pn-max-h", `${max}px`);
+        else card.style.removeProperty("--pn-max-h");
+      }
+      /* Measured again even at the same height: the rows that fit change
+         with the width as well. Cut while the columns were still being
+         counted, a narrow card's prose wrapped to twice its height, every
+         row was hidden, and nothing measured them again once it widened. */
       if (card._cutRows) card._cutRows();
     }
   }
@@ -34771,7 +35009,7 @@ class SpectraPanel extends HTMLElement {
 
   _spanMasonry() {
     if (!this._config.masonry) return;
-    const gap = parseFloat(getComputedStyle(this).getPropertyValue("--pn-row-gap")) || 20;
+    const gap = cssPx(getComputedStyle(this).getPropertyValue("--pn-row-gap"), 20);
     for (const w of this._wrappers) {
       /* offsetHeight, not getBoundingClientRect: under CSS zoom the rect
          is in zoomed pixels and the 4px rows are not, so every section
