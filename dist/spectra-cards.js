@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.198.0";
+const VERSION = "0.199.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -23596,6 +23596,7 @@ class SpectraCard extends HTMLElement {
 
   connectedCallback() {
     this._startTicking();
+    this._startMidnight();
     if (this._cc) this._cameraTick();
     /* Moved, not removed: the live view stays, and its video -- which a
        browser pauses the moment it leaves the page -- carries on. */
@@ -23693,8 +23694,18 @@ class SpectraCard extends HTMLElement {
     if (this._dimGiveUp) { clearTimeout(this._dimGiveUp); this._dimGiveUp = null; }
     if (this._pressTimer) { clearTimeout(this._pressTimer); this._pressTimer = null; }
     if (this._keyPick) { clearTimeout(this._keyPick); this._keyPick = null; }
+    /* The timers that read the calendars and the plan again stop with the
+       card, so the reads are forgotten with them: connectedCallback then
+       asks afresh, which starts the timers again. Left marked as fetched,
+       a card taken off the page for an instant -- Home Assistant moving
+       it, a tablet turning -- never read them again, and a festival card
+       went on showing Bonfire Night until Diwali had come and gone. The
+       old events stay on screen until the new ones replace them. */
     if (this._mealTimer) { clearTimeout(this._mealTimer); this._mealTimer = null; }
     if (this._calTimer) { clearTimeout(this._calTimer); this._calTimer = null; }
+    for (const key of this._mealSources.keys()) this._fetched.delete(key);
+    for (const key of this._calendarSources.keys()) this._fetched.delete(key);
+    if (this._midnight) { clearTimeout(this._midnight); this._midnight = null; }
     /* The season's frames stop with the card rather than running on for a
        canvas nobody can see. */
     if (this._season) this._season.stop();
@@ -23998,6 +24009,28 @@ class SpectraCard extends HTMLElement {
 
   /* Relative times go stale on their own, with no state change to prompt a
      re-render. Only cards that actually show one pay for the timer. */
+  /* Just after midnight, every card is drawn again and reads its calendars
+     and plan afresh. Nothing a card watches changes at midnight, so
+     without this a panel went on showing yesterday's festival, diary and
+     meals until something else happened to move. */
+  _startMidnight() {
+    if (this._midnight || !this.isConnected) return;
+    const next = new Date();
+    next.setHours(24, 0, 2, 0);
+    this._midnight = setTimeout(() => {
+      this._midnight = null;
+      if (!this.isConnected) return;
+      for (const key of this._calendarSources.keys()) this._fetched.delete(key);
+      this._refetchMeals();
+      if (this._hass && this._config) {
+        for (const [key, source] of this._calendarSources) this._fetchCalendar(key, source);
+        this._signature = null;
+        this._update();
+      }
+      this._startMidnight();
+    }, Math.max(1000, next - Date.now()));
+  }
+
   _startTicking() {
     if (this._timer || !this.isConnected) return;
     /* Home Assistant can attach the element before it configures it, so this
