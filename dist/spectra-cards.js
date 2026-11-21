@@ -14392,19 +14392,57 @@ function festBirthdays(b) {
       const k = FEST_LOVES[String(l || "").toLowerCase().trim()];
       if (k && loves.indexOf(k) < 0) loves.push(k);
     }
-    out.push({ name, month, day, loves, key: `${name}\u2019s birthday`,
+    /* `from`: the celebration starts this many days early -- a birthday
+       weekend -- up to a fortnight. */
+    let lead = 0;
+    const f = /^(?:\d{4}-)?(\d{1,2})-(\d{1,2})$/.exec(String(x.from || "").trim());
+    if (f) {
+      const B = new Date(2000, month - 1, day);
+      let F = new Date(2000, Number(f[1]) - 1, Number(f[2]));
+      if (F > B) F = new Date(1999, Number(f[1]) - 1, Number(f[2]));
+      const n = festDiff(B, F);
+      if (n >= 0 && n <= 14) lead = n;
+    }
+    out.push({ name, month, day, loves, lead, key: `${name}\u2019s birthday`,
       short: x.short, message: x.message, say: x.say && typeof x.say === "object" ? x.say : {} });
   }
   return out;
 }
 
-/* Is today theirs? A 29 February birthday is kept on the 28th in the years
-   without one. */
-function festIsBirthday(bd, now) {
-  const m = now.getMonth() + 1, d = now.getDate();
-  if (m === bd.month && d === bd.day) return true;
-  const leap = new Date(now.getFullYear(), 1, 29).getMonth() === 1;
-  return bd.month === 2 && bd.day === 29 && !leap && m === 2 && d === 28;
+/* Is today theirs, or one of the days `from` gives before it? Which day of
+   how many, and the big day's date. A 29 February birthday is kept on the
+   28th in the years without one. */
+function festBirthdayRun(bd, now) {
+  for (const y of [now.getFullYear(), now.getFullYear() + 1]) {
+    let on = new Date(y, bd.month - 1, bd.day);
+    if (bd.month === 2 && bd.day === 29 && on.getMonth() !== 1) on = new Date(y, 1, 28);
+    const start = new Date(on);
+    start.setDate(start.getDate() - bd.lead);
+    const into = festDiff(now, start);
+    if (into >= 0 && into <= bd.lead) return { day: into + 1, of: bd.lead + 1, big: into === bd.lead, on };
+  }
+  return null;
+}
+
+/* The days before the big one: a weekend when the run is short and takes
+   one in, a week when it is long. */
+const FEST_COUNT = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen"];
+function festBirthdayItem(bd, run) {
+  const item = { key: bd.key, day: run.day, of: run.of, rank: 0, birthday: true, big: run.big, on: run.on };
+  if (run.big) return item;
+  let weekend = false;
+  for (let i = 0; i < run.of; i += 1) {
+    const d = new Date(run.on);
+    d.setDate(d.getDate() - i);
+    if (d.getDay() === 0 || d.getDay() === 6) weekend = true;
+  }
+  item.eyebrow = run.of >= 5 ? "Birthday week" : weekend ? "Birthday weekend" : "Birthday countdown";
+  const left = run.of - run.day;
+  if (!(typeof bd.short === "string" && bd.short.trim())) {
+    item.short = `${item.eyebrow}! ${FEST_COUNT[left] || left} more ${left === 1 ? "sleep" : "sleeps"} to ${bd.name}\u2019s big day,`
+      + " and treats are allowed all the way there.";
+  }
+  return item;
 }
 
 function festBirthdayEntry(bd) {
@@ -14497,7 +14535,7 @@ function festActive(b, nowArg) {
   const previewed = wanted && birthdays.find((bd) => [bd.key, bd.name, `${bd.name} birthday`, `${bd.name}'s birthday`, "birthday"]
     .some((k) => festLoose(k) === wanted));
   if (previewed) {
-    add({ key: previewed.key, day: 0, of: 0, rank: 0, birthday: true });
+    add({ key: previewed.key, day: 0, of: 0, rank: 0, birthday: true, big: true });
     return festRanked(found);
   }
   const preview = festKey(b.preview);
@@ -14536,7 +14574,10 @@ function festActive(b, nowArg) {
   }
 
   /* A birthday the dashboard names, on its day, before anything else. */
-  for (const bd of birthdays) if (festIsBirthday(bd, now)) add({ key: bd.key, day: 0, of: 0, rank: 0, birthday: true });
+  for (const bd of birthdays) {
+    const run = festBirthdayRun(bd, now);
+    if (run) add(festBirthdayItem(bd, run));
+  }
 
   /* Advent, until Christmas Eve. */
   const m = now.getMonth() + 1;
@@ -14620,6 +14661,12 @@ function festRanked(found) {
 
 /* The line under the name: how far through, and until when. */
 function festWhen(item) {
+  if (item.birthday) {
+    if (!(item.of > 1)) return "";
+    if (item.big) return `<b>The big day</b> \u00b7 day ${item.day} of ${item.of}`;
+    const left = item.of - item.day;
+    return `<b>Day ${item.day} of ${item.of}</b> \u00b7 the big day is ${left === 1 ? "tomorrow" : esc(festShort(item.on))}`;
+  }
   if (item.key === "Advent") {
     const left = 25 - item.day;
     return `<b>Door ${item.day} of 24</b> · ${left} ${left === 1 ? "sleep" : "sleeps"} to Christmas`;
@@ -14733,15 +14780,15 @@ function festScenesBody(b) {
        with the motif standing large and faint on the right where a
        festival's scene would be. */
     return `<div class="fsquiet"${open}>${festXp()}<span class="fsqart" aria-hidden="true">${festMotif(entry.motif, 96)}</span>`
-      + `<div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsname">${esc(entry.title || lead.key)}</div>`
+      + `<div class="fseye">${esc(lead.eyebrow || entry.eyebrow || "Today")}</div><div class="fsname">${esc(entry.title || lead.key)}</div>`
       + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}`
-      + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>${dots}`;
+      + `${lead.short || entry.short ? `<p class="fsshort">${esc(lead.short || entry.short)}</p>` : ""}${also}</div>${dots}`;
   }
   return `<canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsscrim"></span>`
-    + `<div class="fsin"${open}>${festXp()}<div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div>`
+    + `<div class="fsin"${open}>${festXp()}<div class="fseye">${esc(lead.eyebrow || entry.eyebrow || "Celebrating")}</div>`
     + `<div class="fsname">${esc(entry.title || lead.key)}</div>`
     + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}${festPips(lead, entry)}`
-    + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>${dots}`;
+    + `${lead.short || entry.short ? `<p class="fsshort">${esc(lead.short || entry.short)}</p>` : ""}${also}</div>${dots}`;
 }
 
 /* The full-screen view of one event: its scene large, then all of the
@@ -14757,7 +14804,7 @@ function festSheetMarkup(item, others) {
   const close = `<div class="fsclosebar"><button type="button" class="fsclose" aria-label="Close" data-fsclose>${iconMarkup("mdi:close")}</button></div>`;
   if (entry.tier !== "festive") {
     return `<div class="fsbox quiet">${close}<div class="fshead">${festMotif(entry.motif, 56)}</div>`
-      + `<div class="fsbody"><div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsbig">${esc(entry.title || item.key)}</div>`
+      + `<div class="fsbody"><div class="fseye">${esc(item.eyebrow || entry.eyebrow || "Today")}</div><div class="fsbig">${esc(entry.title || item.key)}</div>`
       + `${festWhen(item) ? `<div class="fswhen">${festWhen(item)}</div>` : ""}<div class="fsstory">${story}</div>${also}</div></div>`;
   }
   const doors = item.key === "Advent" ? `<div class="fsdoors">${Array.from({ length: 24 }, (_, i) => {
@@ -14766,7 +14813,7 @@ function festSheetMarkup(item, others) {
   }).join("")}</div>` : "";
   return `<div class="fsbox${entry.birthday ? " bday" : ""}" style="--fg:${esc(cssColor(entry.bg) || "#1A1426")}">${close}`
     + `<div class="fsstage"><canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsfade"></span></div>`
-    + `<div class="fsbody"><div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div><div class="fsbig">${esc(entry.title || item.key)}</div>`
+    + `<div class="fsbody"><div class="fseye">${esc(item.eyebrow || entry.eyebrow || "Celebrating")}</div><div class="fsbig">${esc(entry.title || item.key)}</div>`
     + `${festWhen(item) ? `<div class="fswhen">${festWhen(item)}</div>` : ""}${festPips(item, entry)}${doors}`
     + `<div class="fsstory">${story}</div>${festShowMarkup(entry)}${also}</div></div>`;
 }
@@ -33544,8 +33591,8 @@ class SpectraCard extends HTMLElement {
           if (s.painter.still) s.painter.size();
         }));
         s.showTimer = setInterval(() => { if (st.goto === null || st.goto === undefined) light(st.chapter || 0); }, 250);
-        /* A birthday's full screen waits for its whole show before it closes itself. */
-        if (st.total) this._fullScreen(s, () => this._festClose(), Math.max(FULL_IDLE_MS, (st.total + 5) * 1000));
+        /* A birthday's full screen stays until somebody closes it. */
+        this._fullScreen(s, () => this._festClose(), Infinity);
       } else if (s.idleMs) {
         this._fullScreen(s, () => this._festClose());
       }
@@ -34616,7 +34663,8 @@ class SpectraCard extends HTMLElement {
   _fullScreen(sheet, close, ms) {
     if (sheet.idle) sheet.idle();
     sheet.idleMs = ms || 0;
-    sheet.idle = fullScreenIdle(sheet.wrap, close, ms || FULL_IDLE_MS);
+    /* Infinity: this one never closes itself (a birthday's). */
+    sheet.idle = ms === Infinity ? null : fullScreenIdle(sheet.wrap, close, ms || FULL_IDLE_MS);
   }
 
   /* The dialog itself lives outside the class (`confirmDialog`) because the

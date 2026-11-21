@@ -19,8 +19,8 @@ and next) closes itself after **a minute untouched**, so a wall panel left
 on one goes back to the dashboard. Any touch, drag, wheel or key inside it
 starts the minute again. A new full screen registers through the card's
 `_fullScreen(sheet, close)`, which is what gives it this; `tools/checkfullidle.js`
-checks each one. The one exception is a birthday's, which waits for its whole
-show to play once before it closes (see Birthdays, under `festival`).
+checks each one. The one exception is a birthday's, which stays until
+somebody closes it (see Birthdays, under `festival`).
 
 ## Why there is no template language
 
@@ -1370,6 +1370,7 @@ body:
   birthdays:
     - name: Morgan
       date: "03-14"              # MM-DD; a year in front is allowed and ignored
+      from: "03-12"              # optional: start early, a birthday weekend (up to 14 days)
       loves: [drawing, yoga, mindfulness, journaling, mystery, romance, comedy]
       say:                       # optional: a chapter's line in your own words
         comedy: Three sketches before bed, minimum.
@@ -1398,11 +1399,16 @@ two names for the same love count once. Every chapter is drawn from its own
 clock alone, so a resize or a jump lands on a composed picture, and reduced
 motion gets one still: the cake, candles lit.
 
+With `from`, the celebration starts early and counts down: "Birthday
+weekend" (a week when it is five days or more), "Day 1 of 3 · the big day is
+Sun 14 Mar", "One more sleep", then "Happy birthday" and "The big day" on
+the day itself. The same show plays on every day of it.
+
 It does not take turns: anything else on the same day is named under it as
 "Also today". Tapped, it opens full screen with the message and the show
 listed, the chapter playing lit; a press on another goes straight to it. That
-full screen waits for one whole show (about eighty seconds with every
-chapter) before it closes itself.
+full screen does not close itself after a minute, as every other one does:
+it stays until somebody closes it.
 
 To see it on another day, put the name (`Morgan`, `Morgan’s birthday`) or
 just `birthday` in the preview helper. 29 February is kept on the 28th in the

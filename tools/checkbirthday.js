@@ -6,10 +6,11 @@
  * are "Also today"), named by the person; the loves become the show's
  * chapters in the dashboard's order, aliases folded and unknowns dropped;
  * the day before shows nothing; a preview by name shows it; 29 February
- * is kept on the 28th in other years; full screen lists the show, follows
- * it and jumps on a press, fits a 1280x800 panel and waits for one whole
- * show before closing itself; every chapter draws at every moment without
- * an error, inside a frame budget; and reduced motion still gets a picture.
+ * is kept on the 28th in other years; `from` makes a birthday weekend,
+ * counted to the big day; full screen lists the show, follows it and jumps
+ * on a press, fits a 1280x800 panel and never closes itself; every chapter
+ * draws at every moment without an error, inside a frame budget; and
+ * reduced motion still gets a picture.
  *
  *   node tools/checkbirthday.js [path/to/spectra-cards.js] [--shot FILE]
  */
@@ -27,6 +28,8 @@ const js = fs.readFileSync(file);
 const MORGAN = { name: "Morgan", date: "03-14",
   loves: ["drawing", "Yoga", "calm", "mindfulness", "journaling", "thrillers", "romance", "comedy", "knitting"] };
 const LEAP = { name: "Casey", date: "2000-02-29", loves: ["comedy"] };
+/* A birthday weekend: Friday 11 to Sunday 13 June 2027. */
+const WEEKEND = { name: "Morgan", date: "06-13", from: "06-11", loves: ["yoga"] };
 
 (async () => {
   console.log(`birthday: ${path.relative(process.cwd(), file)}`);
@@ -61,6 +64,7 @@ const LEAP = { name: "Casey", date: "2000-02-29", loves: ["comedy"] };
 
   const cards = { birthday: "2027-03-14T09:00:00", before: "2027-03-13T09:00:00", leap27: "2027-02-28T09:00:00",
     leap28a: "2028-02-28T09:00:00", leap28b: "2028-02-29T09:00:00" };
+  await page.evaluate((w) => { window.WEEKEND = w; }, WEEKEND);
   await page.evaluate(({ cards, people }) => {
     const hass = {
       states: {
@@ -88,6 +92,7 @@ const LEAP = { name: "Casey", date: "2000-02-29", loves: ["comedy"] };
     window.CARDS = {};
     for (const [k, now] of Object.entries(cards)) window.CARDS[k] = make(now);
     window.CARDS.preview = make("2027-06-01T09:00:00", { preview: { entity: "input_text.preview_name" } });
+    for (const d of ["10", "11", "12", "13", "14"]) window.CARDS[`wk${d}`] = make(`2027-06-${d}T09:00:00`, { birthdays: [window.WEEKEND] });
     window.CARDS.word = make("2027-06-01T09:00:00", { preview: { entity: "input_text.preview_word" } });
   }, { cards, people: [MORGAN, LEAP] });
   await page.waitForTimeout(1500);
@@ -99,7 +104,8 @@ const LEAP = { name: "Casey", date: "2000-02-29", loves: ["comedy"] };
       const text = (sel) => ((r.querySelector(sel) || {}).textContent || "").replace(/\s+/g, " ").trim();
       out[k] = {
         hidden: el.hidden || !r.querySelector(".card"),
-        eye: text(".fseye"), name: text(".fsname"), also: text(".fsalso"), short: text(".fsshort"),
+        eye: text(".fseye"), name: text(".fsname"), also: text(".fsalso"), short: text(".fsshort"), when: text(".fswhen"),
+        pips: r.querySelectorAll(".fspips span").length, lit: r.querySelectorAll(".fspips span.on").length,
         dots: r.querySelectorAll(".fsdots button").length,
         scene: !!r.querySelector(".card.festscene .fscanvas"),
         painting: !!(el._fest && el._fest.draw && el._fest.canvas && el._fest.canvas.width > 0),
@@ -122,6 +128,12 @@ const LEAP = { name: "Casey", date: "2000-02-29", loves: ["comedy"] };
   check("so does a preview of just \"birthday\"", r.word.name === "Morgan", r.word);
   check("29 February is kept on the 28th in a year without one", r.leap27.name === "Casey", r.leap27);
   check("and on the 29th itself in a year with one, not the 28th", r.leap28b.name === "Casey" && r.leap28a.name !== "Casey", [r.leap28a, r.leap28b]);
+  check("from: a birthday weekend starts on its first day, counted to the big day",
+    r.wk11.name === "Morgan" && r.wk11.eye === "Birthday weekend" && r.wk11.when.startsWith("Day 1 of 3") && r.wk11.when.includes("Sun 13 Jun")
+    && r.wk11.pips === 3 && r.wk11.lit === 1 && r.wk11.short.startsWith("Birthday weekend! Two more sleeps"), r.wk11);
+  check("the day before, the big day is tomorrow", r.wk12.when.startsWith("Day 2 of 3") && r.wk12.when.includes("tomorrow") && r.wk12.short.includes("One more sleep"), r.wk12);
+  check("and on it, Happy birthday", r.wk13.eye === "Happy birthday" && r.wk13.when.startsWith("The big day") && r.wk13.short.includes("all about Morgan"), r.wk13);
+  check("not the day before the weekend, nor the day after the birthday", r.wk10.name !== "Morgan" && r.wk14.name !== "Morgan", [r.wk10, r.wk14]);
 
   /* Every chapter, every moment: drawn straight through, at card, phone
      and full-screen sizes, with no error and inside a frame budget. */
@@ -170,8 +182,8 @@ const LEAP = { name: "Casey", date: "2000-02-29", loves: ["comedy"] };
       chapters: eps.map((b) => b.querySelector("b").textContent),
       firstLit: eps.length > 0 && eps[0].classList.contains("on"),
       story: (wrap.querySelector(".fsstory") || {}).textContent || "",
-      idle: el._fsSheet && el._fsSheet.idleMs,
-      total: el._fsSheet && el._fsSheet.painter && el._fsSheet.painter.state.total,
+      idleMs: el._fsSheet && (el._fsSheet.idleMs === Infinity ? "never" : el._fsSheet.idleMs),
+      timer: !!(el._fsSheet && el._fsSheet.idle),
     };
     eps[4].click();
     await new Promise((x) => setTimeout(x, 1900));
@@ -186,7 +198,7 @@ const LEAP = { name: "Casey", date: "2000-02-29", loves: ["comedy"] };
   check("with the birthday message", sheet.story.includes("Happy birthday, Morgan"), sheet.story);
   check("a press on a chapter goes straight to it, and it is lit", sheet.jumped === 4 && sheet.lit === 4, sheet);
   check("it fits a 1280x800 panel without scrolling", sheet.over <= 1, sheet.over);
-  check("and waits for one whole show before closing itself", sheet.idle >= (sheet.total + 5) * 1000 && sheet.idle > 60000, sheet);
+  check("and it never closes itself: it stays until somebody closes it", sheet.idleMs === "never" && !sheet.timer, sheet);
   if (shot) {
     await page.waitForTimeout(1500);
     await page.screenshot({ path: shot });
