@@ -19,7 +19,8 @@ and next) closes itself after **a minute untouched**, so a wall panel left
 on one goes back to the dashboard. Any touch, drag, wheel or key inside it
 starts the minute again. A new full screen registers through the card's
 `_fullScreen(sheet, close)`, which is what gives it this; `tools/checkfullidle.js`
-checks each one.
+checks each one. The one exception is a birthday's, which waits for its whole
+show to play once before it closes (see Birthdays, under `festival`).
 
 ## Why there is no template language
 
@@ -1354,6 +1355,61 @@ not know still shows, as the plain card.
 
 Without `scenes: true` the body is the older one: `text`, `wash`, `decor`,
 `palette`, `day`, `of` and `count_art`, all given by the dashboard.
+
+#### Birthdays
+
+A birthday the dashboard names takes the card for the whole day. Nothing
+about the person lives in the card: the name, the day and what they love are
+all in the dashboard's config, and stay there.
+
+```yaml
+body:
+  type: festival
+  scenes: true
+  events: [...]
+  birthdays:
+    - name: Morgan
+      date: "03-14"              # MM-DD; a year in front is allowed and ignored
+      loves: [drawing, yoga, mindfulness, journaling, mystery, romance, comedy]
+      say:                       # optional: a chapter's line in your own words
+        comedy: Three sketches before bed, minimum.
+      message: Happy birthday!   # optional: the words on the full screen
+      short: It's Morgan's day.  # optional: the line on the card
+```
+
+On the day the card says "Happy birthday" over their name, and on the right
+plays a show in chapters. The cake comes first -- the name piped on it, the
+candles lit one by one, "make a wish", blown out, confetti -- then a chapter
+for each thing they love, in the order the dashboard gives:
+
+| Love | Also accepted | The chapter |
+| --- | --- | --- |
+| `drawing` | art, sketching, painting | A pencil sketches a bouquet on a sketchbook page, then a brush washes it with colour. |
+| `yoga` | stretching | A figure flows from pose to pose on a mat at sunrise: reach, tree, warrior, triangle, prayer. |
+| `mindfulness` | calm, meditation, breathing | A lotus on a lake at dusk, and a circle that breathes: in for four, hold, out for four. |
+| `journaling` | journalling, journal, writing, diary | A fountain pen writes a birthday letter on the day's page, with three of their other loves in it. |
+| `mystery` | thriller, thrillers, mysteries, crime, detective | A magnifying glass sweeps an evidence board, a photo develops, PLOT TWIST, and "Next episode in 3". |
+| `romance` | romcom, romcoms, love stories | A book riffles to its last page -- "...and they lived happily ever after" -- with hearts rising. |
+| `comedy` | funny, laughing, sketches, sketch comedy | Try not to laugh: a clapperboard, a face holding it in, a rubber chicken, the spit take. |
+
+Each chapter blooms in over the last like wet paint and plays for about ten
+seconds, and the show loops. A love the card does not know is left out, and
+two names for the same love count once. Every chapter is drawn from its own
+clock alone, so a resize or a jump lands on a composed picture, and reduced
+motion gets one still: the cake, candles lit.
+
+It does not take turns: anything else on the same day is named under it as
+"Also today". Tapped, it opens full screen with the message and the show
+listed, the chapter playing lit; a press on another goes straight to it. That
+full screen waits for one whole show (about eighty seconds with every
+chapter) before it closes itself.
+
+To see it on another day, put the name (`Morgan`, `Morgan’s birthday`) or
+just `birthday` in the preview helper. 29 February is kept on the 28th in the
+years without one. No age is shown, and none is asked for.
+
+`tools/checkbirthday.js` checks all of this, and draws every chapter at every
+moment at card, phone and full-screen sizes.
 
 ### `alert` — what is wrong right now that you must fix?
 

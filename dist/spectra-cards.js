@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.199.0";
+const VERSION = "0.200.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -3946,6 +3946,22 @@ h4.rmlanehead { margin:0 0 14px; padding:10px 12px; border-radius:10px; }
 .fsgo b { display:block; font-size:15px; font-weight:600; }
 .fsgo span { display:block; font-size:13px; line-height:1.45; opacity:.8; margin-top:2px; }
 .fsbox.quiet .fsgo { background:var(--sp-sink); border-color:var(--sp-edge); }
+/* A birthday's message is one thought: one column, a little larger. */
+.fsfull .fsbox.bday .fsstory { columns:auto; }
+.fsfull .fsbox.bday .fsstory p { font-size:clamp(16px, 2.6vh, 20px); line-height:1.5; max-width:56ch; }
+/* A birthday's show: a button for each chapter, the one playing lit. */
+.fsshow { margin-top:16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px; }
+.fsshow h5 { grid-column:1 / -1; margin:0; font-size:12px; letter-spacing:.09em; text-transform:uppercase;
+  color:#FFD166; font-weight:700; }
+.fsep { text-align:left; padding:9px 12px; border-radius:6px; border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.06); color:inherit; font:inherit; cursor:pointer;
+  transition:background .4s, border-color .4s; }
+.fsep b { display:block; font-size:15px; font-weight:600; }
+.fsep span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  font-size:13px; line-height:1.4; opacity:.82; margin-top:2px; }
+.fsep.on { background:rgba(255,255,255,.17); border-color:rgba(255,255,255,.6); }
+.fsep.on b::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:7px;
+  vertical-align:2px; background:#FFD166; box-shadow:0 0 8px #FFD166; }
 /* A tablet held upright: a shorter scene leaves the words room. */
 @media (min-width: 700px) and (max-aspect-ratio: 5/4) {
   .fsstage { height:clamp(240px, 32vh, 460px); }
@@ -12848,7 +12864,1339 @@ const FEST_SCENES = (() => {
     },
 
   };
-  Object.assign(SCENES, MORE, UK, REDRAWN);
+  /* ---------- Birthdays ----------
+     A birthday is a show in chapters: the cake first, then one for each
+     thing the person loves, in the order the dashboard lists them. Each
+     chapter blooms in over the last like wet paint, plays for about ten
+     seconds and is painted over by the next, and the show loops.
+
+     Every chapter is drawn from its own clock alone -- nothing is carried
+     from frame to frame but cached pictures -- so a jump to any chapter, a
+     resize, or the single still drawn for reduced motion all land on a
+     composed picture. The still is the cake, candles lit. */
+  const BD_BLOOM = 1.3;
+  const bdK = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+  const bdSeg = (t, a, b) => bdK((t - a) / (b - a));
+  const bdEase = (k) => smooth(bdK(k));
+  const bdOut = (k) => 1 - Math.pow(1 - bdK(k), 3);
+  const bdIn = (k) => Math.pow(bdK(k), 3);
+  const bdBack = (k, s = 1.70158) => { const q = bdK(k) - 1; return 1 + (s + 1) * q * q * q + s * q * q; };
+  const bdHash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  const bdLerp = (a, b, k) => a + (b - a) * k;
+  const bdHand = (px, wt = 700) => `${wt} ${Math.max(7, Math.round(px))}px Caveat, "Segoe Script", "Bradley Hand", cursive`;
+  const bdBold = (px) => `${Math.max(7, Math.round(px))}px "Bebas Neue", Impact, "Arial Narrow", sans-serif`;
+  const bdSerif = (px, it = "") => `${it}${Math.max(7, Math.round(px))}px Georgia, "Times New Roman", serif`;
+  const bdRgba = (col, a) => `rgba(${col},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+
+  /* Cached pictures that belong to one chapter are let go a few seconds
+     after it stops showing, so a full screen does not hold eight. */
+  const bdSprite = (st, key, wd, ht, c, paint) => {
+    (st.bdUse || (st.bdUse = {}))[key] = st.bdNow || 0;
+    return cache(st, key, wd, ht, c, paint); };
+  const bdEvict = (st) => {
+    const use = st.bdUse || {}, box = st.cache || {};
+    for (const key of Object.keys(use)) if (use[key] < (st.bdNow || 0) - 3) { delete use[key]; delete box[key]; } };
+  const bdBlit = (st, c, key, x, y, wd, ht, paint) => {
+    const cv = bdSprite(st, key, wd, ht, c, paint);
+    if (cv) c.drawImage(cv, x, y, wd, ht); else { c.save(); c.translate(x, y); paint(c, wd, ht); c.restore(); } };
+  const bdStill = (st, key, c, w, h, paint) => bdBlit(st, c, key, 0, 0, w, h, paint);
+  /* Film grain from a tile, so a gradient reads as paint rather than a
+     screen. Laid once into each chapter's ground, not over every frame. */
+  const bdGrain = (st, x, w, h, a = .05) => {
+    if (st.bdTile === undefined) {
+      st.bdTile = null;
+      if (typeof document !== "undefined") {
+        const cv = document.createElement("canvas"); cv.width = cv.height = 96;
+        const g = cv.getContext("2d"), img = g.createImageData(96, 96);
+        for (let i = 0; i < 96 * 96; i += 1) {
+          const v = bdHash(i * 1.37) > .5 ? 255 : 0;
+          img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+          img.data[i * 4 + 3] = Math.round(bdHash(i * .71 + 9) * 70);
+        }
+        g.putImageData(img, 0, 0); st.bdTile = cv;
+      }
+    }
+    if (!st.bdTile) return;
+    x.save(); x.globalAlpha = a; x.fillStyle = x.createPattern(st.bdTile, "repeat"); x.fillRect(0, 0, w, h); x.restore(); };
+  /* A chapter's ground: everything behind it that does not move, with the
+     vignette and the grain, painted once for its size. */
+  const bdGround = (st, key, c, S, paint, vig = .32) => bdStill(st, key, c, S.w, S.h, (x) => {
+    paint(x, S.w, S.h); vignette(x, S.w, S.h, vig, .79); bdGrain(st, x, S.w, S.h, .05); });
+  const bdSpark = (c, x, y, r, a, col = "255,246,220") => {
+    if (a <= 0 || r <= 0) return;
+    c.fillStyle = bdRgba(col, a); c.beginPath(); c.moveTo(x, y - r);
+    c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r);
+    c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill(); };
+  const bdRound = (c, x, y, wd, ht, r) => {
+    r = Math.min(r, wd / 2, ht / 2); c.beginPath(); c.moveTo(x + r, y);
+    c.arcTo(x + wd, y, x + wd, y + ht, r); c.arcTo(x + wd, y + ht, x, y + ht, r);
+    c.arcTo(x, y + ht, x, y, r); c.arcTo(x, y, x + wd, y, r); c.closePath(); };
+  /* Text that fits: the font shrinks until the line is no wider than `max`. */
+  const bdFit = (c, text, font, px, max) => {
+    c.font = font(px); const wd = c.measureText(text).width;
+    if (wd > max && wd > 0) { px *= max / wd; c.font = font(px); }
+    return px; };
+
+  /* Confetti thrown from a point: each piece follows the closed form for a
+     throw against air drag, so any moment can be drawn on its own. */
+  const BD_CONF = ["#FFD166", "#FF7BAC", "#4DD4C6", "#FFF6E8", "#B79CFF", "#FF8A65"];
+  function bdConfetti(c, S, tau, x0, y0, n, seed, dir = -Math.PI / 2, spread = 1.1, power = 1) {
+    if (tau <= 0) return;
+    const u = S.u, g = u * 1.35, k = 2.3;
+    for (let i = 0; i < n; i += 1) {
+      const hA = bdHash(seed + i * 3.1), hB = bdHash(seed + i * 7.7), hC = bdHash(seed + i * 1.3);
+      const life = 1 - bdSeg(tau, 2.4 + hC * 1.4, 3.4 + hC * 1.4);
+      if (life <= 0) continue;
+      const a = dir + (hA - .5) * 2 * spread, sp = u * (1 + hB * 1.7) * power;
+      const e = 1 - Math.exp(-k * tau);
+      const x = x0 + Math.cos(a) * sp / k * e + Math.sin(tau * (2 + hC * 3) + i) * u * .03 * Math.min(1, tau);
+      const y = y0 + (Math.sin(a) * sp - g / k) / k * e + g / k * tau;
+      c.save(); c.globalAlpha = life; c.translate(x, y); c.rotate(hA * TAU + tau * (2 + hB * 5));
+      c.scale(1, Math.cos(tau * (5 + hC * 7) + i));
+      c.fillStyle = BD_CONF[i % BD_CONF.length];
+      const s = u * (.011 + hC * .009);
+      if (i % 5 === 0) { c.beginPath(); c.arc(0, 0, s * .65, 0, TAU); c.fill(); } else c.fillRect(-s, -s * .42, s * 2, s * .84);
+      c.restore();
+    }
+  }
+  /* Confetti falling from above the frame, over the stage. */
+  function bdConfettiRain(c, S, tau, n, seed) {
+    if (tau <= 0) return;
+    const { w, h, u } = S;
+    for (let i = 0; i < n; i += 1) {
+      const hA = bdHash(seed + i * 2.9), hB = bdHash(seed + i * 5.3), hC = bdHash(seed + i * .7);
+      const t0 = hA * 1.6, q = tau - t0;
+      if (q <= 0) continue;
+      const y = -u * .05 + q * u * (.32 + hB * .2), x = w * (.6 + hC * .4) + Math.sin(q * (1.5 + hB * 2) + i) * u * .05;
+      if (y > h + 10) continue;
+      c.save(); c.translate(x, y); c.rotate(q * (2 + hB * 3) + i); c.scale(1, Math.cos(q * (4 + hC * 5) + i));
+      c.fillStyle = BD_CONF[i % BD_CONF.length]; const s = u * (.01 + hC * .008); c.fillRect(-s, -s * .45, s * 2, s * .9);
+      c.restore();
+    }
+  }
+
+  /* ---------- A pencil's strokes ----------
+     A drawing is a list of strokes, each a run of points in a unit box, so
+     a pen can draw any part of it at any size. */
+  const bdPath = () => {
+    const pts = []; let px = 0, py = 0;
+    const o = {
+      pts,
+      M(x, y) { pts.push([x, y]); px = x; py = y; return o; },
+      L(x, y) { pts.push([x, y]); px = x; py = y; return o; },
+      C(x1, y1, x2, y2, x, y, n = 18) {
+        for (let i = 1; i <= n; i += 1) { const t = i / n, m = 1 - t;
+          pts.push([m * m * m * px + 3 * m * m * t * x1 + 3 * m * t * t * x2 + t * t * t * x, m * m * m * py + 3 * m * m * t * y1 + 3 * m * t * t * y2 + t * t * t * y]); }
+        px = x; py = y; return o; },
+      Q(x1, y1, x, y, n = 14) {
+        for (let i = 1; i <= n; i += 1) { const t = i / n, m = 1 - t;
+          pts.push([m * m * px + 2 * m * t * x1 + t * t * x, m * m * py + 2 * m * t * y1 + t * t * y]); }
+        px = x; py = y; return o; },
+      E(cx, cy, rx, ry, a0, a1, n = 36) {
+        for (let i = 0; i <= n; i += 1) { const a = a0 + (a1 - a0) * i / n; px = cx + Math.cos(a) * rx; py = cy + Math.sin(a) * ry; pts.push([px, py]); }
+        return o; },
+    };
+    return o;
+  };
+  const bdMeasure = (pts) => { const acc = [0]; let L = 0;
+    for (let i = 1; i < pts.length; i += 1) { L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); acc.push(L); }
+    return { pts, acc, L }; };
+  const bdPointAt = (p, len) => { const { pts, acc } = p;
+    for (let i = 1; i < pts.length; i += 1) if (acc[i] >= len) { const k = (len - acc[i - 1]) / Math.max(1e-6, acc[i] - acc[i - 1]); return [bdLerp(pts[i - 1][0], pts[i][0], k), bdLerp(pts[i - 1][1], pts[i][1], k)]; }
+    return pts[pts.length - 1]; };
+  /* Strokes one path up to `len` of its length; returns the point reached. */
+  const bdTrace = (c, p, len, sx, sy, ox, oy) => {
+    const { pts, acc } = p; let end = [ox + pts[0][0] * sx, oy + pts[0][1] * sy];
+    c.beginPath(); c.moveTo(end[0], end[1]);
+    for (let i = 1; i < pts.length; i += 1) {
+      if (acc[i] <= len) { end = [ox + pts[i][0] * sx, oy + pts[i][1] * sy]; c.lineTo(end[0], end[1]); continue; }
+      const k = (len - acc[i - 1]) / Math.max(1e-6, acc[i] - acc[i - 1]);
+      end = [ox + bdLerp(pts[i - 1][0], pts[i][0], k) * sx, oy + bdLerp(pts[i - 1][1], pts[i][1], k) * sy];
+      c.lineTo(end[0], end[1]); break;
+    }
+    c.stroke(); return end; };
+
+  /* ---------- The cake ---------- */
+  const BD_FLAGS = ["#FF7BAC", "#FFD166", "#4DD4C6", "#B79CFF", "#FF8A65", "#FFF1E0"];
+  function bdBunting(c, S, y0, drop, t, letters) {
+    const { cx, u } = S, x0 = cx - u * .56, x1 = cx + u * .56, sag = u * .05;
+    const n = letters.length, fw = (x1 - x0) / n * .88, fh = fw * 1.28;
+    const at = (f) => [bdLerp(x0, x1, f), y0 + sag * 4 * f * (1 - f) - drop];
+    c.strokeStyle = "rgba(255,236,220,.75)"; c.lineWidth = Math.max(1, u * .004); c.beginPath();
+    for (let k = 0; k <= 24; k += 1) { const [x, y] = at(k / 24); if (k) c.lineTo(x, y); else c.moveTo(x, y); }
+    c.stroke();
+    c.textAlign = "center"; c.textBaseline = "middle";
+    for (let i = 0; i < n; i += 1) {
+      const f = (i + .5) / n, [x, y] = at(f), slope = sag * 4 * (1 - 2 * f) / (x1 - x0);
+      c.save(); c.translate(x, y); c.rotate(Math.atan(slope) + Math.sin(t * 1.7 + i * .8) * .07);
+      const col = BD_FLAGS[i % BD_FLAGS.length];
+      c.fillStyle = col; c.beginPath(); c.moveTo(-fw / 2, 0); c.lineTo(fw / 2, 0); c.lineTo(0, fh); c.closePath(); c.fill();
+      c.fillStyle = "rgba(60,0,30,.14)"; c.beginPath(); c.moveTo(0, 0); c.lineTo(fw / 2, 0); c.lineTo(0, fh); c.closePath(); c.fill();
+      const ch = letters[i], ink = i % BD_FLAGS.length === 5 || i % BD_FLAGS.length === 1 ? "#8A2853" : "#FFFFFF";
+      if (ch === "♥") { c.fillStyle = ink; heartPath(c, 0, fh * .34, fw * .2); c.fill(); }
+      else if (ch && ch !== " " && fw > 12) { c.fillStyle = ink; c.font = bdBold(fw * .66); c.fillText(ch, 0, fh * .36); }
+      c.restore();
+    }
+  }
+  function bdBalloon(c, x, y, s, col, t, i) {
+    c.strokeStyle = "rgba(255,240,230,.5)"; c.lineWidth = Math.max(1, s * .03); c.beginPath(); c.moveTo(x, y + s * 1.1);
+    for (let k = 1; k <= 12; k += 1) c.lineTo(x + Math.sin(t * 1.4 + k * .55 + i) * s * .14 * k / 12, y + s * 1.1 + k * s * .34);
+    c.stroke();
+    const g = c.createRadialGradient(x - s * .32, y - s * .42, s * .06, x, y, s * 1.2);
+    g.addColorStop(0, "rgba(255,255,255,.95)"); g.addColorStop(.16, col[0]); g.addColorStop(.72, col[1]); g.addColorStop(1, col[2]);
+    c.fillStyle = g; c.beginPath(); c.moveTo(x, y + s);
+    c.bezierCurveTo(x + s * .98, y + s * .5, x + s * .92, y - s * 1.02, x, y - s * 1.02);
+    c.bezierCurveTo(x - s * .92, y - s * 1.02, x - s * .98, y + s * .5, x, y + s); c.fill();
+    c.fillStyle = col[2]; c.beginPath(); c.moveTo(x - s * .1, y + s * 1.12); c.lineTo(x + s * .1, y + s * 1.12); c.lineTo(x, y + s * .97); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(255,255,255,.22)"; c.lineWidth = Math.max(1, s * .06);
+    c.beginPath(); c.ellipse(x, y - s * .05, s * .7, s * .85, 0, 3.6, 4.6); c.stroke();
+  }
+  /* A wrapped present in a little perspective, its bow on top. */
+  function bdGift(c, x, base, wd, ht, body, ribbon) {
+    const dp = wd * .32;
+    c.fillStyle = "rgba(0,0,0,.28)"; c.beginPath(); c.ellipse(x, base + wd * .02, wd * .62, wd * .1, 0, 0, TAU); c.fill();
+    const g = c.createLinearGradient(x - wd / 2, 0, x + wd / 2, 0); g.addColorStop(0, body[1]); g.addColorStop(.45, body[0]); g.addColorStop(1, body[2]);
+    c.fillStyle = g; c.fillRect(x - wd / 2, base - ht, wd, ht);
+    c.fillStyle = body[0]; c.beginPath(); c.moveTo(x - wd / 2, base - ht); c.lineTo(x - wd / 2 + dp * .5, base - ht - dp * .45); c.lineTo(x + wd / 2 + dp * .5, base - ht - dp * .45); c.lineTo(x + wd / 2, base - ht); c.closePath(); c.fill();
+    c.fillStyle = "rgba(255,255,255,.18)"; c.fill();
+    c.fillStyle = ribbon; c.fillRect(x - wd * .07, base - ht, wd * .14, ht);
+    c.beginPath(); c.moveTo(x - wd * .07, base - ht); c.lineTo(x - wd * .07 + dp * .5, base - ht - dp * .45); c.lineTo(x + wd * .07 + dp * .5, base - ht - dp * .45); c.lineTo(x + wd * .07, base - ht); c.closePath(); c.fill();
+    const bx = x + dp * .25, by = base - ht - dp * .22;
+    [-1, 1].forEach((d) => { c.beginPath(); c.moveTo(bx, by); c.bezierCurveTo(bx + d * wd * .34, by - wd * .32, bx + d * wd * .42, by + wd * .02, bx, by); c.fill();
+      c.strokeStyle = "rgba(0,0,0,.18)"; c.lineWidth = 1; c.stroke(); });
+    c.beginPath(); c.moveTo(bx, by); c.lineTo(bx - wd * .16, by + wd * .2); c.lineTo(bx - wd * .1, by + wd * .2); c.closePath(); c.fill();
+    c.beginPath(); c.arc(bx, by, wd * .045, 0, TAU); c.fill();
+  }
+  function bdCandle(c, x, y, s, col) {
+    const wd = s * .18;
+    c.save(); c.beginPath(); c.rect(x - wd / 2, y - s, wd, s); c.clip();
+    c.fillStyle = "#FFF9F0"; c.fillRect(x - wd / 2, y - s, wd, s);
+    c.strokeStyle = col; c.lineWidth = wd * .5;
+    for (let k = -2; k < 10; k += 1) { c.beginPath(); c.moveTo(x - wd, y - s + k * wd * 1.4); c.lineTo(x + wd, y - s + k * wd * 1.4 - wd * 1.2); c.stroke(); }
+    const g = c.createLinearGradient(x - wd / 2, 0, x + wd / 2, 0);
+    g.addColorStop(0, "rgba(60,0,30,.22)"); g.addColorStop(.35, "rgba(255,255,255,.28)"); g.addColorStop(1, "rgba(60,0,30,.32)");
+    c.fillStyle = g; c.fillRect(x - wd / 2, y - s, wd, s); c.restore();
+    c.strokeStyle = "#2B2020"; c.lineWidth = Math.max(1, wd * .2); c.beginPath(); c.moveTo(x, y - s); c.lineTo(x + wd * .12, y - s * 1.1); c.stroke();
+  }
+  function bdFlame(st, c, x, y, s, t, i, lean, a) {
+    if (a <= 0) return;
+    const f = 1 + Math.sin(t * 13 + i * 1.7) * .08 + Math.sin(t * 7.3 + i * 2.9) * .06;
+    const hgt = s * f * a, wd = s * .34 * Math.min(1, a * 1.5);
+    b1Glow(st, c, x, y - hgt * .45, s * 3 * (.85 + .15 * f), "255,176,80", .5 * a);
+    const tipx = x + lean * hgt * .7 + Math.sin(t * 5 + i) * s * .04;
+    const path = (k) => { const hh = hgt * k, ww = wd * k; c.beginPath(); c.moveTo(x - ww, y);
+      c.bezierCurveTo(x - ww * 1.15, y - hh * .55, tipx - ww * .2, y - hh * .82, tipx, y - hh);
+      c.bezierCurveTo(tipx + ww * .2, y - hh * .82, x + ww * 1.15, y - hh * .55, x + ww, y);
+      c.quadraticCurveTo(x, y + ww * .8, x - ww, y); c.fill(); };
+    c.fillStyle = "rgba(255,128,36,.92)"; path(1);
+    c.fillStyle = "rgba(255,210,100,.96)"; path(.74);
+    c.fillStyle = "rgba(255,252,236,.96)"; path(.42);
+    c.fillStyle = "rgba(80,130,255,.5)"; c.beginPath(); c.ellipse(x, y - hgt * .05, wd * .5, wd * .38, 0, 0, TAU); c.fill();
+  }
+  /* The cake on its stand, painted once: every part of it that does not
+     move. Origin: the middle of the stand's plate. */
+  function bdCakePaint(x, W, H, u, ox, oy) {
+    const X = (f) => ox + f * u, Y = (f) => oy + f * u;
+    shadow(x, X(0), Y(.15), u * .3, u * .04, .45);
+    // the stand: foot, stem, plate
+    const pg = x.createLinearGradient(X(-.4), 0, X(.4), 0);
+    pg.addColorStop(0, "#B9A7B6"); pg.addColorStop(.3, "#FBF5FA"); pg.addColorStop(.55, "#FFFFFF"); pg.addColorStop(1, "#A893A6");
+    x.fillStyle = pg; x.beginPath(); x.ellipse(X(0), Y(.125), u * .15, u * .028, 0, 0, TAU); x.fill();
+    x.beginPath(); x.moveTo(X(-.035), Y(.03)); x.quadraticCurveTo(X(-.02), Y(.08), X(-.07), Y(.125)); x.lineTo(X(.07), Y(.125)); x.quadraticCurveTo(X(.02), Y(.08), X(.035), Y(.03)); x.closePath(); x.fill();
+    x.fillStyle = "#9C879A"; x.beginPath(); x.ellipse(X(0), Y(.022), u * .4, u * .055, 0, 0, TAU); x.fill();
+    x.fillStyle = pg; x.beginPath(); x.ellipse(X(0), Y(0), u * .4, u * .055, 0, 0, TAU); x.fill();
+    x.strokeStyle = "rgba(214,170,80,.9)"; x.lineWidth = Math.max(1, u * .005); x.beginPath(); x.ellipse(X(0), Y(.004), u * .395, u * .052, 0, .1, Math.PI - .1); x.stroke();
+    const tier = (base, rx, ry, ht, side, top) => {
+      const g = x.createLinearGradient(X(-rx), 0, X(rx), 0); side.forEach(([o, col]) => g.addColorStop(o, col));
+      x.fillStyle = g; x.beginPath(); x.moveTo(X(-rx), Y(base - ht)); x.lineTo(X(-rx), Y(base));
+      x.ellipse(X(0), Y(base), u * rx, u * ry, 0, Math.PI, 0, true); x.lineTo(X(rx), Y(base - ht)); x.closePath(); x.fill();
+      const tg = x.createLinearGradient(0, Y(base - ht - ry), 0, Y(base - ht + ry)); tg.addColorStop(0, top[0]); tg.addColorStop(1, top[1]);
+      x.fillStyle = tg; x.beginPath(); x.ellipse(X(0), Y(base - ht), u * rx, u * ry, 0, 0, TAU); x.fill(); };
+    const beads = (base, rx, ry, n, r, col, hi) => {
+      for (let i = 0; i <= n; i += 1) { const a = Math.PI - i / n * Math.PI, bx = X(Math.cos(a) * rx), by = Y(base + Math.sin(a) * ry);
+        const g = x.createRadialGradient(bx - u * r * .35, by - u * r * .4, u * r * .1, bx, by, u * r); g.addColorStop(0, hi); g.addColorStop(1, col);
+        x.fillStyle = g; x.beginPath(); x.arc(bx, by, u * r * (.75 + .25 * Math.sin(a)), 0, TAU); x.fill(); } };
+    // lower tier: strawberry pink, with raspberry ganache running down it
+    tier(-.004, .31, .06, .2, [[0, "#B34A6C"], [.22, "#EE9DB4"], [.42, "#FBC6D3"], [.7, "#E68AA5"], [1, "#9E3A5C"]], ["#FFD9E3", "#F7B8C9"]);
+    const top1 = -.204, rx1 = .31, ry1 = .06;
+    const gg = x.createLinearGradient(0, Y(top1 - ry1), 0, Y(top1 + .12)); gg.addColorStop(0, "#E8457F"); gg.addColorStop(.5, "#B5174E"); gg.addColorStop(1, "#7E0E36");
+    x.fillStyle = gg; x.beginPath(); x.ellipse(X(0), Y(top1), u * rx1 * 1.012, u * ry1 * 1.03, 0, Math.PI, TAU);
+    for (let i = 0; i <= 90; i += 1) {
+      const f = i / 90, a = f * Math.PI, ex = X(Math.cos(a) * rx1 * 1.012), ey = Y(top1 + Math.sin(a) * ry1 * 1.03);
+      let d = .018;
+      for (let j = 0; j < 11; j += 1) { const dc = (j + .5) / 11 + (bdHash(40 + j) - .5) * .05, dw = .028 + bdHash(41 + j * 2.3) * .018, dl = .03 + bdHash(43 + j * 5.1) * .07;
+        const q = (f - dc) / dw; if (q > -1 && q < 1) d = Math.max(d, .018 + dl * Math.sqrt(1 - q * q)); }
+      x.lineTo(ex, ey + u * d * (Math.sin(a) * .75 + .25));
+    }
+    x.closePath(); x.fill();
+    x.strokeStyle = "rgba(255,190,215,.55)"; x.lineWidth = Math.max(1, u * .005);
+    x.beginPath(); x.ellipse(X(0), Y(top1 + .004), u * rx1 * .97, u * ry1 * .9, 0, .25, Math.PI - .25); x.stroke();
+    beads(-.004, .31, .06, 18, .02, "#F2E2D4", "#FFFFFF");
+    // upper tier: vanilla, sprinkled
+    tier(top1, .2, .04, .15, [[0, "#C9A487"], [.25, "#FBEBDA"], [.45, "#FFF8EF"], [.75, "#EED6BF"], [1, "#B8957A"]], ["#FFFBF4", "#F5E6D3"]);
+    for (let i = 0; i < 46; i += 1) {
+      const fx = (bdHash(60 + i) - .5) * 1.8, fy = top1 - .02 - bdHash(70 + i * 1.7) * .11, k = Math.sqrt(Math.max(0, 1 - fx * fx));
+      if (k < .25) continue;
+      x.save(); x.translate(X(fx * .2), Y(fy + .012 * k)); x.rotate(bdHash(80 + i) * TAU); x.scale(k, 1);
+      x.fillStyle = BD_CONF[i % BD_CONF.length]; x.fillRect(-u * .007, -u * .0022, u * .014, u * .0044); x.restore();
+    }
+    beads(top1, .2, .04, 13, .015, "#F07AA2", "#FFD0E0");
+    // the top: a ring of piped rosettes and two berries
+    for (let i = 0; i < 9; i += 1) { const a = i / 9 * TAU, rx = X(Math.cos(a) * .15), ry = Y(top1 - .15 + Math.sin(a) * .026);
+      const g = x.createRadialGradient(rx - u * .006, ry - u * .006, 0, rx, ry, u * .02); g.addColorStop(0, "#FFFFFF"); g.addColorStop(1, "#F4C9D6");
+      x.fillStyle = g; x.beginPath(); x.arc(rx, ry, u * .017, 0, TAU); x.fill();
+      x.strokeStyle = "rgba(200,120,150,.5)"; x.lineWidth = .8; x.beginPath(); x.arc(rx, ry, u * .009, a, a + 4.2); x.stroke(); }
+  }
+  function bdCakeName(c, S, name, base, reveal) {
+    if (!name || reveal <= 0) return;
+    const { cx, u } = S, rx = u * .31;
+    c.save(); c.textAlign = "left"; c.textBaseline = "middle";
+    let px = u * .09; c.font = bdHand(px);
+    let tw = c.measureText(name).width;
+    if (tw > rx * 1.45) { px *= rx * 1.45 / tw; c.font = bdHand(px); tw = c.measureText(name).width; }
+    c.beginPath(); c.rect(cx - tw / 2 - u * .04, base - u * .12, (tw + u * .08) * reveal, u * .24); c.clip();
+    let xx = cx - tw / 2;
+    for (const ch of name) {
+      const cw = c.measureText(ch).width, mid = xx + cw / 2, f = Math.max(-.95, Math.min(.95, (mid - cx) / rx));
+      const dy = u * .06 * (Math.sqrt(1 - f * f) - 1);
+      c.save(); c.translate(mid, base + dy); c.rotate(-f * .22); c.scale(Math.sqrt(1 - f * f) * .25 + .75, 1);
+      c.lineJoin = "round"; c.strokeStyle = "#9A1F4A"; c.lineWidth = Math.max(1.5, px * .16); c.strokeText(ch, -cw / 2, 0);
+      c.fillStyle = "#FFF7F2"; c.fillText(ch, -cw / 2, 0);
+      c.fillStyle = "rgba(255,255,255,.7)"; c.fillText(ch, -cw / 2 - px * .02, -px * .03);
+      c.restore(); xx += cw;
+    }
+    c.restore();
+  }
+
+  const BD_CH = {};
+
+  BD_CH.cake = { d: 10.5, ink: "255,150,190", draw(c, S, lt) {
+    const { w, h, cx, cy, u, st, t } = S;
+    const ty = cy + u * .41, BOKEH = ["255,196,120", "255,140,190", "200,160,255", "255,230,180"];
+    bdGround(st, "bd:cake-bg", c, S, (x) => {
+      fill(x, w, h, [[0, "#260A2E"], [.55, "#561446"], [1, "#842652"]]);
+      for (let i = 6; i < 20; i += 1) b1Glow(st, x, w * (.52 + bdHash(i + 1) * .5), h * (.04 + bdHash(i + 40) * .92), u * (.035 + bdHash(i + 80) * .08), BOKEH[i % 4], .14);
+      const tg = x.createLinearGradient(0, ty, 0, h); tg.addColorStop(0, "rgba(255,214,228,.16)"); tg.addColorStop(1, "rgba(255,214,228,.05)");
+      x.fillStyle = tg; x.fillRect(0, ty, w, h - ty);
+      x.fillStyle = "rgba(255,226,236,.22)"; x.fillRect(0, ty, w, Math.max(1, u * .004));
+    });
+    const lit = bdSeg(lt, 1.5, 3.4), out = bdSeg(lt, 6.4, 7.0);
+    b1Glow(st, c, cx, cy - u * .05, u * .85, "255,160,120", .1 + .3 * lit * (1 - out * .6));
+    for (let i = 0; i < 6; i += 1) {
+      const tw = .45 + .55 * Math.pow(Math.sin(t * (.5 + bdHash(i + 9) * .6) + i), 2);
+      b1Glow(st, c, w * (.52 + bdHash(i + 1) * .5), h * (.04 + bdHash(i + 40) * .92) + Math.sin(t * .3 + i) * u * .01, u * (.035 + bdHash(i + 80) * .08), BOKEH[i % 4], .2 * tw);
+    }
+    // balloons, rising in behind
+    [[-.43, -.16, .085, ["#FFE7A3", "#F5B729", "#A86F00"]], [.44, -.24, .09, ["#FFC2DA", "#F0508F", "#8E1747"]], [-.3, -.36, .06, ["#DCCBFF", "#9C7BEA", "#4E2E9E"]]].forEach(([dx, dy, s, col], i) => {
+      const rise = 1 - bdOut(bdSeg(lt, .2 + i * .35, 2.6 + i * .35));
+      bdBalloon(c, cx + dx * u + Math.sin(t * .8 + i * 2) * u * .01, cy + dy * u + rise * u * 1.1 + Math.sin(t * 1.1 + i) * u * .012, u * s, col, t, i);
+    });
+    // bunting, dropping in
+    bdBunting(c, S, cy - u * .52, (1 - bdBack(bdSeg(lt, .3, 1.5))) * u * .5, t, "HAPPY♥BIRTHDAY");
+    const by = cy + u * .3;
+    bdGift(c, cx - u * .47, ty + u * .05, u * .17, u * .12, ["#4DD4C6", "#2A9D93", "#1F7A72"], "#FF7BAC");
+    bdGift(c, cx + u * .47, ty + u * .05, u * .12, u * .16, ["#C9A8FF", "#9C7BEA", "#6E4FC0"], "#FFD166");
+    const W = u * .92, H = u * .6, ox = W / 2, oy = u * .42;
+    bdBlit(st, c, "bd:cake", cx - ox, by - oy, W, H, (x, wd, ht) => bdCakePaint(x, wd, ht, u, ox, oy));
+    bdCakeName(c, S, S.words.name, by - u * .1, bdSeg(lt, 1.0, 2.3));
+    // candles, back to front, lit one by one; a breath blows them out
+    const spots = [[-.11, .006, "#F06292"], [-.055, -.018, "#FFC94D"], [0, .014, "#4DD4C6"], [.055, -.016, "#B79CFF"], [.11, .008, "#FF8A65"]]
+      .map((p, i) => ({ i, x: cx + p[0] * u, y: by - u * .355 + p[1] * u, col: p[2] })).sort((a, b) => a.y - b.y);
+    const wind = bdSeg(lt, 6.1, 6.45);
+    c.save(); c.globalCompositeOperation = "lighter";
+    b1Glow(st, c, cx, by - u * .4, u * .45, "255,170,90", .28 * lit * (1 - out));
+    c.restore();
+    spots.forEach(({ i, x, y, col }) => bdCandle(c, x, y, u * .12, col));
+    spots.forEach(({ i, x, y }) => {
+      const li = 1.5 + i * .34, bo = 6.32 + i * .07;
+      const a = bdBack(bdSeg(lt, li, li + .32), 2.4) * (1 - bdSeg(lt, bo, bo + .16));
+      const fy = y - u * .12 * 1.1;
+      const sp = bdSeg(lt, li - .1, li + .25);
+      if (sp > 0 && sp < 1) bdSpark(c, x, fy - u * .01, u * .04 * Math.sin(sp * Math.PI), 1 - sp);
+      bdFlame(st, c, x, fy, u * .05, t, i, Math.sin(t * 2.3 + i) * .15 + wind * 1.6, a);
+      const sm = lt - bo;
+      if (sm > 0 && sm < 2.6 && lt > li) {
+        c.strokeStyle = `rgba(236,226,242,${(.55 * (1 - sm / 2.6)).toFixed(3)})`; c.lineWidth = Math.max(1, u * .006); c.lineCap = "round"; c.beginPath();
+        const L = u * .3 * bdOut(sm / 1.5);
+        for (let k = 0; k <= 16; k += 1) { const f = k / 16, px = x + Math.sin(f * 6 + sm * 2.4 + i) * u * .02 * f + f * f * u * .05, py = fy - f * L;
+          if (k) c.lineTo(px, py); else c.moveTo(px, py); }
+        c.stroke();
+      }
+    });
+    // "make a wish", while the candles burn
+    const wa = bdSeg(lt, 3.9, 4.5) * (1 - bdSeg(lt, 6.0, 6.4));
+    if (wa > 0) {
+      c.save(); c.globalAlpha = wa; c.textAlign = "center"; c.textBaseline = "middle";
+      const px = bdFit(c, "make a wish…", bdHand, u * .075, u * .7);
+      const yy = cy - u * .31 + (1 - wa) * u * .02;
+      c.fillStyle = "rgba(40,0,20,.35)"; c.fillText("make a wish…", cx + px * .04, yy + px * .06);
+      c.fillStyle = "#FFF4E8"; c.fillText("make a wish…", cx, yy); c.restore();
+    }
+    // the cheer: confetti from the cake and from two poppers
+    const cheer = lt - 6.85;
+    bdConfetti(c, S, cheer, cx, by - u * .42, 70, 11, -Math.PI / 2, 1.15, 1);
+    bdConfetti(c, S, cheer - .12, cx - u * .55, cy + u * .45, 26, 23, -Math.PI / 2 + .55, .35, 1.25);
+    bdConfetti(c, S, cheer - .2, cx + u * .55, cy + u * .45, 26, 37, -Math.PI / 2 - .55, .35, 1.25);
+    if (cheer > 0) for (let i = 0; i < 12; i += 1) {
+      const a = Math.pow(Math.max(0, Math.sin(t * (1.4 + bdHash(i + 5)) + i * 2)), 6) * bdSeg(cheer, .3, .9);
+      bdSpark(c, cx + (bdHash(i + 200) - .5) * u * 1.05, cy + (bdHash(i + 300) - .62) * u * .9, u * (.018 + bdHash(i + 400) * .02), a);
+    }
+  } };
+
+  /* ---------- Drawing: a bouquet sketched, then washed with colour ---------- */
+  const BD_SKETCH = (() => {
+    const S = [], W = [];
+    const add = (p) => { S.push(bdMeasure(p.pts)); return p; };
+    const vase = bdPath().M(-.07, .22).C(-.175, .26, -.185, .42, -.13, .5).C(-.08, .56, .08, .56, .13, .5).C(.185, .42, .175, .26, .07, .22);
+    add(vase);
+    add(bdPath().E(0, .212, .085, .022, 0, TAU, 40));
+    add(bdPath().M(0, .2).C(.012, .06, -.02, -.06, 0, -.11));
+    add(bdPath().M(-.03, .2).C(-.06, .11, -.15, .06, -.215, .0));
+    add(bdPath().M(.03, .2).C(.07, .13, .15, .09, .215, .06));
+    add(bdPath().M(-.004, -.02).C(-.04, -.13, -.09, -.22, -.12, -.29));
+    const leafA = bdPath().M(-.075, .12).C(-.17, .085, -.25, .16, -.285, .21).C(-.19, .225, -.11, .19, -.075, .12);
+    add(leafA); add(bdPath().M(-.08, .125).Q(-.18, .155, -.275, .207));
+    const leafB = bdPath().M(.08, .13).C(.15, .06, .25, .085, .29, .13).C(.22, .19, .13, .19, .08, .13);
+    add(leafB); add(bdPath().M(.085, .13).Q(.18, .115, .28, .13));
+    const leafC = bdPath().M(.004, -.05).C(.05, -.12, .13, -.12, .16, -.09).C(.12, -.04, .05, -.03, .004, -.05);
+    add(leafC);
+    const tulip = bdPath().M(-.29, -.1).C(-.3, .035, -.13, .035, -.14, -.1);
+    add(tulip);
+    const tips = bdPath().M(-.29, -.1).L(-.27, -.205).L(-.243, -.12).L(-.215, -.23).L(-.188, -.12).L(-.162, -.205).L(-.14, -.1);
+    add(tips);
+    const bud = bdPath().M(-.12, -.29).C(-.165, -.33, -.15, -.39, -.12, -.415).C(-.09, -.39, -.075, -.33, -.12, -.29);
+    add(bud);
+    add(bdPath().M(-.105, -.205).C(-.1, -.105, .1, -.105, .105, -.205));
+    const spiral = bdPath(); for (let k = 0; k <= 52; k += 1) { const a = k * .34, r = .005 + k * .0016; (k ? spiral.L : spiral.M)(Math.cos(a) * r, -.215 + Math.sin(a) * r * .86); }
+    add(spiral);
+    add(bdPath().E(0, -.21, .118, .098, 2.45, 7.05, 48));
+    add(bdPath().E(.235, -.02, .034, .034, 0, TAU, 24));
+    for (let k = 0; k < 12; k += 1) { const a = k / 12 * TAU, dx = Math.cos(a), dy = Math.sin(a), b = [.235 + dx * .04, -.02 + dy * .04], tip = [.235 + dx * .118, -.02 + dy * .118];
+      add(bdPath().M(b[0], b[1]).Q(.235 + dx * .085 - dy * .028, -.02 + dy * .085 + dx * .028, tip[0], tip[1], 8).Q(.235 + dx * .085 + dy * .028, -.02 + dy * .085 - dx * .028, b[0], b[1], 8)); }
+    add(bdPath().M(.36, .555).C(.33, .53, .325, .5, .345, .495).C(.355, .493, .36, .503, .36, .51).C(.36, .503, .365, .493, .375, .495).C(.395, .5, .39, .53, .36, .555));
+    const circ = (x, y, r) => bdPath().E(x, y, r, r, 0, TAU, 40).pts;
+    W.push({ pts: vase.pts, col: "104,160,214", at: [0, .38] });
+    W.push({ pts: leafA.pts, col: "112,186,104", at: [-.18, .16] });
+    W.push({ pts: leafB.pts, col: "112,186,104", at: [.18, .13] });
+    W.push({ pts: leafC.pts, col: "112,186,104", at: [.08, -.075] });
+    W.push({ pts: tulip.pts.concat(tips.pts.slice().reverse()), col: "255,118,100", at: [-.215, -.1] });
+    W.push({ pts: bud.pts, col: "255,150,190", at: [-.12, -.35] });
+    W.push({ pts: circ(0, -.21, .122), col: "240,104,156", at: [0, -.21] });
+    W.push({ pts: circ(.235, -.02, .126), col: "172,140,232", at: [.235, -.02] });
+    W.push({ pts: circ(.235, -.02, .036), col: "255,204,72", at: [.235, -.02] });
+    let total = 0; S.forEach((p) => { p.t0 = total; total += p.L; p.t1 = total; });
+    return { strokes: S, washes: W, total };
+  })();
+  /* A round watercolour brush, its tip carrying the colour it is laying. */
+  function bdBrush(c, x, y, u, lift, ang, col) {
+    const L = u * .5, wd = u * .03;
+    c.save(); c.translate(x + lift * u * .05 + u * .02, y + lift * u * .06 + u * .03); c.rotate(ang);
+    c.fillStyle = "rgba(0,0,0,.22)"; bdRound(c, u * .03, -wd / 2, L, wd, wd / 2); c.fill(); c.restore();
+    c.save(); c.translate(x, y - lift * u * .02); c.rotate(ang);
+    c.fillStyle = bdRgba(col, .95); c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(u * .02, -wd * .55, u * .07, -wd * .5); c.lineTo(u * .07, wd * .5); c.quadraticCurveTo(u * .02, wd * .55, 0, 0); c.fill();
+    c.fillStyle = "#6B4A2E"; c.beginPath(); c.moveTo(u * .035, -wd * .52); c.quadraticCurveTo(u * .06, -wd * .6, u * .075, -wd * .5); c.lineTo(u * .075, wd * .5); c.quadraticCurveTo(u * .06, wd * .6, u * .035, wd * .52); c.closePath(); c.fill();
+    const fg = c.createLinearGradient(0, -wd / 2, 0, wd / 2); fg.addColorStop(0, "#F4F5F8"); fg.addColorStop(.5, "#A9AFBA"); fg.addColorStop(1, "#666C78");
+    c.fillStyle = fg; c.fillRect(u * .075, -wd * .5, u * .07, wd);
+    const hg = c.createLinearGradient(0, -wd / 2, 0, wd / 2); hg.addColorStop(0, "#F0607A"); hg.addColorStop(.45, "#C2183A"); hg.addColorStop(1, "#7A0A20");
+    c.fillStyle = hg; c.beginPath(); c.moveTo(u * .145, -wd * .42); c.lineTo(L, -wd * .22); c.quadraticCurveTo(L + u * .01, 0, L, wd * .22); c.lineTo(u * .145, wd * .42); c.closePath(); c.fill();
+    c.restore();
+  }
+  function bdPencil(c, x, y, u, lift, ang) {
+    const L = u * .58, wd = u * .042;
+    c.save(); c.translate(x + lift * u * .05, y + lift * u * .06);
+    c.rotate(ang); c.fillStyle = "rgba(0,0,0,.22)"; bdRound(c, 0, -wd / 2, L, wd, wd * .3); c.fill(); c.restore();
+    c.save(); c.translate(x, y - lift * u * .02); c.rotate(ang);
+    c.fillStyle = "#3A3632"; c.beginPath(); c.moveTo(0, 0); c.lineTo(u * .026, -wd * .2); c.lineTo(u * .026, wd * .2); c.closePath(); c.fill();
+    c.fillStyle = "#EBC9A0"; c.beginPath(); c.moveTo(u * .024, -wd * .22); c.lineTo(u * .085, -wd / 2); c.lineTo(u * .085, wd / 2); c.lineTo(u * .024, wd * .22); c.closePath(); c.fill();
+    const g = c.createLinearGradient(0, -wd / 2, 0, wd / 2); g.addColorStop(0, "#FFE7A0"); g.addColorStop(.33, "#F7C948"); g.addColorStop(.36, "#EDB935"); g.addColorStop(.66, "#E2A920"); g.addColorStop(.7, "#C98C12"); g.addColorStop(1, "#A9740A");
+    c.fillStyle = g; c.beginPath(); c.moveTo(u * .085, -wd / 2);
+    for (let k = 0; k <= 6; k += 1) c.lineTo(u * .085 - Math.sin(k / 6 * Math.PI) * u * .008, -wd / 2 + k / 6 * wd);
+    c.lineTo(L - u * .07, wd / 2); c.lineTo(L - u * .07, -wd / 2); c.closePath(); c.fill();
+    const fg = c.createLinearGradient(0, -wd / 2, 0, wd / 2); fg.addColorStop(0, "#F1F3F6"); fg.addColorStop(.5, "#AEB4BE"); fg.addColorStop(1, "#6E7480");
+    c.fillStyle = fg; c.fillRect(L - u * .07, -wd * .52, u * .036, wd * 1.04);
+    c.strokeStyle = "rgba(60,64,72,.5)"; c.lineWidth = 1; for (let k = 1; k < 4; k += 1) { c.beginPath(); c.moveTo(L - u * .07 + k * u * .009, -wd * .52); c.lineTo(L - u * .07 + k * u * .009, wd * .52); c.stroke(); }
+    c.fillStyle = "#F28DAF"; bdRound(c, L - u * .034, -wd * .48, u * .034, wd * .96, wd * .3); c.fill();
+    c.restore();
+  }
+  BD_CH.drawing = { d: 10.5, ink: "120,170,220", draw(c, S, lt) {
+    const { w, h, cx, cy, u, st, t } = S;
+    bdGround(st, "bd:desk", c, S, (x) => {
+      fill(x, w, h, [[0, "#3B2617"], [1, "#22150C"]]);
+      for (let i = 0; i < 64; i += 1) { const y0 = bdHash(i + 3) * h, a = .03 + bdHash(i + 7) * .07, dark = i % 3;
+        x.strokeStyle = dark ? `rgba(20,10,4,${a})` : `rgba(255,220,180,${a * .5})`; x.lineWidth = .6 + bdHash(i + 11) * 2.2; x.beginPath();
+        for (let k = 0; k <= 30; k += 1) { const px = k / 30 * w, py = y0 + Math.sin(px / u * (1.4 + bdHash(i) * 1.2) + i) * u * .03 + Math.sin(px / u * 6 + i * 3) * u * .006; if (k) x.lineTo(px, py); else x.moveTo(px, py); }
+        x.stroke(); }
+      b1Glow(st, x, cx + u * .3, cy - u * .45, u * 1.4, "255,200,140", .3); }, .5);
+    const pw = u * .76, sc = pw, px = cx - u * .02, py = cy + u * .03, rot = -.05;
+    const ph = pw * 1.22;
+    // the sketchbook: a soft shadow, the page, its spiral
+    c.save(); c.translate(px, py); c.rotate(rot);
+    for (let k = 3; k >= 1; k -= 1) { c.fillStyle = `rgba(0,0,0,${.12 / k})`; bdRound(c, -pw / 2 + u * .012 * k, -ph / 2 + u * .02 * k, pw + u * .01 * k, ph + u * .01 * k, u * .02); c.fill(); }
+    bdBlit(st, c, "bd:page", -pw / 2, -ph / 2, pw, ph, (x, wd, ht) => {
+      const g = x.createLinearGradient(0, 0, wd, ht); g.addColorStop(0, "#FFFCF4"); g.addColorStop(1, "#F1E7D2");
+      x.fillStyle = g; bdRound(x, 0, 0, wd, ht, u * .012); x.fill();
+      for (let i = 0; i < 900; i += 1) { x.fillStyle = `rgba(120,96,60,${(.03 + bdHash(i * 3.3) * .05).toFixed(3)})`; x.fillRect(bdHash(i * 1.1) * wd, bdHash(i * 2.7) * ht, 1, 1); }
+      x.strokeStyle = "rgba(150,120,80,.25)"; x.lineWidth = 1; bdRound(x, .5, .5, wd - 1, ht - 1, u * .012); x.stroke();
+    });
+    for (let k = 0; k < 11; k += 1) { const rx = -pw / 2 + pw * (k + .9) / 12;
+      c.fillStyle = "#3A2C22"; c.beginPath(); c.arc(rx, -ph / 2 + u * .03, u * .007, 0, TAU); c.fill();
+      c.strokeStyle = "#B8BCC4"; c.lineWidth = Math.max(1, u * .007); c.beginPath(); c.ellipse(rx, -ph / 2 + u * .008, u * .01, u * .025, 0, Math.PI * .55, Math.PI * 1.85); c.stroke(); }
+    const ox = 0, oy = u * .01;
+    // washes, blooming once the lines are down
+    const W0 = 5.75, WS = .27;
+    BD_SKETCH.washes.forEach((wa, j) => {
+      const q = bdEase(bdSeg(lt, W0 + j * WS, W0 + .95 + j * WS));
+      if (q <= 0) return;
+      const poly = (dx = 0, dy = 0, k = 1) => { c.beginPath(); wa.pts.forEach(([x, y], i) => { const X = ox + (wa.at[0] + (x - wa.at[0]) * k) * sc + dx, Y = oy + (wa.at[1] + (y - wa.at[1]) * k) * sc + dy; if (i) c.lineTo(X, Y); else c.moveTo(X, Y); }); c.closePath(); };
+      c.save(); c.beginPath(); c.arc(ox + wa.at[0] * sc, oy + wa.at[1] * sc, sc * .36 * q, 0, TAU); c.clip();
+      poly(); c.fillStyle = bdRgba(wa.col, .46); c.fill();
+      poly(u * .005, u * .004, 1.03); c.fillStyle = bdRgba(wa.col, .2); c.fill();
+      poly(); c.strokeStyle = bdRgba(wa.col, .55); c.lineWidth = Math.max(1, u * .005); c.stroke();
+      c.fillStyle = "rgba(255,255,255,.16)"; c.beginPath(); c.arc(ox + (wa.at[0] - .02) * sc, oy + (wa.at[1] - .02) * sc, sc * .025, 0, TAU); c.fill();
+      c.restore();
+    });
+    // the lines, drawn at an even pace with a lift between strokes
+    const t0 = 1.15, t1 = 5.0, gap = .06, strokes = BD_SKETCH.strokes, n = strokes.length, span = t1 - t0 - gap * (n - 1);
+    const sched = strokes.map((p, j) => [t0 + p.t0 / BD_SKETCH.total * span + j * gap, t0 + p.t1 / BD_SKETCH.total * span + j * gap]);
+    c.lineCap = "round"; c.lineJoin = "round";
+    strokes.forEach((p, j) => {
+      const f = bdSeg(lt, sched[j][0], sched[j][1]);
+      if (f <= 0) return;
+      c.strokeStyle = "rgba(58,52,48,.85)"; c.lineWidth = Math.max(1, u * .0042);
+      bdTrace(c, p, f * p.L, sc, sc, ox, oy);
+      c.strokeStyle = "rgba(58,52,48,.3)"; c.lineWidth = Math.max(.7, u * .0025);
+      c.save(); c.translate(u * .0018, u * .0012); bdTrace(c, p, f * p.L, sc, sc, ox, oy); c.restore();
+    });
+    let tipU = null, lift = 1;
+    for (let j = 0; j < n && !tipU; j += 1) {
+      const p = strokes[j], [s0, s1] = sched[j];
+      if (lt < s0) {
+        const prev = j ? strokes[j - 1].pts[strokes[j - 1].pts.length - 1] : p.pts[0], k = j ? bdSeg(lt, sched[j - 1][1], s0) : 1;
+        tipU = [bdLerp(prev[0], p.pts[0][0], k), bdLerp(prev[1], p.pts[0][1], k)]; lift = j ? Math.sin(k * Math.PI) : 1;
+      } else if (lt < s1) { tipU = bdPointAt(p, (lt - s0) / (s1 - s0) * p.L); lift = 0; }
+    }
+    if (!tipU) { const last = strokes[n - 1].pts; tipU = last[last.length - 1]; lift = 1; }
+    c.restore();
+    // sparkles once it is painted
+    for (let i = 0; i < 9; i += 1) {
+      const a = Math.pow(Math.max(0, Math.sin(t * (1.6 + bdHash(i + 7)) + i * 1.9)), 8) * bdSeg(lt, 8.2, 8.8);
+      bdSpark(c, px + (bdHash(i + 90) - .5) * pw * 1.1, py + (bdHash(i + 91) - .7) * ph * .7, u * (.02 + bdHash(i + 92) * .02), a);
+    }
+    const cosr = Math.cos(rot), sinr = Math.sin(rot), onPage = (q) => { const ax = ox + q[0] * sc, ay = oy + q[1] * sc; return [px + ax * cosr - ay * sinr, py + ax * sinr + ay * cosr]; };
+    // the pencil: in from the right, drawing, then away
+    if (lt < 6.2) {
+      const enter = bdEase(bdSeg(lt, .5, 1.15)), leave = bdEase(bdSeg(lt, 5.0, 5.9));
+      const [gx, gy] = onPage(tipU), jit = lift < .5 ? Math.sin(t * 47) * u * .002 : 0;
+      bdPencil(c, gx + (1 - enter) * u * .9 + leave * u * .9 + jit, gy - (1 - enter) * u * .5 - leave * u * .6, u, Math.max(lift, 1 - enter, leave), -1.0);
+    }
+    // then the brush, dabbing each colour where its wash starts
+    if (lt > 5.2 && lt < 8.4) {
+      const wsh = BD_SKETCH.washes, enter = bdEase(bdSeg(lt, 5.25, W0)), leave = bdEase(bdSeg(lt, W0 + wsh.length * WS, W0 + wsh.length * WS + .7));
+      let j = Math.max(0, Math.min(wsh.length - 1, Math.floor((lt - W0) / WS)));
+      const k = bdSeg(lt, W0 + j * WS + .1, W0 + (j + 1) * WS), nx = wsh[Math.min(wsh.length - 1, j + 1)];
+      const here = j + 1 < wsh.length && lt > W0 ? [bdLerp(wsh[j].at[0], nx.at[0], bdEase(k)), bdLerp(wsh[j].at[1], nx.at[1], bdEase(k))] : wsh[lt > W0 ? j : 0].at;
+      const dab = lt > W0 ? Math.sin(bdK((lt - W0) / WS % 1) * Math.PI) : 0;
+      const [bx, by] = onPage(here);
+      bdBrush(c, bx + (1 - enter) * u * .8 + leave * u * .9, by - (1 - enter) * u * .6 - leave * u * .6, u, Math.max(1 - dab, 1 - enter, leave) * .8, -.95, wsh[lt > W0 ? Math.min(wsh.length - 1, j + (k > .5 ? 1 : 0)) : 0].col);
+    }
+  } };
+
+  /* ---------- Yoga at sunrise ----------
+     A figure drawn as a skeleton of joint angles, flowing from pose to pose:
+     every angle is absolute, measured from straight down, so a pose is
+     nine numbers and the flow between two is a straight blend. */
+  const BD_POSE = {
+    mountain: [0, -9, -5, 9, 5, -3, -1, 3, 1],
+    reach: [0, -195, -197, 195, 197, -3, -1, 3, 1],
+    tree: [0, -158, -166, 158, 166, -62, 62, 1, 0],
+    warrior: [0, -90, -90, 90, 90, -70, -4, 48, 48],
+    triangle: [-62, -4, -4, 176, 176, -36, -36, 36, 36],
+    prayer: [0, -14, 135, 14, 225, -3, -1, 3, 1],
+  };
+  const BD_FLOW = [[0, "mountain"], [1.4, "mountain"], [2.1, "reach"], [2.5, "reach"], [3.3, "tree"], [4.7, "tree"], [5.5, "warrior"], [6.7, "warrior"], [7.5, "triangle"], [8.5, "triangle"], [9.4, "prayer"]];
+  function bdPose(lt) {
+    let i = 0; while (i + 1 < BD_FLOW.length && BD_FLOW[i + 1][0] <= lt) i += 1;
+    const a = BD_POSE[BD_FLOW[i][1]];
+    if (i + 1 >= BD_FLOW.length) return a.slice();
+    const b = BD_POSE[BD_FLOW[i + 1][1]], k = bdEase(bdSeg(lt, BD_FLOW[i][0], BD_FLOW[i + 1][0]));
+    return a.map((v, j) => bdLerp(v, b[j], k));
+  }
+  function bdYogi(c, fx, floor, H, pose, t, body, rim) {
+    const R = Math.PI / 180, dir = (a) => [Math.sin(a * R), Math.cos(a * R)];
+    const [tilt, aL1, aL2, aR1, aR2, lL1, lL2, lR1, lR2] = pose;
+    const breath = Math.sin(t * 1.25) * .012;
+    const up = [Math.sin(tilt * R), -Math.cos(tilt * R)], side = [Math.cos(tilt * R), Math.sin(tilt * R)];
+    const torso = H * .3 * (1 + breath);
+    const add = (p, d, l) => [p[0] + d[0] * l, p[1] + d[1] * l];
+    const at = (p, a, b) => add(add(p, up, a * H), side, b * H);
+    const P = [0, 0], N = add(P, up, torso);
+    const SL = at(N, -.016, -.074), SR = at(N, -.016, .074), HL = at(P, 0, -.05), HR = at(P, 0, .05);
+    const head = add(N, up, H * .108);
+    const EL = add(SL, dir(aL1), H * .165), WL = add(EL, dir(aL2), H * .155);
+    const ER = add(SR, dir(aR1), H * .165), WR = add(ER, dir(aR2), H * .155);
+    const KL = add(HL, dir(lL1), H * .24), AL = add(KL, dir(lL2), H * .235);
+    const KR = add(HR, dir(lR1), H * .24), AR = add(KR, dir(lR2), H * .235);
+    const low = Math.max(AL[1], AR[1]), dy = floor - low - H * .012, dx = fx - (AL[0] + AR[0]) / 2;
+    const T = (p) => [p[0] + dx, p[1] + dy];
+    const seg = (a, b, wd) => { a = T(a); b = T(b); c.lineWidth = wd; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); };
+    const dot = (p, r) => { p = T(p); c.beginPath(); c.arc(p[0], p[1], r, 0, TAU); c.fill(); };
+    const foot = (A, K, s) => (Math.abs(A[1] - low) < H * .02 ? add(A, [s * .96, .28], H * .062) : add(A, [(A[0] - K[0]) / (H * .235), (A[1] - K[1]) / (H * .235)], H * .05));
+    /* The body as one smooth outline through its landmarks. */
+    const outline = [at(N, .012, -.026), at(N, -.008, -.07), at(N, -.068, -.066), at(P, torso / H * .42, -.044), at(P, .018, -.066), at(P, -.045, -.028),
+      at(P, -.045, .028), at(P, .018, .066), at(P, torso / H * .42, .044), at(N, -.068, .066), at(N, -.008, .07), at(N, .012, .026)].map(T);
+    const blob = () => { const n = outline.length, mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      let m = mid(outline[n - 1], outline[0]); c.beginPath(); c.moveTo(m[0], m[1]);
+      for (let i = 0; i < n; i += 1) { const q = outline[i]; m = mid(q, outline[(i + 1) % n]); c.quadraticCurveTo(q[0], q[1], m[0], m[1]); }
+      c.closePath(); };
+    c.lineCap = "round"; c.lineJoin = "round";
+    [rim, body].forEach((col, pass) => {
+      const ex = pass ? 0 : Math.max(2, H * .014);
+      c.strokeStyle = col; c.fillStyle = col;
+      seg(HR, KR, H * .07 + ex); seg(KR, AR, H * .05 + ex); seg(AR, foot(AR, KR, 1), H * .036 + ex);
+      seg(HL, KL, H * .07 + ex); seg(KL, AL, H * .05 + ex); seg(AL, foot(AL, KL, -1), H * .036 + ex);
+      blob(); c.fill(); if (ex) { c.lineWidth = ex; c.stroke(); }
+      seg(N, add(N, up, H * .05), H * .032 + ex);
+      dot(head, H * .058 + ex / 2);
+      dot(add(add(head, up, H * .05), side, -H * .012), H * .032 + ex / 2);
+      seg(SL, EL, H * .042 + ex); seg(EL, WL, H * .034 + ex); dot(WL, H * .022 + ex / 2);
+      seg(SR, ER, H * .042 + ex); seg(ER, WR, H * .034 + ex); dot(WR, H * .022 + ex / 2);
+    });
+  }
+  BD_CH.yoga = { d: 10, ink: "255,170,120", draw(c, S, lt) {
+    const { w, h, cx, cy, u, st, t } = S;
+    const hz = cy + u * .12, rise = u * .07 * bdEase(lt / 11);
+    bdStill(st, "bd:yoga-sky", c, w, h, (x) => {
+      const sky = x.createLinearGradient(0, 0, 0, hz);
+      sky.addColorStop(0, "#2B2A60"); sky.addColorStop(.38, "#6C4A8E"); sky.addColorStop(.66, "#CF6A8A"); sky.addColorStop(.86, "#F59E72"); sky.addColorStop(1, "#FFD08A");
+      x.fillStyle = sky; x.fillRect(0, 0, w, hz + 2);
+      b1Glow(st, x, cx + u * .02, hz - u * .06, u * 1.1, "255,170,110", .45); });
+    const sx = cx + u * .02, sy = hz - u * .02 - rise;
+    b1Glow(st, c, sx, sy, u * .42, "255,228,170", .6);
+    c.save(); c.globalCompositeOperation = "lighter"; c.translate(sx, sy); c.rotate(t * .05);
+    for (let i = 0; i < 14; i += 1) { c.rotate(TAU / 14); c.fillStyle = `rgba(255,214,160,${(.05 + .03 * Math.sin(t * .9 + i * 1.3)).toFixed(3)})`;
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(u * 1.3, -u * .055); c.lineTo(u * 1.3, u * .055); c.closePath(); c.fill(); }
+    c.restore();
+    const sg = c.createRadialGradient(sx, sy, 0, sx, sy, u * .13); sg.addColorStop(0, "#FFFBE6"); sg.addColorStop(.7, "#FFE6A6"); sg.addColorStop(1, "#FFC879");
+    c.fillStyle = sg; c.beginPath(); c.arc(sx, sy, u * .13, 0, TAU); c.fill();
+    bdStill(st, "bd:yoga", c, w, h, (x) => {
+      const hill = (base, amp, f1, f2, col) => { x.fillStyle = col; x.beginPath(); x.moveTo(0, h);
+        for (let k = 0; k <= 60; k += 1) { const px = k / 60 * w; x.lineTo(px, base - u * amp * (1 + .55 * Math.sin(px / u * f1 + 1.3) + .3 * Math.sin(px / u * f2 + .4))); }
+        x.lineTo(w, h); x.closePath(); x.fill(); };
+      hill(hz + u * .005, .06, 2.6, 6.3, "rgba(170,96,140,.9)");
+      hill(hz + u * .03, .035, 1.9, 5.1, "#7A3F70");
+      const gg = x.createLinearGradient(0, hz, 0, h); gg.addColorStop(0, "#56285A"); gg.addColorStop(.35, "#3A1B42"); gg.addColorStop(1, "#1C0D22");
+      x.fillStyle = gg; x.beginPath(); x.moveTo(0, h);
+      for (let k = 0; k <= 40; k += 1) { const px = k / 40 * w; x.lineTo(px, hz + u * .06 + Math.sin(px / u * 1.3 + .7) * u * .012); }
+      x.lineTo(w, h); x.closePath(); x.fill();
+      x.strokeStyle = "rgba(255,190,150,.35)"; x.lineWidth = 1.2; x.beginPath();
+      for (let k = 0; k <= 40; k += 1) { const px = k / 40 * w; const py = hz + u * .06 + Math.sin(px / u * 1.3 + .7) * u * .012; if (k) x.lineTo(px, py); else x.moveTo(px, py); }
+      x.stroke();
+      for (let i = 0; i < 90; i += 1) { const gx = bdHash(i + 500) * w, gy = hz + u * .06 + bdHash(i + 600) * (h - hz) * .25;
+        x.strokeStyle = `rgba(20,8,26,${(.4 + bdHash(i) * .4).toFixed(2)})`; x.lineWidth = 1; x.beginPath(); x.moveTo(gx, gy); x.lineTo(gx + (bdHash(i + 7) - .5) * u * .02, gy - u * (.012 + bdHash(i + 9) * .02)); x.stroke(); }
+      const vg2 = x.createLinearGradient(0, hz, 0, h); vg2.addColorStop(0, "rgba(0,0,0,0)"); vg2.addColorStop(1, "rgba(0,0,0,.3)"); x.fillStyle = vg2; x.fillRect(0, hz, w, h - hz);
+      bdGrain(st, x, w, h, .05);
+    });
+    // birds, far off
+    for (let i = 0; i < 3; i += 1) {
+      const k = ((t * .025 + bdHash(i + 33)) % 1), bx = w * (.5 + k * .55), byy = hz - u * (.32 + bdHash(i + 44) * .18) + Math.sin(t * .7 + i) * u * .02;
+      const fl = Math.sin(t * 7 + i * 2) * u * .012, s = u * (.018 + i * .004);
+      c.strokeStyle = "rgba(60,30,70,.7)"; c.lineWidth = Math.max(1, u * .004); c.beginPath();
+      c.moveTo(bx - s, byy - fl); c.quadraticCurveTo(bx - s * .4, byy - s * .3, bx, byy); c.quadraticCurveTo(bx + s * .4, byy - s * .3, bx + s, byy - fl); c.stroke();
+    }
+    // the mat
+    const floor = cy + u * .38, mw = u * .52;
+    c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.ellipse(cx, floor + u * .03, mw * .58, u * .03, 0, 0, TAU); c.fill();
+    c.fillStyle = "#16706B"; c.beginPath(); c.moveTo(cx - mw * .5, floor + u * .036); c.lineTo(cx + mw * .5, floor + u * .036); c.lineTo(cx + mw * .5, floor + u * .046); c.lineTo(cx - mw * .5, floor + u * .046); c.closePath(); c.fill();
+    const mg = c.createLinearGradient(0, floor - u * .02, 0, floor + u * .036); mg.addColorStop(0, "#2FB3A6"); mg.addColorStop(1, "#1F8C84");
+    c.fillStyle = mg; c.beginPath(); c.moveTo(cx - mw * .42, floor - u * .02); c.lineTo(cx + mw * .42, floor - u * .02); c.lineTo(cx + mw * .5, floor + u * .036); c.lineTo(cx - mw * .5, floor + u * .036); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(255,220,170,.45)"; c.lineWidth = 1; c.beginPath(); c.moveTo(cx - mw * .42, floor - u * .02); c.lineTo(cx + mw * .42, floor - u * .02); c.stroke();
+    const H = u * .6;
+    b1Glow(st, c, cx, floor - H * .5, u * .5, "255,190,130", .22);
+    bdYogi(c, cx, floor + u * .006, H, bdPose(lt), t, "#2A1532", "rgba(255,196,128,.95)");
+    // pollen in the low sun
+    for (let i = 0; i < 16; i += 1) {
+      const k = (t * (.02 + bdHash(i) * .02) + bdHash(i + 3)) % 1, x = w * (.58 + bdHash(i + 5) * .42) + Math.sin(t * .6 + i) * u * .03, y = hz - k * u * .7;
+      b1Glow(st, c, x, y, u * .012, "255,236,190", .5 * Math.sin(k * Math.PI));
+    }
+  } };
+
+  /* ---------- Breathe: a lotus on a lake at dusk ---------- */
+  function bdLotus(c, x, y, s, open, t) {
+    const petal = (a, len, wd, col1, col2, tilt) => {
+      c.save(); c.translate(x, y); c.rotate(a);
+      const g = c.createLinearGradient(0, 0, 0, -len); g.addColorStop(0, col2); g.addColorStop(1, col1);
+      c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(-wd, -len * .35, -wd * .7, -len * .8, 0, -len); c.bezierCurveTo(wd * .7, -len * .8, wd, -len * .35, 0, 0); c.fill();
+      c.strokeStyle = "rgba(160,40,90,.25)"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -len * .1); c.lineTo(0, -len * .85); c.stroke();
+      c.restore(); };
+    const sp = .55 + open * .35;
+    [[-3, .9], [3, .9], [-2, .95], [2, .95]].forEach(([k, l]) => petal(k * sp * .32, s * l, s * .32, "#F7C2D8", "#D9457E"));
+    [[-1.5, 1.05], [1.5, 1.05], [-.5, 1.1], [.5, 1.1]].forEach(([k, l]) => petal(k * sp * .3, s * l, s * .3, "#FFE1EC", "#E25C92"));
+    petal(0, s * 1.15, s * .28, "#FFF0F6", "#EE7AA9");
+    c.fillStyle = "#FFD45C"; c.beginPath(); c.ellipse(x, y - s * .1, s * .14, s * .06, 0, 0, TAU); c.fill();
+  }
+  BD_CH.mindfulness = { d: 10.2, ink: "120,180,255", draw(c, S, lt) {
+    const { w, h, cx, cy, u, st, t } = S;
+    const hz = cy + u * .1;
+    bdStill(st, "bd:lake", c, w, h, (x) => {
+      const sky = x.createLinearGradient(0, 0, 0, hz); sky.addColorStop(0, "#090F2A"); sky.addColorStop(.6, "#1B2A57"); sky.addColorStop(1, "#46598E");
+      x.fillStyle = sky; x.fillRect(0, 0, w, hz);
+      const wg = x.createLinearGradient(0, hz, 0, h); wg.addColorStop(0, "#22335E"); wg.addColorStop(.25, "#121F42"); wg.addColorStop(1, "#070C1E");
+      x.fillStyle = wg; x.fillRect(0, hz, w, h - hz);
+      x.fillStyle = "#0B1430"; x.beginPath(); x.moveTo(0, hz + 1);
+      for (let k = 0; k <= 80; k += 1) { const px = k / 80 * w; x.lineTo(px, hz - u * (.025 + .02 * Math.sin(px / u * 2.1 + 1) + .012 * Math.sin(px / u * 5.3))); }
+      x.lineTo(w, hz + 1); x.closePath(); x.fill();
+      for (let i = 0; i < 60; i += 1) { const px = bdHash(i + 900) * w, base = hz - u * (.03 + .02 * Math.sin(px / u * 2.1 + 1)), ht = u * (.03 + bdHash(i + 901) * .06);
+        x.beginPath(); x.moveTo(px - ht * .22, base); x.lineTo(px, base - ht); x.lineTo(px + ht * .22, base); x.closePath(); x.fill(); }
+      x.strokeStyle = "rgba(150,180,240,.12)"; x.lineWidth = 1;
+      for (let i = 0; i < 40; i += 1) { const yy = hz + Math.pow(bdHash(i + 950), 1.6) * (h - hz), ww = u * (.05 + bdHash(i + 951) * .25), xx = bdHash(i + 952) * w;
+        x.beginPath(); x.moveTo(xx - ww / 2, yy); x.lineTo(xx + ww / 2, yy); x.stroke(); }
+      vignette(x, w, h, .35, .79); bdGrain(st, x, w, h, .05);
+    });
+    for (let i = 0; i < 46; i += 1) { const a = .25 + .75 * Math.abs(Math.sin(t * (.6 + bdHash(i + 70) * 1.2) + i));
+      c.fillStyle = `rgba(255,255,255,${(a * .8).toFixed(3)})`; c.beginPath(); c.arc(bdHash(i + 71) * w, bdHash(i + 72) * (hz - u * .1), .5 + bdHash(i + 73) * 1.1, 0, TAU); c.fill(); }
+    const mx = cx + u * .36, my = cy - u * .38, mr = u * .05;
+    b1Glow(st, c, mx, my, mr * 5, "220,230,255", .25);
+    c.fillStyle = "#FFF6DC"; c.beginPath(); c.arc(mx, my, mr, 0, TAU); c.fill();
+    c.fillStyle = "#1A2752"; c.beginPath(); c.arc(mx + mr * .45, my - mr * .2, mr * .92, 0, TAU); c.fill();
+    for (let k = 0; k < 9; k += 1) { const yy = hz + u * .02 + k * u * .035, ww = u * (.06 - k * .004) * (1 + .3 * Math.sin(t * 2 + k));
+      c.fillStyle = `rgba(255,246,220,${(.28 - k * .025).toFixed(3)})`; c.fillRect(mx - ww / 2 + Math.sin(t * 1.3 + k) * u * .008, yy, ww, Math.max(1, u * .005)); }
+    for (let i = 0; i < 3; i += 1) { const k = (t * .012 + i / 3) % 1;
+      b1Glow(st, c, w * (.45 + k * .7), hz - u * .01 + i * u * .02, u * .6, "170,190,240", .1 * Math.sin(k * Math.PI), .12); }
+    // breath: in for four, hold, out for four
+    const b = lt < 1.3 ? 0 : lt < 5.3 ? bdEase((lt - 1.3) / 4) : lt < 6.1 ? 1 : 1 - bdEase((lt - 6.1) / 4);
+    const lx = cx, ly = cy + u * .33;
+    for (let r = 0; r < 3; r += 1) { const q = (lt - 6.1 - r * .9) / 3.2; if (q <= 0 || q >= 1) continue;
+      c.strokeStyle = `rgba(190,215,255,${(.4 * (1 - q)).toFixed(3)})`; c.lineWidth = Math.max(1, u * .004);
+      c.beginPath(); c.ellipse(lx, ly + u * .02, u * (.12 + q * .55), u * (.025 + q * .11), 0, 0, TAU); c.stroke(); }
+    [[-.2, .05, .13, "#1F5A47"], [.23, .07, .11, "#1C5241"], [.02, .1, .16, "#236650"]].forEach(([dx, dy, r, col], i) => {
+      const px = lx + dx * u, py = ly + dy * u + Math.sin(t * .9 + i) * u * .003;
+      c.fillStyle = col; c.beginPath(); c.ellipse(px, py, u * r, u * r * .26, 0, .25, TAU - .05); c.lineTo(px, py); c.closePath(); c.fill();
+      c.strokeStyle = "rgba(120,200,160,.35)"; c.lineWidth = 1; c.beginPath(); c.ellipse(px, py, u * r, u * r * .26, 0, .3, Math.PI); c.stroke(); });
+    b1Glow(st, c, lx, ly - u * .06, u * .32, "255,170,210", .22 + .2 * b);
+    bdLotus(c, lx, ly + u * .02, u * .155, b, t);
+    // the circle
+    const rx = cx, ry = cy - u * .1, rr = u * (.15 + .15 * b);
+    b1Glow(st, c, rx, ry, rr * 1.7, "150,200,255", .18 + .22 * b);
+    c.fillStyle = `rgba(170,210,255,${(.05 + .06 * b).toFixed(3)})`; c.beginPath(); c.arc(rx, ry, rr, 0, TAU); c.fill();
+    c.strokeStyle = `rgba(225,240,255,${(.55 + .35 * b).toFixed(3)})`; c.lineWidth = Math.max(1.2, u * .006); c.beginPath(); c.arc(rx, ry, rr, 0, TAU); c.stroke();
+    for (let k = 0; k < 16; k += 1) { const a = k / 16 * TAU + t * .15; c.fillStyle = "rgba(225,240,255,.5)"; c.beginPath(); c.arc(rx + Math.cos(a) * rr * 1.12, ry + Math.sin(a) * rr * 1.12, Math.max(.8, u * .0035), 0, TAU); c.fill(); }
+    const words = [["breathe in", bdSeg(lt, 1.0, 1.6) * (1 - bdSeg(lt, 5.4, 5.9))], ["hold", bdSeg(lt, 5.5, 5.8) * (1 - bdSeg(lt, 6.0, 6.3))], ["breathe out", bdSeg(lt, 6.1, 6.6)]];
+    c.textAlign = "center"; c.textBaseline = "middle";
+    words.forEach(([word, a]) => { if (a <= 0) return; c.globalAlpha = a; c.font = bdSerif(u * (.058 + .012 * b), "italic "); c.fillStyle = "#EEF5FF"; c.fillText(word, rx, ry - u * .012); });
+    c.globalAlpha = 1;
+    const sec = lt < 1.3 ? 0 : lt < 5.3 ? Math.min(4, Math.floor(lt - 1.3) + 1) : lt < 6.1 ? 4 : Math.max(0, 4 - Math.floor(lt - 6.1) - 1);
+    for (let k = 0; k < 4; k += 1) { c.fillStyle = k < sec ? "rgba(235,245,255,.9)" : "rgba(235,245,255,.25)"; c.beginPath(); c.arc(rx + (k - 1.5) * u * .028, ry + u * .05, Math.max(1.2, u * .006), 0, TAU); c.fill(); }
+    for (let i = 0; i < 14; i += 1) { const px = cx + Math.sin(t * (.21 + bdHash(i) * .2) + i * 3) * u * .55, py = cy + Math.sin(t * (.17 + bdHash(i + 1) * .2) + i) * u * .35 + u * .05;
+      const a = Math.pow(Math.max(0, Math.sin(t * (.8 + bdHash(i + 2)) + i * 1.7)), 3);
+      b1Glow(st, c, px, py, u * .03, "220,255,150", .7 * a); }
+  } };
+
+  /* ---------- Journal: a letter written on today's page ---------- */
+  const BD_HEART = bdMeasure(bdPath().M(0, .5).C(-.6, .1, -.6, -.55, -.1, -.4).C(0, -.35, 0, -.25, 0, -.2).C(0, -.25, 0, -.35, .1, -.4).C(.6, -.55, .6, .1, 0, .5).pts);
+  function bdPen(c, x, y, u, lift, ang) {
+    const L = u * .46, wd = u * .034;
+    c.save(); c.translate(x + u * .035 + lift * u * .03, y + u * .045 + lift * u * .03); c.rotate(ang);
+    c.fillStyle = "rgba(0,0,0,.25)"; bdRound(c, u * .02, -wd / 2, L, wd, wd / 2); c.fill(); c.restore();
+    c.save(); c.translate(x, y - lift * u * .015); c.rotate(ang);
+    c.fillStyle = "#E7C36A"; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(u * .02, -wd * .32, u * .05, -wd * .42); c.lineTo(u * .05, wd * .42); c.quadraticCurveTo(u * .02, wd * .32, 0, 0); c.fill();
+    c.strokeStyle = "#7A5A1A"; c.lineWidth = .8; c.beginPath(); c.moveTo(u * .004, 0); c.lineTo(u * .035, 0); c.stroke();
+    const g = c.createLinearGradient(0, -wd / 2, 0, wd / 2); g.addColorStop(0, "#5A6FB8"); g.addColorStop(.4, "#25336E"); g.addColorStop(1, "#111A3E");
+    c.fillStyle = "#1B1B22"; bdRound(c, u * .048, -wd * .45, u * .07, wd * .9, wd * .2); c.fill();
+    c.fillStyle = g; bdRound(c, u * .115, -wd / 2, L - u * .115, wd, wd / 2); c.fill();
+    c.fillStyle = "#E7C36A"; c.fillRect(u * .113, -wd / 2, u * .01, wd); c.fillRect(L - u * .14, -wd / 2, u * .008, wd);
+    c.fillRect(L - u * .2, -wd * .62, u * .14, wd * .14);
+    c.restore();
+  }
+  BD_CH.journaling = { d: 10.5, ink: "250,220,160", draw(c, S, lt) {
+    const { w, h, cx, cy, u, st, t } = S;
+    bdGround(st, "bd:linen", c, S, (x) => {
+      fill(x, w, h, [[0, "#1D3B3E"], [1, "#0F2427"]]);
+      for (let i = 0; i < 1400; i += 1) { x.fillStyle = i % 2 ? "rgba(255,255,255,.03)" : "rgba(0,0,0,.06)"; x.fillRect(bdHash(i * 1.9) * w, bdHash(i * 3.1) * h, 2 + bdHash(i) * 4, 1); }
+      b1Glow(st, x, cx - u * .1, cy - u * .1, u * 1.2, "255,214,160", .28); }, .45);
+    const jx = cx - u * .02, jy = cy + u * .07, JW = u * 1.02, JH = u * .64, rot = .035;
+    c.save(); c.translate(jx, jy); c.rotate(rot);
+    bdBlit(st, c, "bd:journal", -JW / 2 - u * .03, -JH / 2 - u * .03, JW + u * .06, JH + u * .06, (x, wd, ht) => {
+      const o = u * .03;
+      for (let k = 3; k >= 1; k -= 1) { x.fillStyle = `rgba(0,0,0,${.14 / k})`; bdRound(x, o - u * .01 + u * .008 * k, o + u * .012 * k, JW + u * .02, JH + u * .01, u * .02); x.fill(); }
+      x.fillStyle = "#5B2E2A"; bdRound(x, o - u * .018, o - u * .014, JW + u * .036, JH + u * .03, u * .02); x.fill();
+      [[0, "#FBF4E4", "#EFE3CB"], [JW / 2, "#FDF7EA", "#F2E7D1"]].forEach(([px, a, b], side) => {
+        const g = x.createLinearGradient(o + px, 0, o + px + JW / 2, 0);
+        if (side) { g.addColorStop(0, b); g.addColorStop(.12, a); g.addColorStop(1, a); } else { g.addColorStop(0, a); g.addColorStop(.88, a); g.addColorStop(1, b); }
+        x.fillStyle = g; x.fillRect(o + px, o, JW / 2, JH); });
+      const gut = x.createLinearGradient(o + JW / 2 - u * .04, 0, o + JW / 2 + u * .04, 0);
+      gut.addColorStop(0, "rgba(90,60,30,0)"); gut.addColorStop(.5, "rgba(90,60,30,.28)"); gut.addColorStop(1, "rgba(90,60,30,0)");
+      x.fillStyle = gut; x.fillRect(o + JW / 2 - u * .04, o, u * .08, JH);
+      x.strokeStyle = "rgba(110,150,190,.35)"; x.lineWidth = 1;
+      for (let k = 0; k < 8; k += 1) { const yy = o + u * .1 + k * u * .068; x.beginPath(); x.moveTo(o + JW / 2 + u * .03, yy); x.lineTo(o + JW - u * .03, yy); x.stroke(); }
+      x.fillStyle = "rgba(120,110,95,.35)";
+      for (let i = 0; i < 9; i += 1) for (let j = 0; j < 12; j += 1) { x.beginPath(); x.arc(o + u * .04 + i * u * .052, o + u * .05 + j * u * .05, Math.max(.6, u * .0025), 0, TAU); x.fill(); }
+      // a pressed flower under a strip of washi tape, and a doodled sun
+      const fx = o + JW * .2, fy = o + JH * .42;
+      x.strokeStyle = "#5E8A4A"; x.lineWidth = Math.max(1, u * .005); x.beginPath(); x.moveTo(fx, fy + u * .05); x.quadraticCurveTo(fx - u * .02, fy + u * .14, fx + u * .01, fy + u * .22); x.stroke();
+      x.fillStyle = "#7FAF5E"; x.beginPath(); x.ellipse(fx - u * .025, fy + u * .14, u * .035, u * .013, -.6, 0, TAU); x.fill();
+      for (let k = 0; k < 5; k += 1) { const a = k / 5 * TAU - Math.PI / 2; x.fillStyle = "rgba(186,120,200,.85)"; x.beginPath(); x.ellipse(fx + Math.cos(a) * u * .032, fy + Math.sin(a) * u * .032, u * .03, u * .019, a, 0, TAU); x.fill(); }
+      x.fillStyle = "#F2C14E"; x.beginPath(); x.arc(fx, fy, u * .016, 0, TAU); x.fill();
+      x.save(); x.translate(fx, fy + u * .12); x.rotate(-.3); x.fillStyle = "rgba(244,150,180,.7)"; x.fillRect(-u * .09, -u * .022, u * .18, u * .044);
+      x.fillStyle = "rgba(255,255,255,.6)"; for (let k = 0; k < 7; k += 1) { x.beginPath(); x.arc(-u * .075 + k * u * .025, (k % 2 ? 1 : -1) * u * .008, u * .004, 0, TAU); x.fill(); } x.restore();
+      const sx = o + JW * .36, sy = o + JH * .16;
+      x.strokeStyle = "rgba(230,150,40,.85)"; x.lineWidth = Math.max(1, u * .005); x.beginPath(); x.arc(sx, sy, u * .028, 0, TAU); x.stroke();
+      for (let k = 0; k < 8; k += 1) { const a = k / 8 * TAU; x.beginPath(); x.moveTo(sx + Math.cos(a) * u * .04, sy + Math.sin(a) * u * .04); x.lineTo(sx + Math.cos(a) * u * .055, sy + Math.sin(a) * u * .055); x.stroke(); }
+      x.fillStyle = "rgba(230,90,120,.8)"; heartPath(x, o + JW * .36, o + JH * .74, u * .022); x.fill();
+      x.fillStyle = "rgba(60,80,140,.7)"; x.font = bdHand(u * .04, 600); x.textAlign = "left"; x.fillText("good things", o + JW * .07, o + JH * .1);
+    });
+    // the letter, written line by line, the pen at the end of the ink
+    const ox = u * .045, oy = -JH / 2 + u * .088, lh = u * .068, maxw = JW / 2 - u * .09;
+    c.textBaseline = "alphabetic";
+    let at = 1.3;
+    const plan = S.words.letter.map((line, i) => {
+      if (!line) return null;
+      const small = i === 0, px = bdFit(c, line, (p) => bdHand(p, 600), small ? u * .042 : u * .052, maxw);
+      const tw = c.measureText(line).width, x0 = small ? JW / 2 - u * .035 - tw : ox + (i === 1 ? 0 : u * .01);
+      const yb = oy + (i + .7) * lh - (small ? u * .01 : 0), s0 = at, s1 = at + .3 + tw / u * 2.1;
+      at = s1 + .18;
+      return { line, px, tw, x0, yb, s0, s1 };
+    }).filter(Boolean);
+    const last = plan[plan.length - 1], heart = last ? [last.x0 + last.tw + u * .045, last.yb - lh * .22] : [0, 0];
+    const hs0 = last ? last.s1 + .1 : 0, hs1 = hs0 + .6, done = hs1 + .2;
+    let pen = null, penLift = 1;
+    c.fillStyle = "#22305A";
+    plan.forEach((q, i) => {
+      const f = bdSeg(lt, q.s0, q.s1);
+      if (lt < q.s0 && !pen) { const prev = plan[i - 1]; if (prev) { const k = bdSeg(lt, prev.s1, q.s0); pen = [bdLerp(prev.x0 + prev.tw, q.x0, k), bdLerp(prev.yb, q.yb, k) - lh * .3]; penLift = Math.sin(k * Math.PI); } else { pen = [q.x0, q.yb - lh * .2]; penLift = 1; } }
+      if (f <= 0) return;
+      c.font = bdHand(q.px, 600);
+      c.save(); c.beginPath(); c.rect(q.x0 - u * .02, q.yb - lh, q.tw * f + u * .02, lh * 1.4); c.clip(); c.fillText(q.line, q.x0, q.yb); c.restore();
+      if (f < 1) { pen = [q.x0 + q.tw * f, q.yb - lh * .18 + Math.sin(t * 31) * lh * .1 + Math.sin(t * 17) * lh * .06]; penLift = 0; }
+    });
+    const hk = bdSeg(lt, hs0, hs1);
+    if (hk > 0) {
+      c.save(); c.strokeStyle = "#C2354F"; c.lineWidth = Math.max(1, u * .005); c.lineCap = "round"; c.lineJoin = "round";
+      bdTrace(c, BD_HEART, hk * BD_HEART.L, u * .032, u * .032, heart[0], heart[1]); c.restore();
+      if (hk < 1) { pen = bdPointAt(BD_HEART, hk * BD_HEART.L); pen = [heart[0] + pen[0] * u * .032, heart[1] + pen[1] * u * .032]; penLift = 0; }
+    }
+    if (!pen) { pen = heart; penLift = 1; }
+    c.restore();
+    // the mug, steaming, at the corner of the page
+    const mx = jx + u * .45, my = jy - u * .36;
+    shadow(c, mx + u * .02, my + u * .025, u * .14, u * .12, .4);
+    c.fillStyle = "#EDE3D6"; c.beginPath(); c.arc(mx, my, u * .125, 0, TAU); c.fill();
+    c.fillStyle = "#F7F1E8"; c.beginPath(); c.arc(mx, my, u * .092, 0, TAU); c.fill();
+    c.strokeStyle = "#F7F1E8"; c.lineWidth = u * .022; c.beginPath(); c.arc(mx + u * .11, my + u * .02, u * .03, -1.4, 1.6); c.stroke();
+    const tg = c.createRadialGradient(mx - u * .02, my - u * .02, 0, mx, my, u * .08); tg.addColorStop(0, "#B07A4E"); tg.addColorStop(1, "#6A3F22");
+    c.fillStyle = tg; c.beginPath(); c.arc(mx, my, u * .076, 0, TAU); c.fill();
+    c.fillStyle = "rgba(255,240,220,.35)"; c.beginPath(); c.ellipse(mx - u * .025, my - u * .028, u * .028, u * .012, -.6, 0, TAU); c.fill();
+    c.lineCap = "round";
+    for (let i = 0; i < 3; i += 1) { const q = (t * .22 + i / 3) % 1; c.strokeStyle = `rgba(255,255,255,${(Math.sin(q * Math.PI) * .3).toFixed(3)})`; c.lineWidth = Math.max(1.5, u * .012);
+      c.beginPath(); for (let k = 0; k <= 10; k += 1) { const f = k / 10; c.lineTo(mx + (i - 1) * u * .025 + Math.sin(f * 5 + t * 1.6 + i * 2) * u * .02 * f, my - u * .02 - f * u * .2 * (.4 + q)); } c.stroke(); }
+    // the pen
+    const enter = bdEase(bdSeg(lt, .6, 1.3)), leave = bdEase(bdSeg(lt, done, done + .9));
+    if (leave < 1) {
+      const p = pen;
+      const cosr = Math.cos(rot), sinr = Math.sin(rot);
+      const gx = jx + p[0] * cosr - p[1] * sinr + (1 - enter) * u * .8 + leave * u * .9, gy = jy + p[0] * sinr + p[1] * cosr - (1 - enter) * u * .5 - leave * u * .5;
+      bdPen(c, gx, gy, u, Math.max(penLift, 1 - enter, leave), -1.05);
+    }
+  } };
+
+  /* ---------- Mystery: the board, the string, the twist ---------- */
+  const BD_BOARD = [
+    { id: "a", x: -.28, y: -.12, w: .2, h: .24, r: -.14 },
+    { id: "b", x: .27, y: -.13, w: .2, h: .24, r: .12 },
+    { id: "k", x: -.25, y: .2, w: .25, h: .14, r: .06 },
+    { id: "n", x: .28, y: .19, w: .15, h: .15, r: -.08 },
+    { id: "c", x: 0, y: .03, w: .24, h: .29, r: -.04 },
+  ];
+  const bdPin = (it) => [it.x + Math.sin(it.r) * (it.h / 2 - .022), it.y - Math.cos(it.r) * (it.h / 2 - .022)];
+  function bdBoardPaint(x, u, BW, BH) {
+    const o = (BW) / 2, oy = BH / 2;
+    const fr = x.createLinearGradient(0, 0, BW, BH); fr.addColorStop(0, "#6B4528"); fr.addColorStop(1, "#3A2414");
+    x.fillStyle = fr; bdRound(x, 0, 0, BW, BH, u * .015); x.fill();
+    const fw = u * .03;
+    x.fillStyle = "#B88752"; x.fillRect(fw, fw, BW - fw * 2, BH - fw * 2);
+    x.fillStyle = "rgba(90,50,20,.2)";
+    for (let i = 0; i < 1500; i += 1) { const r = .8 + bdHash(i * 2.2) * 2; x.fillRect(fw + bdHash(i * 1.3) * (BW - fw * 2), fw + bdHash(i * 4.1) * (BH - fw * 2), r, r); }
+    x.fillStyle = "rgba(255,230,190,.14)";
+    for (let i = 0; i < 700; i += 1) { const r = .8 + bdHash(i * 5.2) * 1.6; x.fillRect(fw + bdHash(i * 3.3) * (BW - fw * 2), fw + bdHash(i * 6.1) * (BH - fw * 2), r, r); }
+    const ins = x.createLinearGradient(0, fw, 0, fw + u * .05); ins.addColorStop(0, "rgba(0,0,0,.35)"); ins.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = ins; x.fillRect(fw, fw, BW - fw * 2, u * .05);
+    const card = (it, paint) => { x.save(); x.translate(o + it.x * u, oy + it.y * u); x.rotate(it.r);
+      x.fillStyle = "rgba(0,0,0,.3)"; x.fillRect(-it.w * u / 2 + u * .008, -it.h * u / 2 + u * .01, it.w * u, it.h * u);
+      paint(it.w * u, it.h * u); x.restore(); };
+    const polaroid = (wd, ht, photo) => { x.fillStyle = "#F6F3EC"; x.fillRect(-wd / 2, -ht / 2, wd, ht);
+      const pw = wd * .86, ph = pw; x.save(); x.beginPath(); x.rect(-pw / 2, -ht / 2 + wd * .07, pw, ph); x.clip(); photo(-pw / 2, -ht / 2 + wd * .07, pw, ph); x.restore(); };
+    BD_BOARD.forEach((it) => card(it, (wd, ht) => {
+      if (it.id === "a") polaroid(wd, ht, (px, py, pw, ph) => {
+        const g = x.createLinearGradient(0, py, 0, py + ph); g.addColorStop(0, "#2B3A55"); g.addColorStop(1, "#141B2B"); x.fillStyle = g; x.fillRect(px, py, pw, ph);
+        x.fillStyle = "#0A0D14"; x.beginPath(); x.arc(px + pw * .5, py + ph * .45, pw * .16, 0, TAU); x.fill();
+        x.beginPath(); x.ellipse(px + pw * .5, py + ph * 1.02, pw * .36, ph * .36, 0, Math.PI, TAU); x.fill();
+        x.fillStyle = "rgba(255,255,255,.9)"; x.font = bdBold(pw * .5); x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("?", px + pw * .5, py + ph * .45); });
+      if (it.id === "b") polaroid(wd, ht, (px, py, pw, ph) => {
+        const g = x.createLinearGradient(0, py, 0, py + ph); g.addColorStop(0, "#1C2540"); g.addColorStop(1, "#2E3A5C"); x.fillStyle = g; x.fillRect(px, py, pw, ph);
+        x.fillStyle = "#0B0F1C"; x.beginPath(); x.moveTo(px + pw * .18, py + ph); x.lineTo(px + pw * .18, py + ph * .55); x.lineTo(px + pw * .5, py + ph * .3); x.lineTo(px + pw * .82, py + ph * .55); x.lineTo(px + pw * .82, py + ph); x.fill();
+        x.fillStyle = "#FFD27A"; x.fillRect(px + pw * .58, py + ph * .62, pw * .12, ph * .12);
+        x.fillStyle = "rgba(255,210,122,.25)"; x.beginPath(); x.arc(px + pw * .64, py + ph * .68, pw * .14, 0, TAU); x.fill(); });
+      if (it.id === "k") { x.fillStyle = "#E9E3D4"; x.fillRect(-wd / 2, -ht / 2, wd, ht);
+        x.fillStyle = "#2A2622"; x.fillRect(-wd * .42, -ht * .38, wd * .84, ht * .18);
+        x.fillStyle = "rgba(60,55,50,.45)"; for (let k = 0; k < 4; k += 1) { x.fillRect(-wd * .42, -ht * .1 + k * ht * .12, wd * (k === 3 ? .5 : .84), ht * .05); } }
+      if (it.id === "n") { x.fillStyle = "#FFE066"; x.fillRect(-wd / 2, -ht / 2, wd, ht);
+        x.fillStyle = "rgba(0,0,0,.06)"; x.fillRect(-wd / 2, ht * .3, wd, ht * .2);
+        x.fillStyle = "#C0283C"; x.font = bdHand(ht * .32); x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("WHO?", 0, -ht * .12); }
+      if (it.id === "c") { x.fillStyle = "#F6F3EC"; x.fillRect(-wd / 2, -ht / 2, wd, ht); }
+    }));
+  }
+  function bdBoard(st, c, S, bx, by, lt, scale) {
+    const { u } = S, BW = u * .96, BH = u * .74;
+    /* The lens draws the board again, magnified: its own picture, painted
+       at the lens's scale, so neither is repainted every frame. */
+    bdBlit(st, c, scale === 1 ? "bd:board" : "bd:board-lens", bx - BW / 2, by - BH / 2, BW, BH, (x) => bdBoardPaint(x, u, BW, BH));
+    const C = BD_BOARD[4], P = (it) => { const p = bdPin(it); return [bx + p[0] * u, by + p[1] * u]; };
+    // the twist photo, developing
+    c.save(); c.translate(bx + C.x * u, by + C.y * u); c.rotate(C.r);
+    const wd = C.w * u, ht = C.h * u, pw = wd * .86, py = -ht / 2 + wd * .07;
+    const dev = bdEase(bdSeg(lt, 5.1, 6.5));
+    c.fillStyle = "#2E2A26"; c.fillRect(-pw / 2, py, pw, pw);
+    if (dev > 0) { c.save(); c.globalAlpha = dev; c.beginPath(); c.rect(-pw / 2, py, pw, pw); c.clip();
+      const g = c.createLinearGradient(0, py, 0, py + pw); g.addColorStop(0, "#FF9EC4"); g.addColorStop(1, "#C2457E"); c.fillStyle = g; c.fillRect(-pw / 2, py, pw, pw);
+      const kx = 0, ky = py + pw * .78;
+      c.fillStyle = "#FFF1E6"; c.fillRect(kx - pw * .3, ky - pw * .22, pw * .6, pw * .22); c.fillStyle = "#E85A8E"; c.fillRect(kx - pw * .3, ky - pw * .22, pw * .6, pw * .05);
+      c.fillStyle = "#FFF8F0"; c.fillRect(kx - pw * .19, ky - pw * .38, pw * .38, pw * .16); c.fillStyle = "#F2B33A"; c.fillRect(kx - pw * .19, ky - pw * .38, pw * .38, pw * .04);
+      for (let k = -1; k <= 1; k += 1) { c.fillStyle = "#FFFFFF"; c.fillRect(kx + k * pw * .1 - pw * .012, ky - pw * .5, pw * .024, pw * .12);
+        c.fillStyle = "#FFC24D"; c.beginPath(); c.ellipse(kx + k * pw * .1, ky - pw * .53, pw * .018, pw * .03, 0, 0, TAU); c.fill(); }
+      for (let k = 0; k < 14; k += 1) { c.fillStyle = BD_CONF[k % 6]; c.fillRect(-pw / 2 + bdHash(k + 700) * pw, py + bdHash(k + 701) * pw * .5, pw * .03, pw * .015); }
+      c.restore(); c.fillStyle = `rgba(60,40,20,${(.25 * (1 - dev)).toFixed(3)})`; c.fillRect(-pw / 2, py, pw, pw); }
+    const nm = bdSeg(lt, 6.0, 6.7);
+    if (nm > 0) { c.fillStyle = "#26304F"; c.textAlign = "center"; c.textBaseline = "middle"; const label = S.words.name || "you!";
+      bdFit(c, label, (p) => bdHand(p, 700), ht * .13, wd * .8); c.save(); c.beginPath(); c.rect(-wd / 2, py + pw, wd * nm, ht - pw); c.clip(); c.fillText(label, 0, py + pw + (ht / 2 - py - pw) * .5); c.restore(); }
+    c.restore();
+    // the strings, run pin to pin
+    const runs = [["a", "c"], ["c", "b"], ["a", "k"], ["k", "c"], ["b", "n"]];
+    const pin = {}; BD_BOARD.forEach((it) => { pin[it.id] = P(it); });
+    c.lineCap = "round";
+    runs.forEach(([p, q], i) => { const f = bdEase(bdSeg(lt, 1.0 + i * .32, 1.42 + i * .32)); if (f <= 0) return;
+      const a = pin[p], b = pin[q], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 + u * .03;
+      c.strokeStyle = "#C21E34"; c.lineWidth = Math.max(1.2, u * .0055); c.beginPath(); c.moveTo(a[0], a[1]);
+      for (let k = 1; k <= 20; k += 1) { const s = k / 20 * f, m = 1 - s; c.lineTo(m * m * a[0] + 2 * m * s * mx + s * s * b[0], m * m * a[1] + 2 * m * s * my + s * s * b[1]); } c.stroke(); });
+    BD_BOARD.forEach((it) => { const [px, py2] = pin[it.id];
+      c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.arc(px + u * .006, py2 + u * .008, u * .014, 0, TAU); c.fill();
+      const g = c.createRadialGradient(px - u * .005, py2 - u * .005, 0, px, py2, u * .015); g.addColorStop(0, "#FF8A8A"); g.addColorStop(1, "#B3101F");
+      c.fillStyle = g; c.beginPath(); c.arc(px, py2, u * .014, 0, TAU); c.fill(); });
+    // after the twist the note changes its mind
+    const N = BD_BOARD[3], nk = bdSeg(lt, 7.5, 8.0), nk2 = bdSeg(lt, 8.0, 8.6);
+    if (nk > 0) { c.save(); c.translate(bx + N.x * u, by + N.y * u); c.rotate(N.r); const nh = N.h * u;
+      c.strokeStyle = "#1E2A6A"; c.lineWidth = Math.max(1, u * .005); c.beginPath(); c.moveTo(-nh * .34, -nh * .12); c.lineTo(-nh * .34 + nh * .68 * nk, -nh * .1); c.stroke();
+      if (nk2 > 0) { c.beginPath(); c.rect(-nh / 2, nh * .05, nh * nk2, nh * .45); c.clip(); c.fillStyle = "#1E2A6A"; c.font = bdHand(nh * .3); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("YOU!", 0, nh * .26); }
+      c.restore(); }
+  }
+  function bdStamp(st, c, u, x, y, s, rot) {
+    const W = u * .5, H = u * .16;
+    const cv = bdSprite(st, "bd:stamp", W, H, c, (x2, wd, ht) => {
+      x2.strokeStyle = "#C8142C"; x2.lineWidth = ht * .07; bdRound(x2, ht * .06, ht * .06, wd - ht * .12, ht - ht * .12, ht * .1); x2.stroke();
+      x2.lineWidth = ht * .03; bdRound(x2, ht * .15, ht * .15, wd - ht * .3, ht - ht * .3, ht * .06); x2.stroke();
+      x2.fillStyle = "#C8142C"; x2.textAlign = "center"; x2.textBaseline = "middle"; bdFit(x2, "PLOT TWIST", bdBold, ht * .62, wd * .8); x2.fillText("PLOT TWIST", wd / 2, ht * .55);
+      x2.globalCompositeOperation = "destination-out";
+      for (let i = 0; i < 260; i += 1) { x2.fillStyle = `rgba(0,0,0,${(.3 + bdHash(i * 5.1) * .6).toFixed(2)})`; x2.beginPath(); x2.arc(bdHash(i * 1.7) * wd, bdHash(i * 2.9) * ht, .4 + bdHash(i * 3.3) * ht * .03, 0, TAU); x2.fill(); }
+    });
+    if (!cv) return;
+    c.save(); c.translate(x, y); c.rotate(rot); c.scale(s, s); c.globalAlpha = .92; c.drawImage(cv, -W / 2, -H / 2, W, H); c.restore();
+  }
+  BD_CH.mystery = { d: 10.5, ink: "200,30,50", draw(c, S, lt) {
+    const { w, h, cx, cy, u, st, t } = S;
+    bdGround(st, "bd:wall", c, S, (x) => { fill(x, w, h, [[0, "#151B29"], [1, "#090C14"]]); b1Glow(st, x, cx + u * .15, cy - u * .5, u * 1.3, "255,205,140", .32); }, .45);
+    const flash = Math.max(0, 1 - (lt - 6.72) / .35) * (lt > 6.72 ? .55 : 0) + Math.max(0, 1 - (lt - 6.95) / .3) * (lt > 6.95 ? .3 : 0);
+    const flick = lt > 7.1 && lt < 7.7 ? (Math.sin(lt * 60) > .3 ? .55 : 1) : 1;
+    if (flick < 1) { c.fillStyle = "rgba(5,6,10,.35)"; c.fillRect(0, 0, w, h); }
+    const shake = lt > 6.85 && lt < 7.2 ? (1 - (lt - 6.85) / .35) * u * .008 : 0;
+    const bx = cx + Math.sin(lt * 90) * shake, by = cy + u * .02 + Math.cos(lt * 77) * shake;
+    bdBoard(st, c, S, bx, by, lt, 1);
+    // the lamp's pool of light on the board
+    c.save(); c.globalCompositeOperation = "lighter"; b1Glow(st, c, bx + u * .1, by - u * .2, u * .7, "255,190,120", .14 * flick); c.restore();
+    // the magnifying glass: sweeps the board and settles on the photo that changes
+    const keys = [[2.0, .75, .65], [2.7, -.28, -.1], [3.2, -.28, -.1], [3.8, .27, -.1], [4.3, .27, -.1], [4.95, 0, .02], [6.3, 0, .02], [6.9, .8, .7]];
+    let i = 0; while (i + 1 < keys.length && keys[i + 1][0] <= lt) i += 1;
+    const ka = keys[i], kb = keys[Math.min(keys.length - 1, i + 1)], kk = bdEase(bdSeg(lt, ka[0], kb[0]));
+    const gx = bx + bdLerp(ka[1], kb[1], kk) * u + Math.sin(t * 2.1) * u * .006, gy = by + bdLerp(ka[2], kb[2], kk) * u + Math.cos(t * 1.7) * u * .006;
+    if (lt > 1.9 && lt < 7.0) {
+      const lr = u * .11;
+      c.save(); c.strokeStyle = "rgba(0,0,0,.35)"; c.lineWidth = u * .03; c.lineCap = "round"; c.beginPath(); c.moveTo(gx + lr * .75 + u * .02, gy + lr * .75 + u * .03); c.lineTo(gx + lr * 2.3 + u * .02, gy + lr * 2.3 + u * .03); c.stroke(); c.restore();
+      c.save(); c.beginPath(); c.arc(gx, gy, lr, 0, TAU); c.clip();
+      c.translate(gx, gy); c.scale(1.6, 1.6); c.translate(-gx, -gy);
+      c.fillStyle = "#10151F"; c.fillRect(gx - lr, gy - lr, lr * 2, lr * 2);
+      bdBoard(st, c, S, bx, by, lt, 1.6);
+      c.restore();
+      c.fillStyle = "rgba(180,220,255,.08)"; c.beginPath(); c.arc(gx, gy, lr, 0, TAU); c.fill();
+      c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = Math.max(1, u * .006); c.beginPath(); c.arc(gx, gy, lr * .78, 3.6, 4.5); c.stroke();
+      const rg = c.createLinearGradient(gx - lr, gy - lr, gx + lr, gy + lr); rg.addColorStop(0, "#D9DDE3"); rg.addColorStop(.5, "#5D636C"); rg.addColorStop(1, "#2A2E35");
+      c.strokeStyle = rg; c.lineWidth = u * .016; c.beginPath(); c.arc(gx, gy, lr, 0, TAU); c.stroke();
+      c.strokeStyle = "#2B1A10"; c.lineWidth = u * .028; c.lineCap = "round"; c.beginPath(); c.moveTo(gx + lr * .78, gy + lr * .78); c.lineTo(gx + lr * 2.2, gy + lr * 2.2); c.stroke();
+      c.strokeStyle = "rgba(255,220,180,.25)"; c.lineWidth = u * .006; c.beginPath(); c.moveTo(gx + lr * .85, gy + lr * .8); c.lineTo(gx + lr * 2.1, gy + lr * 2.05); c.stroke();
+    }
+    // the twist
+    const sk = bdSeg(lt, 6.72, 6.86);
+    if (sk > 0) bdStamp(st, c, u, bx + u * .02, by + u * .06, 1 + (1 - sk) * 1.4, -.2);
+    if (flash > 0) { c.fillStyle = `rgba(235,240,255,${flash.toFixed(3)})`; c.fillRect(0, 0, w, h); }
+    // and the next episode, whether anyone wants it or not
+    const ne = bdSeg(lt, 7.7, 8.1);
+    if (ne > 0) {
+      const n = Math.max(1, 3 - Math.floor((lt - 8.1) / .9)), fs = Math.max(10, u * .036), txt = `Next episode in ${n}`;
+      c.font = `600 ${Math.round(fs)}px system-ui, Roboto, sans-serif`; const tw = c.measureText(txt).width;
+      const pw = tw + fs * 3.2, ph = fs * 2.1, px = Math.min(cx + u * .5, S.w - u * .03) - pw, py = cy + u * .5 - ph - u * .02 + (1 - ne) * u * .05;
+      c.globalAlpha = ne; c.fillStyle = "rgba(12,12,18,.88)"; bdRound(c, px, py, pw, ph, ph * .25); c.fill();
+      c.strokeStyle = "rgba(255,255,255,.25)"; c.lineWidth = 1; c.stroke();
+      const rc = [px + fs * 1.15, py + ph / 2], ring = ((lt - 8.1) % .9) / .9;
+      c.strokeStyle = "rgba(255,255,255,.3)"; c.lineWidth = Math.max(1.5, fs * .14); c.beginPath(); c.arc(rc[0], rc[1], fs * .5, 0, TAU); c.stroke();
+      c.strokeStyle = "#FFFFFF"; c.beginPath(); c.arc(rc[0], rc[1], fs * .5, -Math.PI / 2, -Math.PI / 2 + TAU * (lt > 8.1 ? ring : 0)); c.stroke();
+      c.fillStyle = "#FFFFFF"; c.beginPath(); c.moveTo(rc[0] - fs * .14, rc[1] - fs * .22); c.lineTo(rc[0] + fs * .22, rc[1]); c.lineTo(rc[0] - fs * .14, rc[1] + fs * .22); c.closePath(); c.fill();
+      c.textAlign = "left"; c.textBaseline = "middle"; c.fillText(txt, px + fs * 2.1, py + ph / 2 + 1); c.globalAlpha = 1;
+    }
+  } };
+
+  /* ---------- Romance: a book that ends happily ---------- */
+  function bdBook(c, S, gx, gy, lt, t) {
+    const { u } = S, W = u * .44, D = u * .54, kz = .62, ky = .8;
+    const P = (X, Y, Z) => [gx + X + Z * .16, gy + Z * kz - Y * ky];
+    const curve = (s) => u * .045 * Math.sin(Math.min(1, s / (W * .4)) * Math.PI / 2) * (1 - .25 * s / W);
+    const page = (mode, fillA, fillB, lines) => {
+      const N = 14, top = [], bot = [];
+      let X = 0, Y = 0;
+      for (let k = 0; k <= N; k += 1) {
+        const s = k / N * W;
+        let YY;
+        if (mode.theta !== undefined) { const th = mode.theta - .35 * Math.sin(mode.theta) * (k / N);
+          if (k) { X += Math.cos(th) * W / N; Y += Math.sin(th) * W / N; } YY = Y + curve(s) * Math.abs(Math.cos(mode.theta)); }
+        else { X = mode.side * s; YY = curve(s); }
+        top.push(P(X, YY, -D / 2)); bot.push(P(X, YY, D / 2));
+      }
+      const g = c.createLinearGradient(gx - W, 0, gx + W, 0); g.addColorStop(0, fillA); g.addColorStop(1, fillB);
+      c.fillStyle = g; c.beginPath(); top.forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y))); bot.slice().reverse().forEach(([x, y]) => c.lineTo(x, y)); c.closePath(); c.fill();
+      c.strokeStyle = "rgba(150,110,80,.3)"; c.lineWidth = 1; c.stroke();
+      if (lines) lines(top, bot);
+    };
+    // the cover and the block of pages under it
+    c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.ellipse(gx, gy + D * kz * .55, W * 1.15, u * .05, 0, 0, TAU); c.fill();
+    c.fillStyle = "#6E1530"; c.beginPath(); const cv = [P(-W - u * .02, 0, -D / 2 - u * .015), P(W + u * .02, 0, -D / 2 - u * .015), P(W + u * .02, -u * .03, D / 2 + u * .015), P(-W - u * .02, -u * .03, D / 2 + u * .015)];
+    cv.forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill();
+    c.fillStyle = "#EFE2CC"; c.beginPath(); [P(-W, 0, D / 2), P(W, 0, D / 2), P(W, -u * .025, D / 2), P(-W, -u * .025, D / 2)].forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(160,130,100,.5)"; c.lineWidth = .7; for (let k = 1; k < 5; k += 1) { const y = P(0, -u * .005 * k, D / 2)[1]; c.beginPath(); c.moveTo(P(-W, 0, 0)[0], y); c.lineTo(P(W, 0, 0)[0], y); c.stroke(); }
+    const textLines = (top, bot, n, from, ink) => { for (let k = 0; k < n; k += 1) { const f = from + k * .085, a = (i) => [bdLerp(top[i][0], bot[i][0], f), bdLerp(top[i][1], bot[i][1], f)];
+      const i0 = 2, i1 = top.length - 2 - (k % 4 === 3 ? 4 : 0), p0 = a(i0), p1 = a(i1);
+      c.strokeStyle = ink; c.lineWidth = Math.max(1, u * .006); c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.stroke(); } };
+    page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => textLines(top, bot, 9, .12, "rgba(110,90,80,.32)"));
+    const lastLanded = lt > 1.35 + 5 * .36 + 25 * .02 + .5;
+    page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => {
+      if (!lastLanded) { textLines(top, bot, 9, .12, "rgba(110,90,80,.32)"); return; }
+      textLines(top, bot, 3, .12, "rgba(110,90,80,.32)");
+      const mid = (i, f) => [bdLerp(top[i][0], bot[i][0], f), bdLerp(top[i][1], bot[i][1], f)];
+      const [ax, ay] = mid(7, .5), [bx2, by2] = mid(7, .7), [ex, ey] = mid(7, .86);
+      const r1 = bdSeg(lt, 4.0, 5.0), r2 = bdSeg(lt, 5.0, 6.0), r3 = bdSeg(lt, 6.0, 6.6);
+      c.fillStyle = "#5A2236"; c.textAlign = "center"; c.textBaseline = "middle";
+      [["…and they lived", ax, ay, r1], ["happily ever after.", bx2, by2, r2]].forEach(([s, x, y, r]) => { if (r <= 0) return;
+        bdFit(c, s, (p) => bdHand(p, 700), u * .056, W * .86); const tw = c.measureText(s).width;
+        c.save(); c.beginPath(); c.rect(x - tw / 2 - 4, y - u * .05, (tw + 8) * r, u * .1); c.clip(); c.save(); c.translate(x, y); c.scale(1, .88); c.fillText(s, 0, 0); c.restore(); c.restore(); });
+      if (r3 > 0) { c.globalAlpha = r3; c.font = bdSerif(u * .03, "italic "); c.fillStyle = "#8A3A55"; c.fillText("The End", ex, ey); c.fillStyle = "#E0456E"; heartPath(c, ex, ey + u * .035, u * .012); c.fill(); c.globalAlpha = 1; }
+    });
+    // pages riffling over, slowing to the last
+    for (let k = 0; k < 6; k += 1) { const s0 = 1.35 + k * .36 + k * k * .02, f = bdSeg(lt, s0, s0 + .55);
+      if (f <= 0 || f >= 1) continue; const th = bdEase(f) * Math.PI;
+      page({ theta: th }, th < Math.PI / 2 ? "#FFF6E6" : "#EADBC2", th < Math.PI / 2 ? "#F2E3CB" : "#FFF3E0", (top, bot) => textLines(top, bot, 9, .12, `rgba(110,90,80,${(.22 * Math.abs(Math.cos(th))).toFixed(3)})`)); }
+    const gut = P(0, 0, 0);
+    const gg = c.createLinearGradient(gut[0] - u * .04, 0, gut[0] + u * .04, 0); /* across the spine */ gg.addColorStop(0, "rgba(120,80,60,0)"); gg.addColorStop(.5, "rgba(120,80,60,.25)"); gg.addColorStop(1, "rgba(120,80,60,0)");
+    const g0 = P(0, 0, -D / 2), g1 = P(0, 0, D / 2); c.fillStyle = gg; c.beginPath(); c.moveTo(g0[0] - u * .04, g0[1]); c.lineTo(g0[0] + u * .04, g0[1]); c.lineTo(g1[0] + u * .04, g1[1]); c.lineTo(g1[0] - u * .04, g1[1]); c.closePath(); c.fill();
+  }
+  function bdPopcorn(st, c, u, x, y, lt) {
+    const bw = u * .17, bh = u * .2;
+    c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(x, y + u * .005, bw * .5, u * .02, 0, 0, TAU); c.fill();
+    c.save(); c.beginPath(); c.moveTo(x - bw * .4, y); c.lineTo(x - bw * .5, y - bh); c.lineTo(x + bw * .5, y - bh); c.lineTo(x + bw * .4, y); c.closePath(); c.clip();
+    for (let k = 0; k < 7; k += 1) { c.fillStyle = k % 2 ? "#FFF6EC" : "#D9283F"; c.fillRect(x - bw * .5 + k * bw / 7, y - bh, bw / 7 + 1, bh); }
+    const g = c.createLinearGradient(x - bw / 2, 0, x + bw / 2, 0); g.addColorStop(0, "rgba(0,0,0,.25)"); g.addColorStop(.4, "rgba(255,255,255,.12)"); g.addColorStop(1, "rgba(0,0,0,.3)");
+    c.fillStyle = g; c.fillRect(x - bw / 2, y - bh, bw, bh); c.restore();
+    const kernel = (kx, ky, r, i) => { c.fillStyle = "#FFF4D6"; [[0, 0], [.6, -.3], [-.5, -.35], [.1, -.7]].forEach(([dx, dy]) => { c.beginPath(); c.arc(kx + dx * r, ky + dy * r, r * .65, 0, TAU); c.fill(); });
+      c.fillStyle = "rgba(230,170,60,.55)"; c.beginPath(); c.arc(kx + r * .2, ky + r * .1, r * .35, 0, TAU); c.fill(); };
+    for (let k = 0; k < 13; k += 1) kernel(x + (bdHash(k + 800) - .5) * bw * .95, y - bh - bdHash(k + 801) * u * .045 * Math.sin(bdHash(k + 802) * Math.PI) - u * .005, u * .018, k);
+    [4.6, 6.0, 7.6].forEach((p, i) => { const q = lt - p; if (q < 0 || q > .9) return; const kx = x + (i - 1) * bw * .25 + q * u * .1 * (i - 1), ky = y - bh - u * .03 - (q * 1.6 - q * q * 1.9) * u * .35;
+      kernel(kx, ky, u * .018, i); });
+  }
+  BD_CH.romance = { d: 10, ink: "255,120,160", draw(c, S, lt) {
+    const { w, h, cx, cy, u, st, t } = S;
+    bdStill(st, "bd:nook", c, w, h, (x) => {
+      fill(x, w, h, [[0, "#2A0A1F"], [.6, "#4C1430"], [1, "#6A1F3E"]]);
+      for (let i = 0; i < 26; i += 1) { const bx = w * (.5 + bdHash(i + 1100) * .5), by = h * bdHash(i + 1101) * .7, r = u * (.03 + bdHash(i + 1102) * .07);
+        const g = x.createRadialGradient(bx, by, 0, bx, by, r); const col = ["255,190,140", "255,140,170", "255,220,180"][i % 3];
+        g.addColorStop(0, `rgba(${col},.22)`); g.addColorStop(.7, `rgba(${col},.08)`); g.addColorStop(1, `rgba(${col},0)`); x.fillStyle = g; x.beginPath(); x.arc(bx, by, r, 0, TAU); x.fill(); }
+      const by0 = cy + u * .24;
+      const bg = x.createLinearGradient(0, by0, 0, h); bg.addColorStop(0, "#C98FA0"); bg.addColorStop(1, "#7A4256");
+      x.fillStyle = bg; x.beginPath(); x.moveTo(0, by0 + u * .02); for (let k = 0; k <= 30; k += 1) { const px = k / 30 * w; x.lineTo(px, by0 + Math.sin(px / u * 2.2) * u * .02); } x.lineTo(w, h); x.lineTo(0, h); x.closePath(); x.fill();
+      x.strokeStyle = "rgba(255,230,235,.22)"; x.lineWidth = Math.max(1, u * .008);
+      for (let row = 0; row < 8; row += 1) for (let k = 0; k < w / (u * .05); k += 1) { const px = k * u * .05, py = by0 + u * .05 + row * u * .045;
+        x.beginPath(); x.moveTo(px, py); x.quadraticCurveTo(px + u * .012, py + u * .02, px + u * .025, py); x.quadraticCurveTo(px + u * .037, py + u * .02, px + u * .05, py); x.stroke(); }
+      vignette(x, w, h, .4, .78); bdGrain(st, x, w, h, .05); });
+    // fairy lights
+    const fx0 = cx - u * .6, fx1 = cx + u * .6, fy0 = cy - u * .44;
+    c.strokeStyle = "rgba(40,20,20,.7)"; c.lineWidth = 1; c.beginPath();
+    for (let k = 0; k <= 30; k += 1) { const f = k / 30, px = bdLerp(fx0, fx1, f), py = fy0 + Math.sin(f * Math.PI) * u * .08; if (k) c.lineTo(px, py); else c.moveTo(px, py); } c.stroke();
+    for (let k = 0; k < 13; k += 1) { const f = (k + .5) / 13, px = bdLerp(fx0, fx1, f), py = fy0 + Math.sin(f * Math.PI) * u * .08 + u * .012;
+      const a = .55 + .45 * Math.sin(t * 1.5 + k * 1.9); b1Glow(st, c, px, py, u * .06, "255,206,140", .45 * a);
+      c.fillStyle = `rgba(255,236,190,${(.6 + .4 * a).toFixed(3)})`; c.beginPath(); c.ellipse(px, py, u * .007, u * .01, 0, 0, TAU); c.fill(); }
+    const gx = cx - u * .08, gy = cy + u * .15;
+    b1Glow(st, c, gx, gy - u * .05, u * .7, "255,214,170", .25);
+    bdBook(c, S, gx, gy, lt, t);
+    bdPopcorn(st, c, u, cx + u * .5, cy + u * .42, lt);
+    // hearts, rising from the gutter once the last page is turned
+    for (let i = 0; i < 18; i += 1) {
+      const q = lt - (3.9 + i * .3); if (q <= 0 || q > 4.2) continue;
+      const hA = bdHash(i + 1200), hB = bdHash(i + 1201), hC = bdHash(i + 1202);
+      const x = gx + (hA - .5) * u * .25 + Math.sin(q * (1.4 + hB) + i) * u * .07 * Math.min(1, q), y = gy - u * .08 - q * u * (.2 + hB * .12);
+      const a = Math.min(1, q * 3) * (1 - bdSeg(q, 2.6, 4.2)), s = u * (.024 + hC * .024);
+      c.save(); c.globalAlpha = a; c.translate(x, y); c.rotate(Math.sin(q * 2 + i) * .3); c.scale(Math.cos(q * (2 + hC * 2) + i) * .35 + .65, 1);
+      if (i % 3) glossHeart(c, 0, 0, s, .8); else { c.fillStyle = "#FFC2D4"; heartPath(c, 0, 0, s); c.fill(); c.strokeStyle = "rgba(200,60,100,.4)"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -s * .5); c.lineTo(0, s); c.stroke(); }
+      c.restore();
+    }
+    for (let i = 0; i < 12; i += 1) { const a = Math.pow(Math.max(0, Math.sin(t * (1 + bdHash(i + 9)) + i * 2.3)), 6) * bdSeg(lt, 4, 4.6);
+      bdSpark(c, gx + (bdHash(i + 1300) - .5) * u * .9, gy - u * (.1 + bdHash(i + 1301) * .45), u * (.014 + bdHash(i + 1302) * .016), a, "255,236,200"); }
+  } };
+
+  /* ---------- Comedy: try not to laugh ---------- */
+  /* A rubber chicken held up by its feet: plump body, long limp neck, the
+     head at the bottom with a big red comb, an open beak and crossed eyes. */
+  function bdChicken(c, x, y, s, rot, squash) {
+    c.save(); c.translate(x, y); c.rotate(rot); c.scale(1 + squash * .3, 1 - squash * .22);
+    const Y = "#FFD83A", YD = "#E0A600", YL = "#FFF0A0";
+    c.strokeStyle = "#F09A1A"; c.lineWidth = Math.max(1.5, s * .045); c.lineCap = "round"; c.lineJoin = "round";
+    [-1, 1].forEach((d) => { c.beginPath(); c.moveTo(d * s * .09, s * .22); c.lineTo(d * s * .07, s * .02); c.lineTo(d * s * .12, -s * .04); c.moveTo(d * s * .07, s * .02); c.lineTo(d * s * .02, -s * .05); c.stroke(); });
+    const g = c.createLinearGradient(-s * .3, 0, s * .3, 0); g.addColorStop(0, YD); g.addColorStop(.4, YL); g.addColorStop(.6, Y); g.addColorStop(1, YD);
+    c.fillStyle = g; c.beginPath(); c.ellipse(0, s * .42, s * .27, s * .3, 0, 0, TAU); c.fill();
+    c.fillStyle = YD; [-1, 1].forEach((d) => { c.beginPath(); c.ellipse(d * s * .27, s * .4, s * .07, s * .17, d * -.3, 0, TAU); c.fill(); });
+    c.fillStyle = g; c.beginPath(); c.moveTo(-s * .09, s * .66); c.bezierCurveTo(-s * .12, s * .82, -s * .02, s * .95, -s * .06, s * 1.05);
+    c.lineTo(s * .08, s * 1.05); c.bezierCurveTo(s * .1, s * .95, s * .13, s * .82, s * .09, s * .66); c.closePath(); c.fill();
+    c.beginPath(); c.ellipse(s * .01, s * 1.12, s * .13, s * .12, 0, 0, TAU); c.fill();
+    c.fillStyle = "#E8343A"; [[-.07, 1.25, .06], [.0, 1.28, .065], [.07, 1.25, .06]].forEach(([dx, dy, r]) => { c.beginPath(); c.arc(dx * s, dy * s, r * s, 0, TAU); c.fill(); });
+    c.beginPath(); c.ellipse(s * .1, s * 1.03, s * .03, s * .05, .3, 0, TAU); c.fill();
+    c.fillStyle = "#F28A2E"; c.beginPath(); c.moveTo(s * .08, s * 1.08); c.lineTo(s * .24, s * 1.0); c.lineTo(s * .1, s * 1.13); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(s * .08, s * 1.1); c.lineTo(s * .22, s * 1.16); c.lineTo(s * .1, s * 1.14); c.closePath(); c.fill();
+    c.strokeStyle = "#3A2A10"; c.lineWidth = Math.max(1, s * .022);
+    c.beginPath(); c.moveTo(-s * .06, s * 1.08); c.lineTo(-s * .01, s * 1.13); c.moveTo(-s * .01, s * 1.08); c.lineTo(-s * .06, s * 1.13); c.stroke();
+    c.restore();
+  }
+  function bdFace(c, x, y, R, lt, t) {
+    const laugh = bdSeg(lt, 5.05, 5.2), shake = laugh > 0 ? Math.sin(t * 22) * R * .02 * (1 - bdSeg(lt, 7.5, 9.5)) : Math.sin(t * 40) * R * .012;
+    const rock = laugh > 0 ? Math.sin(t * 9) * .1 * (1 - bdSeg(lt, 8, 10) * .6) : 0;
+    const puff = (1 - laugh) * (.92 + .08 * Math.sin(lt * 5));
+    c.save(); c.translate(x + shake, y); c.rotate(rock);
+    c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(0, R * 1.35, R * .9, R * .14, 0, 0, TAU); c.fill();
+    const g = c.createRadialGradient(-R * .35, -R * .45, R * .1, 0, 0, R * 1.15); g.addColorStop(0, "#FFF0A0"); g.addColorStop(.55, "#FFCC33"); g.addColorStop(1, "#E39A10");
+    c.fillStyle = g;
+    c.beginPath(); c.arc(0, 0, R, 0, TAU); c.fill();
+    if (puff > 0) [-1, 1].forEach((d) => { c.beginPath(); c.arc(d * R * .5, R * .28, R * .38 * puff + R * .12, 0, TAU); c.fill();
+      c.fillStyle = `rgba(255,110,110,${(.3 * puff).toFixed(3)})`; c.beginPath(); c.arc(d * R * .52, R * .25, R * .22, 0, TAU); c.fill(); c.fillStyle = g; });
+    c.fillStyle = "rgba(255,255,255,.25)"; c.beginPath(); c.ellipse(-R * .35, -R * .55, R * .28, R * .14, -.5, 0, TAU); c.fill();
+    c.strokeStyle = "#5A3A10"; c.fillStyle = "#3A2208"; c.lineCap = "round";
+    if (laugh < 1) {
+      const look = Math.sin(lt * 2.4) * R * .06;
+      [-1, 1].forEach((d) => { c.fillStyle = "#FFFFFF"; c.beginPath(); c.ellipse(d * R * .32, -R * .15, R * .15, R * .19, 0, 0, TAU); c.fill();
+        c.fillStyle = "#2A1A08"; c.beginPath(); c.arc(d * R * .32 + look, -R * .12, R * .075, 0, TAU); c.fill();
+        c.lineWidth = Math.max(1.5, R * .06); c.beginPath(); c.moveTo(d * R * .18, -R * .42 + (d > 0 ? R * .04 : 0)); c.lineTo(d * R * .46, -R * .5 + (d > 0 ? 0 : R * .04)); c.stroke(); });
+      c.fillStyle = "#C2185B"; c.beginPath(); c.arc(0, R * .42, R * .085, 0, TAU); c.fill();
+      c.fillStyle = "#7A0E36"; c.beginPath(); c.arc(0, R * .42, R * .04, 0, TAU); c.fill();
+      c.fillStyle = "rgba(120,190,255,.9)"; c.beginPath(); c.moveTo(R * .62, -R * .72); c.quadraticCurveTo(R * .72, -R * .55, R * .62, -R * .5); c.quadraticCurveTo(R * .52, -R * .55, R * .62, -R * .72); c.fill();
+    } else {
+      c.lineWidth = Math.max(2, R * .08);
+      [-1, 1].forEach((d) => { c.beginPath(); c.moveTo(d * R * .48, -R * .12); c.lineTo(d * R * .3, -R * .24); c.lineTo(d * R * .16, -R * .12); c.stroke(); });
+      const open = .85 + .15 * Math.sin(t * 18);
+      c.fillStyle = "#5E1A22"; c.beginPath(); c.moveTo(-R * .45, R * .12); c.lineTo(R * .45, R * .12); c.quadraticCurveTo(R * .42, R * (.12 + .62 * open), 0, R * (.12 + .62 * open)); c.quadraticCurveTo(-R * .42, R * (.12 + .62 * open), -R * .45, R * .12); c.fill();
+      c.fillStyle = "#FFFFFF"; c.fillRect(-R * .38, R * .12, R * .76, R * .1);
+      c.fillStyle = "#F26C7E"; c.beginPath(); c.ellipse(0, R * (.12 + .5 * open), R * .2, R * .1, 0, 0, TAU); c.fill();
+      for (const d of [-1, 1]) for (let k = 0; k < 4; k += 1) { const q = ((t * 1.6 + k / 4) % 1);
+        c.fillStyle = `rgba(120,200,255,${(.9 * (1 - q)).toFixed(3)})`; c.beginPath(); c.arc(d * (R * .5 + q * R * .55), -R * .12 + (q * 1.4 - q * q * .5) * R * .6 - R * .2 * q, R * .055 * (1 - q * .4), 0, TAU); c.fill(); }
+    }
+    c.restore();
+  }
+  function bdMarquee(st, c, S, x, y, lt, t, text, fast) {
+    const { u } = S, W = u * .74, H = u * .13;
+    c.fillStyle = "rgba(0,0,0,.35)"; bdRound(c, x - W / 2 + u * .01, y - H / 2 + u * .014, W, H, H * .2); c.fill();
+    const g = c.createLinearGradient(0, y - H / 2, 0, y + H / 2); g.addColorStop(0, "#5A0F2A"); g.addColorStop(1, "#2C0614");
+    c.fillStyle = g; bdRound(c, x - W / 2, y - H / 2, W, H, H * .2); c.fill();
+    c.strokeStyle = "#E8B84A"; c.lineWidth = Math.max(1.5, u * .006); c.stroke();
+    const n = 26, per = W * 2 + H * 2;
+    for (let k = 0; k < n; k += 1) { const d = k / n * per; let bx, by;
+      if (d < W) { bx = x - W / 2 + d; by = y - H / 2; } else if (d < W + H) { bx = x + W / 2; by = y - H / 2 + d - W; } else if (d < 2 * W + H) { bx = x + W / 2 - (d - W - H); by = y + H / 2; } else { bx = x - W / 2; by = y + H / 2 - (d - 2 * W - H); }
+      const on = (Math.floor(t * (fast ? 14 : 5)) + k) % 3 === 0;
+      if (on) b1Glow(st, c, bx, by, u * .025, "255,214,120", .7);
+      c.fillStyle = on ? "#FFF3C8" : "#8A6A2A"; c.beginPath(); c.arc(bx, by, Math.max(1.2, u * .0065), 0, TAU); c.fill(); }
+    c.textAlign = "center"; c.textBaseline = "middle"; bdFit(c, text, bdBold, H * .72, W * .86);
+    c.fillStyle = "rgba(255,200,90,.35)"; c.fillText(text, x, y + H * .06 + 1);
+    c.fillStyle = "#FFF4D6"; c.fillText(text, x, y + H * .05);
+  }
+  BD_CH.comedy = { d: 10, ink: "255,210,80", draw(c, S, lt) {
+    const { w, h, cx, cy, u, st, t } = S;
+    const floor = cy + u * .32;
+    bdStill(st, "bd:stage", c, w, h, (x) => {
+      fill(x, w, h, [[0, "#2A0F45"], [1, "#12061E"]]);
+      const fg = x.createLinearGradient(0, floor, 0, h); fg.addColorStop(0, "#6A4122"); fg.addColorStop(1, "#2E1B0C");
+      x.fillStyle = fg; x.fillRect(0, floor, w, h - floor);
+      x.strokeStyle = "rgba(0,0,0,.35)"; x.lineWidth = 1;
+      for (let k = -12; k <= 12; k += 1) { x.beginPath(); x.moveTo(cx + k * u * .06, floor); x.lineTo(cx + k * u * .16, h); x.stroke(); }
+      for (let k = 1; k < 5; k += 1) { const yy = floor + (h - floor) * (k * k) / 25; x.beginPath(); x.moveTo(0, yy); x.lineTo(w, yy); x.stroke(); }
+      x.fillStyle = "rgba(255,220,160,.18)"; x.fillRect(0, floor, w, Math.max(1, u * .005));
+      const curtain = (x0, x1, flip) => { const n = 7; for (let k = 0; k < n; k += 1) { const a = x0 + (x1 - x0) * k / n, b = x0 + (x1 - x0) * (k + 1) / n;
+        const g = x.createLinearGradient(a, 0, b, 0); g.addColorStop(0, "#5E0614"); g.addColorStop(.5, "#C21E34"); g.addColorStop(1, "#4A0410");
+        x.fillStyle = g; x.beginPath(); x.moveTo(a, 0); x.lineTo(b, 0); x.quadraticCurveTo(b + (flip ? -1 : 1) * u * .01, h * .6, b - (flip ? 1 : -1) * u * .02 * (k / n), h); x.lineTo(a - (flip ? 1 : -1) * u * .02 * (k / n), h); x.closePath(); x.fill(); } };
+      curtain(cx - u * .78, cx - u * .5, false); curtain(cx + u * .5, cx + u * .78, true);
+      const vy = cy - u * .5; x.fillStyle = "#A3162B"; x.beginPath(); x.moveTo(0, 0); x.lineTo(w, 0); x.lineTo(w, vy);
+      for (let k = 30; k >= 0; k -= 1) { const px = k / 30 * w; x.quadraticCurveTo(px + w / 60, vy + u * .05, px, vy); } x.closePath(); x.fill();
+      x.fillStyle = "#E8B84A"; for (let k = 0; k < w / (u * .02); k += 1) x.fillRect(k * u * .02, vy - u * .004, u * .01, u * .012);
+      // the spotlight
+      x.save(); x.globalCompositeOperation = "lighter";
+      const sg = x.createLinearGradient(0, 0, 0, floor); sg.addColorStop(0, "rgba(255,240,200,.02)"); sg.addColorStop(1, "rgba(255,240,200,.14)");
+      x.fillStyle = sg; x.beginPath(); x.moveTo(cx - u * .05, 0); x.lineTo(cx + u * .05, 0); x.lineTo(cx + u * .34, floor + u * .06); x.lineTo(cx - u * .34, floor + u * .06); x.closePath(); x.fill();
+      b1Glow(st, x, cx, floor + u * .05, u * .4, "255,236,190", .35, .22);
+      x.restore();
+      vignette(x, w, h, .3, .79); bdGrain(st, x, w, h, .05);
+    });
+    const laughed = lt > 5.6;
+    const sign = laughed && lt < 5.9 ? (Math.sin(lt * 80) > 0 ? "YOU LAUGHED!" : "TRY NOT TO LAUGH") : laughed ? "YOU LAUGHED!" : "TRY NOT TO LAUGH";
+    bdMarquee(st, c, S, cx, cy - u * .36, lt, t, sign, laughed);
+    const R = u * .2, fx = cx, fy = cy + u * .1;
+    // the chicken swings in on its string and bonks
+    const cs = u * .26, pvx = cx + u * .3, pvy = cy - u * .62, hit = [fx + R * .98 + cs * .2, fy - R * .3 - cs * .42], L = Math.hypot(hit[0] - pvx, hit[1] - pvy), phiHit = Math.atan2(hit[0] - pvx, hit[1] - pvy);
+    let phi = null;
+    if (lt > 4.1) { const q = lt - 4.1; phi = q < .9 ? phiHit + .95 * (1 - bdK(q / .9) * bdK(q / .9)) : phiHit + .55 * Math.exp(-(q - .9) * 1.3) * Math.sin((q - .9) * 6); }
+    /* Action: the face comes up on the stage lift once the board has clapped. */
+    const lift = bdBack(bdSeg(lt, 2.15, 2.75), 2.2);
+    if (lift > 0) { c.save(); c.beginPath(); c.rect(0, 0, w, floor + u * .02); c.clip(); bdFace(c, fx, fy + (1 - lift) * u * .62, R, lt, t); c.restore(); }
+    if (phi !== null) { const ex = pvx + Math.sin(phi) * L, ey = pvy + Math.cos(phi) * L;
+      c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = 1; c.beginPath(); c.moveTo(pvx, pvy); c.lineTo(ex, ey); c.stroke();
+      const sq = Math.max(0, 1 - Math.abs(lt - 5.02) / .14);
+      bdChicken(c, ex, ey, cs, -phi, sq); }
+    const sqk = bdSeg(lt, 5.0, 5.12) * (1 - bdSeg(lt, 5.6, 5.9));
+    if (sqk > 0) { const kx = hit[0] + u * .1, ky = hit[1] - u * .06; c.save(); c.translate(kx, ky); c.rotate(.15); c.scale(sqk, sqk);
+      c.fillStyle = "#FFFFFF"; c.beginPath(); for (let k = 0; k < 20; k += 1) { const a = k / 20 * TAU, r = (k % 2 ? .07 : .11) * u; c.lineTo(Math.cos(a) * r * 1.3, Math.sin(a) * r); } c.closePath(); c.fill();
+      c.fillStyle = "#E8343A"; c.textAlign = "center"; c.textBaseline = "middle"; bdFit(c, "SQUEAK!", bdBold, u * .055, u * .2); c.fillText("SQUEAK!", 0, u * .004); c.restore(); }
+    // the spit take
+    const sp = lt - 5.08;
+    if (sp > 0 && sp < 2) for (let i = 0; i < 44; i += 1) {
+      const hA = bdHash(i + 1500), hB = bdHash(i + 1501), a = -Math.PI / 2 + (hA - .5) * 2.6, v = u * (.7 + hB * 1.2);
+      const x = fx + Math.cos(a) * v * sp, y = fy + R * .42 + Math.sin(a) * v * sp + u * 1.6 * sp * sp;
+      const al = 1 - bdSeg(sp, .8 + hB * .6, 1.6 + hB * .4); if (al <= 0) continue;
+      c.fillStyle = `rgba(150,215,255,${(al * .9).toFixed(3)})`; c.beginPath(); c.arc(x, y, u * (.006 + hA * .008), 0, TAU); c.fill(); }
+    if (sp > 0 && sp < .6) b1Glow(st, c, fx, fy + R * .3, u * .3 * (sp / .6 + .3), "200,235,255", .4 * (1 - sp / .6));
+    // and the room goes with it
+    [["HA", -.42, -.12, -.25], ["HA", .45, -.05, .2], ["HA!", .36, .3, .1], ["HA", -.4, .3, -.15]].forEach(([s, dx, dy, r], i) => {
+      const k = bdSeg(lt, 5.35 + i * .28, 5.65 + i * .28); if (k <= 0) return;
+      const sc = bdBack(k, 3) * (1 + .06 * Math.sin(t * 9 + i)); c.save(); c.translate(fx + dx * u, fy + dy * u + Math.sin(t * 6 + i) * u * .01); c.rotate(r + Math.sin(t * 5 + i) * .08); c.scale(sc, sc);
+      c.textAlign = "center"; c.textBaseline = "middle"; c.font = bdBold(u * .11); c.lineJoin = "round";
+      c.strokeStyle = ["#E8343A", "#2E8BFF", "#B04CE0", "#18A86B"][i]; c.lineWidth = u * .018; c.strokeText(s, 0, 0); c.fillStyle = "#FFF6D6"; c.fillText(s, 0, 0); c.restore(); });
+    bdConfettiRain(c, S, lt - 5.6, 60, 77);
+    // the clapperboard opens the scene
+    const cb = lt - 1.0;
+    if (cb > 0 && cb < 1.9) {
+      const drop = (1 - bdOut(bdSeg(cb, 0, .35))) * -u * .8 + bdIn(bdSeg(cb, 1.3, 1.9)) * u * 1.2;
+      const bw = u * .44, bh = u * .28, bx = cx - bw / 2, by = cy - u * .1 + drop;
+      c.fillStyle = "#1C1C22"; bdRound(c, bx, by, bw, bh, u * .015); c.fill();
+      c.save(); c.beginPath(); c.rect(bx, by, bw, bh * .17); c.clip(); c.fillStyle = "#FFFFFF";
+      for (let k = 0; k < 8; k += 1) { c.beginPath(); c.moveTo(bx + k * bw / 6 - bw * .03, by); c.lineTo(bx + k * bw / 6 + bw * .06, by); c.lineTo(bx + k * bw / 6 - bw * .02, by + bh * .17); c.lineTo(bx + k * bw / 6 - bw * .11, by + bh * .17); c.closePath(); c.fill(); }
+      c.restore();
+      c.strokeStyle = "rgba(255,255,255,.75)"; c.lineWidth = 1; c.beginPath(); c.moveTo(bx + bw * .06, by + bh * .48); c.lineTo(bx + bw * .94, by + bh * .48); c.moveTo(bx + bw * .5, by + bh * .48); c.lineTo(bx + bw * .5, by + bh * .92); c.stroke();
+      c.fillStyle = "#FFFFFF"; c.textAlign = "left"; c.textBaseline = "middle"; c.font = bdBold(bh * .2);
+      c.fillText("SCENE 1", bx + bw * .08, by + bh * .32); c.fillText("TAKE 27", bx + bw * .56, by + bh * .7); c.fillText("ROLL", bx + bw * .08, by + bh * .7);
+      const open = cb < .9 ? bdEase(bdSeg(cb, .3, .6)) * .5 : .5 * (1 - bdIn(bdSeg(cb, .9, 1.0)));
+      c.save(); c.translate(bx, by); c.rotate(-open);
+      c.fillStyle = "#1C1C22"; c.fillRect(0, -bh * .2, bw, bh * .2);
+      c.save(); c.beginPath(); c.rect(0, -bh * .2, bw, bh * .2); c.clip(); c.fillStyle = "#FFFFFF";
+      for (let k = 0; k < 7; k += 1) { c.beginPath(); c.moveTo(k * bw / 6 - bw * .04, -bh * .2); c.lineTo(k * bw / 6 + bw * .05, -bh * .2); c.lineTo(k * bw / 6 - bw * .03, 0); c.lineTo(k * bw / 6 - bw * .12, 0); c.closePath(); c.fill(); }
+      c.restore(); c.restore();
+      const clap = bdSeg(cb, 1.0, 1.25);
+      if (clap > 0 && clap < 1) { c.strokeStyle = `rgba(255,255,255,${(1 - clap).toFixed(3)})`; c.lineWidth = Math.max(1.5, u * .007);
+        for (let k = 0; k < 5; k += 1) { const a = -2.4 + k * .3, r0 = u * (.06 + clap * .05), r1 = r0 + u * .05; c.beginPath(); c.moveTo(bx + Math.cos(a) * r0, by + Math.sin(a) * r0); c.lineTo(bx + Math.cos(a) * r1, by + Math.sin(a) * r1); c.stroke(); } }
+    }
+  } };
+
+  /* The words a chapter needs from the dashboard: the name, the day, and
+     three of the person's own loves for the letter in the journal. */
+  const BD_PHRASE = { drawing: "fresh pages", yoga: "slow sunrises", mindfulness: "quiet minutes", journaling: "new chapters",
+    mystery: "twisty plots", romance: "happy endings", comedy: "big laughs" };
+  const BD_MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  function bdWords(cfg, loves) {
+    const name = String(cfg.name || "").trim();
+    const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(cfg.date || ""));
+    const day = m && Number(m[1]) >= 1 && Number(m[1]) <= 12 ? `${Number(m[2])} ${BD_MON[Number(m[1]) - 1]}` : "";
+    const own = loves.filter((k) => k !== "journaling" && BD_PHRASE[k]);
+    const picks = own.length >= 3 ? [own[0], own[Math.floor(own.length / 2)], own[own.length - 1]] : own.slice();
+    const phrases = picks.map((k) => BD_PHRASE[k]);
+    ["big laughs", "happy endings", "quiet minutes"].forEach((p) => { if (phrases.length < 3 && phrases.indexOf(p) < 0) phrases.push(p); });
+    return { name, day, letter: [day, `Dear ${name || "you"},`, "happy birthday!", "May this year bring", `${phrases[0]}, ${phrases[1]}`, `and ${phrases[2]}.`] };
+  }
+
+  const BIRTHDAY = {
+    /* `v` is the birthday as JSON: {name, date: "MM-DD", loves: [...]}. */
+    birthday(st, v) {
+      let cfg = {};
+      try { cfg = JSON.parse(v || "{}") || {}; } catch (e) { cfg = {}; }
+      const loves = (Array.isArray(cfg.loves) ? cfg.loves : []).filter((k, i, all) => BD_CH[k] && k !== "cake" && all.indexOf(k) === i);
+      const order = ["cake"].concat(loves), starts = [];
+      let total = 0;
+      for (const k of order) { starts.push(total); total += BD_CH[k].d; }
+      Object.assign(st, { order, starts, total, bloom: BD_BLOOM, off: 0, chapter: 0, goto: null, jump: null });
+      const words = bdWords(cfg, loves);
+      if (typeof document !== "undefined" && document.fonts && document.fonts.load) {
+        ['700 24px "Caveat"', '24px "Bebas Neue"'].forEach((f) => { try { document.fonts.load(f).catch(() => {}); } catch (e) { /* no font loading here */ } });
+      }
+      const at = (tr) => {
+        tr = ((tr % total) + total) % total;
+        let k = 0; while (k + 1 < order.length && starts[k + 1] <= tr) k += 1;
+        return { k, lt: tr - starts[k] + BD_BLOOM, into: tr - (starts[k] + BD_CH[order[k]].d - BD_BLOOM) };
+      };
+      const one = (c, S, k, lt) => { c.save(); BD_CH[order[k]].draw(c, S, lt); c.restore(); };
+      return (c, w, h, t) => {
+        st.bdNow = t;
+        const u = Math.min(h * .88, w * .36);
+        const S = { w, h, u, cx: w * .79, cy: h * .52, st, t, words };
+        let now = at(t - 4 + st.off);
+        /* A jump: the chapter showing is painted over by the one asked for. */
+        if (st.goto !== null && st.goto !== undefined) {
+          const g = Math.max(0, Math.min(order.length - 1, Math.floor(Number(st.goto)) || 0));
+          st.goto = null;
+          const showing = now.into > BD_BLOOM / 2 ? { k: (now.k + 1) % order.length, lt: now.into } : { k: now.k, lt: now.lt };
+          if (g !== showing.k) {
+            st.jump = { k: showing.k, lt: showing.lt, t };
+            st.off = starts[g] - BD_BLOOM - (t - 4);
+            now = at(t - 4 + st.off);
+          }
+        }
+        const jump = st.jump && t >= st.jump.t && t - st.jump.t < BD_BLOOM ? st.jump : null;
+        if (!jump) st.jump = null;
+        /* The next chapter's pictures are painted a moment before it blooms,
+           while this one holds, rather than on the bloom's first frame: a
+           draw clipped to nothing paints the caches and shows nothing. */
+        if (!jump && now.into > -1.6 && now.into <= 0) {
+          const nk = (now.k + 1) % order.length, tag = `${nk}@${Math.round(t - now.into)}`;
+          if (st.pre !== tag) { st.pre = tag; c.save(); c.beginPath(); c.rect(0, 0, 0, 0); c.clip(); one(c, S, nk, .01); c.restore(); }
+        }
+        const under = jump ? { k: jump.k, lt: jump.lt + (t - jump.t) } : { k: now.k, lt: now.lt };
+        one(c, S, under.k, under.lt);
+        let next = null;
+        if (now.into > 0) {
+          next = (now.k + 1) % order.length;
+          const p = bdK(now.into / BD_BLOOM), seed = next * 1.7 + .3;
+          const R = Math.hypot(Math.max(S.cx, w - S.cx), Math.max(S.cy, h - S.cy)) * 1.15, r = R * (.5 - .5 * Math.cos(Math.PI * p));
+          const blob = () => { c.beginPath();
+            for (let i = 0; i <= 72; i += 1) { const a = i / 72 * TAU;
+              const k = 1 + .09 * Math.sin(5 * a + seed + p * 3) + .05 * Math.sin(9 * a + seed * 2.3 - p * 4) + .03 * Math.sin(15 * a + seed * 4.1 + p * 2);
+              const x = S.cx + Math.cos(a) * r * k, y = S.cy + Math.sin(a) * r * k;
+              if (i) c.lineTo(x, y); else c.moveTo(x, y); }
+            c.closePath(); };
+          c.save(); blob(); c.clip(); one(c, S, next, now.into); c.restore();
+          const ink = BD_CH[order[next]].ink;
+          c.save(); blob(); c.strokeStyle = bdRgba(ink, .2 * (1 - p)); c.lineWidth = u * .05; c.stroke();
+          c.strokeStyle = bdRgba(ink, .6 * (1 - p)); c.lineWidth = Math.max(1, u * .008); c.stroke();
+          for (let i = 0; i < 12; i += 1) { const a = bdHash(seed + i) * TAU, d = r * (1.06 + bdHash(seed + i * 2) * .18);
+            c.fillStyle = bdRgba(ink, .55 * (1 - p)); c.beginPath(); c.arc(S.cx + Math.cos(a) * d, S.cy + Math.sin(a) * d, u * (.004 + bdHash(seed + i * 3) * .012), 0, TAU); c.fill(); }
+          c.restore();
+        }
+        st.chapter = next !== null && now.into > BD_BLOOM / 2 ? next : under.k;
+        bdEvict(st);
+      };
+    },
+  };
+  Object.assign(SCENES, MORE, UK, REDRAWN, BIRTHDAY);
 
   return SCENES;
 })();
@@ -12985,7 +14333,94 @@ function festKey(name) {
 }
 
 function festEntry(key) {
-  return FEST_TABLE[key] || { tier: "quiet", motif: "star", eyebrow: "Today", short: "", full: [] };
+  return FEST_TABLE[key] || FEST_BDAY.get(key) || { tier: "quiet", motif: "star", eyebrow: "Today", short: "", full: [] };
+}
+
+/* ------------------------------------------------------------------ *
+ * Birthdays
+ *
+ * The dashboard names them -- who, which day, and what they love -- so
+ * nothing about a person lives in the card. On the day the card is
+ * theirs all day: their name, then a show in chapters, the cake first and
+ * one for each thing they love. It does not take turns with anything else
+ * on that day; the rest are named under it as "Also today".
+ * ------------------------------------------------------------------ */
+
+/* What a love may be called on the dashboard, and the chapter it is. */
+const FEST_LOVES = {
+  drawing: "drawing", art: "drawing", sketching: "drawing", painting: "drawing",
+  yoga: "yoga", stretching: "yoga",
+  mindfulness: "mindfulness", calm: "mindfulness", meditation: "mindfulness", breathing: "mindfulness",
+  journaling: "journaling", journalling: "journaling", journal: "journaling", writing: "journaling", diary: "journaling",
+  mystery: "mystery", mysteries: "mystery", thriller: "mystery", thrillers: "mystery", crime: "mystery", detective: "mystery",
+  romance: "romance", romcom: "romance", romcoms: "romance", "love stories": "romance",
+  comedy: "comedy", funny: "comedy", laughing: "comedy", sketches: "comedy", "sketch comedy": "comedy",
+};
+
+/* The chapters as the full screen lists them. A dashboard's `say` gives a
+   chapter its own line in place of these. */
+const FEST_SHOW = {
+  cake: { title: "Make a wish", line: "Candles lit, everyone singing, and the first slice is yours." },
+  drawing: { title: "A fresh page", line: "The good pencils, a blank page and nowhere else to be." },
+  yoga: { title: "Morning flow", line: "Sun up, mat out. Stretch, breathe, smile." },
+  mindfulness: { title: "Breathe", line: "In for four, out for four. The day can wait a minute." },
+  journaling: { title: "Dear diary", line: "A new page for a new year, in the good pen." },
+  mystery: { title: "Plot twist", line: "Nobody is who they seem, and it is definitely just one more episode." },
+  romance: { title: "Happy ever after", line: "A feel-good love story, a blanket and a happy ending, guaranteed." },
+  comedy: { title: "Try not to laugh", line: "You will. Everybody does." },
+};
+
+/* Each birthday's entry, made from the dashboard's words whenever the card
+   reads them, and found by festEntry beside the table's. */
+const FEST_BDAY = new Map();
+const festLoose = (s) => festNorm(s).toLowerCase();
+
+/* The birthdays the dashboard lists, each checked: a name, and a date as
+   MM-DD (a year in front is allowed and ignored -- no age is shown). */
+function festBirthdays(b) {
+  const list = Array.isArray(b && b.birthdays) ? b.birthdays : (b && b.birthdays ? [b.birthdays] : []);
+  const out = [];
+  for (const x of list) {
+    if (!x || typeof x !== "object") continue;
+    const name = String(x.name || "").trim();
+    const m = /^(?:\d{4}-)?(\d{1,2})-(\d{1,2})$/.exec(String(x.date || "").trim());
+    if (!name || !m) continue;
+    const month = Number(m[1]), day = Number(m[2]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) continue;
+    const loves = [];
+    for (const l of Array.isArray(x.loves) ? x.loves : []) {
+      const k = FEST_LOVES[String(l || "").toLowerCase().trim()];
+      if (k && loves.indexOf(k) < 0) loves.push(k);
+    }
+    out.push({ name, month, day, loves, key: `${name}\u2019s birthday`,
+      short: x.short, message: x.message, say: x.say && typeof x.say === "object" ? x.say : {} });
+  }
+  return out;
+}
+
+/* Is today theirs? A 29 February birthday is kept on the 28th in the years
+   without one. */
+function festIsBirthday(bd, now) {
+  const m = now.getMonth() + 1, d = now.getDate();
+  if (m === bd.month && d === bd.day) return true;
+  const leap = new Date(now.getFullYear(), 1, 29).getMonth() === 1;
+  return bd.month === 2 && bd.day === 29 && !leap && m === 2 && d === 28;
+}
+
+function festBirthdayEntry(bd) {
+  const line = (k) => (typeof bd.say[k] === "string" && bd.say[k].trim()) || FEST_SHOW[k].line;
+  const show = ["cake"].concat(bd.loves).map((k) => ({ key: k, title: FEST_SHOW[k].title, line: line(k) }));
+  const message = typeof bd.message === "string" && bd.message.trim()
+    ? bd.message.trim()
+    : `Happy birthday, ${bd.name}! Today is yours: breakfast however you like it, first pick of what to watch, and the biggest slice of cake.`;
+  return {
+    tier: "festive", scene: "birthday", bg: "#2A0A2E", eyebrow: "Happy birthday", title: bd.name, w: 9, birthday: true,
+    v: JSON.stringify({ name: bd.name, date: `${pad2(bd.month)}-${pad2(bd.day)}`, loves: bd.loves }),
+    short: typeof bd.short === "string" && bd.short.trim() ? bd.short.trim()
+      : `Today is all about ${bd.name}: hugs first, cake later, and first pick of everything.`,
+    full: [["", message]],
+    show,
+  };
 }
 
 /* How a run is worked out from the calendar. `days` counts from the named
@@ -13032,6 +14467,8 @@ const festShort = (d) => `${FEST_WD[d.getDay()]} ${d.getDate()} ${FEST_MON[d.get
    that fall inside it. */
 function festActive(b, nowArg) {
   const now = festDay(nowArg ? new Date(nowArg) : new Date());
+  const birthdays = festBirthdays(b);
+  for (const bd of birthdays) FEST_BDAY.set(bd.key, festBirthdayEntry(bd));
   const lists = Array.isArray(b.events) ? b.events : [b.events];
   const days = [];
   for (const list of lists) {
@@ -13054,7 +14491,15 @@ function festActive(b, nowArg) {
     found.set(item.key, keep);
   };
 
-  /* A preview names one event and shows it as if it were today. */
+  /* A preview names one event and shows it as if it were today. A
+     birthday answers to its name, "<name>'s birthday", or "birthday". */
+  const wanted = festLoose(b.preview);
+  const previewed = wanted && birthdays.find((bd) => [bd.key, bd.name, `${bd.name} birthday`, `${bd.name}'s birthday`, "birthday"]
+    .some((k) => festLoose(k) === wanted));
+  if (previewed) {
+    add({ key: previewed.key, day: 0, of: 0, rank: 0, birthday: true });
+    return festRanked(found);
+  }
   const preview = festKey(b.preview);
   if (preview) {
     const run = FEST_RUNS[preview];
@@ -13089,6 +14534,9 @@ function festActive(b, nowArg) {
     if (!end.of) Object.assign(end, { day: mid.day, of: mid.of, until: mid.until });
     found.delete(run.daily || start);
   }
+
+  /* A birthday the dashboard names, on its day, before anything else. */
+  for (const bd of birthdays) if (festIsBirthday(bd, now)) add({ key: bd.key, day: 0, of: 0, rank: 0, birthday: true });
 
   /* Advent, until Christmas Eve. */
   const m = now.getMonth() + 1;
@@ -13254,7 +14702,8 @@ function festPick(b) {
   if (festWaiting(b)) return null;
   const list = festActive(b, b.now);
   if (!list.length) return null;
-  if (b.rotate === false || list.length < 2) return { item: list[0], also: list.slice(1), list, at: 0 };
+  /* A birthday holds the card all day: the rest are named under it. */
+  if (b.rotate === false || list.length < 2 || list[0].birthday) return { item: list[0], also: list.slice(1), list, at: 0 };
   const at = ((Math.floor(Number(b.index) || 0) % list.length) + list.length) % list.length;
   return { item: list[at], also: [], list, at };
 }
@@ -13284,13 +14733,13 @@ function festScenesBody(b) {
        with the motif standing large and faint on the right where a
        festival's scene would be. */
     return `<div class="fsquiet"${open}>${festXp()}<span class="fsqart" aria-hidden="true">${festMotif(entry.motif, 96)}</span>`
-      + `<div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsname">${esc(lead.key)}</div>`
+      + `<div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsname">${esc(entry.title || lead.key)}</div>`
       + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}`
       + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>${dots}`;
   }
   return `<canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsscrim"></span>`
     + `<div class="fsin"${open}>${festXp()}<div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div>`
-    + `<div class="fsname">${esc(lead.key)}</div>`
+    + `<div class="fsname">${esc(entry.title || lead.key)}</div>`
     + `${festWhen(lead) ? `<div class="fswhen">${festWhen(lead)}</div>` : ""}${festPips(lead, entry)}`
     + `${entry.short ? `<p class="fsshort">${esc(entry.short)}</p>` : ""}${also}</div>${dots}`;
 }
@@ -13308,18 +14757,26 @@ function festSheetMarkup(item, others) {
   const close = `<div class="fsclosebar"><button type="button" class="fsclose" aria-label="Close" data-fsclose>${iconMarkup("mdi:close")}</button></div>`;
   if (entry.tier !== "festive") {
     return `<div class="fsbox quiet">${close}<div class="fshead">${festMotif(entry.motif, 56)}</div>`
-      + `<div class="fsbody"><div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsbig">${esc(item.key)}</div>`
+      + `<div class="fsbody"><div class="fseye">${esc(entry.eyebrow || "Today")}</div><div class="fsbig">${esc(entry.title || item.key)}</div>`
       + `${festWhen(item) ? `<div class="fswhen">${festWhen(item)}</div>` : ""}<div class="fsstory">${story}</div>${also}</div></div>`;
   }
   const doors = item.key === "Advent" ? `<div class="fsdoors">${Array.from({ length: 24 }, (_, i) => {
     const n = i + 1;
     return `<span class="${n < item.day ? "open" : n === item.day ? "today" : "shut"}"><b>${n}</b></span>`;
   }).join("")}</div>` : "";
-  return `<div class="fsbox" style="--fg:${esc(cssColor(entry.bg) || "#1A1426")}">${close}`
+  return `<div class="fsbox${entry.birthday ? " bday" : ""}" style="--fg:${esc(cssColor(entry.bg) || "#1A1426")}">${close}`
     + `<div class="fsstage"><canvas class="fscanvas" aria-hidden="true"></canvas><span class="fsfade"></span></div>`
-    + `<div class="fsbody"><div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div><div class="fsbig">${esc(item.key)}</div>`
+    + `<div class="fsbody"><div class="fseye">${esc(entry.eyebrow || "Celebrating")}</div><div class="fsbig">${esc(entry.title || item.key)}</div>`
     + `${festWhen(item) ? `<div class="fswhen">${festWhen(item)}</div>` : ""}${festPips(item, entry)}${doors}`
-    + `<div class="fsstory">${story}</div>${also}</div></div>`;
+    + `<div class="fsstory">${story}</div>${festShowMarkup(entry)}${also}</div></div>`;
+}
+
+/* A birthday's show, a button for each chapter: the one playing is lit,
+   and a press goes straight to it. */
+function festShowMarkup(entry) {
+  if (!Array.isArray(entry.show) || !entry.show.length) return "";
+  return `<div class="fsshow"><h5>Today\u2019s show</h5>${entry.show.map((x, i) => `<button type="button" class="fsep${i ? "" : " on"}"`
+    + ` data-fsep="${i}"><b>${esc(x.title)}</b><span>${esc(x.line)}</span></button>`).join("")}</div>`;
 }
 
 /* One painter per canvas: the card's scene and the sheet's each have one.
@@ -13342,7 +14799,8 @@ class FestPainter {
     if (key !== this.key || !this.draw) {
       const make = FEST_SCENES[scene];
       this.key = key;
-      this.draw = make ? make({}, v || "") : null;
+      this.state = {};
+      this.draw = make ? make(this.state, v || "") : null;
       this.warm = false; this.cost = 0; this.step = 0;
     }
     if (canvas !== this.canvas) {
@@ -13438,7 +14896,7 @@ function festFont() {
   FEST_FONT = true;
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = "https://fonts.googleapis.com/css2?family=Rozha+One&display=swap";
+  link.href = "https://fonts.googleapis.com/css2?family=Rozha+One&family=Caveat:wght@600;700&family=Bebas+Neue&display=swap";
   document.head.appendChild(link);
 }
 
@@ -32072,6 +33530,25 @@ class SpectraCard extends HTMLElement {
         s.painter = new FestPainter();
         s.painter.attach(canvas, entry.scene, festVariant(item, entry));
       }
+      clearInterval(s.showTimer);
+      s.showTimer = null;
+      const eps = [...s.wrap.querySelectorAll("[data-fsep]")];
+      const st = s.painter && s.painter.state;
+      if (eps.length && st) {
+        const light = (at) => eps.forEach((el, i) => el.classList.toggle("on", i === at));
+        eps.forEach((el) => el.addEventListener("click", () => {
+          const at = Number(el.dataset.fsep) || 0;
+          st.goto = at;
+          light(at);
+          /* Reduced motion draws one still: draw it again, at the chapter asked for. */
+          if (s.painter.still) s.painter.size();
+        }));
+        s.showTimer = setInterval(() => { if (st.goto === null || st.goto === undefined) light(st.chapter || 0); }, 250);
+        /* A birthday's full screen waits for its whole show before it closes itself. */
+        if (st.total) this._fullScreen(s, () => this._festClose(), Math.max(FULL_IDLE_MS, (st.total + 5) * 1000));
+      } else if (s.idleMs) {
+        this._fullScreen(s, () => this._festClose());
+      }
       s.wrap.querySelector("[data-fsclose]").addEventListener("click", () => this._festClose());
       s.wrap.querySelectorAll("[data-festgo]").forEach((el) => el.addEventListener("click", () => show(el.dataset.festgo)));
       const close = s.wrap.querySelector("[data-fsclose]");
@@ -32095,10 +33572,17 @@ class SpectraCard extends HTMLElement {
     return Object.keys(FEST_TABLE);
   }
 
+  /* A scene's maker by name, for tools/checkbirthday.js to draw every
+     chapter of a birthday at every moment. */
+  _festScene(name) {
+    return FEST_SCENES[name];
+  }
+
   _festClose() {
     const s = this._fsSheet;
     if (!s) return;
     if (s.idle) s.idle();
+    clearInterval(s.showTimer);
     if (s.painter) s.painter.detach();
     if (s.onKey) document.removeEventListener("keydown", s.onKey, true);
     if (s.wrap.parentNode) s.wrap.parentNode.removeChild(s.wrap);
@@ -33129,9 +34613,10 @@ class SpectraCard extends HTMLElement {
 
   /* A full screen opened: it closes itself after a minute untouched. The
      sheet keeps the disposer as `idle`, and its close calls it. */
-  _fullScreen(sheet, close) {
+  _fullScreen(sheet, close, ms) {
     if (sheet.idle) sheet.idle();
-    sheet.idle = fullScreenIdle(sheet.wrap, close);
+    sheet.idleMs = ms || 0;
+    sheet.idle = fullScreenIdle(sheet.wrap, close, ms || FULL_IDLE_MS);
   }
 
   /* The dialog itself lives outside the class (`confirmDialog`) because the
