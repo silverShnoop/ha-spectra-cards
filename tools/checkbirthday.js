@@ -3,14 +3,14 @@
  * what they love, and on that day the card is theirs.
  *
  * Asserts: the birthday leads and holds the card (no taking turns; the rest
- * are "Also today"), named by the person; the loves become the show's
- * chapters in the dashboard's order, aliases folded and unknowns dropped;
- * the day before shows nothing; a preview by name shows it; 29 February
- * is kept on the 28th in other years; `from` makes a birthday weekend,
- * counted to the big day; full screen lists the show, follows it and jumps
- * on a press, fits a 1280x800 panel and never closes itself; every chapter
- * draws at every moment without an error, inside a frame budget; and
- * reduced motion still gets a picture.
+ * are "Also today"), named by the person; the loves become its scenes in
+ * the dashboard's order, aliases folded and unknowns dropped; the day
+ * before shows nothing; a preview by name shows it; 29 February is kept on
+ * the 28th in other years; `from` makes a birthday weekend, counted to the
+ * big day; full screen is the name, the day's message and the scene, with
+ * no list of scenes, fits a 1280x800 panel and never closes itself; every
+ * scene draws at every moment without an error, inside a frame budget;
+ * and reduced motion still gets a picture.
  *
  *   node tools/checkbirthday.js [path/to/spectra-cards.js] [--shot FILE]
  */
@@ -26,7 +26,7 @@ const file = args[0] || path.join(__dirname, "..", "dist", "spectra-cards.js");
 const js = fs.readFileSync(file);
 
 const MORGAN = { name: "Morgan", date: "03-14",
-  loves: ["drawing", "Yoga", "calm", "mindfulness", "journaling", "thrillers", "romance", "comedy", "knitting"] };
+  loves: ["Brush lettering", "drawing", "Yoga", "calm", "mindfulness", "journaling", "Reddit stories", "thrillers", "romance", "comedy", "knitting"] };
 const LEAP = { name: "Casey", date: "2000-02-29", loves: ["comedy"] };
 /* A birthday weekend: Friday 11 to Sunday 13 June 2027. */
 const WEEKEND = { name: "Morgan", date: "06-13", from: "06-11", loves: ["yoga"] };
@@ -121,21 +121,21 @@ const WEEKEND = { name: "Morgan", date: "06-13", from: "06-11", loves: ["yoga"] 
   check("it holds the card: no turns, the day's other things are Also today",
     r.birthday.dots === 0 && !r.birthday.timer && r.birthday.also.includes("Pi Day"), r.birthday);
   check("the short line says whose day it is", r.birthday.short.includes("Morgan"), r.birthday.short);
-  check("the show is the cake, then the loves in the dashboard's order; calm folds into mindfulness, knitting is dropped",
-    JSON.stringify(r.birthday.order) === JSON.stringify(["cake", "drawing", "yoga", "mindfulness", "journaling", "mystery", "romance", "comedy"]), r.birthday.order);
+  check("the scenes are the cake, then the loves in the dashboard's order; calm folds into mindfulness, knitting is dropped",
+    JSON.stringify(r.birthday.order) === JSON.stringify(["cake", "lettering", "drawing", "yoga", "mindfulness", "journaling", "stories", "mystery", "romance", "comedy"]), r.birthday.order);
   check("the day before, nothing", r.before.hidden, r.before);
   check("a preview by name shows it on any day", r.preview.name === "Morgan", r.preview);
   check("so does a preview of just \"birthday\"", r.word.name === "Morgan", r.word);
   check("29 February is kept on the 28th in a year without one", r.leap27.name === "Casey", r.leap27);
   check("and on the 29th itself in a year with one, not the 28th", r.leap28b.name === "Casey" && r.leap28a.name !== "Casey", [r.leap28a, r.leap28b]);
-  check("from: a birthday weekend starts on its first day, counted to the big day",
-    r.wk11.name === "Morgan" && r.wk11.eye === "Birthday weekend" && r.wk11.when.startsWith("Day 1 of 3") && r.wk11.when.includes("Sun 13 Jun")
-    && r.wk11.pips === 3 && r.wk11.lit === 1 && r.wk11.short.startsWith("Birthday weekend! Two more sleeps"), r.wk11);
-  check("the day before, the big day is tomorrow", r.wk12.when.startsWith("Day 2 of 3") && r.wk12.when.includes("tomorrow") && r.wk12.short.includes("One more sleep"), r.wk12);
-  check("and on it, Happy birthday", r.wk13.eye === "Happy birthday" && r.wk13.when.startsWith("The big day") && r.wk13.short.includes("all about Morgan"), r.wk13);
+  check("from: a birthday weekend, each day a celebration of its own, not a countdown",
+    r.wk11.name === "Morgan" && r.wk11.eye === "Birthday weekend" && r.wk11.when === "Day 1 of 3"
+    && r.wk11.pips === 3 && r.wk11.lit === 1 && r.wk11.short === "Celebrating Morgan all weekend.", r.wk11);
+  check("the next day the same, a day further on", r.wk12.when === "Day 2 of 3" && r.wk12.short === "Celebrating Morgan all weekend.", r.wk12);
+  check("and on the birthday, Happy birthday", r.wk13.eye === "Happy birthday" && r.wk13.when === "Day 3 of 3" && r.wk13.short === "Today is all about Morgan.", r.wk13);
   check("not the day before the weekend, nor the day after the birthday", r.wk10.name !== "Morgan" && r.wk14.name !== "Morgan", [r.wk10, r.wk14]);
 
-  /* Every chapter, every moment: drawn straight through, at card, phone
+  /* Every scene, every moment: drawn straight through, at card, phone
      and full-screen sizes, with no error and inside a frame budget. */
   const drawn = await page.evaluate(() => {
     const el = window.CARDS.birthday;
@@ -163,40 +163,35 @@ const WEEKEND = { name: "Morgan", date: "06-13", from: "06-11", loves: ["yoga"] 
     }
     return out;
   });
-  check("every chapter draws at every moment, at card, phone and full-screen sizes, without an error", !drawn.errors.length && !drawn.blank.length, drawn);
+  check("every scene draws at every moment, at card, phone and full-screen sizes, without an error", !drawn.errors.length && !drawn.blank.length, drawn);
   check("inside the frame budget: under 12ms a frame on average at full screen", drawn.worst.full.mean < 12, drawn.worst);
   console.log("     frame cost (ms):", JSON.stringify(drawn.worst));
 
-  /* Full screen: the show listed, lit as it plays, a press jumps to it. */
-  const sheet = await page.evaluate(async () => {
-    const el = window.CARDS.birthday;
+  /* Full screen: the name, the day's message and the scene. No list of
+     the scenes: it is a birthday, not a programme. */
+  const sheetOf = (key) => page.evaluate(async (k) => {
+    const el = window.CARDS[k];
     const r = el.shadowRoot || el;
     r.querySelector("[data-festopen]").click();
     await new Promise((x) => setTimeout(x, 400));
     const wrap = r.querySelector(".fsfull");
     if (!wrap) return { open: false };
-    const eps = [...wrap.querySelectorAll("[data-fsep]")];
-    const out = {
+    const box = wrap.querySelector(".fsbox"), body = wrap.querySelector(".fsbody");
+    return {
       open: true, title: (wrap.querySelector(".fsbig") || {}).textContent,
       eye: (wrap.querySelector(".fseye") || {}).textContent,
-      chapters: eps.map((b) => b.querySelector("b").textContent),
-      firstLit: eps.length > 0 && eps[0].classList.contains("on"),
       story: (wrap.querySelector(".fsstory") || {}).textContent || "",
+      canvas: !!wrap.querySelector(".fsstage .fscanvas"),
+      list: wrap.querySelectorAll("[data-fsep], .fsshow").length,
       idleMs: el._fsSheet && (el._fsSheet.idleMs === Infinity ? "never" : el._fsSheet.idleMs),
       timer: !!(el._fsSheet && el._fsSheet.idle),
+      over: Math.max(box.scrollHeight - box.clientHeight, body.scrollHeight - body.clientHeight),
     };
-    eps[4].click();
-    await new Promise((x) => setTimeout(x, 1900));
-    out.jumped = el._fsSheet.painter.state.chapter;
-    out.lit = eps.findIndex((b) => b.classList.contains("on"));
-    const box = wrap.querySelector(".fsbox"), body = wrap.querySelector(".fsbody");
-    out.over = Math.max(box.scrollHeight - box.clientHeight, body.scrollHeight - body.clientHeight);
-    return out;
-  });
-  check("tapped, it opens full screen with the name and the show", sheet.open && sheet.title === "Morgan" && sheet.eye === "Happy birthday"
-    && sheet.chapters.length === 8 && sheet.chapters[0] === "Make a wish" && sheet.firstLit, sheet);
-  check("with the birthday message", sheet.story.includes("Happy birthday, Morgan"), sheet.story);
-  check("a press on a chapter goes straight to it, and it is lit", sheet.jumped === 4 && sheet.lit === 4, sheet);
+  }, key);
+  const sheet = await sheetOf("birthday");
+  check("tapped, it opens full screen: the name, the message and the scene", sheet.open && sheet.title === "Morgan" && sheet.eye === "Happy birthday"
+    && sheet.canvas && sheet.story.includes("Happy birthday, Morgan"), sheet);
+  check("and no list of the scenes", sheet.list === 0, sheet);
   check("it fits a 1280x800 panel without scrolling", sheet.over <= 1, sheet.over);
   check("and it never closes itself: it stays until somebody closes it", sheet.idleMs === "never" && !sheet.timer, sheet);
   if (shot) {
@@ -207,9 +202,11 @@ const WEEKEND = { name: "Morgan", date: "06-13", from: "06-11", loves: ["yoga"] 
   await page.waitForTimeout(150);
   const closed = await page.evaluate(() => !(window.CARDS.birthday.shadowRoot || window.CARDS.birthday).querySelector(".fsfull"));
   check("Escape closes it", closed, closed);
+  const early = await sheetOf("wk12");
+  check("on a day of the weekend before it, the message is the weekend's", early.eye === "Birthday weekend" && early.story.includes("Happy birthday weekend, Morgan"), early);
+  await page.keyboard.press("Escape");
 
-  /* Reduced motion: one still, the cake, drawn; a chapter pressed is drawn
-     as a still too. */
+  /* Reduced motion: one still, the cake, drawn, and nothing running. */
   const still = await open("reduce");
   const quiet = await still.evaluate(async (person) => {
     const el = document.createElement("spectra-card");

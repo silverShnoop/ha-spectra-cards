@@ -1358,9 +1358,8 @@ Without `scenes: true` the body is the older one: `text`, `wash`, `decor`,
 
 #### Birthdays
 
-A birthday the dashboard names takes the card for the whole day. Nothing
-about the person lives in the card: the name, the day and what they love are
-all in the dashboard's config, and stay there.
+On a birthday the card belongs to that person all day. Their name, the day
+and what they love live in the dashboard config, not in the card.
 
 ```yaml
 body:
@@ -1369,53 +1368,42 @@ body:
   events: [...]
   birthdays:
     - name: Morgan
-      date: "03-14"              # MM-DD; a year in front is allowed and ignored
-      from: "03-12"              # optional: start early, a birthday weekend (up to 14 days)
-      loves: [drawing, yoga, mindfulness, journaling, mystery, romance, comedy]
-      say:                       # optional: a chapter's line in your own words
-        comedy: Three sketches before bed, minimum.
-      message: Happy birthday!   # optional: the words on the full screen
-      short: It's Morgan's day.  # optional: the line on the card
+      date: "03-14"              # MM-DD
+      from: "03-12"              # optional: start early, for a birthday weekend
+      loves: [lettering, drawing, yoga, mindfulness, journaling, stories, mystery, romance]
+      message: Happy birthday!   # optional: the full screen's words
+      short: It's Morgan's day.  # optional: the card's line
 ```
 
-On the day the card says "Happy birthday" over their name, and on the right
-plays a show in chapters. The cake comes first -- the name piped on it, the
-candles lit one by one, "make a wish", blown out, confetti -- then a chapter
-for each thing they love, in the order the dashboard gives:
+The card shows "Happy birthday" and the name, and plays a slow run of
+painted scenes: the cake first, then one for each love, in the order given.
 
-| Love | Also accepted | The chapter |
+| Love | Also accepted | Scene |
 | --- | --- | --- |
-| `drawing` | art, sketching, painting | A pencil sketches a bouquet on a sketchbook page, then a brush washes it with colour. |
-| `yoga` | stretching | A figure flows from pose to pose on a mat at sunrise: reach, tree, warrior, triangle, prayer. |
-| `mindfulness` | calm, meditation, breathing | A lotus on a lake at dusk, and a circle that breathes: in for four, hold, out for four. |
-| `journaling` | journalling, journal, writing, diary | A fountain pen writes a birthday letter on the day's page, with three of their other loves in it. |
-| `mystery` | thriller, thrillers, mysteries, crime, detective | A magnifying glass sweeps an evidence board, a photo develops, PLOT TWIST, and "Next episode in 3". |
-| `romance` | romcom, romcoms, love stories | A book riffles to its last page -- "...and they lived happily ever after" -- with hearts rising. |
-| `comedy` | funny, laughing, sketches, sketch comedy | Try not to laugh: a clapperboard, a face holding it in, a rubber chicken, the spit take. |
+| `lettering` | brush lettering, hand lettering, calligraphy | A brush pen writes "Happy Birthday" and the name. |
+| `drawing` | art, sketching, painting | A pencil sketches flowers, then a brush adds colour. |
+| `yoga` | stretching | Slow poses on a mat at sunrise. |
+| `mindfulness` | calm, meditation, breathing | A lotus on a lake, and a circle that breathes. |
+| `journaling` | journal, writing, diary | A pen writes a birthday letter. |
+| `stories` | reddit stories, story time | A happy story read aloud on a sofa. |
+| `mystery` | thrillers, crime, detective | An evidence board and a plot twist. |
+| `romance` | romcoms, love stories | A book reaches its happy ending. |
+| `comedy` | funny, sketches | Try not to laugh. |
 
-Each chapter blooms in over the last like wet paint and plays for about ten
-seconds, and the show loops. A love the card does not know is left out, and
-two names for the same love count once. Every chapter is drawn from its own
-clock alone, so a resize or a jump lands on a composed picture, and reduced
-motion gets one still: the cake, candles lit.
+Everything moves slowly, and each scene fades into the next. With reduced
+motion the card shows one still picture.
 
-With `from`, the celebration starts early and counts down: "Birthday
-weekend" (a week when it is five days or more), "Day 1 of 3 · the big day is
-Sun 14 Mar", "One more sleep", then "Happy birthday" and "The big day" on
-the day itself. The same show plays on every day of it.
+With `from`, the days before are a birthday weekend (or week): "Birthday
+weekend", "Day 1 of 3", then "Happy birthday" on the day.
 
-It does not take turns: anything else on the same day is named under it as
-"Also today". Tapped, it opens full screen with the message and the show
-listed, the chapter playing lit; a press on another goes straight to it. That
-full screen does not close itself after a minute, as every other one does:
-it stays until somebody closes it.
+Anything else on that day is listed under it as "Also today". Tapped, it
+opens full screen with the name, a short message and the scenes. That full
+screen stays until someone closes it.
 
-To see it on another day, put the name (`Morgan`, `Morgan’s birthday`) or
-just `birthday` in the preview helper. 29 February is kept on the 28th in the
-years without one. No age is shown, and none is asked for.
+To preview it, put the name or `birthday` in the preview helper. No age is
+shown.
 
-`tools/checkbirthday.js` checks all of this, and draws every chapter at every
-moment at card, phone and full-screen sizes.
+`tools/checkbirthday.js` checks it.
 
 ### `alert` — what is wrong right now that you must fix?
 
