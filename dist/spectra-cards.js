@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.201.0";
+const VERSION = "0.202.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -13105,9 +13105,9 @@ const FEST_SCENES = (() => {
         const g = x.createRadialGradient(bx - u * r * .35, by - u * r * .4, u * r * .1, bx, by, u * r); g.addColorStop(0, hi); g.addColorStop(1, col);
         x.fillStyle = g; x.beginPath(); x.arc(bx, by, u * r * (.75 + .25 * Math.sin(a)), 0, TAU); x.fill(); } };
     // lower tier: strawberry pink, with raspberry ganache running down it
-    tier(-.004, .31, .06, .2, [[0, "#B34A6C"], [.22, "#EE9DB4"], [.42, "#FBC6D3"], [.7, "#E68AA5"], [1, "#9E3A5C"]], ["#FFD9E3", "#F7B8C9"]);
+    tier(-.004, .31, .06, .2, [[0, "#C9A227"], [.22, "#F7DC6F"], [.42, "#FFF0A8"], [.7, "#F2D45C"], [1, "#B8901C"]], ["#FFF6CC", "#F7E38A"]);
     const top1 = -.204, rx1 = .31, ry1 = .06;
-    const gg = x.createLinearGradient(0, Y(top1 - ry1), 0, Y(top1 + .12)); gg.addColorStop(0, "#E8457F"); gg.addColorStop(.5, "#B5174E"); gg.addColorStop(1, "#7E0E36");
+    const gg = x.createLinearGradient(0, Y(top1 - ry1), 0, Y(top1 + .12)); gg.addColorStop(0, "#FFFFFF"); gg.addColorStop(.5, "#FFFBEA"); gg.addColorStop(1, "#F3EBC8");
     x.fillStyle = gg; x.beginPath(); x.ellipse(X(0), Y(top1), u * rx1 * 1.012, u * ry1 * 1.03, 0, Math.PI, TAU);
     for (let i = 0; i <= 90; i += 1) {
       const f = i / 90, a = f * Math.PI, ex = X(Math.cos(a) * rx1 * 1.012), ey = Y(top1 + Math.sin(a) * ry1 * 1.03);
@@ -13117,23 +13117,27 @@ const FEST_SCENES = (() => {
       x.lineTo(ex, ey + u * d * (Math.sin(a) * .75 + .25));
     }
     x.closePath(); x.fill();
-    x.strokeStyle = "rgba(255,190,215,.55)"; x.lineWidth = Math.max(1, u * .005);
+    x.strokeStyle = "rgba(255,255,255,.8)"; x.lineWidth = Math.max(1, u * .005);
     x.beginPath(); x.ellipse(X(0), Y(top1 + .004), u * rx1 * .97, u * ry1 * .9, 0, .25, Math.PI - .25); x.stroke();
     beads(-.004, .31, .06, 18, .02, "#F2E2D4", "#FFFFFF");
-    // upper tier: vanilla, sprinkled
-    tier(top1, .2, .04, .15, [[0, "#C9A487"], [.25, "#FBEBDA"], [.45, "#FFF8EF"], [.75, "#EED6BF"], [1, "#B8957A"]], ["#FFFBF4", "#F5E6D3"]);
+    // upper tier: lemon cream, flecked with zest
+    tier(top1, .2, .04, .15, [[0, "#CDB46A"], [.25, "#FBF1C8"], [.45, "#FFFBE6"], [.75, "#F1E3B0"], [1, "#BCA25C"]], ["#FFFDF0", "#F6EBC2"]);
     for (let i = 0; i < 46; i += 1) {
       const fx = (bdHash(60 + i) - .5) * 1.8, fy = top1 - .02 - bdHash(70 + i * 1.7) * .11, k = Math.sqrt(Math.max(0, 1 - fx * fx));
       if (k < .25) continue;
       x.save(); x.translate(X(fx * .2), Y(fy + .012 * k)); x.rotate(bdHash(80 + i) * TAU); x.scale(k, 1);
-      x.fillStyle = BD_CONF[i % BD_CONF.length]; x.fillRect(-u * .007, -u * .0022, u * .014, u * .0044); x.restore();
+      x.fillStyle = i % 3 ? "#E9C10F" : "#9BBF3B"; x.fillRect(-u * .004, -u * .0016, u * .008, u * .0032); x.restore();
     }
-    beads(top1, .2, .04, 13, .015, "#F07AA2", "#FFD0E0");
-    // the top: a ring of piped rosettes and two berries
-    for (let i = 0; i < 9; i += 1) { const a = i / 9 * TAU, rx = X(Math.cos(a) * .15), ry = Y(top1 - .15 + Math.sin(a) * .026);
-      const g = x.createRadialGradient(rx - u * .006, ry - u * .006, 0, rx, ry, u * .02); g.addColorStop(0, "#FFFFFF"); g.addColorStop(1, "#F4C9D6");
-      x.fillStyle = g; x.beginPath(); x.arc(rx, ry, u * .017, 0, TAU); x.fill();
-      x.strokeStyle = "rgba(200,120,150,.5)"; x.lineWidth = .8; x.beginPath(); x.arc(rx, ry, u * .009, a, a + 4.2); x.stroke(); }
+    beads(top1, .2, .04, 13, .015, "#F5F0DC", "#FFFFFF");
+    // the top: lemon slices standing in a ring, a sprig of mint
+    for (let i = 0; i < 7; i += 1) { const a = i / 7 * TAU, rx = X(Math.cos(a) * .14), ry = Y(top1 - .15 + Math.sin(a) * .024) - u * .012, r = u * .022;
+      x.save(); x.translate(rx, ry); x.scale(.55 + .45 * Math.abs(Math.cos(a)), 1);
+      x.fillStyle = "#F2C80F"; x.beginPath(); x.arc(0, 0, r, 0, TAU); x.fill();
+      x.fillStyle = "#FFF3B0"; x.beginPath(); x.arc(0, 0, r * .82, 0, TAU); x.fill();
+      x.strokeStyle = "rgba(255,255,255,.9)"; x.lineWidth = Math.max(.6, r * .08);
+      for (let k = 0; k < 8; k += 1) { const q = k / 8 * TAU; x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(q) * r * .8, Math.sin(q) * r * .8); x.stroke(); }
+      x.restore(); }
+    x.fillStyle = "#5E9E45"; [[-.02, -.4], [.02, -.39]].forEach(([dx, dy], k) => { x.beginPath(); x.ellipse(X(dx), Y(top1 + dy + .15) - u * .02, u * .018, u * .009, k ? .5 : -.5, 0, TAU); x.fill(); });
   }
   function bdCakeName(c, S, name, base, reveal) {
     if (!name || reveal <= 0) return;
@@ -13148,7 +13152,7 @@ const FEST_SCENES = (() => {
       const cw = c.measureText(ch).width, mid = xx + cw / 2, f = Math.max(-.95, Math.min(.95, (mid - cx) / rx));
       const dy = u * .06 * (Math.sqrt(1 - f * f) - 1);
       c.save(); c.translate(mid, base + dy); c.rotate(-f * .22); c.scale(Math.sqrt(1 - f * f) * .25 + .75, 1);
-      c.lineJoin = "round"; c.strokeStyle = "#9A1F4A"; c.lineWidth = Math.max(1.5, px * .16); c.strokeText(ch, -cw / 2, 0);
+      c.lineJoin = "round"; c.strokeStyle = "#A8820F"; c.lineWidth = Math.max(1.5, px * .16); c.strokeText(ch, -cw / 2, 0);
       c.fillStyle = "#FFF7F2"; c.fillText(ch, -cw / 2, 0);
       c.fillStyle = "rgba(255,255,255,.7)"; c.fillText(ch, -cw / 2 - px * .02, -px * .03);
       c.restore(); xx += cw;
