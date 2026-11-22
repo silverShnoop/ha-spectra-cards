@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.206.0";
+const VERSION = "0.207.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -13899,70 +13899,91 @@ const FEST_SCENES = (() => {
     cv.forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill();
     c.fillStyle = "#EFE2CC"; c.beginPath(); [P(-W, 0, D / 2), P(W, 0, D / 2), P(W, -u * .025, D / 2), P(-W, -u * .025, D / 2)].forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill();
     c.strokeStyle = "rgba(160,130,100,.5)"; c.lineWidth = .7; for (let k = 1; k < 5; k += 1) { const y = P(0, -u * .005 * k, D / 2)[1]; c.beginPath(); c.moveTo(P(-W, 0, 0)[0], y); c.lineTo(P(W, 0, 0)[0], y); c.stroke(); }
-    const textLines = (top, bot, n, from, ink) => { for (let k = 0; k < n; k += 1) { const f = from + k * .085, a = (i) => [bdLerp(top[i][0], bot[i][0], f), bdLerp(top[i][1], bot[i][1], f)];
-      const i0 = 2, i1 = top.length - 2 - (k % 4 === 3 ? 4 : 0), p0 = a(i0), p1 = a(i1);
-      c.strokeStyle = ink; c.lineWidth = Math.max(1, u * .006); c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.stroke(); } };
+    /* Each page's words are painted flat, in reading order, on a sheet of
+       their own, then laid onto the paper strip by strip, so they bend and
+       foreshorten with the page as it turns instead of sliding across it.
+       The sheet leans the words back by the book's own slant, so on a page
+       lying open they read upright, as print does. */
+    const N = 14, M0 = c.getTransform ? c.getTransform() : { a: 1, b: 0 }, kd = Math.max(1, Math.min(2.5, Math.hypot(M0.a, M0.b)));
+    const box = S.st.bdLeaves || (S.st.bdLeaves = {});
+    /* `still` sheets repaint once a second (for a late font); a number is how
+       often an animated one repaints; false repaints every frame. */
+    const sheet = (key, still, paint) => {
+      if (typeof document === "undefined") return null;
+      const wd = Math.ceil(W * kd), ht = Math.ceil(D * kd);
+      let e = box[key];
+      if (!e) e = box[key] = { cv: document.createElement("canvas"), at: -9 };
+      const fresh = e.cv.width !== wd || e.cv.height !== ht;
+      if (!fresh && still && Math.abs(t - e.at) < (still === true ? 1 : still)) return e.cv;
+      if (fresh) { e.cv.width = wd; e.cv.height = ht; }
+      const x = e.cv.getContext("2d"); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, wd, ht); x.setTransform(kd, 0, 0, kd, 0, 0);
+      paint(x); e.at = t; return e.cv;
+    };
+    /* A sheet onto a page, `mirror` for a left-hand page, whose reading
+       starts at the outer edge. A page lying open is only curved near the
+       spine, so beyond that it takes one strip; a turning page curves all
+       along, gently, and takes five. */
+    const FLAT = [0, 2, 4, 6, N], AIR = [0, 3, 6, 9, 12, N];
+    const lay = (cv, top, bot, mirror, a, flat) => {
+      if (!cv || a <= .02) return;
+      const per = cv.width / N, H = cv.height, cuts = flat ? FLAT : AIR;
+      c.save(); c.globalAlpha = a;
+      for (let q = 0; q + 1 < cuts.length; q += 1) {
+        const i = cuts[q], j = cuts[q + 1], sw = (j - i) * per, sx = (mirror ? N - j : i) * per;
+        const p00 = top[mirror ? j : i], p10 = top[mirror ? i : j], p01 = bot[mirror ? j : i], ow = Math.min(sw + 1, cv.width - sx);
+        c.save(); c.transform((p10[0] - p00[0]) / sw, (p10[1] - p00[1]) / sw, (p01[0] - p00[0]) / H, (p01[1] - p00[1]) / H, p00[0], p00[1]);
+        c.drawImage(cv, sx, 0, ow, H, 0, 0, ow, H); c.restore();
+      }
+      c.restore();
+    };
+    const upright = (x, cx, cy, vs, draw) => { x.save(); x.translate(cx, cy); x.transform(1, 0, -.16 * vs / kz, vs / kz, 0, 0); draw(); x.restore(); };
+    const textLines = (x, n, from) => { x.strokeStyle = "#CCBFAF"; /* solid, so the strips can overlap unseen */ x.lineWidth = Math.max(1, u * .006) / kz;
+      for (let k = 0; k < n; k += 1) { const y = (from + k * .085) * D; x.beginPath(); x.moveTo(W * 2 / N, y); x.lineTo(W * (k % 4 === 3 ? 8 : 12) / N, y); x.stroke(); } };
     /* The story, a spread at a time: a chapter heading on the left, a line
-       and a doodle on the right, then a slow turn to the next. The last
-       spread is the ending. */
-    const mid = (top, bot, i, f) => [bdLerp(top[i][0], bot[i][0], f), bdLerp(top[i][1], bot[i][1], f)];
+       and a doodle on the right. The last spread is the ending. */
     const n = BD_TROPES.length;
-    const left = (top, bot, k, a) => {
-      if (a <= .02) return;
-      const T = BD_TROPES[k];
-      if (!T) { textLines(top, bot, 9, .12, `rgba(110,90,80,${(.32 * a).toFixed(3)})`); return; }
-      c.save(); c.globalAlpha = a; c.textAlign = "center"; c.textBaseline = "middle";
-      const [hx, hy] = mid(top, bot, 7, .2), [tx, ty] = mid(top, bot, 7, .32);
-      c.fillStyle = "#9A6A58"; c.font = bdSerif(u * .022); c.fillText(`Chapter ${T.ch}`, hx, hy);
-      c.fillStyle = "#6E1530"; bdFit(c, T.title, (q) => bdSerif(q, "italic "), u * .036, W * .8); c.fillText(T.title, tx, ty);
-      c.restore();
-      textLines(top, bot, 6, .44, `rgba(110,90,80,${(.32 * a).toFixed(3)})`);
-    };
-    const right = (top, bot, k, a) => {
-      if (a <= .02) return;
-      const T = BD_TROPES[k];
-      c.save(); c.globalAlpha = a; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = "#5A2236";
-      T.line.forEach((s, j) => { const [x, y] = mid(top, bot, 7, .2 + j * .14); bdFit(c, s, (q) => bdHand(q, 700), u * .046, W * .84);
-        c.save(); c.translate(x, y); c.scale(1, .88); c.fillText(s, 0, 0); c.restore(); });
-      const [dx, dy] = mid(top, bot, 7, .7);
-      c.strokeStyle = "#8A3A55"; c.fillStyle = "#E0456E"; c.lineWidth = Math.max(1, u * .0045); c.lineCap = "round"; c.lineJoin = "round";
-      bdDoodle(c, T.doodle, dx, dy, u * .1, t);
-      c.restore();
-    };
-    const ending = (top, bot) => {
-      textLines(top, bot, 3, .12, "rgba(110,90,80,.32)");
-      const [ax, ay] = mid(top, bot, 7, .5), [bx2, by2] = mid(top, bot, 7, .7), [ex, ey] = mid(top, bot, 7, .86);
+    const proseSheet = () => sheet("prose", true, (x) => textLines(x, 9, .12));
+    const leftSheet = (k) => (BD_TROPES[k] ? sheet(`L${k}`, true, (x) => { const T = BD_TROPES[k];
+      x.textAlign = "center"; x.textBaseline = "middle";
+      upright(x, W / 2, D * .2, 1, () => { x.fillStyle = "#9A6A58"; x.font = bdSerif(u * .022); x.fillText(`Chapter ${T.ch}`, 0, 0); });
+      upright(x, W / 2, D * .32, 1, () => { x.fillStyle = "#6E1530"; bdFit(x, T.title, (q) => bdSerif(q, "italic "), u * .036, W * .8); x.fillText(T.title, 0, 0); });
+      textLines(x, 6, .44); }) : proseSheet());
+    const rightSheet = (k) => sheet(`R${k}`, 1 / 15, (x) => { const T = BD_TROPES[k];
+      x.textAlign = "center"; x.textBaseline = "middle"; x.fillStyle = "#5A2236";
+      T.line.forEach((s, j) => upright(x, W / 2, D * (.2 + j * .14), .88, () => { bdFit(x, s, (q) => bdHand(q, 700), u * .046, W * .84); x.fillText(s, 0, 0); }));
+      upright(x, W / 2, D * .7, 1, () => { x.strokeStyle = "#8A3A55"; x.fillStyle = "#E0456E"; x.lineWidth = Math.max(1, u * .0045); x.lineCap = "round"; x.lineJoin = "round";
+        bdDoodle(x, T.doodle, 0, 0, u * .1, t); }); });
+    const endSheet = () => sheet("end", false, (x) => {
+      textLines(x, 3, .12);
       const e0 = BD_BOOK_END, r1 = bdSeg(lt, e0 + .1, e0 + .9), r2 = bdSeg(lt, e0 + .9, e0 + 1.7), r3 = bdSeg(lt, e0 + 1.7, e0 + 2.2);
-      c.fillStyle = "#5A2236"; c.textAlign = "center"; c.textBaseline = "middle";
-      [["…and they lived", ax, ay, r1], ["happily ever after.", bx2, by2, r2]].forEach(([s, x, y, r]) => { if (r <= 0) return;
-        bdFit(c, s, (p) => bdHand(p, 700), u * .056, W * .86); const tw = c.measureText(s).width;
-        c.save(); c.beginPath(); c.rect(x - tw / 2 - 4, y - u * .05, (tw + 8) * r, u * .1); c.clip(); c.save(); c.translate(x, y); c.scale(1, .88); c.fillText(s, 0, 0); c.restore(); c.restore(); });
-      if (r3 > 0) { c.globalAlpha = r3; c.font = bdSerif(u * .03, "italic "); c.fillStyle = "#8A3A55"; c.fillText("The End", ex, ey); c.fillStyle = "#E0456E"; heartPath(c, ex, ey + u * .035, u * .012); c.fill(); c.globalAlpha = 1; }
-    };
+      x.fillStyle = "#5A2236"; x.textAlign = "center"; x.textBaseline = "middle";
+      [["…and they lived", .5, r1], ["happily ever after.", .7, r2]].forEach(([s, f, r]) => { if (r <= 0) return;
+        upright(x, W / 2, D * f, .88, () => { bdFit(x, s, (q) => bdHand(q, 700), u * .056, W * .86); const tw = x.measureText(s).width;
+          x.beginPath(); x.rect(-tw / 2 - 4, -u * .06, (tw + 8) * r, u * .12); x.clip(); x.fillText(s, 0, 0); }); });
+      if (r3 > 0) upright(x, W / 2, D * .86, 1, () => { x.globalAlpha = r3; x.font = bdSerif(u * .03, "italic "); x.fillStyle = "#8A3A55"; x.fillText("The End", 0, 0);
+        x.fillStyle = "#E0456E"; heartPath(x, 0, u * .035, u * .012); x.fill(); });
+    });
     const fadeIn = bdSeg(lt, BD_BOOK_T0, BD_BOOK_T0 + .5);
-    const prose = (top, bot, a) => { if (a > .02) textLines(top, bot, 9, .12, `rgba(110,90,80,${(.32 * a).toFixed(3)})`); };
-    const nextRight = (top, bot, k, a) => (k >= n ? ending(top, bot) : right(top, bot, k, a));
     // which run of turning pages we are in, if any: the last one begun
     let k = -1; BD_BOOK.at.forEach((r, i) => { if (lt >= r.t0) k = i; });
     if (k < 0) {
-      page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => left(top, bot, 0, fadeIn));
-      page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => right(top, bot, 0, fadeIn));
+      page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => lay(leftSheet(0), top, bot, true, fadeIn, true));
+      page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => lay(rightSheet(0), top, bot, false, fadeIn, true));
     } else {
       const { t0, m } = BD_BOOK.at[k], from = (j) => t0 + j * BD_RIFFLE;
       let lifted = 0, landed = 0;
       for (let j = 0; j < m; j += 1) { if (lt >= from(j)) lifted += 1; if (lt >= from(j) + BD_TURN) landed += 1; }
-      page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => (landed === 0 ? left(top, bot, k, 1) : landed < m ? prose(top, bot, 1) : left(top, bot, k + 1, 1)));
-      page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => (lifted < m ? prose(top, bot, 1) : nextRight(top, bot, k + 1, 1)));
+      page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => lay(landed === 0 ? leftSheet(k) : landed < m ? proseSheet() : leftSheet(k + 1), top, bot, true, 1, true));
+      page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => lay(lifted < m ? proseSheet() : k + 1 >= n ? endSheet() : rightSheet(k + 1), top, bot, false, 1, true));
       /* The leaves in the air: the first carries this chapter's page on its
          front, the last the next chapter's on its back. Drawn flattest first,
          so the one standing up is on top. */
       const air = [];
       for (let j = 0; j < m; j += 1) { const f = bdSeg(lt, from(j), from(j) + BD_TURN); if (f > 0 && f < 1) air.push({ j, th: bdEase(f) * Math.PI }); }
       air.sort((p, q) => Math.abs(q.th - Math.PI / 2) - Math.abs(p.th - Math.PI / 2));
-      air.forEach(({ j, th }) => { const a = Math.abs(Math.cos(th));
-        page({ theta: th }, th < Math.PI / 2 ? "#FFF6E6" : "#EADBC2", th < Math.PI / 2 ? "#F2E3CB" : "#FFF3E0", (top, bot) => {
-          if (th < Math.PI / 2) { if (j === 0) right(top, bot, k, a); else prose(top, bot, a); }
-          else if (j === m - 1) left(top, bot, k + 1, a); else prose(top, bot, a); }); });
+      air.forEach(({ j, th }) => { const a = Math.min(1, Math.abs(Math.cos(th)) * 3), back = th >= Math.PI / 2;
+        page({ theta: th }, back ? "#EADBC2" : "#FFF6E6", back ? "#FFF3E0" : "#F2E3CB", (top, bot) =>
+          lay(back ? (j === m - 1 ? leftSheet(k + 1) : proseSheet()) : (j === 0 ? rightSheet(k) : proseSheet()), top, bot, back, a, false)); });
     }
     const gut = P(0, 0, 0);
     const gg = c.createLinearGradient(gut[0] - u * .04, 0, gut[0] + u * .04, 0); /* across the spine */ gg.addColorStop(0, "rgba(120,80,60,0)"); gg.addColorStop(.5, "rgba(120,80,60,.25)"); gg.addColorStop(1, "rgba(120,80,60,0)");
