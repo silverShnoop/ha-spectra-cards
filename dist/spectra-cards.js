@@ -13526,7 +13526,7 @@ const FEST_SCENES = (() => {
     petal(0, s * 1.15, s * .28, "#FFF0F6", "#EE7AA9");
     c.fillStyle = "#FFD45C"; c.beginPath(); c.ellipse(x, y - s * .1, s * .14, s * .06, 0, 0, TAU); c.fill();
   }
-  BD_CH.mindfulness = { d: 10.2, pace: .7, ink: "120,180,255", draw(c, S, lt) {
+  BD_CH.mindfulness = { d: 13.4, pace: .7, ink: "120,180,255", draw(c, S, lt) {
     const { w, h, cx, cy, u, st, t } = S;
     const hz = cy + u * .1;
     bdStill(st, "bd:lake", c, w, h, (x) => {
@@ -13554,10 +13554,10 @@ const FEST_SCENES = (() => {
       c.fillStyle = `rgba(255,246,220,${(.28 - k * .025).toFixed(3)})`; c.fillRect(mx - ww / 2 + Math.sin(t * 1.3 + k) * u * .008, yy, ww, Math.max(1, u * .005)); }
     for (let i = 0; i < 3; i += 1) { const k = (t * .012 + i / 3) % 1;
       b1Glow(st, c, w * (.45 + k * .7), hz - u * .01 + i * u * .02, u * .6, "170,190,240", .1 * Math.sin(k * Math.PI), .12); }
-    // breath: in for four, hold, out for four
-    const b = lt < 1.3 ? 0 : lt < 5.3 ? bdEase((lt - 1.3) / 4) : lt < 6.1 ? 1 : 1 - bdEase((lt - 6.1) / 4);
+    // breath: in for four, hold for four, out for four
+    const b = lt < 1.3 ? 0 : lt < 5.3 ? bdEase((lt - 1.3) / 4) : lt < 9.3 ? 1 : 1 - bdEase((lt - 9.3) / 4);
     const lx = cx, ly = cy + u * .33;
-    for (let r = 0; r < 3; r += 1) { const q = (lt - 6.1 - r * .9) / 3.2; if (q <= 0 || q >= 1) continue;
+    for (let r = 0; r < 3; r += 1) { const q = (lt - 9.3 - r * .9) / 3.2; if (q <= 0 || q >= 1) continue;
       c.strokeStyle = `rgba(190,215,255,${(.4 * (1 - q)).toFixed(3)})`; c.lineWidth = Math.max(1, u * .004);
       c.beginPath(); c.ellipse(lx, ly + u * .02, u * (.12 + q * .55), u * (.025 + q * .11), 0, 0, TAU); c.stroke(); }
     [[-.2, .05, .13, "#1F5A47"], [.23, .07, .11, "#1C5241"], [.02, .1, .16, "#236650"]].forEach(([dx, dy, r, col], i) => {
@@ -13572,11 +13572,11 @@ const FEST_SCENES = (() => {
     c.fillStyle = `rgba(170,210,255,${(.05 + .06 * b).toFixed(3)})`; c.beginPath(); c.arc(rx, ry, rr, 0, TAU); c.fill();
     c.strokeStyle = `rgba(225,240,255,${(.55 + .35 * b).toFixed(3)})`; c.lineWidth = Math.max(1.2, u * .006); c.beginPath(); c.arc(rx, ry, rr, 0, TAU); c.stroke();
     for (let k = 0; k < 16; k += 1) { const a = k / 16 * TAU + t * .15; c.fillStyle = "rgba(225,240,255,.5)"; c.beginPath(); c.arc(rx + Math.cos(a) * rr * 1.12, ry + Math.sin(a) * rr * 1.12, Math.max(.8, u * .0035), 0, TAU); c.fill(); }
-    const words = [["breathe in", bdSeg(lt, 1.0, 1.6) * (1 - bdSeg(lt, 5.4, 5.9))], ["hold", bdSeg(lt, 5.5, 5.8) * (1 - bdSeg(lt, 6.0, 6.3))], ["breathe out", bdSeg(lt, 6.1, 6.6)]];
+    const words = [["breathe in", bdSeg(lt, 1.0, 1.6) * (1 - bdSeg(lt, 5.4, 5.9))], ["hold", bdSeg(lt, 5.5, 6.0) * (1 - bdSeg(lt, 8.9, 9.4))], ["breathe out", bdSeg(lt, 9.3, 9.8)]];
     c.textAlign = "center"; c.textBaseline = "middle";
     words.forEach(([word, a]) => { if (a <= 0) return; c.globalAlpha = a; c.font = bdSerif(u * (.058 + .012 * b), "italic "); c.fillStyle = "#EEF5FF"; c.fillText(word, rx, ry - u * .012); });
     c.globalAlpha = 1;
-    const sec = lt < 1.3 ? 0 : lt < 5.3 ? Math.min(4, Math.floor(lt - 1.3) + 1) : lt < 6.1 ? 4 : Math.max(0, 4 - Math.floor(lt - 6.1) - 1);
+    const sec = lt < 1.3 ? 0 : lt < 5.3 ? Math.min(4, Math.floor(lt - 1.3) + 1) : lt < 9.3 ? 4 : Math.max(0, 4 - Math.floor(lt - 9.3) - 1);
     for (let k = 0; k < 4; k += 1) { c.fillStyle = k < sec ? "rgba(235,245,255,.9)" : "rgba(235,245,255,.25)"; c.beginPath(); c.arc(rx + (k - 1.5) * u * .028, ry + u * .05, Math.max(1.2, u * .006), 0, TAU); c.fill(); }
     for (let i = 0; i < 14; i += 1) { const px = cx + Math.sin(t * (.21 + bdHash(i) * .2) + i * 3) * u * .55, py = cy + Math.sin(t * (.17 + bdHash(i + 1) * .2) + i) * u * .35 + u * .05;
       const a = Math.pow(Math.max(0, Math.sin(t * (.8 + bdHash(i + 2)) + i * 1.7)), 3);
