@@ -129,10 +129,10 @@ const WEEKEND = { name: "Morgan", date: "06-13", from: "06-11", loves: ["yoga"] 
   check("29 February is kept on the 28th in a year without one", r.leap27.name === "Casey", r.leap27);
   check("and on the 29th itself in a year with one, not the 28th", r.leap28b.name === "Casey" && r.leap28a.name !== "Casey", [r.leap28a, r.leap28b]);
   check("from: a birthday weekend, each day a celebration of its own, not a countdown",
-    r.wk11.name === "Morgan" && r.wk11.eye === "Birthday weekend" && r.wk11.when === "Day 1 of 3"
-    && r.wk11.pips === 3 && r.wk11.lit === 1 && r.wk11.short === "Celebrating Morgan all weekend.", r.wk11);
-  check("the next day the same, a day further on", r.wk12.when === "Day 2 of 3" && r.wk12.short === "Celebrating Morgan all weekend.", r.wk12);
-  check("and on the birthday, Happy birthday", r.wk13.eye === "Happy birthday" && r.wk13.when === "Day 3 of 3" && r.wk13.short === "Today is all about Morgan.", r.wk13);
+    r.wk11.name === "Morgan" && r.wk11.eye === "Birthday weekend" && r.wk11.when === ""
+    && r.wk11.pips === 0 && r.wk11.short === "Celebrating Morgan all weekend.", r.wk11);
+  check("the next day the same, a day further on", r.wk12.when === "" && r.wk12.short === "Celebrating Morgan all weekend.", r.wk12);
+  check("and on the birthday, Happy birthday", r.wk13.eye === "Happy birthday" && r.wk13.when === "" && r.wk13.short === "Today is all about Morgan.", r.wk13);
   check("not the day before the weekend, nor the day after the birthday", r.wk10.name !== "Morgan" && r.wk14.name !== "Morgan", [r.wk10, r.wk14]);
 
   /* Every scene, every moment: drawn straight through, at card, phone

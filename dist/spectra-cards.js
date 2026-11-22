@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.202.0";
+const VERSION = "0.203.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -14383,7 +14383,8 @@ const FEST_SCENES = (() => {
     ["big laughs", "happy endings", "quiet minutes"].forEach((p) => { if (phrases.length < 3 && phrases.indexOf(p) < 0) phrases.push(p); });
     const on = m ? new Date(new Date().getFullYear(), Number(m[1]) - 1, Number(m[2])) : new Date();
     const weekday = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][on.getDay()];
-    return { name, day, weekday, letter: [day, `Dear ${name || "you"},`, "happy birthday!", "May this year bring", `${phrases[0]}, ${phrases[1]}`, `and ${phrases[2]}.`] };
+    /* Her own page: a gratitude list, written in her hand, not a card to her. */
+    return { name, day, weekday, letter: ["", "Grateful for\u2026", "slow mornings,", "good tea,", "lemon cake,", "quiet minutes,", "people I love"] };
   }
 
   const BIRTHDAY = {
@@ -14915,7 +14916,8 @@ function festRanked(found) {
 
 /* The line under the name: how far through, and until when. */
 function festWhen(item) {
-  if (item.birthday) return item.of > 1 ? `<b>Day ${item.day} of ${item.of}</b>` : "";
+  /* A birthday's days are all the same celebration: no count. */
+  if (item.birthday) return "";
   if (item.key === "Advent") {
     const left = 25 - item.day;
     return `<b>Door ${item.day} of 24</b> · ${left} ${left === 1 ? "sleep" : "sleeps"} to Christmas`;
@@ -14926,7 +14928,7 @@ function festWhen(item) {
 }
 
 function festPips(item, entry) {
-  if (!item.of || item.key === "Advent") return "";
+  if (!item.of || item.key === "Advent" || item.birthday) return "";
   const day = Math.max(0, Math.min(item.of, item.day));
   if (item.of > 12) {
     return `<div class="fspips bar" role="img" aria-label="Day ${day} of ${item.of}">`
