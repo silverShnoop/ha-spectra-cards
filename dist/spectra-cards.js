@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.205.0";
+const VERSION = "0.206.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -13832,8 +13832,12 @@ const FEST_SCENES = (() => {
     { ch: 15, title: "Enemies to lovers", line: ["She still hated him.", "Mostly."], doodle: "crossed" },
     { ch: 20, title: "The grand gesture", line: ["He ran all the way", "to the station."], doodle: "train" },
   ];
-  const BD_BOOK_T0 = .3, BD_DWELL = 1.6, BD_TURN = .8;
-  const BD_BOOK_END = BD_BOOK_T0 + BD_TROPES.length * (BD_DWELL + BD_TURN);
+  /* Between chapters a few pages turn, one just behind another: three,
+     or four where the chapter numbers jump further. */
+  const BD_BOOK_T0 = .3, BD_DWELL = 1.6, BD_TURN = .8, BD_RIFFLE = .3;
+  const BD_BOOK = BD_TROPES.reduce((b, T, k) => { const nx = BD_TROPES[k + 1], m = nx && nx.ch - T.ch > 3 ? 4 : 3;
+    b.at.push({ t0: b.end, m }); b.end += BD_TURN + (m - 1) * BD_RIFFLE + (nx ? BD_DWELL : 0); return b; }, { at: [], end: BD_BOOK_T0 + BD_DWELL });
+  const BD_BOOK_END = BD_BOOK.end;
   /* Little ink drawings in a book's margin, centred on (x, y), about s across. */
   function bdDoodle(c, kind, x, y, s, t) {
     const L = (pts) => { c.beginPath(); pts.forEach(([a, b], k) => (k ? c.lineTo(x + a * s, y + b * s) : c.moveTo(x + a * s, y + b * s))); c.stroke(); };
@@ -13902,9 +13906,7 @@ const FEST_SCENES = (() => {
        and a doodle on the right, then a slow turn to the next. The last
        spread is the ending. */
     const mid = (top, bot, i, f) => [bdLerp(top[i][0], bot[i][0], f), bdLerp(top[i][1], bot[i][1], f)];
-    const n = BD_TROPES.length, turnAt = (k) => BD_BOOK_T0 + BD_DWELL + k * (BD_DWELL + BD_TURN);
-    let started = 0, done = 0;
-    for (let k = 0; k < n; k += 1) { if (lt >= turnAt(k)) started += 1; if (lt >= turnAt(k) + BD_TURN) done += 1; }
+    const n = BD_TROPES.length;
     const left = (top, bot, k, a) => {
       if (a <= .02) return;
       const T = BD_TROPES[k];
@@ -13930,7 +13932,7 @@ const FEST_SCENES = (() => {
     const ending = (top, bot) => {
       textLines(top, bot, 3, .12, "rgba(110,90,80,.32)");
       const [ax, ay] = mid(top, bot, 7, .5), [bx2, by2] = mid(top, bot, 7, .7), [ex, ey] = mid(top, bot, 7, .86);
-      const e0 = BD_BOOK_END, r1 = bdSeg(lt, e0 + .2, e0 + 1.2), r2 = bdSeg(lt, e0 + 1.2, e0 + 2.2), r3 = bdSeg(lt, e0 + 2.2, e0 + 2.8);
+      const e0 = BD_BOOK_END, r1 = bdSeg(lt, e0 + .1, e0 + .9), r2 = bdSeg(lt, e0 + .9, e0 + 1.7), r3 = bdSeg(lt, e0 + 1.7, e0 + 2.2);
       c.fillStyle = "#5A2236"; c.textAlign = "center"; c.textBaseline = "middle";
       [["…and they lived", ax, ay, r1], ["happily ever after.", bx2, by2, r2]].forEach(([s, x, y, r]) => { if (r <= 0) return;
         bdFit(c, s, (p) => bdHand(p, 700), u * .056, W * .86); const tw = c.measureText(s).width;
@@ -13938,12 +13940,30 @@ const FEST_SCENES = (() => {
       if (r3 > 0) { c.globalAlpha = r3; c.font = bdSerif(u * .03, "italic "); c.fillStyle = "#8A3A55"; c.fillText("The End", ex, ey); c.fillStyle = "#E0456E"; heartPath(c, ex, ey + u * .035, u * .012); c.fill(); c.globalAlpha = 1; }
     };
     const fadeIn = bdSeg(lt, BD_BOOK_T0, BD_BOOK_T0 + .5);
-    page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => left(top, bot, done, done ? 1 : fadeIn));
-    page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => (started >= n ? ending(top, bot) : right(top, bot, started, started ? 1 : fadeIn)));
-    // the page being turned: this spread's right on its front, the next one's left on its back
-    if (started > done) { const k = done, f = bdSeg(lt, turnAt(k), turnAt(k) + BD_TURN), th = bdEase(f) * Math.PI, a = Math.abs(Math.cos(th));
-      page({ theta: th }, th < Math.PI / 2 ? "#FFF6E6" : "#EADBC2", th < Math.PI / 2 ? "#F2E3CB" : "#FFF3E0", (top, bot) => {
-        if (th < Math.PI / 2) right(top, bot, k, a); else left(top, bot, k + 1, a); }); }
+    const prose = (top, bot, a) => { if (a > .02) textLines(top, bot, 9, .12, `rgba(110,90,80,${(.32 * a).toFixed(3)})`); };
+    const nextRight = (top, bot, k, a) => (k >= n ? ending(top, bot) : right(top, bot, k, a));
+    // which run of turning pages we are in, if any: the last one begun
+    let k = -1; BD_BOOK.at.forEach((r, i) => { if (lt >= r.t0) k = i; });
+    if (k < 0) {
+      page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => left(top, bot, 0, fadeIn));
+      page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => right(top, bot, 0, fadeIn));
+    } else {
+      const { t0, m } = BD_BOOK.at[k], from = (j) => t0 + j * BD_RIFFLE;
+      let lifted = 0, landed = 0;
+      for (let j = 0; j < m; j += 1) { if (lt >= from(j)) lifted += 1; if (lt >= from(j) + BD_TURN) landed += 1; }
+      page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => (landed === 0 ? left(top, bot, k, 1) : landed < m ? prose(top, bot, 1) : left(top, bot, k + 1, 1)));
+      page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => (lifted < m ? prose(top, bot, 1) : nextRight(top, bot, k + 1, 1)));
+      /* The leaves in the air: the first carries this chapter's page on its
+         front, the last the next chapter's on its back. Drawn flattest first,
+         so the one standing up is on top. */
+      const air = [];
+      for (let j = 0; j < m; j += 1) { const f = bdSeg(lt, from(j), from(j) + BD_TURN); if (f > 0 && f < 1) air.push({ j, th: bdEase(f) * Math.PI }); }
+      air.sort((p, q) => Math.abs(q.th - Math.PI / 2) - Math.abs(p.th - Math.PI / 2));
+      air.forEach(({ j, th }) => { const a = Math.abs(Math.cos(th));
+        page({ theta: th }, th < Math.PI / 2 ? "#FFF6E6" : "#EADBC2", th < Math.PI / 2 ? "#F2E3CB" : "#FFF3E0", (top, bot) => {
+          if (th < Math.PI / 2) { if (j === 0) right(top, bot, k, a); else prose(top, bot, a); }
+          else if (j === m - 1) left(top, bot, k + 1, a); else prose(top, bot, a); }); });
+    }
     const gut = P(0, 0, 0);
     const gg = c.createLinearGradient(gut[0] - u * .04, 0, gut[0] + u * .04, 0); /* across the spine */ gg.addColorStop(0, "rgba(120,80,60,0)"); gg.addColorStop(.5, "rgba(120,80,60,.25)"); gg.addColorStop(1, "rgba(120,80,60,0)");
     const g0 = P(0, 0, -D / 2), g1 = P(0, 0, D / 2); c.fillStyle = gg; c.beginPath(); c.moveTo(g0[0] - u * .04, g0[1]); c.lineTo(g0[0] + u * .04, g0[1]); c.lineTo(g1[0] + u * .04, g1[1]); c.lineTo(g1[0] - u * .04, g1[1]); c.closePath(); c.fill();
@@ -13961,7 +13981,7 @@ const FEST_SCENES = (() => {
     c.strokeStyle = "rgba(255,255,255,.4)"; c.lineWidth = Math.max(1, u * .003); bdRound(c, x - jw / 2, y - jh, jw, jh, jw * .12); c.stroke();
     c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(x - jw * .38, y - jh * .9, jw * .06, jh * .7);
   }
-  BD_CH.romance = { d: 10 + BD_BOOK_END - 4.15, pace: .5, ink: "255,120,160", draw(c, S, lt) {
+  BD_CH.romance = { d: BD_BOOK_END + 4.2, pace: .5, ink: "255,120,160", draw(c, S, lt) {
     const { w, h, cx, cy, u, st, t } = S;
     bdStill(st, "bd:nook", c, w, h, (x) => {
       fill(x, w, h, [[0, "#2A0A1F"], [.6, "#4C1430"], [1, "#6A1F3E"]]);
