@@ -14129,7 +14129,8 @@ const FEST_SCENES = (() => {
     if (f >= 1) return null;
     const i = Math.max(0, Math.min(ink.top.length - 1, Math.round(rx * ink.k)));
     const phase = rx / (ink.px * .22) * Math.PI, has = ink.top[i] >= 0;
-    const y = has ? bdLerp(ink.top[i], ink.bot[i], .5 + .5 * Math.cos(phase)) : ink.base - ink.px * .12;
+    const mid = ink.base - ink.px * .22;
+    const y = has ? bdLerp(mid, bdLerp(ink.top[i], ink.bot[i], .5 + .5 * Math.cos(phase)), .45) : mid;
     return { x: ix + rx + (ink.base - y) * BD_SLANT, y: iy + y, press: has ? .5 + .5 * Math.sin(phase) : 0 };
   }
   /* A brush pen: a soft felt brush that bends as it presses, a grip, and a
@@ -14207,8 +14208,8 @@ const FEST_SCENES = (() => {
     });
     // the swash under the name: a ribbon thick in the middle, fine at the ends
     const sw = bdSeg(lt, 8.1, 9.2);
+    const P0 = [-PW * .3, PH * .335], P1 = [-PW * .08, PH * .42], P2 = [PW * .12, PH * .29], P3 = [PW * .34, PH * .325], HEART = [PW * .4, PH * .3];
     if (sw > 0) {
-      const P0 = [-PW * .3, PH * .335], P1 = [-PW * .08, PH * .42], P2 = [PW * .12, PH * .29], P3 = [PW * .34, PH * .325];
       const at = (s) => { const m = 1 - s; return [m * m * m * P0[0] + 3 * m * m * s * P1[0] + 3 * m * s * s * P2[0] + s * s * s * P3[0], m * m * m * P0[1] + 3 * m * m * s * P1[1] + 3 * m * s * s * P2[1] + s * s * s * P3[1]]; };
       const N = 40, n = Math.max(2, Math.round(N * sw)), Lp = [], Rp = [];
       for (let k = 0; k <= n; k += 1) { const s = k / N, p = at(s), q = at(Math.min(1, s + .01)), dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy) || 1;
@@ -14217,7 +14218,27 @@ const FEST_SCENES = (() => {
       c.fillStyle = g; c.beginPath(); Lp.forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y))); Rp.reverse().forEach(([x, y]) => c.lineTo(x, y)); c.closePath(); c.fill();
       if (sw < 1) { const p = at(n / N); tip = { x: p[0], y: p[1] }; lift = 0; press = .7; }
       const hk = bdEase(bdSeg(lt, 9.2, 10.0));
-      if (hk > 0) { c.fillStyle = "#E64980"; heartPath(c, PW * .4, PH * .3, u * .022 * hk); c.fill(); }
+      if (hk > 0) { c.fillStyle = "#E64980"; heartPath(c, HEART[0], HEART[1], u * .022 * hk); c.fill(); }
+    }
+    /* Where the pen is when it is not writing, so it never jumps: before
+       the first word, at its start; from the name's last letter it drifts,
+       lifted, to the start of the swash; after the swash, to the heart. */
+    const first = placed.find(Boolean), last = placed[placed.length - 1];
+    if (!tip && first) {
+      if (lt < first.L2.s0) tip = { x: first.ix + first.ink.x0, y: first.iy + first.ink.base };
+      else if (lt < 8.1 && last) { const k = bdEase(bdSeg(lt, last.L2.s1, 8.1)); tip = { x: bdLerp(last.ix + last.ink.x1, P0[0], k), y: bdLerp(last.iy + last.ink.base, P0[1], k) }; lift = Math.sin(k * Math.PI); }
+      else { const k = bdEase(bdSeg(lt, 9.2, 9.7)); tip = { x: bdLerp(P3[0], HEART[0], k), y: bdLerp(P3[1], HEART[1], k) }; lift = Math.max(lift, Math.sin(k * Math.PI) * .6); }
+    }
+    /* And it moves like a hand, not a cursor: eased towards where the ink
+       is, so a stroke that runs out mid-letter does not snap it away. */
+    if (tip) {
+      const pen = st.bdPen, gap = pen ? t - pen.t : 1;
+      if (pen && gap > 0 && gap < .5) {
+        const a = 1 - Math.exp(-gap * 9), want = { x: bdLerp(pen.x, tip.x, a), y: bdLerp(pen.y, tip.y, a) };
+        const dx = want.x - pen.x, dy = want.y - pen.y, d = Math.hypot(dx, dy), most = u * .35 * gap;
+        tip = d > most ? { x: pen.x + dx / d * most, y: pen.y + dy / d * most } : want;
+      }
+      st.bdPen = { x: tip.x, y: tip.y, t };
     }
     c.restore();
     for (let i = 0; i < 8; i += 1) {
