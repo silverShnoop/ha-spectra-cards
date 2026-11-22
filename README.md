@@ -1393,8 +1393,8 @@ painted scenes: the cake first, then one for each love, in the order given.
 Everything moves slowly, and each scene fades into the next. With reduced
 motion the card shows one still picture.
 
-With `from`, the days before are a birthday weekend (or week): "Birthday
-weekend", "Day 1 of 3", then "Happy birthday" on the day.
+With `from`, the days before are a birthday weekend (or week), with the
+same scenes every day, then "Happy birthday" on the day.
 
 Anything else on that day is listed under it as "Also today". Tapped, it
 opens full screen with the name, a short message and the scenes. That full
