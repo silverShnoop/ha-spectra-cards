@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.203.0";
+const VERSION = "0.204.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -14115,8 +14115,21 @@ const FEST_SCENES = (() => {
     let first = 0, last = W - 1;
     while (first < W - 1 && top[first] < 0) first += 1;
     while (last > 0 && top[last] < 0) last -= 1;
+    /* Where the brush tip rides in each column, and how hard it presses,
+       blurred so the pen glides over letter gaps rather than stepping. */
+    const mid = base - px * .22, py = new Float32Array(W), pp = new Float32Array(W);
+    for (let i = 0; i < W; i += 1) {
+      const ph = i / k / (px * .22) * Math.PI, has = top[i] >= 0;
+      py[i] = has ? bdLerp(mid, bdLerp(top[i], bot[i], .5 + .5 * Math.cos(ph)), .45) : mid;
+      pp[i] = has ? .5 + .5 * Math.sin(ph) : 0;
+    }
+    const blur = (a) => { const r = Math.max(1, Math.round(px * .09 * k)), o = new Float32Array(W);
+      for (let pass = 0; pass < 3; pass += 1) { let s = 0, n = 0;
+        for (let i = -r; i < W; i += 1) { if (i + r < W) { s += a[i + r]; n += 1; } if (i - r - 1 >= 0) { s -= a[i - r - 1]; n -= 1; } if (i >= 0) o[i] = s / n; }
+        a.set(o); } return a; };
+    blur(py); blur(pp);
     for (const key of Object.keys(box)) if (key.startsWith(`${text}|`)) delete box[key];
-    return (box[id] = { cv, wd, ht, base, k, px, top, bot, x0: first / k, x1: last / k });
+    return (box[id] = { cv, wd, ht, base, k, px, top, bot, py, pp, x0: first / k, x1: last / k });
   }
   /* Draws a word lettered as far as `f`, its image's top-left at (ix, iy).
      Returns where the brush tip is, and whether it is pressing down. */
@@ -14126,12 +14139,21 @@ const FEST_SCENES = (() => {
     const clipTo = (from) => { c.beginPath(); c.moveTo(ix + from, iy); c.lineTo(ix + edge(0), iy); c.lineTo(ix + edge(ink.ht), iy + ink.ht); c.lineTo(ix + from, iy + ink.ht); c.closePath(); c.clip(); };
     c.save(); if (f < 1) clipTo(-2); c.drawImage(ink.cv, ix, iy, ink.wd, ink.ht); c.restore();
     if (wet > 0) { c.save(); clipTo(Math.max(-2, rx - ink.px * .9)); c.globalCompositeOperation = "lighter"; c.globalAlpha = .3 * wet; c.drawImage(ink.cv, ix, iy, ink.wd, ink.ht); c.restore(); }
-    if (f >= 1) return null;
-    const i = Math.max(0, Math.min(ink.top.length - 1, Math.round(rx * ink.k)));
-    const phase = rx / (ink.px * .22) * Math.PI, has = ink.top[i] >= 0;
-    const mid = ink.base - ink.px * .22;
-    const y = has ? bdLerp(mid, bdLerp(ink.top[i], ink.bot[i], .5 + .5 * Math.cos(phase)), .45) : mid;
-    return { x: ix + rx + (ink.base - y) * BD_SLANT, y: iy + y, press: has ? .5 + .5 * Math.sin(phase) : 0 };
+    return f >= 1 ? null : bdTip(ink, ix, iy, f);
+  }
+  /* The brush tip with the word lettered as far as `f`: on the edge of the
+     ink, exactly, so the pen is always where the line is being drawn. */
+  function bdTip(ink, ix, iy, f) {
+    const rx = bdLerp(ink.x0, ink.x1, Math.max(0, Math.min(1, f))), j = rx * ink.k, n = ink.py.length - 1;
+    const i0 = Math.max(0, Math.min(n, Math.floor(j))), i1 = Math.min(n, i0 + 1), fr = Math.max(0, Math.min(1, j - i0));
+    const y = bdLerp(ink.py[i0], ink.py[i1], fr), press = bdLerp(ink.pp[i0], ink.pp[i1], fr);
+    return { x: ix + rx + (ink.base - y) * BD_SLANT, y: iy + y, press };
+  }
+  /* The pen carried, lifted, from one place on the sheet to the next along
+     a gentle arc, starting and stopping exactly where the ink does. */
+  function bdTravel(a, b, k, u) {
+    const e = bdEase(k), arc = Math.sin(k * Math.PI) * u * .03;
+    return { x: bdLerp(a.x, b.x, e), y: bdLerp(a.y, b.y, e) - arc, press: .5 };
   }
   /* A brush pen: a soft felt brush that bends as it presses, a grip, and a
      long body in its own colour. Tip at (x, y). */
@@ -14151,14 +14173,14 @@ const FEST_SCENES = (() => {
     c.fillStyle = "rgba(0,0,0,.18)"; bdRound(c, L - u * .07, -wd / 2, u * .07, wd, wd / 2); c.fill();
     c.restore();
   }
-  BD_CH.lettering = { d: 11, pace: .5, ink: "214,51,108", draw(c, S, lt) {
+  BD_CH.lettering = { d: 12, pace: .5, ink: "214,51,108", draw(c, S, lt) {
     const { w, h, cx, cy, u, st, t } = S;
     const PW = u * 1.04, PH = u * .8, px = cx - u * .02, py = cy + u * .02, rot = .025;
     const name = S.words.name || "you";
     const LINES = [
-      { text: "Happy", size: .15, left: -.37, base: -.21, s0: 1.2, s1: 2.9, a: "#E64980", b: "#AE3EC9" },
-      { text: "Birthday", size: .17, left: -.29, base: .02, s0: 3.1, s1: 5.3, a: "#E64980", b: "#AE3EC9" },
-      { text: name, size: .22, left: null, base: .27, s0: 5.6, s1: 7.9, a: "#C2255C", b: "#6741D9" },
+      { text: "Happy", size: .15, left: -.37, base: -.21, s0: 1.2, s1: 2.7, a: "#E64980", b: "#AE3EC9" },
+      { text: "Birthday", size: .17, left: -.29, base: .02, s0: 3.5, s1: 5.4, a: "#E64980", b: "#AE3EC9" },
+      { text: name, size: .22, left: null, base: .27, s0: 6.2, s1: 7.9, a: "#C2255C", b: "#6741D9" },
     ];
     bdGround(st, "bd:mat", c, S, (x) => {
       fill(x, w, h, [[0, "#1F4C40"], [1, "#143229"]]);
@@ -14204,20 +14226,20 @@ const FEST_SCENES = (() => {
       if (at) { tip = at; lift = 0; press = at.press; }
       const nx = placed[i + 1];
       if (nx && lt >= q.L2.s1 && lt < nx.L2.s0) { const k = bdSeg(lt, q.L2.s1, nx.L2.s0);
-        tip = { x: bdLerp(q.ix + q.ink.x1, nx.ix + nx.ink.x0, bdEase(k)), y: bdLerp(q.iy + q.ink.base, nx.iy + nx.ink.base, bdEase(k)) - u * .02 }; lift = Math.sin(k * Math.PI); }
+        tip = bdTravel(bdTip(q.ink, q.ix, q.iy, 1), bdTip(nx.ink, nx.ix, nx.iy, 0), k, u); lift = Math.sin(k * Math.PI); press = .5; }
     });
     // the swash under the name: a ribbon thick in the middle, fine at the ends
-    const sw = bdSeg(lt, 8.1, 9.2);
+    const sw = bdEase(bdSeg(lt, 9.0, 9.9));
     const P0 = [-PW * .3, PH * .335], P1 = [-PW * .08, PH * .42], P2 = [PW * .12, PH * .29], P3 = [PW * .34, PH * .325], HEART = [PW * .4, PH * .3];
     if (sw > 0) {
       const at = (s) => { const m = 1 - s; return [m * m * m * P0[0] + 3 * m * m * s * P1[0] + 3 * m * s * s * P2[0] + s * s * s * P3[0], m * m * m * P0[1] + 3 * m * m * s * P1[1] + 3 * m * s * s * P2[1] + s * s * s * P3[1]]; };
-      const N = 40, n = Math.max(2, Math.round(N * sw)), Lp = [], Rp = [];
-      for (let k = 0; k <= n; k += 1) { const s = k / N, p = at(s), q = at(Math.min(1, s + .01)), dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy) || 1;
+      const N = 40, n = Math.floor(N * sw), Lp = [], Rp = [];
+      for (let k = 0; k <= n + 1; k += 1) { const s = Math.min(sw, k / N), p = at(s), q = at(Math.min(1, s + .01)), dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy) || 1;
         const wd = u * .011 * Math.pow(Math.sin(Math.PI * s), .9) + .5; Lp.push([p[0] - dy / len * wd, p[1] + dx / len * wd]); Rp.push([p[0] + dy / len * wd, p[1] - dx / len * wd]); }
       const g = c.createLinearGradient(P0[0], 0, P3[0], 0); g.addColorStop(0, "#C2255C"); g.addColorStop(1, "#6741D9");
       c.fillStyle = g; c.beginPath(); Lp.forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y))); Rp.reverse().forEach(([x, y]) => c.lineTo(x, y)); c.closePath(); c.fill();
-      if (sw < 1) { const p = at(n / N); tip = { x: p[0], y: p[1] }; lift = 0; press = .7; }
-      const hk = bdEase(bdSeg(lt, 9.2, 10.0));
+      if (sw < 1) { const p = at(sw); tip = { x: p[0], y: p[1] }; lift = 0; press = .7; }
+      const hk = bdEase(bdSeg(lt, 10.3, 10.8));
       if (hk > 0) { c.fillStyle = "#E64980"; heartPath(c, HEART[0], HEART[1], u * .022 * hk); c.fill(); }
     }
     /* Where the pen is when it is not writing, so it never jumps: before
@@ -14225,28 +14247,17 @@ const FEST_SCENES = (() => {
        lifted, to the start of the swash; after the swash, to the heart. */
     const first = placed.find(Boolean), last = placed[placed.length - 1];
     if (!tip && first) {
-      if (lt < first.L2.s0) tip = { x: first.ix + first.ink.x0, y: first.iy + first.ink.base };
-      else if (lt < 8.1 && last) { const k = bdEase(bdSeg(lt, last.L2.s1, 8.1)); tip = { x: bdLerp(last.ix + last.ink.x1, P0[0], k), y: bdLerp(last.iy + last.ink.base, P0[1], k) }; lift = Math.sin(k * Math.PI); }
-      else { const k = bdEase(bdSeg(lt, 9.2, 9.7)); tip = { x: bdLerp(P3[0], HEART[0], k), y: bdLerp(P3[1], HEART[1], k) }; lift = Math.max(lift, Math.sin(k * Math.PI) * .6); }
-    }
-    /* And it moves like a hand, not a cursor: eased towards where the ink
-       is, so a stroke that runs out mid-letter does not snap it away. */
-    if (tip) {
-      const pen = st.bdPen, gap = pen ? t - pen.t : 1;
-      if (pen && gap > 0 && gap < .5) {
-        const a = 1 - Math.exp(-gap * 9), want = { x: bdLerp(pen.x, tip.x, a), y: bdLerp(pen.y, tip.y, a) };
-        const dx = want.x - pen.x, dy = want.y - pen.y, d = Math.hypot(dx, dy), most = u * .35 * gap;
-        tip = d > most ? { x: pen.x + dx / d * most, y: pen.y + dy / d * most } : want;
-      }
-      st.bdPen = { x: tip.x, y: tip.y, t };
+      if (lt < first.L2.s0) { tip = bdTip(first.ink, first.ix, first.iy, 0); press = .5; }
+      else if (lt < 9.0 && last) { const k = bdSeg(lt, last.L2.s1, 9.0); tip = bdTravel(bdTip(last.ink, last.ix, last.iy, 1), { x: P0[0], y: P0[1] }, k, u); lift = Math.sin(k * Math.PI); press = .5; }
+      else { const k = bdSeg(lt, 9.9, 10.4); tip = bdTravel({ x: P3[0], y: P3[1] }, { x: HEART[0], y: HEART[1] }, k, u * .4); lift = Math.max(lift, Math.sin(k * Math.PI) * .6); }
     }
     c.restore();
     for (let i = 0; i < 8; i += 1) {
-      const a = Math.pow(Math.max(0, Math.sin(t * (.9 + bdHash(i + 3) * .5) + i * 2.1)), 8) * bdSeg(lt, 9.4, 10.2);
+      const a = Math.pow(Math.max(0, Math.sin(t * (.9 + bdHash(i + 3) * .5) + i * 2.1)), 8) * bdSeg(lt, 10.3, 11.1);
       bdSpark(c, px + (bdHash(i + 60) - .5) * PW, py + (bdHash(i + 61) - .5) * PH * .9, u * (.016 + bdHash(i + 62) * .016), a);
     }
     // the pen: in from the right, lettering, then laid back down
-    const enter = bdEase(bdSeg(lt, .5, 1.2)), leave = bdEase(bdSeg(lt, 9.3, 10.4));
+    const enter = bdEase(bdSeg(lt, .5, 1.2)), leave = bdEase(bdSeg(lt, 10.5, 11.5));
     if (leave < 1) {
       const cosr = Math.cos(rot), sinr = Math.sin(rot), p = tip || (placed[0] ? { x: placed[0].ix + placed[0].ink.x0, y: placed[0].iy + placed[0].ink.base } : { x: 0, y: 0 });
       const gx = px + p.x * cosr - p.y * sinr, gy = py + p.x * sinr + p.y * cosr;
