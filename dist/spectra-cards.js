@@ -9,7 +9,7 @@
  * say renders nothing at all.
  */
 
-const VERSION = "0.204.0";
+const VERSION = "0.205.0";
 
 const LOGGER_WARN = (...args) => console.warn(...args);
 
@@ -13824,6 +13824,51 @@ const FEST_SCENES = (() => {
   } };
 
   /* ---------- Romance: a book that ends happily ---------- */
+  const BD_TROPES = [
+    { ch: 1, title: "The meet-cute", line: ["Two coffees.", "One name on both."], doodle: "cups" },
+    { ch: 6, title: "The last copy", line: ["He bought the last copy.", "She'd waited a year for it."], doodle: "shelf" },
+    { ch: 9, title: "Slow burn", line: ["Their hands almost touched."], doodle: "candle" },
+    { ch: 12, title: "Caught in the rain", line: ["He held the umbrella", "over her."], doodle: "umbrella" },
+    { ch: 15, title: "Enemies to lovers", line: ["She still hated him.", "Mostly."], doodle: "crossed" },
+    { ch: 20, title: "The grand gesture", line: ["He ran all the way", "to the station."], doodle: "train" },
+  ];
+  const BD_BOOK_T0 = .3, BD_DWELL = 1.6, BD_TURN = .8;
+  const BD_BOOK_END = BD_BOOK_T0 + BD_TROPES.length * (BD_DWELL + BD_TURN);
+  /* Little ink drawings in a book's margin, centred on (x, y), about s across. */
+  function bdDoodle(c, kind, x, y, s, t) {
+    const L = (pts) => { c.beginPath(); pts.forEach(([a, b], k) => (k ? c.lineTo(x + a * s, y + b * s) : c.moveTo(x + a * s, y + b * s))); c.stroke(); };
+    const heart = (a, b, r) => { heartPath(c, x + a * s, y + b * s, r * s); c.fill(); };
+    if (kind === "cups") {
+      [-.32, .32].forEach((ox) => { const side = ox < 0 ? -1 : 1;
+        L([[ox - .2, -.1], [ox - .16, .4], [ox + .16, .4], [ox + .2, -.1], [ox - .2, -.1]]);
+        c.beginPath(); c.arc(x + (ox + side * .22) * s, y + .12 * s, .09 * s, side < 0 ? Math.PI * .5 : -Math.PI * .5, side < 0 ? Math.PI * 1.5 : Math.PI * .5); c.stroke();
+        const w = Math.sin(t * 1.2 + ox * 9) * .03; L([[ox, -.18], [ox + .06 + w, -.3], [ox - .04 - w, -.42], [ox + .03, -.52]]); });
+      heart(0, -.32, .1);
+    } else if (kind === "shelf") {
+      L([[-.66, .42], [.66, .42]]);
+      [[-.6, .62], [-.47, .74], [-.34, .66], [.12, .7], [.25, .6], [.38, .78]].forEach(([bx, bh]) => c.strokeRect(x + bx * s, y + (.42 - bh) * s, .12 * s, bh * s));
+      c.save(); c.setLineDash([s * .05, s * .05]); c.strokeRect(x - .17 * s, y + (.42 - .68) * s, .2 * s, .68 * s); c.restore();
+    } else if (kind === "candle") {
+      L([[-.12, .45], [-.12, -.1], [.12, -.1], [.12, .45]]); L([[-.3, .45], [.3, .45]]); L([[0, -.1], [0, -.18]]);
+      const fl = 1 + .06 * Math.sin(t * 2.2); c.beginPath(); c.moveTo(x, y - .48 * s * fl); c.quadraticCurveTo(x + .1 * s, y - .26 * s, x, y - .18 * s); c.quadraticCurveTo(x - .1 * s, y - .26 * s, x, y - .48 * s * fl); c.fill();
+    } else if (kind === "umbrella") {
+      c.beginPath(); c.moveTo(x - .5 * s, y - .1 * s); c.quadraticCurveTo(x, y - .75 * s, x + .5 * s, y - .1 * s);
+      for (let k = 0; k < 4; k += 1) { const x0 = .5 - k * .25; c.quadraticCurveTo(x + (x0 - .125) * s, y - .2 * s, x + (x0 - .25) * s, y - .1 * s); } c.stroke();
+      L([[0, -.42], [0, .4]]); c.beginPath(); c.arc(x - .07 * s, y + .4 * s, .07 * s, 0, Math.PI); c.stroke();
+      for (let k = 0; k < 9; k += 1) { const ox = -.75 + bdHash(k + 40) * 1.5, oy = ((t * .35 + bdHash(k + 41)) % 1) * 1.2 - .7;
+        if (Math.abs(ox) < .56 && oy > -.45) continue; L([[ox, oy], [ox - .03, oy + .1]]); }
+    } else if (kind === "crossed") {
+      c.save(); c.globalAlpha *= .5; heart(-.24, 0, .3); c.restore();
+      L([[-.56, .3], [.08, -.3]]); L([[-.52, -.28], [.06, .32]]);
+      heart(.36, -.02, .2 + .012 * Math.sin(t * 1.6));
+    } else if (kind === "train") {
+      L([[-.55, .25], [.45, .25], [.45, -.15], [-.25, -.15], [-.25, -.35], [-.55, -.35], [-.55, .25]]);
+      for (let k = 0; k < 3; k += 1) c.strokeRect(x + (-.15 + k * .19) * s, y - .08 * s, .12 * s, .12 * s);
+      [-.4, -.05, .3].forEach((ox) => { c.beginPath(); c.arc(x + ox * s, y + .32 * s, .08 * s, 0, TAU); c.stroke(); });
+      L([[-.75, .44], [.7, .44]]);
+      for (let k = 0; k < 3; k += 1) { const q = (t * .2 + k / 3) % 1; c.save(); c.globalAlpha *= Math.sin(q * Math.PI); heart(-.45 + q * .2, -.45 - q * .45, .06 + q * .06); c.restore(); }
+    }
+  }
   function bdBook(c, S, gx, gy, lt, t) {
     const { u } = S, W = u * .44, D = u * .54, kz = .62, ky = .8;
     const P = (X, Y, Z) => [gx + X + Z * .16, gy + Z * kz - Y * ky];
@@ -13853,24 +13898,52 @@ const FEST_SCENES = (() => {
     const textLines = (top, bot, n, from, ink) => { for (let k = 0; k < n; k += 1) { const f = from + k * .085, a = (i) => [bdLerp(top[i][0], bot[i][0], f), bdLerp(top[i][1], bot[i][1], f)];
       const i0 = 2, i1 = top.length - 2 - (k % 4 === 3 ? 4 : 0), p0 = a(i0), p1 = a(i1);
       c.strokeStyle = ink; c.lineWidth = Math.max(1, u * .006); c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.stroke(); } };
-    page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => textLines(top, bot, 9, .12, "rgba(110,90,80,.32)"));
-    const lastLanded = lt > 1.35 + 5 * .36 + 25 * .02 + .5;
-    page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => {
-      if (!lastLanded) { textLines(top, bot, 9, .12, "rgba(110,90,80,.32)"); return; }
+    /* The story, a spread at a time: a chapter heading on the left, a line
+       and a doodle on the right, then a slow turn to the next. The last
+       spread is the ending. */
+    const mid = (top, bot, i, f) => [bdLerp(top[i][0], bot[i][0], f), bdLerp(top[i][1], bot[i][1], f)];
+    const n = BD_TROPES.length, turnAt = (k) => BD_BOOK_T0 + BD_DWELL + k * (BD_DWELL + BD_TURN);
+    let started = 0, done = 0;
+    for (let k = 0; k < n; k += 1) { if (lt >= turnAt(k)) started += 1; if (lt >= turnAt(k) + BD_TURN) done += 1; }
+    const left = (top, bot, k, a) => {
+      if (a <= .02) return;
+      const T = BD_TROPES[k];
+      if (!T) { textLines(top, bot, 9, .12, `rgba(110,90,80,${(.32 * a).toFixed(3)})`); return; }
+      c.save(); c.globalAlpha = a; c.textAlign = "center"; c.textBaseline = "middle";
+      const [hx, hy] = mid(top, bot, 7, .2), [tx, ty] = mid(top, bot, 7, .32);
+      c.fillStyle = "#9A6A58"; c.font = bdSerif(u * .022); c.fillText(`Chapter ${T.ch}`, hx, hy);
+      c.fillStyle = "#6E1530"; bdFit(c, T.title, (q) => bdSerif(q, "italic "), u * .036, W * .8); c.fillText(T.title, tx, ty);
+      c.restore();
+      textLines(top, bot, 6, .44, `rgba(110,90,80,${(.32 * a).toFixed(3)})`);
+    };
+    const right = (top, bot, k, a) => {
+      if (a <= .02) return;
+      const T = BD_TROPES[k];
+      c.save(); c.globalAlpha = a; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = "#5A2236";
+      T.line.forEach((s, j) => { const [x, y] = mid(top, bot, 7, .2 + j * .14); bdFit(c, s, (q) => bdHand(q, 700), u * .046, W * .84);
+        c.save(); c.translate(x, y); c.scale(1, .88); c.fillText(s, 0, 0); c.restore(); });
+      const [dx, dy] = mid(top, bot, 7, .7);
+      c.strokeStyle = "#8A3A55"; c.fillStyle = "#E0456E"; c.lineWidth = Math.max(1, u * .0045); c.lineCap = "round"; c.lineJoin = "round";
+      bdDoodle(c, T.doodle, dx, dy, u * .1, t);
+      c.restore();
+    };
+    const ending = (top, bot) => {
       textLines(top, bot, 3, .12, "rgba(110,90,80,.32)");
-      const mid = (i, f) => [bdLerp(top[i][0], bot[i][0], f), bdLerp(top[i][1], bot[i][1], f)];
-      const [ax, ay] = mid(7, .5), [bx2, by2] = mid(7, .7), [ex, ey] = mid(7, .86);
-      const r1 = bdSeg(lt, 4.0, 5.0), r2 = bdSeg(lt, 5.0, 6.0), r3 = bdSeg(lt, 6.0, 6.6);
+      const [ax, ay] = mid(top, bot, 7, .5), [bx2, by2] = mid(top, bot, 7, .7), [ex, ey] = mid(top, bot, 7, .86);
+      const e0 = BD_BOOK_END, r1 = bdSeg(lt, e0 + .2, e0 + 1.2), r2 = bdSeg(lt, e0 + 1.2, e0 + 2.2), r3 = bdSeg(lt, e0 + 2.2, e0 + 2.8);
       c.fillStyle = "#5A2236"; c.textAlign = "center"; c.textBaseline = "middle";
       [["…and they lived", ax, ay, r1], ["happily ever after.", bx2, by2, r2]].forEach(([s, x, y, r]) => { if (r <= 0) return;
         bdFit(c, s, (p) => bdHand(p, 700), u * .056, W * .86); const tw = c.measureText(s).width;
         c.save(); c.beginPath(); c.rect(x - tw / 2 - 4, y - u * .05, (tw + 8) * r, u * .1); c.clip(); c.save(); c.translate(x, y); c.scale(1, .88); c.fillText(s, 0, 0); c.restore(); c.restore(); });
       if (r3 > 0) { c.globalAlpha = r3; c.font = bdSerif(u * .03, "italic "); c.fillStyle = "#8A3A55"; c.fillText("The End", ex, ey); c.fillStyle = "#E0456E"; heartPath(c, ex, ey + u * .035, u * .012); c.fill(); c.globalAlpha = 1; }
-    });
-    // pages riffling over, slowing to the last
-    for (let k = 0; k < 6; k += 1) { const s0 = 1.35 + k * .36 + k * k * .02, f = bdSeg(lt, s0, s0 + .55);
-      if (f <= 0 || f >= 1) continue; const th = bdEase(f) * Math.PI;
-      page({ theta: th }, th < Math.PI / 2 ? "#FFF6E6" : "#EADBC2", th < Math.PI / 2 ? "#F2E3CB" : "#FFF3E0", (top, bot) => textLines(top, bot, 9, .12, `rgba(110,90,80,${(.22 * Math.abs(Math.cos(th))).toFixed(3)})`)); }
+    };
+    const fadeIn = bdSeg(lt, BD_BOOK_T0, BD_BOOK_T0 + .5);
+    page({ side: -1 }, "#F8EEDC", "#FFF8EA", (top, bot) => left(top, bot, done, done ? 1 : fadeIn));
+    page({ side: 1 }, "#FFF8EA", "#F3E7D2", (top, bot) => (started >= n ? ending(top, bot) : right(top, bot, started, started ? 1 : fadeIn)));
+    // the page being turned: this spread's right on its front, the next one's left on its back
+    if (started > done) { const k = done, f = bdSeg(lt, turnAt(k), turnAt(k) + BD_TURN), th = bdEase(f) * Math.PI, a = Math.abs(Math.cos(th));
+      page({ theta: th }, th < Math.PI / 2 ? "#FFF6E6" : "#EADBC2", th < Math.PI / 2 ? "#F2E3CB" : "#FFF3E0", (top, bot) => {
+        if (th < Math.PI / 2) right(top, bot, k, a); else left(top, bot, k + 1, a); }); }
     const gut = P(0, 0, 0);
     const gg = c.createLinearGradient(gut[0] - u * .04, 0, gut[0] + u * .04, 0); /* across the spine */ gg.addColorStop(0, "rgba(120,80,60,0)"); gg.addColorStop(.5, "rgba(120,80,60,.25)"); gg.addColorStop(1, "rgba(120,80,60,0)");
     const g0 = P(0, 0, -D / 2), g1 = P(0, 0, D / 2); c.fillStyle = gg; c.beginPath(); c.moveTo(g0[0] - u * .04, g0[1]); c.lineTo(g0[0] + u * .04, g0[1]); c.lineTo(g1[0] + u * .04, g1[1]); c.lineTo(g1[0] - u * .04, g1[1]); c.closePath(); c.fill();
@@ -13888,7 +13961,7 @@ const FEST_SCENES = (() => {
     c.strokeStyle = "rgba(255,255,255,.4)"; c.lineWidth = Math.max(1, u * .003); bdRound(c, x - jw / 2, y - jh, jw, jh, jw * .12); c.stroke();
     c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(x - jw * .38, y - jh * .9, jw * .06, jh * .7);
   }
-  BD_CH.romance = { d: 10, pace: .5, ink: "255,120,160", draw(c, S, lt) {
+  BD_CH.romance = { d: 10 + BD_BOOK_END - 4.15, pace: .5, ink: "255,120,160", draw(c, S, lt) {
     const { w, h, cx, cy, u, st, t } = S;
     bdStill(st, "bd:nook", c, w, h, (x) => {
       fill(x, w, h, [[0, "#2A0A1F"], [.6, "#4C1430"], [1, "#6A1F3E"]]);
@@ -13915,7 +13988,7 @@ const FEST_SCENES = (() => {
     bdJarCandle(st, c, u, cx + u * .5, cy + u * .42, t);
     // hearts, rising from the gutter once the last page is turned
     for (let i = 0; i < 18; i += 1) {
-      const q = lt - (3.9 + i * .3); if (q <= 0 || q > 4.2) continue;
+      const q = lt - (BD_BOOK_END - .25 + i * .3); if (q <= 0 || q > 4.2) continue;
       const hA = bdHash(i + 1200), hB = bdHash(i + 1201), hC = bdHash(i + 1202);
       const x = gx + (hA - .5) * u * .25 + Math.sin(q * (1.4 + hB) + i) * u * .07 * Math.min(1, q), y = gy - u * .08 - q * u * (.2 + hB * .12);
       const a = Math.min(1, q * 3) * (1 - bdSeg(q, 2.6, 4.2)), s = u * (.024 + hC * .024);
@@ -13923,7 +13996,7 @@ const FEST_SCENES = (() => {
       if (i % 3) glossHeart(c, 0, 0, s, .8); else { c.fillStyle = "#FFC2D4"; heartPath(c, 0, 0, s); c.fill(); c.strokeStyle = "rgba(200,60,100,.4)"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -s * .5); c.lineTo(0, s); c.stroke(); }
       c.restore();
     }
-    for (let i = 0; i < 12; i += 1) { const a = Math.pow(Math.max(0, Math.sin(t * (1 + bdHash(i + 9)) + i * 2.3)), 6) * bdSeg(lt, 4, 4.6);
+    for (let i = 0; i < 12; i += 1) { const a = Math.pow(Math.max(0, Math.sin(t * (1 + bdHash(i + 9)) + i * 2.3)), 6) * bdSeg(lt, BD_BOOK_END - .15, BD_BOOK_END + .45);
       bdSpark(c, gx + (bdHash(i + 1300) - .5) * u * .9, gy - u * (.1 + bdHash(i + 1301) * .45), u * (.014 + bdHash(i + 1302) * .016), a, "255,236,200"); }
   } };
 
